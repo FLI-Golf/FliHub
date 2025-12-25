@@ -1,5 +1,6 @@
 <script lang="ts">
 	import type { PageData } from './$types';
+	import Card from '$lib/components/ui/card.svelte';
 	
 	export let data: PageData;
 </script>
@@ -8,76 +9,64 @@
 	<title>Dashboard - FliHub</title>
 </svelte:head>
 
-<div class="dashboard">
-	<h1>Dashboard</h1>
-	<p>Welcome to FliHub, {data.user?.email}</p>
+<div class="max-w-7xl">
+	<h1 class="text-3xl font-bold mb-2">Dashboard</h1>
+	<p class="text-slate-600 mb-8">Welcome to FliHub, {data.user?.email}</p>
 
-	<div class="cards">
-		<div class="card">
-			<h3>People</h3>
-			<p>Manage contacts, sponsors, partners, and pros</p>
-			<a href="/dashboard/people" class="btn">View People</a>
-		</div>
+	<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+		<Card class="p-6">
+			<h3 class="text-xl font-semibold mb-2">Managers</h3>
+			<p class="text-slate-600 mb-4">Team members and departments</p>
+			<a 
+				href="/dashboard/managers" 
+				class="inline-block px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 transition-colors"
+			>
+				View Managers
+			</a>
+		</Card>
 
-		<div class="card">
-			<h3>Projects</h3>
-			<p>Track tournaments, events, and campaigns</p>
-			<a href="/dashboard/projects" class="btn">View Projects</a>
-		</div>
+		<Card class="p-6">
+			<h3 class="text-xl font-semibold mb-2">Tasks</h3>
+			<p class="text-slate-600 mb-4">Business roadmap and checklists</p>
+			<a 
+				href="/dashboard/tasks" 
+				class="inline-block px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 transition-colors"
+			>
+				View Tasks
+			</a>
+		</Card>
 
-		<div class="card">
-			<h3>Expenses</h3>
-			<p>Manage expenses, invoices, and payouts</p>
-			<a href="/dashboard/expenses" class="btn">View Expenses</a>
-		</div>
+		<Card class="p-6">
+			<h3 class="text-xl font-semibold mb-2">People</h3>
+			<p class="text-slate-600 mb-4">Contacts, sponsors, partners, and pros</p>
+			<a 
+				href="/dashboard/people" 
+				class="inline-block px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 transition-colors"
+			>
+				View People
+			</a>
+		</Card>
+
+		<Card class="p-6">
+			<h3 class="text-xl font-semibold mb-2">Projects</h3>
+			<p class="text-slate-600 mb-4">Tournaments, events, and campaigns</p>
+			<a 
+				href="/dashboard/projects" 
+				class="inline-block px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 transition-colors"
+			>
+				View Projects
+			</a>
+		</Card>
+
+		<Card class="p-6">
+			<h3 class="text-xl font-semibold mb-2">Expenses</h3>
+			<p class="text-slate-600 mb-4">Financial tracking and approvals</p>
+			<a 
+				href="/dashboard/expenses" 
+				class="inline-block px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 transition-colors"
+			>
+				View Expenses
+			</a>
+		</Card>
 	</div>
 </div>
-
-<style>
-	.dashboard {
-		max-width: 1200px;
-	}
-
-	h1 {
-		margin: 0 0 0.5rem 0;
-		font-size: 2rem;
-	}
-
-	.cards {
-		display: grid;
-		grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-		gap: 1.5rem;
-		margin-top: 2rem;
-	}
-
-	.card {
-		background: white;
-		padding: 1.5rem;
-		border-radius: 8px;
-		box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-	}
-
-	.card h3 {
-		margin: 0 0 0.5rem 0;
-		font-size: 1.25rem;
-	}
-
-	.card p {
-		margin: 0 0 1rem 0;
-		color: #666;
-	}
-
-	.btn {
-		display: inline-block;
-		padding: 0.5rem 1rem;
-		background: #667eea;
-		color: white;
-		text-decoration: none;
-		border-radius: 4px;
-		transition: background 0.2s;
-	}
-
-	.btn:hover {
-		background: #5568d3;
-	}
-</style>

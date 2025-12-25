@@ -1,114 +1,91 @@
 <script lang="ts">
 	import type { LayoutData } from './$types';
+	import { page } from '$app/stores';
 	
 	export let data: LayoutData;
+
+	const isActive = (path: string) => $page.url.pathname === path;
 </script>
 
-<div class="layout">
-	<nav class="sidebar">
-		<div class="logo">
-			<h2>FliHub</h2>
+<div class="flex min-h-screen">
+	<nav class="w-64 bg-slate-900 text-white flex flex-col fixed h-screen">
+		<div class="p-6 border-b border-slate-800">
+			<h2 class="text-2xl font-bold">FliHub</h2>
 		</div>
 		
-		<ul class="nav-menu">
-			<li><a href="/dashboard">Dashboard</a></li>
-			<li><a href="/dashboard/people">People</a></li>
-			<li><a href="/dashboard/projects">Projects</a></li>
-			<li><a href="/dashboard/expenses">Expenses</a></li>
+		<ul class="flex-1 py-4">
+			<li>
+				<a 
+					href="/dashboard" 
+					class="block px-6 py-3 hover:bg-slate-800 transition-colors {isActive('/dashboard') ? 'bg-slate-800 border-l-4 border-blue-500' : ''}"
+				>
+					Dashboard
+				</a>
+			</li>
+			<li>
+				<a 
+					href="/dashboard/managers" 
+					class="block px-6 py-3 hover:bg-slate-800 transition-colors {isActive('/dashboard/managers') ? 'bg-slate-800 border-l-4 border-blue-500' : ''}"
+				>
+					Managers
+				</a>
+			</li>
+			<li>
+				<a 
+					href="/dashboard/tasks" 
+					class="block px-6 py-3 hover:bg-slate-800 transition-colors {isActive('/dashboard/tasks') ? 'bg-slate-800 border-l-4 border-blue-500' : ''}"
+				>
+					Tasks
+				</a>
+			</li>
+			<li>
+				<a 
+					href="/dashboard/people" 
+					class="block px-6 py-3 hover:bg-slate-800 transition-colors {isActive('/dashboard/people') ? 'bg-slate-800 border-l-4 border-blue-500' : ''}"
+				>
+					People
+				</a>
+			</li>
+			<li>
+				<a 
+					href="/dashboard/projects" 
+					class="block px-6 py-3 hover:bg-slate-800 transition-colors {isActive('/dashboard/projects') ? 'bg-slate-800 border-l-4 border-blue-500' : ''}"
+				>
+					Projects
+				</a>
+			</li>
+			<li>
+				<a 
+					href="/dashboard/expenses" 
+					class="block px-6 py-3 hover:bg-slate-800 transition-colors {isActive('/dashboard/expenses') ? 'bg-slate-800 border-l-4 border-blue-500' : ''}"
+				>
+					Expenses
+				</a>
+			</li>
+			<li class="mt-4 pt-4 border-t border-slate-800">
+				<a 
+					href="/dashboard/import" 
+					class="block px-6 py-3 hover:bg-slate-800 transition-colors {isActive('/dashboard/import') ? 'bg-slate-800 border-l-4 border-blue-500' : ''}"
+				>
+					Import Data
+				</a>
+			</li>
 		</ul>
 
-		<div class="user-section">
-			<p class="user-email">{data.user?.email}</p>
+		<div class="p-6 border-t border-slate-800">
+			<p class="text-sm opacity-80 mb-2">{data.user?.email}</p>
 			<form method="POST" action="/auth/logout">
-				<button type="submit" class="btn-logout">Logout</button>
+				<button 
+					type="submit" 
+					class="w-full px-4 py-2 bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded transition-colors"
+				>
+					Logout
+				</button>
 			</form>
 		</div>
 	</nav>
 
-	<main class="content">
+	<main class="flex-1 ml-64 p-8 bg-slate-50">
 		<slot />
 	</main>
 </div>
-
-<style>
-	.layout {
-		display: flex;
-		min-height: 100vh;
-	}
-
-	.sidebar {
-		width: 250px;
-		background: #2c3e50;
-		color: white;
-		display: flex;
-		flex-direction: column;
-		position: fixed;
-		height: 100vh;
-	}
-
-	.logo {
-		padding: 1.5rem;
-		border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-	}
-
-	.logo h2 {
-		margin: 0;
-		font-size: 1.5rem;
-	}
-
-	.nav-menu {
-		flex: 1;
-		list-style: none;
-		padding: 1rem 0;
-		margin: 0;
-	}
-
-	.nav-menu li {
-		margin: 0;
-	}
-
-	.nav-menu a {
-		display: block;
-		padding: 0.75rem 1.5rem;
-		color: white;
-		text-decoration: none;
-		transition: background 0.2s;
-	}
-
-	.nav-menu a:hover {
-		background: rgba(255, 255, 255, 0.1);
-	}
-
-	.user-section {
-		padding: 1rem 1.5rem;
-		border-top: 1px solid rgba(255, 255, 255, 0.1);
-	}
-
-	.user-email {
-		margin: 0 0 0.5rem 0;
-		font-size: 0.875rem;
-		opacity: 0.8;
-	}
-
-	.btn-logout {
-		width: 100%;
-		padding: 0.5rem;
-		background: rgba(255, 255, 255, 0.1);
-		color: white;
-		border: 1px solid rgba(255, 255, 255, 0.2);
-		border-radius: 4px;
-		cursor: pointer;
-		transition: background 0.2s;
-	}
-
-	.btn-logout:hover {
-		background: rgba(255, 255, 255, 0.2);
-	}
-
-	.content {
-		flex: 1;
-		margin-left: 250px;
-		padding: 2rem;
-		background: #f5f5f5;
-	}
-</style>
