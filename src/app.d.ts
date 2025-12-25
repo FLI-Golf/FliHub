@@ -1,0 +1,16 @@
+import type PocketBase from 'pocketbase';
+
+declare global {
+	namespace App {
+		interface Locals {
+			pb: PocketBase;
+			user?: {
+				id: string;
+				email: string;
+				name?: string;
+			};
+		}
+	}
+}
+
+export {};
