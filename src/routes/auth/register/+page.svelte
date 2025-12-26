@@ -5,6 +5,8 @@
 	import { Button } from '$lib/components/ui/button/index.js';
 
 	export let form: ActionData;
+	
+	let loading = false;
 </script>
 
 <svelte:head>
@@ -34,7 +36,19 @@
 				</div>
 			{/if}
 
-			<form method="POST" use:enhance class="space-y-6">
+			<form 
+				method="POST" 
+				use:enhance={() => {
+					loading = true;
+					console.log('Form submitting...');
+					return async ({ result, update }) => {
+						console.log('Form result:', result);
+						loading = false;
+						await update();
+					};
+				}}
+				class="space-y-6"
+			>
 				<!-- Name Fields -->
 				<div class="grid grid-cols-2 gap-4">
 					<div>
@@ -106,7 +120,9 @@
 					</div>
 				</div>
 
-				<Button type="submit" class="w-full py-6 text-base font-semibold">Create Account</Button>
+				<Button type="submit" disabled={loading} class="w-full py-6 text-base font-semibold">
+					{loading ? 'Creating Account...' : 'Create Account'}
+				</Button>
 			</form>
 
 			<div class="mt-6 text-center space-y-2">
