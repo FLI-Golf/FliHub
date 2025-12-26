@@ -43,6 +43,9 @@
 					console.log('Form submitting...');
 					return async ({ result, update }) => {
 						console.log('Form result:', result);
+						if (result.type === 'failure') {
+							console.error('Registration failed:', result.data);
+						}
 						loading = false;
 						await update();
 					};

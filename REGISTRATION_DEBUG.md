@@ -92,10 +92,41 @@ PocketBase validation errors: { userId: { message: '...' } }
 ## Quick Fix Checklist
 
 - [ ] Import user_profiles_import.json to PocketBase
-- [ ] Verify createRule allows authenticated users
+- [ ] Verify createRule allows authenticated users: `@request.auth.id != ''`
 - [ ] Check userId field is text type (not relation)
 - [ ] Verify status field has 'active' as valid option
 - [ ] Verify role field has 'leader' as valid option
 - [ ] Check dashboard route exists and is accessible
 - [ ] Clear browser cookies and try again
 - [ ] Check server logs for detailed error messages
+
+## URGENT: Import user_profiles Collection
+
+**If you're getting a 400 error, the user_profiles collection likely doesn't exist!**
+
+### Steps to Import:
+
+1. Go to PocketBase Admin: https://pocketbase-production-6ab5.up.railway.app/_/
+2. Click **Settings** (gear icon in sidebar)
+3. Click **Import collections**
+4. Click **Load from JSON file**
+5. Select: `/workspaces/FliHub/json_data/user_profiles_import.json`
+6. Click **Review** then **Import**
+
+### Verify Collection Rules:
+
+After import, check the `user_profiles` collection:
+- **createRule**: `@request.auth.id != ''` (any authenticated user can create their profile)
+- **listRule**: `@request.auth.id != ''`
+- **viewRule**: `@request.auth.id != ''`
+- **updateRule**: `@request.auth.id != ''`
+- **deleteRule**: `@request.auth.id != ''`
+
+### Check Required Fields:
+
+- `userId` (text, required)
+- `firstName` (text, required)
+- `lastName` (text, required)
+- `role` (select, required) - must include 'leader' option
+- `status` (select, required) - must include 'active' option
+- `email` (email, optional)
