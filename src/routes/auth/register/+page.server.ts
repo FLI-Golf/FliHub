@@ -9,16 +9,14 @@ export const actions = {
 		const confirmPassword = data.get('confirmPassword') as string;
 		const firstName = data.get('firstName') as string;
 		const lastName = data.get('lastName') as string;
-		const role = data.get('role') as string;
 
 		// Validation
-		if (!email || !password || !confirmPassword || !firstName || !lastName || !role) {
+		if (!email || !password || !confirmPassword || !firstName || !lastName) {
 			return fail(400, {
 				error: 'All fields are required',
 				email,
 				firstName,
-				lastName,
-				role
+				lastName
 			});
 		}
 
@@ -27,8 +25,7 @@ export const actions = {
 				error: 'Passwords do not match',
 				email,
 				firstName,
-				lastName,
-				role
+				lastName
 			});
 		}
 
@@ -37,8 +34,7 @@ export const actions = {
 				error: 'Password must be at least 8 characters',
 				email,
 				firstName,
-				lastName,
-				role
+				lastName
 			});
 		}
 
@@ -51,13 +47,14 @@ export const actions = {
 				emailVisibility: true
 			});
 
-			// Create user profile
+			// Create user profile with default role 'leader'
 			await locals.pb.collection('user_profiles').create({
 				userId: user.id,
-				role,
+				role: 'leader',
 				firstName,
 				lastName,
-				isActive: true
+				email,
+				status: 'active'
 			});
 
 			// Auto-login after registration
@@ -75,8 +72,7 @@ export const actions = {
 						error: 'Email already exists',
 						email,
 						firstName,
-						lastName,
-						role
+						lastName
 					});
 				}
 			}
@@ -85,8 +81,7 @@ export const actions = {
 				error: 'Registration failed. Please try again.',
 				email,
 				firstName,
-				lastName,
-				role
+				lastName
 			});
 		}
 	}

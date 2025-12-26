@@ -1,0 +1,198 @@
+[
+  {
+    "id": "broadcast_partners_collection",
+    "listRule": "@request.auth.id != ''",
+    "viewRule": "@request.auth.id != ''",
+    "createRule": "@request.auth.id != ''",
+    "updateRule": "@request.auth.id != ''",
+    "deleteRule": "@request.auth.id != ''",
+    "name": "broadcast_partners",
+    "type": "base",
+    "fields": [
+      {
+        "autogeneratePattern": "[a-z0-9]{15}",
+        "hidden": false,
+        "id": "text3208210256",
+        "max": 15,
+        "min": 15,
+        "name": "id",
+        "pattern": "^[a-z0-9]+$",
+        "presentable": false,
+        "primaryKey": true,
+        "required": true,
+        "system": true,
+        "type": "text"
+      },
+      {
+        "autogeneratePattern": "",
+        "hidden": false,
+        "id": "name_7ko7kt78qe",
+        "max": 255,
+        "min": 1,
+        "name": "name",
+        "pattern": "",
+        "presentable": false,
+        "primaryKey": false,
+        "required": true,
+        "system": false,
+        "type": "text"
+      },
+      {
+        "hidden": false,
+        "id": "type_f8ydmonefg",
+        "maxSelect": 1,
+        "name": "type",
+        "presentable": false,
+        "required": true,
+        "system": false,
+        "type": "select",
+        "values": [
+          "tv_network",
+          "streaming_platform",
+          "radio",
+          "podcast",
+          "social_media",
+          "other"
+        ]
+      },
+      {
+        "hidden": false,
+        "id": "status_suv0t5ised",
+        "maxSelect": 1,
+        "name": "status",
+        "presentable": false,
+        "required": true,
+        "system": false,
+        "type": "select",
+        "values": [
+          "prospect",
+          "in_negotiation",
+          "active",
+          "inactive",
+          "ended"
+        ]
+      },
+      {
+        "exceptDomains": [],
+        "hidden": false,
+        "id": "contactEmail_z4bpsv6csq",
+        "name": "contactEmail",
+        "onlyDomains": [],
+        "presentable": false,
+        "required": false,
+        "system": false,
+        "type": "email"
+      },
+      {
+        "autogeneratePattern": "",
+        "hidden": false,
+        "id": "contactName_njh9fg201b",
+        "max": 255,
+        "min": 0,
+        "name": "contactName",
+        "pattern": "",
+        "presentable": false,
+        "primaryKey": false,
+        "required": false,
+        "system": false,
+        "type": "text"
+      },
+      {
+        "autogeneratePattern": "",
+        "hidden": false,
+        "id": "contactPhone_x7k3u1swve",
+        "max": 0,
+        "min": 0,
+        "name": "contactPhone",
+        "pattern": "",
+        "presentable": false,
+        "primaryKey": false,
+        "required": false,
+        "system": false,
+        "type": "text"
+      },
+      {
+        "exceptDomains": [],
+        "hidden": false,
+        "id": "website_2mk8p4n7qw",
+        "name": "website",
+        "onlyDomains": [],
+        "presentable": false,
+        "required": false,
+        "system": false,
+        "type": "url"
+      },
+      {
+        "hidden": false,
+        "id": "contractStartDate_27xkz9fwcf",
+        "max": "",
+        "min": "",
+        "name": "contractStartDate",
+        "presentable": false,
+        "required": false,
+        "system": false,
+        "type": "date"
+      },
+      {
+        "hidden": false,
+        "id": "contractEndDate_onv5hn33fa",
+        "max": "",
+        "min": "",
+        "name": "contractEndDate",
+        "presentable": false,
+        "required": false,
+        "system": false,
+        "type": "date"
+      },
+      {
+        "hidden": false,
+        "id": "contractValue_smq6hplh01",
+        "max": null,
+        "min": 0,
+        "name": "contractValue",
+        "onlyInt": false,
+        "presentable": false,
+        "required": false,
+        "system": false,
+        "type": "number"
+      },
+      {
+        "convertURLs": false,
+        "hidden": false,
+        "id": "description_7wm2jh3pze",
+        "maxSize": 0,
+        "name": "description",
+        "presentable": false,
+        "required": false,
+        "system": false,
+        "type": "editor"
+      },
+      {
+        "convertURLs": false,
+        "hidden": false,
+        "id": "notes_95chcpsbn1",
+        "maxSize": 0,
+        "name": "notes",
+        "presentable": false,
+        "required": false,
+        "system": false,
+        "type": "editor"
+      },
+      {
+        "cascadeDelete": false,
+        "collectionId": "user_profiles_collection",
+        "hidden": false,
+        "id": "accountManager_5nk2m9p3xw",
+        "maxSelect": 1,
+        "minSelect": 0,
+        "name": "accountManager",
+        "presentable": false,
+        "required": false,
+        "system": false,
+        "type": "relation"
+      }
+    ],
+    "indexes": [],
+    "system": false
+  }
+]

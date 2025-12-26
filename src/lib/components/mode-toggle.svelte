@@ -1,26 +1,41 @@
 <script lang="ts">
 	import { Moon, Sun } from 'lucide-svelte';
-	import { toggleMode } from 'mode-watcher';
-	import { Button } from '$lib/components/ui/button/index.js';
-	import * as DropdownMenu from '$lib/components/ui/dropdown-menu/index.js';
+	import { setMode } from 'mode-watcher';
+	import { onMount } from 'svelte';
+
+	let isDark = $state(false);
+
+	onMount(() => {
+		// Initialize state
+		isDark = document.documentElement.classList.contains('dark');
+		
+		// Watch for changes to the dark class
+		const observer = new MutationObserver(() => {
+			isDark = document.documentElement.classList.contains('dark');
+		});
+		
+		observer.observe(document.documentElement, {
+			attributes: true,
+			attributeFilter: ['class']
+		});
+		
+		return () => observer.disconnect();
+	});
+
+	function handleToggle() {
+		setMode(isDark ? 'light' : 'dark');
+	}
 </script>
 
-<DropdownMenu.Root>
-	<DropdownMenu.Trigger asChild let:builder>
-		<Button builders={[builder]} variant="ghost" size="icon" class="size-9">
-			<Sun class="size-5 rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0 stroke-[2]" />
-			<Moon class="absolute size-5 rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100 stroke-[2]" />
-			<span class="sr-only">Toggle theme</span>
-		</Button>
-	</DropdownMenu.Trigger>
-	<DropdownMenu.Content align="end">
-		<DropdownMenu.Item on:click={() => toggleMode()}>
-			<Sun class="size-4 mr-2 stroke-[2]" />
-			<span class="font-medium">Light</span>
-		</DropdownMenu.Item>
-		<DropdownMenu.Item on:click={() => toggleMode()}>
-			<Moon class="size-4 mr-2 stroke-[2]" />
-			<span class="font-medium">Dark</span>
-		</DropdownMenu.Item>
-	</DropdownMenu.Content>
-</DropdownMenu.Root>
+<button 
+	onclick={handleToggle} 
+	type="button"
+	class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 hover:bg-accent hover:text-accent-foreground size-9 relative"
+>
+	{#if isDark}
+		<Moon class="h-[1.2rem] w-[1.2rem]" />
+	{:else}
+		<Sun class="h-[1.2rem] w-[1.2rem]" />
+	{/if}
+	<span class="sr-only">Toggle theme</span>
+</button>

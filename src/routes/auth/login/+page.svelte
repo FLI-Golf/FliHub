@@ -11,7 +11,7 @@
 	<title>Login - FliHub</title>
 </svelte:head>
 
-<div class="flex justify-center items-center min-h-screen bg-white">
+<div class="flex justify-center items-center min-h-screen bg-background">
 	<div class="w-full max-w-md">
 		<!-- Logo Header -->
 		<div class="flex items-center justify-center gap-3 mb-8">
@@ -29,7 +29,7 @@
 			<p class="text-muted-foreground mb-8">Sign in to access your dashboard</p>
 
 			{#if form?.error}
-				<div class="bg-black dark:bg-white text-white dark:text-black p-4 rounded-lg mb-6 font-medium">
+				<div class="bg-destructive text-destructive-foreground p-4 rounded-lg mb-6 font-medium">
 					{form.error}
 				</div>
 			{/if}

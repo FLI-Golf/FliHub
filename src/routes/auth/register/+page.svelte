@@ -3,27 +3,15 @@
 	import type { ActionData } from './$types';
 	import Card from '$lib/components/ui/card.svelte';
 	import { Button } from '$lib/components/ui/button/index.js';
-	import { UserCircle } from 'lucide-svelte';
-	import { ROLE_DESCRIPTIONS, ROLE_LABELS } from '$lib/domain/schemas';
 
 	export let form: ActionData;
-
-	const roles = [
-		{ value: 'leader', label: ROLE_LABELS.leader, description: ROLE_DESCRIPTIONS.leader },
-		{ value: 'admin', label: ROLE_LABELS.admin, description: ROLE_DESCRIPTIONS.admin },
-		{ value: 'vendor', label: ROLE_LABELS.vendor, description: ROLE_DESCRIPTIONS.vendor },
-		{ value: 'pro', label: ROLE_LABELS.pro, description: ROLE_DESCRIPTIONS.pro },
-		{ value: 'franchise_owner', label: ROLE_LABELS.franchise_owner, description: ROLE_DESCRIPTIONS.franchise_owner }
-	];
-
-	let selectedRole = form?.role || 'admin';
 </script>
 
 <svelte:head>
 	<title>Register - FliHub</title>
 </svelte:head>
 
-<div class="flex justify-center items-center min-h-screen bg-white py-12">
+<div class="flex justify-center items-center min-h-screen bg-background py-12">
 	<div class="w-full max-w-2xl px-6">
 		<!-- Logo Header -->
 		<div class="flex items-center justify-center gap-3 mb-8">
@@ -41,7 +29,7 @@
 			<p class="text-muted-foreground mb-8">Join FliHub to manage your business operations</p>
 
 			{#if form?.error}
-				<div class="bg-black text-white p-4 rounded-lg mb-6 font-medium">
+				<div class="bg-destructive text-destructive-foreground p-4 rounded-lg mb-6 font-medium">
 					{form.error}
 				</div>
 			{/if}
@@ -115,32 +103,6 @@
 							class="w-full px-4 py-3 border-2 border-input rounded-lg focus:outline-none focus:ring-2 focus:ring-black focus:border-black font-medium"
 							placeholder="••••••••"
 						/>
-					</div>
-				</div>
-
-				<!-- Role Selection -->
-				<div>
-					<label class="block text-sm font-semibold mb-3">Select Your Role</label>
-					<div class="space-y-3">
-						{#each roles as role}
-							<label class="flex items-start gap-3 p-4 border-2 rounded-lg cursor-pointer hover:bg-accent transition-colors {selectedRole === role.value ? 'border-black bg-accent' : 'border-input'}">
-								<input
-									type="radio"
-									name="role"
-									value={role.value}
-									bind:group={selectedRole}
-									required
-									class="mt-1"
-								/>
-								<div class="flex-1">
-									<div class="flex items-center gap-2 mb-1">
-										<UserCircle class="size-4 stroke-[2]" />
-										<span class="font-semibold">{role.label}</span>
-									</div>
-									<p class="text-sm text-muted-foreground">{role.description}</p>
-								</div>
-							</label>
-						{/each}
 					</div>
 				</div>
 

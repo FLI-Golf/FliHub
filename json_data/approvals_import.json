@@ -1,0 +1,146 @@
+[
+  {
+    "id": "approvals_collection",
+    "listRule": "@request.auth.id != ''",
+    "viewRule": "@request.auth.id != ''",
+    "createRule": "@request.auth.id != ''",
+    "updateRule": "@request.auth.id != ''",
+    "deleteRule": "@request.auth.id != ''",
+    "name": "approvals",
+    "type": "base",
+    "fields": [
+      {
+        "autogeneratePattern": "[a-z0-9]{15}",
+        "hidden": false,
+        "id": "text3208210256",
+        "max": 15,
+        "min": 15,
+        "name": "id",
+        "pattern": "^[a-z0-9]+$",
+        "presentable": false,
+        "primaryKey": true,
+        "required": true,
+        "system": true,
+        "type": "text"
+      },
+      {
+        "hidden": false,
+        "id": "entityType_vlgfrox37j",
+        "maxSelect": 1,
+        "name": "entityType",
+        "presentable": false,
+        "required": true,
+        "system": false,
+        "type": "select",
+        "values": [
+          "project",
+          "expense",
+          "budget"
+        ]
+      },
+      {
+        "autogeneratePattern": "",
+        "hidden": false,
+        "id": "entityId_7ko7kt78qe",
+        "max": 255,
+        "min": 1,
+        "name": "entityId",
+        "pattern": "",
+        "presentable": false,
+        "primaryKey": false,
+        "required": true,
+        "system": false,
+        "type": "text"
+      },
+      {
+        "hidden": false,
+        "id": "status_suv0t5ised",
+        "maxSelect": 1,
+        "name": "status",
+        "presentable": false,
+        "required": true,
+        "system": false,
+        "type": "select",
+        "values": [
+          "pending",
+          "approved",
+          "rejected",
+          "revision_requested"
+        ]
+      },
+      {
+        "cascadeDelete": false,
+        "collectionId": "user_profiles_collection",
+        "hidden": false,
+        "id": "requestedBy_2nk8j4m9xw",
+        "maxSelect": 1,
+        "minSelect": 0,
+        "name": "requestedBy",
+        "presentable": false,
+        "required": true,
+        "system": false,
+        "type": "relation"
+      },
+      {
+        "cascadeDelete": false,
+        "collectionId": "user_profiles_collection",
+        "hidden": false,
+        "id": "approver_5pk2n7m4qw",
+        "maxSelect": 1,
+        "minSelect": 0,
+        "name": "approver",
+        "presentable": false,
+        "required": false,
+        "system": false,
+        "type": "relation"
+      },
+      {
+        "hidden": false,
+        "id": "requestedDate_27xkz9fwcf",
+        "max": "",
+        "min": "",
+        "name": "requestedDate",
+        "presentable": false,
+        "required": true,
+        "system": false,
+        "type": "date"
+      },
+      {
+        "hidden": false,
+        "id": "reviewedDate_onv5hn33fa",
+        "max": "",
+        "min": "",
+        "name": "reviewedDate",
+        "presentable": false,
+        "required": false,
+        "system": false,
+        "type": "date"
+      },
+      {
+        "convertURLs": false,
+        "hidden": false,
+        "id": "comments_7wm2jh3pze",
+        "maxSize": 0,
+        "name": "comments",
+        "presentable": false,
+        "required": false,
+        "system": false,
+        "type": "editor"
+      },
+      {
+        "hidden": false,
+        "id": "amount_smq6hplh01",
+        "max": null,
+        "min": 0,
+        "name": "amount",
+        "onlyInt": false,
+        "presentable": false,
+        "required": false,
+        "system": false,
+        "type": "number"
+      }
+    ],
+    "indexes": [],
+    "system": false
+  }
+]
