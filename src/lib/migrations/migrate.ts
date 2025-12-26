@@ -53,14 +53,19 @@ export async function migrate(options: MigrationOptions) {
 					}
 				} else {
 					console.log(`➕ Creating collection: ${collection.name}`);
-					await pb.collections.create(collection as any);
-					console.log(`✅ Created: ${collection.name}\n`);
+					const result = await pb.collections.create(collection as any);
+					console.log(`✅ Created: ${collection.name} (${result.schema?.length || 0} fields)\n`);
 				}
 			} catch (error: any) {
 				console.error(`❌ Error processing ${collection.name}:`, error.message);
 				if (error.data) {
 					console.error('Details:', JSON.stringify(error.data, null, 2));
 				}
+				if (error.response) {
+					console.error('Response:', await error.response.text());
+				}
+				// Don't continue on error
+				throw error;
 			}
 		}
 
