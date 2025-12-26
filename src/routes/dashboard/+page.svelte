@@ -11,66 +11,66 @@
 	<title>Dashboard - FliHub</title>
 </svelte:head>
 
-<div class="flex flex-col gap-4 py-4">
+<div class="flex flex-col gap-6">
 	<div>
-		<h1 class="text-3xl font-bold mb-2">Dashboard</h1>
-		<p class="text-muted-foreground">Welcome to FliHub, {data.user?.email}</p>
+		<h1 class="text-4xl font-bold mb-2 tracking-tight">Dashboard</h1>
+		<p class="text-muted-foreground text-base">Welcome to FliHub, {data.user?.email}</p>
 	</div>
 
-	<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-		<Card class="p-6">
-			<div class="flex items-center gap-3 mb-4">
-				<div class="flex size-10 items-center justify-center rounded-lg bg-primary/10">
-					<Users class="size-5 text-primary" />
+	<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+		<Card class="p-6 hover:shadow-lg transition-shadow border-2">
+			<div class="flex items-center gap-4 mb-4">
+				<div class="flex size-12 items-center justify-center rounded-xl bg-black dark:bg-white text-white dark:text-black">
+					<Users class="size-6 stroke-[2]" />
 				</div>
-				<h3 class="text-xl font-semibold">Managers</h3>
+				<h3 class="text-xl font-bold">Managers</h3>
 			</div>
-			<p class="text-muted-foreground mb-4">Team members and departments</p>
-			<Button href="/dashboard/managers" class="w-full">View Managers</Button>
+			<p class="text-muted-foreground mb-6">Team members and departments</p>
+			<Button href="/dashboard/managers" class="w-full font-semibold">View Managers</Button>
 		</Card>
 
-		<Card class="p-6">
-			<div class="flex items-center gap-3 mb-4">
-				<div class="flex size-10 items-center justify-center rounded-lg bg-primary/10">
-					<ListTodo class="size-5 text-primary" />
+		<Card class="p-6 hover:shadow-lg transition-shadow border-2">
+			<div class="flex items-center gap-4 mb-4">
+				<div class="flex size-12 items-center justify-center rounded-xl bg-black dark:bg-white text-white dark:text-black">
+					<ListTodo class="size-6 stroke-[2]" />
 				</div>
-				<h3 class="text-xl font-semibold">Tasks</h3>
+				<h3 class="text-xl font-bold">Tasks</h3>
 			</div>
-			<p class="text-muted-foreground mb-4">Business roadmap and checklists</p>
-			<Button href="/dashboard/tasks" class="w-full">View Tasks</Button>
+			<p class="text-muted-foreground mb-6">Business roadmap and checklists</p>
+			<Button href="/dashboard/tasks" class="w-full font-semibold">View Tasks</Button>
 		</Card>
 
-		<Card class="p-6">
-			<div class="flex items-center gap-3 mb-4">
-				<div class="flex size-10 items-center justify-center rounded-lg bg-primary/10">
-					<UserCircle class="size-5 text-primary" />
+		<Card class="p-6 hover:shadow-lg transition-shadow border-2">
+			<div class="flex items-center gap-4 mb-4">
+				<div class="flex size-12 items-center justify-center rounded-xl bg-black dark:bg-white text-white dark:text-black">
+					<UserCircle class="size-6 stroke-[2]" />
 				</div>
-				<h3 class="text-xl font-semibold">People</h3>
+				<h3 class="text-xl font-bold">People</h3>
 			</div>
-			<p class="text-muted-foreground mb-4">Contacts, sponsors, partners, and pros</p>
-			<Button href="/dashboard/people" class="w-full">View People</Button>
+			<p class="text-muted-foreground mb-6">Contacts, sponsors, partners, and pros</p>
+			<Button href="/dashboard/people" class="w-full font-semibold">View People</Button>
 		</Card>
 
-		<Card class="p-6">
-			<div class="flex items-center gap-3 mb-4">
-				<div class="flex size-10 items-center justify-center rounded-lg bg-primary/10">
-					<FolderKanban class="size-5 text-primary" />
+		<Card class="p-6 hover:shadow-lg transition-shadow border-2">
+			<div class="flex items-center gap-4 mb-4">
+				<div class="flex size-12 items-center justify-center rounded-xl bg-black dark:bg-white text-white dark:text-black">
+					<FolderKanban class="size-6 stroke-[2]" />
 				</div>
-				<h3 class="text-xl font-semibold">Projects</h3>
+				<h3 class="text-xl font-bold">Projects</h3>
 			</div>
-			<p class="text-muted-foreground mb-4">Tournaments, events, and campaigns</p>
-			<Button href="/dashboard/projects" class="w-full">View Projects</Button>
+			<p class="text-muted-foreground mb-6">Tournaments, events, and campaigns</p>
+			<Button href="/dashboard/projects" class="w-full font-semibold">View Projects</Button>
 		</Card>
 
-		<Card class="p-6">
-			<div class="flex items-center gap-3 mb-4">
-				<div class="flex size-10 items-center justify-center rounded-lg bg-primary/10">
-					<Receipt class="size-5 text-primary" />
+		<Card class="p-6 hover:shadow-lg transition-shadow border-2">
+			<div class="flex items-center gap-4 mb-4">
+				<div class="flex size-12 items-center justify-center rounded-xl bg-black dark:bg-white text-white dark:text-black">
+					<Receipt class="size-6 stroke-[2]" />
 				</div>
-				<h3 class="text-xl font-semibold">Expenses</h3>
+				<h3 class="text-xl font-bold">Expenses</h3>
 			</div>
-			<p class="text-muted-foreground mb-4">Financial tracking and approvals</p>
-			<Button href="/dashboard/expenses" class="w-full">View Expenses</Button>
+			<p class="text-muted-foreground mb-6">Financial tracking and approvals</p>
+			<Button href="/dashboard/expenses" class="w-full font-semibold">View Expenses</Button>
 		</Card>
 	</div>
 </div>

@@ -1,773 +1,759 @@
 [
   {
     "id": "managers_collection",
+    "listRule": "@request.auth.id != ''",
+    "viewRule": "@request.auth.id != ''",
+    "createRule": "@request.auth.id != ''",
+    "updateRule": "@request.auth.id != ''",
+    "deleteRule": "@request.auth.id != ''",
     "name": "managers",
     "type": "base",
-    "system": false,
-    "schema": [
+    "fields": [
       {
+        "autogeneratePattern": "[a-z0-9]{15}",
+        "hidden": false,
+        "id": "text3208210256",
+        "max": 15,
+        "min": 15,
+        "name": "id",
+        "pattern": "^[a-z0-9]+$",
+        "presentable": false,
+        "primaryKey": true,
+        "required": true,
+        "system": true,
+        "type": "text"
+      },
+      {
+        "id": "name_9eug0cl2kk",
         "name": "name",
         "type": "text",
         "required": true,
         "presentable": false,
         "unique": false,
-        "options": {
-          "min": 1,
-          "max": 255,
-          "pattern": ""
-        },
-        "id": "name_9eug0cl2kk"
+        "min": 1,
+        "max": 255,
+        "pattern": ""
       },
       {
+        "id": "department_ka9xzoprva",
         "name": "department",
         "type": "select",
         "required": true,
         "presentable": false,
         "unique": false,
-        "options": {
-          "maxSelect": 1,
-          "values": [
-            "Publicist",
-            "Sales",
-            "Product Development",
-            "Finance",
-            "Marketing and PR",
-            "Technical",
-            "Production",
-            "Consultant",
-            "Operations",
-            "Apparel"
-          ]
-        },
-        "id": "department_ka9xzoprva"
+        "maxSelect": 1,
+        "values": [
+          "Publicist",
+          "Sales",
+          "Product Development",
+          "Finance",
+          "Marketing and PR",
+          "Technical",
+          "Production",
+          "Consultant",
+          "Operations",
+          "Apparel"
+        ]
       },
       {
+        "id": "email_lecirp3qwl",
         "name": "email",
         "type": "email",
         "required": false,
         "presentable": false,
         "unique": false,
-        "options": {
-          "exceptDomains": [],
-          "onlyDomains": []
-        },
-        "id": "email_lecirp3qwl"
+        "exceptDomains": [],
+        "onlyDomains": []
       },
       {
+        "id": "phone_16r1yhmyw0",
         "name": "phone",
         "type": "text",
         "required": false,
         "presentable": false,
         "unique": false,
-        "options": {
-          "min": null,
-          "max": null,
-          "pattern": ""
-        },
-        "id": "phone_16r1yhmyw0"
+        "min": null,
+        "max": null,
+        "pattern": ""
       },
       {
+        "id": "goals_kifnivdfbx",
         "name": "goals",
         "type": "editor",
         "required": false,
         "presentable": false,
         "unique": false,
-        "options": {
-          "convertUrls": false
-        },
-        "id": "goals_kifnivdfbx"
+        "convertUrls": false
       }
     ],
     "indexes": [],
+    "system": false
+  },
+  {
+    "id": "tasks_collection",
     "listRule": "@request.auth.id != ''",
     "viewRule": "@request.auth.id != ''",
     "createRule": "@request.auth.id != ''",
     "updateRule": "@request.auth.id != ''",
-    "deleteRule": "@request.auth.id != ''"
-  },
-  {
-    "id": "tasks_collection",
+    "deleteRule": "@request.auth.id != ''",
     "name": "tasks",
     "type": "base",
-    "system": false,
-    "schema": [
+    "fields": [
       {
+        "autogeneratePattern": "[a-z0-9]{15}",
+        "hidden": false,
+        "id": "text3208210256",
+        "max": 15,
+        "min": 15,
+        "name": "id",
+        "pattern": "^[a-z0-9]+$",
+        "presentable": false,
+        "primaryKey": true,
+        "required": true,
+        "system": true,
+        "type": "text"
+      },
+      {
+        "id": "task_22rv54e0n9",
         "name": "task",
         "type": "text",
         "required": true,
         "presentable": false,
         "unique": false,
-        "options": {
-          "min": 1,
-          "max": 500,
-          "pattern": ""
-        },
-        "id": "task_22rv54e0n9"
+        "min": 1,
+        "max": 500,
+        "pattern": ""
       },
       {
+        "id": "subTasksChecklist_cjo8rqo53s",
         "name": "subTasksChecklist",
         "type": "editor",
         "required": false,
         "presentable": false,
         "unique": false,
-        "options": {
-          "convertUrls": false
-        },
-        "id": "subTasksChecklist_cjo8rqo53s"
+        "convertUrls": false
       },
       {
+        "id": "managers_8qb2b5k9fo",
         "name": "managers",
         "type": "text",
         "required": false,
         "presentable": false,
         "unique": false,
-        "options": {
-          "min": null,
-          "max": null,
-          "pattern": ""
-        },
-        "id": "managers_8qb2b5k9fo"
+        "min": null,
+        "max": null,
+        "pattern": ""
       },
       {
+        "id": "track_00smj5f52i",
         "name": "track",
         "type": "select",
         "required": false,
         "presentable": false,
         "unique": false,
-        "options": {
-          "maxSelect": 1,
-          "values": [
-            "Phase 1",
-            "Phase 2",
-            "Overall",
-            "Other"
-          ]
-        },
-        "id": "track_00smj5f52i"
+        "maxSelect": 1,
+        "values": [
+          "Phase 1",
+          "Phase 2",
+          "Overall",
+          "Other"
+        ]
       },
       {
+        "id": "strategicGoal_kwaelb2bap",
         "name": "strategicGoal",
         "type": "select",
         "required": false,
         "presentable": false,
         "unique": false,
-        "options": {
-          "maxSelect": 1,
-          "values": [
-            "Company Growth",
-            "Brand Awareness",
-            "Revenue",
-            "Increase Revenue",
-            "Managerial Tasks",
-            "App",
-            "Legal Tasks"
-          ]
-        },
-        "id": "strategicGoal_kwaelb2bap"
+        "maxSelect": 1,
+        "values": [
+          "Company Growth",
+          "Brand Awareness",
+          "Revenue",
+          "Increase Revenue",
+          "Managerial Tasks",
+          "App",
+          "Legal Tasks"
+        ]
       },
       {
+        "id": "departments_bct7zzm29v",
         "name": "departments",
         "type": "text",
         "required": false,
         "presentable": false,
         "unique": false,
-        "options": {
-          "min": null,
-          "max": null,
-          "pattern": ""
-        },
-        "id": "departments_bct7zzm29v"
+        "min": null,
+        "max": null,
+        "pattern": ""
       },
       {
+        "id": "quarters_6rdkp9rxd1",
         "name": "quarters",
         "type": "select",
         "required": false,
         "presentable": false,
         "unique": false,
-        "options": {
-          "maxSelect": 1,
-          "values": [
-            "Q1",
-            "Q2",
-            "Q3",
-            "Q4"
-          ]
-        },
-        "id": "quarters_6rdkp9rxd1"
+        "maxSelect": 1,
+        "values": [
+          "Q1",
+          "Q2",
+          "Q3",
+          "Q4"
+        ]
       },
       {
+        "id": "startDate_ck90nvwz2h",
         "name": "startDate",
         "type": "date",
         "required": false,
         "presentable": false,
         "unique": false,
-        "options": {
-          "min": "",
-          "max": ""
-        },
-        "id": "startDate_ck90nvwz2h"
+        "min": "",
+        "max": ""
       },
       {
+        "id": "endDate_8bi3ku7jr1",
         "name": "endDate",
         "type": "date",
         "required": false,
         "presentable": false,
         "unique": false,
-        "options": {
-          "min": "",
-          "max": ""
-        },
-        "id": "endDate_8bi3ku7jr1"
+        "min": "",
+        "max": ""
       },
       {
+        "id": "budget_nibgz6sjb2",
         "name": "budget",
         "type": "number",
         "required": false,
         "presentable": false,
         "unique": false,
-        "options": {
-          "min": 0,
-          "max": null,
-          "noDecimal": false
-        },
-        "id": "budget_nibgz6sjb2"
+        "min": 0,
+        "max": null,
+        "noDecimal": false
       },
       {
+        "id": "income_0s7gmck4pk",
         "name": "income",
         "type": "number",
         "required": false,
         "presentable": false,
         "unique": false,
-        "options": {
-          "min": 0,
-          "max": null,
-          "noDecimal": false
-        },
-        "id": "income_0s7gmck4pk"
+        "min": 0,
+        "max": null,
+        "noDecimal": false
       },
       {
+        "id": "status_j4hisbtq7g",
         "name": "status",
         "type": "select",
         "required": true,
         "presentable": false,
         "unique": false,
-        "options": {
-          "maxSelect": 1,
-          "values": [
-            "In Progress",
-            "Scheduled",
-            "Completed",
-            "Cancelled"
-          ]
-        },
-        "id": "status_j4hisbtq7g"
+        "maxSelect": 1,
+        "values": [
+          "In Progress",
+          "Scheduled",
+          "Completed",
+          "Cancelled"
+        ]
       }
     ],
     "indexes": [],
+    "system": false
+  },
+  {
+    "id": "broadcast_partners_collection",
     "listRule": "@request.auth.id != ''",
     "viewRule": "@request.auth.id != ''",
     "createRule": "@request.auth.id != ''",
     "updateRule": "@request.auth.id != ''",
-    "deleteRule": "@request.auth.id != ''"
-  },
-  {
-    "id": "broadcast_partners_collection",
+    "deleteRule": "@request.auth.id != ''",
     "name": "broadcast_partners",
     "type": "base",
-    "system": false,
-    "schema": [
+    "fields": [
       {
+        "autogeneratePattern": "[a-z0-9]{15}",
+        "hidden": false,
+        "id": "text3208210256",
+        "max": 15,
+        "min": 15,
+        "name": "id",
+        "pattern": "^[a-z0-9]+$",
+        "presentable": false,
+        "primaryKey": true,
+        "required": true,
+        "system": true,
+        "type": "text"
+      },
+      {
+        "id": "point_gcn8agqhdi",
         "name": "point",
         "type": "text",
         "required": true,
         "presentable": false,
         "unique": false,
-        "options": {
-          "min": null,
-          "max": null,
-          "pattern": ""
-        },
-        "id": "point_gcn8agqhdi"
+        "min": null,
+        "max": null,
+        "pattern": ""
       },
       {
+        "id": "details_y083s9roo2",
         "name": "details",
         "type": "editor",
         "required": true,
         "presentable": false,
         "unique": false,
-        "options": {
-          "convertUrls": false
-        },
-        "id": "details_y083s9roo2"
+        "convertUrls": false
       },
       {
+        "id": "type_f8ydmonefg",
         "name": "type",
         "type": "select",
         "required": true,
         "presentable": false,
         "unique": false,
-        "options": {
-          "maxSelect": 1,
-          "values": [
-            "Key Point",
-            "Supporting Point",
-            "Risk",
-            "Opportunity"
-          ]
-        },
-        "id": "type_f8ydmonefg"
+        "maxSelect": 1,
+        "values": [
+          "Key Point",
+          "Supporting Point",
+          "Risk",
+          "Opportunity"
+        ]
       },
       {
+        "id": "category_abphahs9pu",
         "name": "category",
         "type": "select",
         "required": true,
         "presentable": false,
         "unique": false,
-        "options": {
-          "maxSelect": 1,
-          "values": [
-            "Broadcasting & Audience Growth",
-            "Viewer Engagement",
-            "Revenue Opportunities",
-            "Technology & Innovation",
-            "Brand Building",
-            "Operational Efficiency",
-            "Risk Management"
-          ]
-        },
-        "id": "category_abphahs9pu"
+        "maxSelect": 1,
+        "values": [
+          "Broadcasting & Audience Growth",
+          "Viewer Engagement",
+          "Revenue Opportunities",
+          "Technology & Innovation",
+          "Brand Building",
+          "Operational Efficiency",
+          "Risk Management"
+        ]
       },
       {
+        "id": "importanceLevel_l20hrahnkc",
         "name": "importanceLevel",
         "type": "select",
         "required": true,
         "presentable": false,
         "unique": false,
-        "options": {
-          "maxSelect": 1,
-          "values": [
-            "High",
-            "Medium",
-            "Low"
-          ]
-        },
-        "id": "importanceLevel_l20hrahnkc"
+        "maxSelect": 1,
+        "values": [
+          "High",
+          "Medium",
+          "Low"
+        ]
       },
       {
+        "id": "tags_06mmctkits",
         "name": "tags",
         "type": "text",
         "required": false,
         "presentable": false,
         "unique": false,
-        "options": {
-          "min": null,
-          "max": null,
-          "pattern": ""
-        },
-        "id": "tags_06mmctkits"
+        "min": null,
+        "max": null,
+        "pattern": ""
       },
       {
+        "id": "additionalNotes_uprohclex3",
         "name": "additionalNotes",
         "type": "editor",
         "required": false,
         "presentable": false,
         "unique": false,
-        "options": {
-          "convertUrls": false
-        },
-        "id": "additionalNotes_uprohclex3"
+        "convertUrls": false
       }
     ],
     "indexes": [],
+    "system": false
+  },
+  {
+    "id": "people_collection",
     "listRule": "@request.auth.id != ''",
     "viewRule": "@request.auth.id != ''",
     "createRule": "@request.auth.id != ''",
     "updateRule": "@request.auth.id != ''",
-    "deleteRule": "@request.auth.id != ''"
-  },
-  {
-    "id": "people_collection",
+    "deleteRule": "@request.auth.id != ''",
     "name": "people",
     "type": "base",
-    "system": false,
-    "schema": [
+    "fields": [
       {
+        "autogeneratePattern": "[a-z0-9]{15}",
+        "hidden": false,
+        "id": "text3208210256",
+        "max": 15,
+        "min": 15,
+        "name": "id",
+        "pattern": "^[a-z0-9]+$",
+        "presentable": false,
+        "primaryKey": true,
+        "required": true,
+        "system": true,
+        "type": "text"
+      },
+      {
+        "id": "firstName_njh9fg201b",
         "name": "firstName",
         "type": "text",
         "required": true,
         "presentable": false,
         "unique": false,
-        "options": {
-          "min": 1,
-          "max": 255,
-          "pattern": ""
-        },
-        "id": "firstName_njh9fg201b"
+        "min": 1,
+        "max": 255,
+        "pattern": ""
       },
       {
+        "id": "lastName_4k9n9my4jc",
         "name": "lastName",
         "type": "text",
         "required": true,
         "presentable": false,
         "unique": false,
-        "options": {
-          "min": 1,
-          "max": 255,
-          "pattern": ""
-        },
-        "id": "lastName_4k9n9my4jc"
+        "min": 1,
+        "max": 255,
+        "pattern": ""
       },
       {
+        "id": "email_z4bpsv6csq",
         "name": "email",
         "type": "email",
         "required": false,
         "presentable": false,
         "unique": false,
-        "options": {
-          "exceptDomains": [],
-          "onlyDomains": []
-        },
-        "id": "email_z4bpsv6csq"
+        "exceptDomains": [],
+        "onlyDomains": []
       },
       {
+        "id": "phone_x7k3u1swve",
         "name": "phone",
         "type": "text",
         "required": false,
         "presentable": false,
         "unique": false,
-        "options": {
-          "min": null,
-          "max": null,
-          "pattern": ""
-        },
-        "id": "phone_x7k3u1swve"
+        "min": null,
+        "max": null,
+        "pattern": ""
       },
       {
+        "id": "type_rlja9r8x78",
         "name": "type",
         "type": "select",
         "required": true,
         "presentable": false,
         "unique": false,
-        "options": {
-          "maxSelect": 1,
-          "values": [
-            "contact",
-            "sponsor",
-            "partner",
-            "pro",
-            "player",
-            "staff"
-          ]
-        },
-        "id": "type_rlja9r8x78"
+        "maxSelect": 1,
+        "values": [
+          "contact",
+          "sponsor",
+          "partner",
+          "pro",
+          "player",
+          "staff"
+        ]
       },
       {
+        "id": "status_du5w402szw",
         "name": "status",
         "type": "select",
         "required": true,
         "presentable": false,
         "unique": false,
-        "options": {
-          "maxSelect": 1,
-          "values": [
-            "active",
-            "inactive",
-            "pending"
-          ]
-        },
-        "id": "status_du5w402szw"
+        "maxSelect": 1,
+        "values": [
+          "active",
+          "inactive",
+          "pending"
+        ]
       },
       {
+        "id": "organization_8kjicj4occ",
         "name": "organization",
         "type": "text",
         "required": false,
         "presentable": false,
         "unique": false,
-        "options": {
-          "min": null,
-          "max": null,
-          "pattern": ""
-        },
-        "id": "organization_8kjicj4occ"
+        "min": null,
+        "max": null,
+        "pattern": ""
       },
       {
+        "id": "notes_h272jk2koe",
         "name": "notes",
         "type": "editor",
         "required": false,
         "presentable": false,
         "unique": false,
-        "options": {
-          "convertUrls": false
-        },
-        "id": "notes_h272jk2koe"
+        "convertUrls": false
       }
     ],
     "indexes": [],
+    "system": false
+  },
+  {
+    "id": "projects_collection",
     "listRule": "@request.auth.id != ''",
     "viewRule": "@request.auth.id != ''",
     "createRule": "@request.auth.id != ''",
     "updateRule": "@request.auth.id != ''",
-    "deleteRule": "@request.auth.id != ''"
-  },
-  {
-    "id": "projects_collection",
+    "deleteRule": "@request.auth.id != ''",
     "name": "projects",
     "type": "base",
-    "system": false,
-    "schema": [
+    "fields": [
       {
+        "autogeneratePattern": "[a-z0-9]{15}",
+        "hidden": false,
+        "id": "text3208210256",
+        "max": 15,
+        "min": 15,
+        "name": "id",
+        "pattern": "^[a-z0-9]+$",
+        "presentable": false,
+        "primaryKey": true,
+        "required": true,
+        "system": true,
+        "type": "text"
+      },
+      {
+        "id": "name_7ko7kt78qe",
         "name": "name",
         "type": "text",
         "required": true,
         "presentable": false,
         "unique": false,
-        "options": {
-          "min": 1,
-          "max": 255,
-          "pattern": ""
-        },
-        "id": "name_7ko7kt78qe"
+        "min": 1,
+        "max": 255,
+        "pattern": ""
       },
       {
+        "id": "description_7wm2jh3pze",
         "name": "description",
         "type": "editor",
         "required": false,
         "presentable": false,
         "unique": false,
-        "options": {
-          "convertUrls": false
-        },
-        "id": "description_7wm2jh3pze"
+        "convertUrls": false
       },
       {
+        "id": "type_vlgfrox37j",
         "name": "type",
         "type": "select",
         "required": true,
         "presentable": false,
         "unique": false,
-        "options": {
-          "maxSelect": 1,
-          "values": [
-            "tournament",
-            "activation",
-            "event",
-            "campaign"
-          ]
-        },
-        "id": "type_vlgfrox37j"
+        "maxSelect": 1,
+        "values": [
+          "tournament",
+          "activation",
+          "event",
+          "campaign"
+        ]
       },
       {
+        "id": "status_suv0t5ised",
         "name": "status",
         "type": "select",
         "required": true,
         "presentable": false,
         "unique": false,
-        "options": {
-          "maxSelect": 1,
-          "values": [
-            "draft",
-            "planned",
-            "in_progress",
-            "completed",
-            "cancelled"
-          ]
-        },
-        "id": "status_suv0t5ised"
+        "maxSelect": 1,
+        "values": [
+          "draft",
+          "planned",
+          "in_progress",
+          "completed",
+          "cancelled"
+        ]
       },
       {
+        "id": "startDate_27xkz9fwcf",
         "name": "startDate",
         "type": "date",
         "required": false,
         "presentable": false,
         "unique": false,
-        "options": {
-          "min": "",
-          "max": ""
-        },
-        "id": "startDate_27xkz9fwcf"
+        "min": "",
+        "max": ""
       },
       {
+        "id": "endDate_onv5hn33fa",
         "name": "endDate",
         "type": "date",
         "required": false,
         "presentable": false,
         "unique": false,
-        "options": {
-          "min": "",
-          "max": ""
-        },
-        "id": "endDate_onv5hn33fa"
+        "min": "",
+        "max": ""
       },
       {
+        "id": "budget_smq6hplh01",
         "name": "budget",
         "type": "number",
         "required": false,
         "presentable": false,
         "unique": false,
-        "options": {
-          "min": 0,
-          "max": null,
-          "noDecimal": false
-        },
-        "id": "budget_smq6hplh01"
+        "min": 0,
+        "max": null,
+        "noDecimal": false
       },
       {
+        "id": "notes_95chcpsbn1",
         "name": "notes",
         "type": "editor",
         "required": false,
         "presentable": false,
         "unique": false,
-        "options": {
-          "convertUrls": false
-        },
-        "id": "notes_95chcpsbn1"
+        "convertUrls": false
       }
     ],
     "indexes": [],
+    "system": false
+  },
+  {
+    "id": "expenses_collection",
     "listRule": "@request.auth.id != ''",
     "viewRule": "@request.auth.id != ''",
     "createRule": "@request.auth.id != ''",
     "updateRule": "@request.auth.id != ''",
-    "deleteRule": "@request.auth.id != ''"
-  },
-  {
-    "id": "expenses_collection",
+    "deleteRule": "@request.auth.id != ''",
     "name": "expenses",
     "type": "base",
-    "system": false,
-    "schema": [
+    "fields": [
       {
+        "autogeneratePattern": "[a-z0-9]{15}",
+        "hidden": false,
+        "id": "text3208210256",
+        "max": 15,
+        "min": 15,
+        "name": "id",
+        "pattern": "^[a-z0-9]+$",
+        "presentable": false,
+        "primaryKey": true,
+        "required": true,
+        "system": true,
+        "type": "text"
+      },
+      {
+        "id": "description_77n0tp9wt7",
         "name": "description",
         "type": "text",
         "required": true,
         "presentable": false,
         "unique": false,
-        "options": {
-          "min": 1,
-          "max": 500,
-          "pattern": ""
-        },
-        "id": "description_77n0tp9wt7"
+        "min": 1,
+        "max": 500,
+        "pattern": ""
       },
       {
+        "id": "amount_xrztycjian",
         "name": "amount",
         "type": "number",
         "required": true,
         "presentable": false,
         "unique": false,
-        "options": {
-          "min": 0,
-          "max": null,
-          "noDecimal": false
-        },
-        "id": "amount_xrztycjian"
+        "min": 0,
+        "max": null,
+        "noDecimal": false
       },
       {
+        "id": "category_kildodz49r",
         "name": "category",
         "type": "select",
         "required": true,
         "presentable": false,
         "unique": false,
-        "options": {
-          "maxSelect": 1,
-          "values": [
-            "travel",
-            "accommodation",
-            "meals",
-            "equipment",
-            "marketing",
-            "venue",
-            "staff",
-            "other"
-          ]
-        },
-        "id": "category_kildodz49r"
+        "maxSelect": 1,
+        "values": [
+          "travel",
+          "accommodation",
+          "meals",
+          "equipment",
+          "marketing",
+          "venue",
+          "staff",
+          "other"
+        ]
       },
       {
+        "id": "status_nnll9410qo",
         "name": "status",
         "type": "select",
         "required": true,
         "presentable": false,
         "unique": false,
-        "options": {
-          "maxSelect": 1,
-          "values": [
-            "draft",
-            "submitted",
-            "approved",
-            "rejected",
-            "paid"
-          ]
-        },
-        "id": "status_nnll9410qo"
+        "maxSelect": 1,
+        "values": [
+          "draft",
+          "submitted",
+          "approved",
+          "rejected",
+          "paid"
+        ]
       },
       {
+        "id": "date_0ohigl4tkd",
         "name": "date",
         "type": "date",
         "required": true,
         "presentable": false,
         "unique": false,
-        "options": {
-          "min": "",
-          "max": ""
-        },
-        "id": "date_0ohigl4tkd"
+        "min": "",
+        "max": ""
       },
       {
+        "id": "submittedBy_avrg0rojge",
         "name": "submittedBy",
         "type": "text",
         "required": false,
         "presentable": false,
         "unique": false,
-        "options": {
-          "min": null,
-          "max": null,
-          "pattern": ""
-        },
-        "id": "submittedBy_avrg0rojge"
+        "min": null,
+        "max": null,
+        "pattern": ""
       },
       {
+        "id": "approvedBy_p1h8mn3s5p",
         "name": "approvedBy",
         "type": "text",
         "required": false,
         "presentable": false,
         "unique": false,
-        "options": {
-          "min": null,
-          "max": null,
-          "pattern": ""
-        },
-        "id": "approvedBy_p1h8mn3s5p"
+        "min": null,
+        "max": null,
+        "pattern": ""
       },
       {
+        "id": "receiptUrl_qhd88yg3ej",
         "name": "receiptUrl",
         "type": "url",
         "required": false,
         "presentable": false,
         "unique": false,
-        "options": {
-          "exceptDomains": [],
-          "onlyDomains": []
-        },
-        "id": "receiptUrl_qhd88yg3ej"
+        "exceptDomains": [],
+        "onlyDomains": []
       },
       {
+        "id": "notes_wluet295mb",
         "name": "notes",
         "type": "editor",
         "required": false,
         "presentable": false,
         "unique": false,
-        "options": {
-          "convertUrls": false
-        },
-        "id": "notes_wluet295mb"
+        "convertUrls": false
       }
     ],
     "indexes": [],
-    "listRule": "@request.auth.id != ''",
-    "viewRule": "@request.auth.id != ''",
-    "createRule": "@request.auth.id != ''",
-    "updateRule": "@request.auth.id != ''",
-    "deleteRule": "@request.auth.id != ''"
+    "system": false
   }
 ]

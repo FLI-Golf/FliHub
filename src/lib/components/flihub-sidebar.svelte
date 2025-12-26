@@ -62,13 +62,13 @@
 
 <Sidebar.Root {...restProps} bind:ref>
 	<Sidebar.Header>
-		<div class="flex items-center gap-2 px-4 py-2">
-			<div class="flex size-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-				<span class="text-lg font-bold">F</span>
+		<div class="flex items-center gap-3 px-4 py-4 border-b">
+			<div class="flex size-10 items-center justify-center rounded-lg bg-black dark:bg-white text-white dark:text-black border-2 border-black dark:border-white">
+				<span class="text-xl font-bold">F</span>
 			</div>
 			<div class="flex flex-col">
-				<span class="text-sm font-semibold">FliHub</span>
-				<span class="text-xs text-muted-foreground">Business OS</span>
+				<span class="text-base font-bold tracking-tight">FliHub</span>
+				<span class="text-xs text-muted-foreground uppercase tracking-wider">Business OS</span>
 			</div>
 		</div>
 	</Sidebar.Header>
@@ -80,9 +80,9 @@
 						<Sidebar.MenuItem>
 							<Sidebar.MenuButton isActive={isActive(item.url)}>
 								{#snippet child({ props })}
-									<a href={item.url} {...props} class="flex items-center gap-2">
-										<svelte:component this={item.icon} class="size-4" />
-										<span>{item.title}</span>
+									<a href={item.url} {...props} class="flex items-center gap-3 py-2">
+										<svelte:component this={item.icon} class="size-5 stroke-[2]" />
+										<span class="font-medium">{item.title}</span>
 									</a>
 								{/snippet}
 							</Sidebar.MenuButton>

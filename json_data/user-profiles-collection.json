@@ -1,0 +1,130 @@
+[
+  {
+    "id": "user_profiles_collection",
+    "listRule": "@request.auth.id != ''",
+    "viewRule": "@request.auth.id != ''",
+    "createRule": "@request.auth.id != ''",
+    "updateRule": "@request.auth.id != '' && (@request.auth.id = userId || @request.data.role:isset = false)",
+    "deleteRule": "@request.auth.id != '' && @request.auth.id = userId",
+    "name": "user_profiles",
+    "type": "base",
+    "fields": [
+      {
+        "autogeneratePattern": "[a-z0-9]{15}",
+        "hidden": false,
+        "id": "text3208210256",
+        "max": 15,
+        "min": 15,
+        "name": "id",
+        "pattern": "^[a-z0-9]+$",
+        "presentable": false,
+        "primaryKey": true,
+        "required": true,
+        "system": true,
+        "type": "text"
+      },
+      {
+        "id": "userId_xk9p2m4nqw",
+        "name": "userId",
+        "type": "text",
+        "required": true,
+        "presentable": false,
+        "unique": true,
+        "min": 1,
+        "max": 255,
+        "pattern": ""
+      },
+      {
+        "id": "role_7hj3k9m2pq",
+        "name": "role",
+        "type": "select",
+        "required": true,
+        "presentable": false,
+        "unique": false,
+        "maxSelect": 1,
+        "values": [
+          "leader",
+          "admin",
+          "vendor",
+          "pro",
+          "franchise_owner"
+        ]
+      },
+      {
+        "id": "firstName_2nk8j4m9xw",
+        "name": "firstName",
+        "type": "text",
+        "required": true,
+        "presentable": false,
+        "unique": false,
+        "min": 1,
+        "max": 100,
+        "pattern": ""
+      },
+      {
+        "id": "lastName_5pk2n7m4qw",
+        "name": "lastName",
+        "type": "text",
+        "required": true,
+        "presentable": false,
+        "unique": false,
+        "min": 1,
+        "max": 100,
+        "pattern": ""
+      },
+      {
+        "id": "phone_9mk3p2n7xw",
+        "name": "phone",
+        "type": "text",
+        "required": false,
+        "presentable": false,
+        "unique": false,
+        "min": 0,
+        "max": 0,
+        "pattern": ""
+      },
+      {
+        "id": "organization_4nk8m2p9qw",
+        "name": "organization",
+        "type": "text",
+        "required": false,
+        "presentable": false,
+        "unique": false,
+        "min": 0,
+        "max": 0,
+        "pattern": ""
+      },
+      {
+        "id": "bio_7pk3n9m2xw",
+        "name": "bio",
+        "type": "editor",
+        "required": false,
+        "presentable": false,
+        "unique": false,
+        "convertURLs": false,
+        "maxSize": 0
+      },
+      {
+        "id": "avatar_2mk8p4n7qw",
+        "name": "avatar",
+        "type": "url",
+        "required": false,
+        "presentable": false,
+        "unique": false,
+        "exceptDomains": [],
+        "onlyDomains": []
+      },
+      {
+        "id": "isActive_5nk2m9p3xw",
+        "name": "isActive",
+        "type": "bool",
+        "required": false,
+        "presentable": false
+      }
+    ],
+    "indexes": [
+      "CREATE UNIQUE INDEX idx_userId ON user_profiles (userId)"
+    ],
+    "system": false
+  }
+]

@@ -3,3 +3,4 @@ export * from './manager.schema';
 export * from './task.schema';
 export * from './broadcast-partner.schema';
 export * from './marketing.schema';
+export * from './user-profile.schema';

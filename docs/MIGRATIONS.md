@@ -4,135 +4,101 @@ This document explains how to set up and migrate your PocketBase database for Fl
 
 ## Overview
 
-FliHub uses PocketBase as its backend database. The migration system allows you to:
+FliHub uses PocketBase as its backend database. The migration system provides:
 
-1. Create all required collections in PocketBase
-2. Import data from CSV files
-3. Update existing collections with schema changes
+1. Collection schema definitions with all fields
+2. Validation tools to verify import files
+3. Import instructions for PocketBase admin UI
 
 ## Prerequisites
 
 - PocketBase instance (local or production)
-- Admin credentials for PocketBase
+- Admin access to PocketBase UI
 - Node.js and npm installed
 
 ## Collections
 
-FliHub creates the following collections:
+FliHub includes the following collections:
 
-### Core Collections
-- `managers` - Team members and their roles
-- `tasks` - Business roadmap and task tracking
-- `broadcast_partners` - Partnership analysis
+### User Management
+- `user_profiles` - User roles and profile information (9 fields)
+  - Roles: leader, admin, vendor, pro, franchise_owner
+  - Links to PocketBase users collection
 
-### Marketing Collections
-- `brand_positioning` - Brand identity and positioning
-- `budgets` - Financial tracking
-- `business_objectives` - High-level goals
-- `campaigns` - Marketing campaigns
-- `continuous_improvements` - Process improvements
-- `digital_marketing_strategies` - Digital channel strategies
-- `marketing_goals` - SMART marketing objectives
-- `swot_analysis` - Strategic analysis
-- `kpis` - Performance metrics
+### Business Collections
+- `managers` - Team members and departments (5 fields)
+- `tasks` - Business roadmap and task tracking (12 fields)
+- `broadcast_partners` - Partnership analysis (7 fields)
+- `people` - Contacts, sponsors, partners, players (8 fields)
+- `projects` - Tournaments, events, campaigns (8 fields)
+- `expenses` - Financial tracking and approvals (9 fields)
 
-## Running Migrations
+## Import Process
 
-### 1. Create/Update Collections
+### Option 1: JSON Import (Recommended)
 
-This command creates all collections in your PocketBase instance:
+1. **Validate the import file:**
+   ```bash
+   npx tsx scripts/prepare-import.ts
+   ```
 
+2. **Access PocketBase Admin UI:**
+   - URL: `https://pocketbase-production-6ab5.up.railway.app/_/`
+   - Login with your admin credentials
+
+3. **Delete existing empty collections:**
+   - Go to Collections
+   - Delete: managers, tasks, broadcast_partners, people, projects, expenses
+
+4. **Import collections:**
+   - Go to Settings → Import collections
+   - Upload: `json_data/pocketbase-import-no-relations.json`
+   - Review the preview
+   - Confirm import
+
+### Option 2: Manual Field Addition
+
+If JSON import fails, add fields manually to each collection.
+See `docs/MANUAL_COLLECTION_SETUP.md` for detailed field definitions.
+
+## Validation
+
+The validation script checks:
+- All collections have required fields
+- Field IDs are present
+- Field types are valid
+- System ID field exists
+
+Run validation anytime:
 ```bash
-npm run migrate -- \
-  --url=https://your-pocketbase.com \
-  --email=admin@example.com \
-  --password=yourpassword
+npx tsx scripts/prepare-import.ts
 ```
 
-**Options**:
-- `--url`: Your PocketBase URL
-- `--email`: Admin email
-- `--password`: Admin password
-- `--dry-run`: Preview changes without applying them
+## Troubleshooting Import
 
-**Dry Run Example**:
-```bash
-npm run migrate -- \
-  --url=https://your-pocketbase.com \
-  --email=admin@example.com \
-  --password=yourpassword \
-  --dry-run
-```
+### Import Preview Shows Errors
+- Ensure all empty collections are deleted first
+- Check that field IDs don't conflict with existing fields
+- Verify JSON structure matches PocketBase format
 
-### 2. Import CSV Data
+### Collections Not Appearing
+- Refresh the admin UI
+- Check browser console for errors
+- Verify you have admin permissions
 
-After creating collections, import your CSV data:
+### Fields Missing After Import
+- Re-run the import (it should update existing collections)
+- Check the import preview for warnings
+- Use manual field addition as fallback
 
-```bash
-npm run import-data -- \
-  --url=https://your-pocketbase.com \
-  --email=admin@example.com \
-  --password=yourpassword \
-  --dataDir=./static/csv_data
-```
+## Environment Setup
 
-**Options**:
-- `--url`: Your PocketBase URL
-- `--email`: Admin email
-- `--password`: Admin password
-- `--dataDir`: Path to CSV files directory
-- `--dry-run`: Preview import without creating records
-
-**What Gets Imported**:
-- `Managers.csv` → `managers` collection
-- `Business Roadmap.csv` → `tasks` collection
-- `FanNetApp_broadcast_partner.csv` → `broadcast_partners` collection
-
-## Production Setup
-
-### Step 1: Set Up PocketBase
-
-**Option A: PocketHost (Recommended)**
-1. Go to [pockethost.io](https://pockethost.io)
-2. Create a new instance
-3. Note your instance URL
-
-**Option B: Self-Hosted**
-1. Download PocketBase from [pocketbase.io](https://pocketbase.io)
-2. Run: `./pocketbase serve --http=0.0.0.0:8090`
-3. Access admin UI at `http://your-server:8090/_/`
-
-### Step 2: Create Admin User
-
-1. Access PocketBase admin UI
-2. Create your admin account
-3. Note the email and password
-
-### Step 3: Update Environment Variables
-
-Update `.env` with your production URL:
+Update `.env` with your PocketBase URL:
 
 ```env
-POCKETBASE_URL=https://your-pocketbase-instance.com
+POCKETBASE_URL=https://pocketbase-production-6ab5.up.railway.app
 POCKETBASE_ADMIN_EMAIL=your-admin@example.com
-POCKETBASE_ADMIN_PASSWORD=your-secure-password
-```
-
-### Step 4: Run Migrations
-
-```bash
-# Create collections
-npm run migrate -- \
-  --url=$POCKETBASE_URL \
-  --email=$POCKETBASE_ADMIN_EMAIL \
-  --password=$POCKETBASE_ADMIN_PASSWORD
-
-# Import data
-npm run import-data -- \
-  --url=$POCKETBASE_URL \
-  --email=$POCKETBASE_ADMIN_EMAIL \
-  --password=$POCKETBASE_ADMIN_PASSWORD \
-  --dataDir=./static/csv_data
+POCKETBASE_ADMIN_PASSWORD=your-password
 ```
 
 ## Collection Schema
@@ -140,91 +106,41 @@ npm run import-data -- \
 Each collection includes:
 
 ### Standard Fields (Auto-generated)
-- `id` - Unique identifier (UUID)
+- `id` - Unique identifier (15-character alphanumeric)
 - `created` - Creation timestamp
 - `updated` - Last update timestamp
 
 ### Access Rules
-All collections use authenticated access:
+All collections require authentication:
 - `listRule`: `@request.auth.id != ""`
 - `viewRule`: `@request.auth.id != ""`
 - `createRule`: `@request.auth.id != ""`
 - `updateRule`: `@request.auth.id != ""`
 - `deleteRule`: `@request.auth.id != ""`
 
-This means users must be logged in to access any data.
+Users must be logged in to access any data.
 
-## Validation
+## Data Validation
 
-All data is validated using Zod schemas before import:
+All domain models use Zod schemas for validation:
 
 ```typescript
 import { ManagerSchema } from '$lib/domain/schemas';
 
-// Validate before import
 const result = ManagerSchema.safeParse(data);
 if (result.success) {
+  // Data is valid
   await pb.collection('managers').create(result.data);
 }
 ```
 
-Invalid records are skipped with a warning message.
-
-## Troubleshooting
-
-### Authentication Failed
-- Verify your admin email and password
-- Check that you're using admin credentials, not regular user credentials
-
-### Collection Already Exists
-- The migration script updates existing collections
-- Use `--dry-run` to preview changes first
-
-### Invalid Data
-- Check CSV file format matches expected columns
-- Review validation errors in console output
-- Fix data and re-run import
-
-### Connection Refused
-- Verify PocketBase URL is correct
-- Check that PocketBase is running
-- Ensure firewall allows connections
-
-## Manual Migration
-
-If you prefer to create collections manually:
-
-1. Access PocketBase admin UI
-2. Go to Collections
-3. Click "New Collection"
-4. Use the schema definitions in `src/lib/migrations/collections.ts`
-
-## Backup
-
-Before running migrations on production:
-
-```bash
-# Backup PocketBase data directory
-cp -r pb_data pb_data.backup
-```
-
-Or use PocketBase's built-in backup:
-1. Go to Settings → Backups in admin UI
-2. Create a backup
-3. Download the backup file
+See `docs/DOMAIN_MODELS.md` for complete schema definitions.
 
 ## Next Steps
 
-After successful migration:
+After successful import:
 
-1. Create user accounts in PocketBase admin
-2. Test authentication in FliHub
-3. Verify data appears in the application
-4. Set up regular backups
-
-## Support
-
-For issues or questions:
-- Check PocketBase docs: [pocketbase.io/docs](https://pocketbase.io/docs)
-- Review Zod validation errors
-- Check migration script logs
+1. Create user accounts in PocketBase admin UI
+2. Test authentication in FliHub application
+3. Verify collections and data appear correctly
+4. Set up regular backups in PocketBase settings
