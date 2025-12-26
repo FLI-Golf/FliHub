@@ -1,5 +1,6 @@
 [
   {
+    "id": "managers_collection",
     "name": "managers",
     "type": "base",
     "system": false,
@@ -14,7 +15,8 @@
           "min": 1,
           "max": 255,
           "pattern": ""
-        }
+        },
+        "id": "name_9eug0cl2kk"
       },
       {
         "name": "department",
@@ -36,7 +38,8 @@
             "Operations",
             "Apparel"
           ]
-        }
+        },
+        "id": "department_ka9xzoprva"
       },
       {
         "name": "email",
@@ -47,7 +50,8 @@
         "options": {
           "exceptDomains": [],
           "onlyDomains": []
-        }
+        },
+        "id": "email_lecirp3qwl"
       },
       {
         "name": "phone",
@@ -59,7 +63,8 @@
           "min": null,
           "max": null,
           "pattern": ""
-        }
+        },
+        "id": "phone_16r1yhmyw0"
       },
       {
         "name": "goals",
@@ -69,7 +74,8 @@
         "unique": false,
         "options": {
           "convertUrls": false
-        }
+        },
+        "id": "goals_kifnivdfbx"
       }
     ],
     "indexes": [],
@@ -80,6 +86,7 @@
     "deleteRule": "@request.auth.id != ''"
   },
   {
+    "id": "tasks_collection",
     "name": "tasks",
     "type": "base",
     "system": false,
@@ -94,7 +101,8 @@
           "min": 1,
           "max": 500,
           "pattern": ""
-        }
+        },
+        "id": "task_22rv54e0n9"
       },
       {
         "name": "subTasksChecklist",
@@ -104,7 +112,8 @@
         "unique": false,
         "options": {
           "convertUrls": false
-        }
+        },
+        "id": "subTasksChecklist_cjo8rqo53s"
       },
       {
         "name": "managers",
@@ -116,7 +125,8 @@
           "min": null,
           "max": null,
           "pattern": ""
-        }
+        },
+        "id": "managers_8qb2b5k9fo"
       },
       {
         "name": "track",
@@ -126,8 +136,14 @@
         "unique": false,
         "options": {
           "maxSelect": 1,
-          "values": ["Phase 1", "Phase 2", "Overall", "Other"]
-        }
+          "values": [
+            "Phase 1",
+            "Phase 2",
+            "Overall",
+            "Other"
+          ]
+        },
+        "id": "track_00smj5f52i"
       },
       {
         "name": "strategicGoal",
@@ -146,7 +162,8 @@
             "App",
             "Legal Tasks"
           ]
-        }
+        },
+        "id": "strategicGoal_kwaelb2bap"
       },
       {
         "name": "departments",
@@ -158,7 +175,8 @@
           "min": null,
           "max": null,
           "pattern": ""
-        }
+        },
+        "id": "departments_bct7zzm29v"
       },
       {
         "name": "quarters",
@@ -168,8 +186,14 @@
         "unique": false,
         "options": {
           "maxSelect": 1,
-          "values": ["Q1", "Q2", "Q3", "Q4"]
-        }
+          "values": [
+            "Q1",
+            "Q2",
+            "Q3",
+            "Q4"
+          ]
+        },
+        "id": "quarters_6rdkp9rxd1"
       },
       {
         "name": "startDate",
@@ -180,7 +204,8 @@
         "options": {
           "min": "",
           "max": ""
-        }
+        },
+        "id": "startDate_ck90nvwz2h"
       },
       {
         "name": "endDate",
@@ -191,7 +216,8 @@
         "options": {
           "min": "",
           "max": ""
-        }
+        },
+        "id": "endDate_8bi3ku7jr1"
       },
       {
         "name": "budget",
@@ -203,7 +229,8 @@
           "min": 0,
           "max": null,
           "noDecimal": false
-        }
+        },
+        "id": "budget_nibgz6sjb2"
       },
       {
         "name": "income",
@@ -215,7 +242,8 @@
           "min": 0,
           "max": null,
           "noDecimal": false
-        }
+        },
+        "id": "income_0s7gmck4pk"
       },
       {
         "name": "status",
@@ -225,8 +253,14 @@
         "unique": false,
         "options": {
           "maxSelect": 1,
-          "values": ["In Progress", "Scheduled", "Completed", "Cancelled"]
-        }
+          "values": [
+            "In Progress",
+            "Scheduled",
+            "Completed",
+            "Cancelled"
+          ]
+        },
+        "id": "status_j4hisbtq7g"
       }
     ],
     "indexes": [],
@@ -237,6 +271,7 @@
     "deleteRule": "@request.auth.id != ''"
   },
   {
+    "id": "broadcast_partners_collection",
     "name": "broadcast_partners",
     "type": "base",
     "system": false,
@@ -251,7 +286,8 @@
           "min": null,
           "max": null,
           "pattern": ""
-        }
+        },
+        "id": "point_gcn8agqhdi"
       },
       {
         "name": "details",
@@ -261,7 +297,8 @@
         "unique": false,
         "options": {
           "convertUrls": false
-        }
+        },
+        "id": "details_y083s9roo2"
       },
       {
         "name": "type",
@@ -271,8 +308,14 @@
         "unique": false,
         "options": {
           "maxSelect": 1,
-          "values": ["Key Point", "Supporting Point", "Risk", "Opportunity"]
-        }
+          "values": [
+            "Key Point",
+            "Supporting Point",
+            "Risk",
+            "Opportunity"
+          ]
+        },
+        "id": "type_f8ydmonefg"
       },
       {
         "name": "category",
@@ -291,7 +334,8 @@
             "Operational Efficiency",
             "Risk Management"
           ]
-        }
+        },
+        "id": "category_abphahs9pu"
       },
       {
         "name": "importanceLevel",
@@ -301,8 +345,13 @@
         "unique": false,
         "options": {
           "maxSelect": 1,
-          "values": ["High", "Medium", "Low"]
-        }
+          "values": [
+            "High",
+            "Medium",
+            "Low"
+          ]
+        },
+        "id": "importanceLevel_l20hrahnkc"
       },
       {
         "name": "tags",
@@ -314,7 +363,8 @@
           "min": null,
           "max": null,
           "pattern": ""
-        }
+        },
+        "id": "tags_06mmctkits"
       },
       {
         "name": "additionalNotes",
@@ -324,7 +374,8 @@
         "unique": false,
         "options": {
           "convertUrls": false
-        }
+        },
+        "id": "additionalNotes_uprohclex3"
       }
     ],
     "indexes": [],
@@ -335,6 +386,7 @@
     "deleteRule": "@request.auth.id != ''"
   },
   {
+    "id": "people_collection",
     "name": "people",
     "type": "base",
     "system": false,
@@ -349,7 +401,8 @@
           "min": 1,
           "max": 255,
           "pattern": ""
-        }
+        },
+        "id": "firstName_njh9fg201b"
       },
       {
         "name": "lastName",
@@ -361,7 +414,8 @@
           "min": 1,
           "max": 255,
           "pattern": ""
-        }
+        },
+        "id": "lastName_4k9n9my4jc"
       },
       {
         "name": "email",
@@ -372,7 +426,8 @@
         "options": {
           "exceptDomains": [],
           "onlyDomains": []
-        }
+        },
+        "id": "email_z4bpsv6csq"
       },
       {
         "name": "phone",
@@ -384,7 +439,8 @@
           "min": null,
           "max": null,
           "pattern": ""
-        }
+        },
+        "id": "phone_x7k3u1swve"
       },
       {
         "name": "type",
@@ -394,8 +450,16 @@
         "unique": false,
         "options": {
           "maxSelect": 1,
-          "values": ["contact", "sponsor", "partner", "pro", "player", "staff"]
-        }
+          "values": [
+            "contact",
+            "sponsor",
+            "partner",
+            "pro",
+            "player",
+            "staff"
+          ]
+        },
+        "id": "type_rlja9r8x78"
       },
       {
         "name": "status",
@@ -405,8 +469,13 @@
         "unique": false,
         "options": {
           "maxSelect": 1,
-          "values": ["active", "inactive", "pending"]
-        }
+          "values": [
+            "active",
+            "inactive",
+            "pending"
+          ]
+        },
+        "id": "status_du5w402szw"
       },
       {
         "name": "organization",
@@ -418,7 +487,8 @@
           "min": null,
           "max": null,
           "pattern": ""
-        }
+        },
+        "id": "organization_8kjicj4occ"
       },
       {
         "name": "notes",
@@ -428,7 +498,8 @@
         "unique": false,
         "options": {
           "convertUrls": false
-        }
+        },
+        "id": "notes_h272jk2koe"
       }
     ],
     "indexes": [],
@@ -439,6 +510,7 @@
     "deleteRule": "@request.auth.id != ''"
   },
   {
+    "id": "projects_collection",
     "name": "projects",
     "type": "base",
     "system": false,
@@ -453,7 +525,8 @@
           "min": 1,
           "max": 255,
           "pattern": ""
-        }
+        },
+        "id": "name_7ko7kt78qe"
       },
       {
         "name": "description",
@@ -463,7 +536,8 @@
         "unique": false,
         "options": {
           "convertUrls": false
-        }
+        },
+        "id": "description_7wm2jh3pze"
       },
       {
         "name": "type",
@@ -473,8 +547,14 @@
         "unique": false,
         "options": {
           "maxSelect": 1,
-          "values": ["tournament", "activation", "event", "campaign"]
-        }
+          "values": [
+            "tournament",
+            "activation",
+            "event",
+            "campaign"
+          ]
+        },
+        "id": "type_vlgfrox37j"
       },
       {
         "name": "status",
@@ -484,8 +564,15 @@
         "unique": false,
         "options": {
           "maxSelect": 1,
-          "values": ["draft", "planned", "in_progress", "completed", "cancelled"]
-        }
+          "values": [
+            "draft",
+            "planned",
+            "in_progress",
+            "completed",
+            "cancelled"
+          ]
+        },
+        "id": "status_suv0t5ised"
       },
       {
         "name": "startDate",
@@ -496,7 +583,8 @@
         "options": {
           "min": "",
           "max": ""
-        }
+        },
+        "id": "startDate_27xkz9fwcf"
       },
       {
         "name": "endDate",
@@ -507,7 +595,8 @@
         "options": {
           "min": "",
           "max": ""
-        }
+        },
+        "id": "endDate_onv5hn33fa"
       },
       {
         "name": "budget",
@@ -519,7 +608,8 @@
           "min": 0,
           "max": null,
           "noDecimal": false
-        }
+        },
+        "id": "budget_smq6hplh01"
       },
       {
         "name": "notes",
@@ -529,7 +619,8 @@
         "unique": false,
         "options": {
           "convertUrls": false
-        }
+        },
+        "id": "notes_95chcpsbn1"
       }
     ],
     "indexes": [],
@@ -540,6 +631,7 @@
     "deleteRule": "@request.auth.id != ''"
   },
   {
+    "id": "expenses_collection",
     "name": "expenses",
     "type": "base",
     "system": false,
@@ -554,7 +646,8 @@
           "min": 1,
           "max": 500,
           "pattern": ""
-        }
+        },
+        "id": "description_77n0tp9wt7"
       },
       {
         "name": "amount",
@@ -566,7 +659,8 @@
           "min": 0,
           "max": null,
           "noDecimal": false
-        }
+        },
+        "id": "amount_xrztycjian"
       },
       {
         "name": "category",
@@ -586,7 +680,8 @@
             "staff",
             "other"
           ]
-        }
+        },
+        "id": "category_kildodz49r"
       },
       {
         "name": "status",
@@ -596,8 +691,15 @@
         "unique": false,
         "options": {
           "maxSelect": 1,
-          "values": ["draft", "submitted", "approved", "rejected", "paid"]
-        }
+          "values": [
+            "draft",
+            "submitted",
+            "approved",
+            "rejected",
+            "paid"
+          ]
+        },
+        "id": "status_nnll9410qo"
       },
       {
         "name": "date",
@@ -608,7 +710,8 @@
         "options": {
           "min": "",
           "max": ""
-        }
+        },
+        "id": "date_0ohigl4tkd"
       },
       {
         "name": "submittedBy",
@@ -620,7 +723,8 @@
           "min": null,
           "max": null,
           "pattern": ""
-        }
+        },
+        "id": "submittedBy_avrg0rojge"
       },
       {
         "name": "approvedBy",
@@ -632,7 +736,8 @@
           "min": null,
           "max": null,
           "pattern": ""
-        }
+        },
+        "id": "approvedBy_p1h8mn3s5p"
       },
       {
         "name": "receiptUrl",
@@ -643,7 +748,8 @@
         "options": {
           "exceptDomains": [],
           "onlyDomains": []
-        }
+        },
+        "id": "receiptUrl_qhd88yg3ej"
       },
       {
         "name": "notes",
@@ -653,7 +759,8 @@
         "unique": false,
         "options": {
           "convertUrls": false
-        }
+        },
+        "id": "notes_wluet295mb"
       }
     ],
     "indexes": [],
