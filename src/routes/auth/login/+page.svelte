@@ -2,7 +2,7 @@
 	import { enhance } from '$app/forms';
 	import type { ActionData } from './$types';
 	import Card from '$lib/components/ui/card.svelte';
-	import Button from '$lib/components/ui/button.svelte';
+	import { Button } from '$lib/components/ui/button/index.js';
 
 	export let form: ActionData;
 </script>
