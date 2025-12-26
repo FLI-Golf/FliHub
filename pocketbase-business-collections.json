@@ -1,0 +1,376 @@
+[
+  {
+    "id": "managers_collection",
+    "name": "managers",
+    "type": "base",
+    "system": false,
+    "schema": [
+      {
+        "id": "name_field",
+        "name": "name",
+        "type": "text",
+        "required": true,
+        "presentable": false,
+        "unique": false,
+        "options": {
+          "min": 1,
+          "max": 255,
+          "pattern": ""
+        }
+      },
+      {
+        "id": "department_field",
+        "name": "department",
+        "type": "select",
+        "required": true,
+        "presentable": false,
+        "unique": false,
+        "options": {
+          "maxSelect": 1,
+          "values": [
+            "Publicist",
+            "Sales",
+            "Product Development",
+            "Finance",
+            "Marketing and PR",
+            "Technical",
+            "Production",
+            "Consultant",
+            "Operations",
+            "Apparel"
+          ]
+        }
+      },
+      {
+        "id": "email_field",
+        "name": "email",
+        "type": "email",
+        "required": false,
+        "presentable": false,
+        "unique": false,
+        "options": {
+          "exceptDomains": [],
+          "onlyDomains": []
+        }
+      },
+      {
+        "id": "phone_field",
+        "name": "phone",
+        "type": "text",
+        "required": false,
+        "presentable": false,
+        "unique": false,
+        "options": {
+          "min": null,
+          "max": null,
+          "pattern": ""
+        }
+      },
+      {
+        "id": "goals_field",
+        "name": "goals",
+        "type": "editor",
+        "required": false,
+        "presentable": false,
+        "unique": false,
+        "options": {
+          "convertUrls": false
+        }
+      }
+    ],
+    "indexes": [
+      "CREATE INDEX idx_managers_department ON managers (department)",
+      "CREATE INDEX idx_managers_email ON managers (email)"
+    ],
+    "listRule": "@request.auth.id != ''",
+    "viewRule": "@request.auth.id != ''",
+    "createRule": "@request.auth.id != ''",
+    "updateRule": "@request.auth.id != ''",
+    "deleteRule": "@request.auth.id != ''"
+  },
+  {
+    "id": "tasks_collection",
+    "name": "tasks",
+    "type": "base",
+    "system": false,
+    "schema": [
+      {
+        "id": "task_field",
+        "name": "task",
+        "type": "text",
+        "required": true,
+        "presentable": false,
+        "unique": false,
+        "options": {
+          "min": 1,
+          "max": 500,
+          "pattern": ""
+        }
+      },
+      {
+        "id": "subtasks_field",
+        "name": "subTasksChecklist",
+        "type": "editor",
+        "required": false,
+        "presentable": false,
+        "unique": false,
+        "options": {
+          "convertUrls": false
+        }
+      },
+      {
+        "id": "managers_field",
+        "name": "managers",
+        "type": "text",
+        "required": false,
+        "presentable": false,
+        "unique": false,
+        "options": {
+          "min": null,
+          "max": null,
+          "pattern": ""
+        }
+      },
+      {
+        "id": "track_field",
+        "name": "track",
+        "type": "select",
+        "required": false,
+        "presentable": false,
+        "unique": false,
+        "options": {
+          "maxSelect": 1,
+          "values": ["Phase 1", "Phase 2", "Overall", "Other"]
+        }
+      },
+      {
+        "id": "strategic_goal_field",
+        "name": "strategicGoal",
+        "type": "select",
+        "required": false,
+        "presentable": false,
+        "unique": false,
+        "options": {
+          "maxSelect": 1,
+          "values": [
+            "Company Growth",
+            "Brand Awareness",
+            "Revenue",
+            "Increase Revenue",
+            "Managerial Tasks",
+            "App",
+            "Legal Tasks"
+          ]
+        }
+      },
+      {
+        "id": "departments_field",
+        "name": "departments",
+        "type": "text",
+        "required": false,
+        "presentable": false,
+        "unique": false,
+        "options": {
+          "min": null,
+          "max": null,
+          "pattern": ""
+        }
+      },
+      {
+        "id": "quarters_field",
+        "name": "quarters",
+        "type": "select",
+        "required": false,
+        "presentable": false,
+        "unique": false,
+        "options": {
+          "maxSelect": 1,
+          "values": ["Q1", "Q2", "Q3", "Q4"]
+        }
+      },
+      {
+        "id": "start_date_field",
+        "name": "startDate",
+        "type": "date",
+        "required": false,
+        "presentable": false,
+        "unique": false,
+        "options": {
+          "min": "",
+          "max": ""
+        }
+      },
+      {
+        "id": "end_date_field",
+        "name": "endDate",
+        "type": "date",
+        "required": false,
+        "presentable": false,
+        "unique": false,
+        "options": {
+          "min": "",
+          "max": ""
+        }
+      },
+      {
+        "id": "budget_field",
+        "name": "budget",
+        "type": "number",
+        "required": false,
+        "presentable": false,
+        "unique": false,
+        "options": {
+          "min": 0,
+          "max": null,
+          "noDecimal": false
+        }
+      },
+      {
+        "id": "income_field",
+        "name": "income",
+        "type": "number",
+        "required": false,
+        "presentable": false,
+        "unique": false,
+        "options": {
+          "min": 0,
+          "max": null,
+          "noDecimal": false
+        }
+      },
+      {
+        "id": "status_field",
+        "name": "status",
+        "type": "select",
+        "required": true,
+        "presentable": false,
+        "unique": false,
+        "options": {
+          "maxSelect": 1,
+          "values": ["In Progress", "Scheduled", "Completed", "Cancelled"]
+        }
+      }
+    ],
+    "indexes": [
+      "CREATE INDEX idx_tasks_status ON tasks (status)",
+      "CREATE INDEX idx_tasks_track ON tasks (track)",
+      "CREATE INDEX idx_tasks_strategic_goal ON tasks (strategicGoal)",
+      "CREATE INDEX idx_tasks_quarters ON tasks (quarters)"
+    ],
+    "listRule": "@request.auth.id != ''",
+    "viewRule": "@request.auth.id != ''",
+    "createRule": "@request.auth.id != ''",
+    "updateRule": "@request.auth.id != ''",
+    "deleteRule": "@request.auth.id != ''"
+  },
+  {
+    "id": "broadcast_partners_collection",
+    "name": "broadcast_partners",
+    "type": "base",
+    "system": false,
+    "schema": [
+      {
+        "id": "point_field",
+        "name": "point",
+        "type": "text",
+        "required": true,
+        "presentable": false,
+        "unique": false,
+        "options": {
+          "min": null,
+          "max": null,
+          "pattern": ""
+        }
+      },
+      {
+        "id": "details_field",
+        "name": "details",
+        "type": "editor",
+        "required": true,
+        "presentable": false,
+        "unique": false,
+        "options": {
+          "convertUrls": false
+        }
+      },
+      {
+        "id": "type_field",
+        "name": "type",
+        "type": "select",
+        "required": true,
+        "presentable": false,
+        "unique": false,
+        "options": {
+          "maxSelect": 1,
+          "values": ["Key Point", "Supporting Point", "Risk", "Opportunity"]
+        }
+      },
+      {
+        "id": "category_field",
+        "name": "category",
+        "type": "select",
+        "required": true,
+        "presentable": false,
+        "unique": false,
+        "options": {
+          "maxSelect": 1,
+          "values": [
+            "Broadcasting & Audience Growth",
+            "Viewer Engagement",
+            "Revenue Opportunities",
+            "Technology & Innovation",
+            "Brand Building",
+            "Operational Efficiency",
+            "Risk Management"
+          ]
+        }
+      },
+      {
+        "id": "importance_field",
+        "name": "importanceLevel",
+        "type": "select",
+        "required": true,
+        "presentable": false,
+        "unique": false,
+        "options": {
+          "maxSelect": 1,
+          "values": ["High", "Medium", "Low"]
+        }
+      },
+      {
+        "id": "tags_field",
+        "name": "tags",
+        "type": "text",
+        "required": false,
+        "presentable": false,
+        "unique": false,
+        "options": {
+          "min": null,
+          "max": null,
+          "pattern": ""
+        }
+      },
+      {
+        "id": "notes_field",
+        "name": "additionalNotes",
+        "type": "editor",
+        "required": false,
+        "presentable": false,
+        "unique": false,
+        "options": {
+          "convertUrls": false
+        }
+      }
+    ],
+    "indexes": [
+      "CREATE INDEX idx_broadcast_partners_type ON broadcast_partners (type)",
+      "CREATE INDEX idx_broadcast_partners_category ON broadcast_partners (category)",
+      "CREATE INDEX idx_broadcast_partners_importance ON broadcast_partners (importanceLevel)"
+    ],
+    "listRule": "@request.auth.id != ''",
+    "viewRule": "@request.auth.id != ''",
+    "createRule": "@request.auth.id != ''",
+    "updateRule": "@request.auth.id != ''",
+    "deleteRule": "@request.auth.id != ''"
+  }
+]
