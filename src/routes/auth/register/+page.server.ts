@@ -39,6 +39,8 @@ export const actions = {
 		}
 
 		try {
+			console.log('Starting registration for:', email);
+
 			// Create user account
 			const user = await locals.pb.collection('users').create({
 				email,
@@ -46,9 +48,10 @@ export const actions = {
 				passwordConfirm: password,
 				emailVisibility: true
 			});
+			console.log('User created:', user.id);
 
 			// Create user profile with default role 'leader'
-			await locals.pb.collection('user_profiles').create({
+			const profile = await locals.pb.collection('user_profiles').create({
 				userId: user.id,
 				role: 'leader',
 				firstName,
@@ -56,17 +59,27 @@ export const actions = {
 				email,
 				status: 'active'
 			});
+			console.log('User profile created:', profile.id);
 
 			// Auto-login after registration
-			await locals.pb.collection('users').authWithPassword(email, password);
+			const authData = await locals.pb.collection('users').authWithPassword(email, password);
+			console.log('User authenticated:', authData.token ? 'Token received' : 'No token');
+			console.log('Auth store valid:', locals.pb.authStore.isValid);
+			console.log('Auth store model:', locals.pb.authStore.model?.id);
 
 			throw redirect(303, '/dashboard');
 		} catch (error: any) {
 			console.error('Registration error:', error);
 			
+			// Don't catch redirect errors
+			if (error?.status === 303) {
+				throw error;
+			}
+			
 			// Handle specific PocketBase errors
 			if (error.data?.data) {
 				const errors = error.data.data;
+				console.error('PocketBase validation errors:', errors);
 				if (errors.email) {
 					return fail(400, {
 						error: 'Email already exists',
@@ -75,10 +88,18 @@ export const actions = {
 						lastName
 					});
 				}
+				if (errors.userId) {
+					return fail(400, {
+						error: 'User profile creation failed: ' + JSON.stringify(errors.userId),
+						email,
+						firstName,
+						lastName
+					});
+				}
 			}
 
 			return fail(400, {
-				error: 'Registration failed. Please try again.',
+				error: error.message || 'Registration failed. Please try again.',
 				email,
 				firstName,
 				lastName
