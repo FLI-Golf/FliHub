@@ -1,17 +1,8 @@
 import { Entity } from '../../base/Entity';
+import { ManagerSchema, type Department, type ManagerInput } from '../../schemas/manager.schema';
+import type { z } from 'zod';
 
-export enum Department {
-	PUBLICIST = 'Publicist',
-	SALES = 'Sales',
-	PRODUCT_DEVELOPMENT = 'Product Development',
-	FINANCE = 'Finance',
-	MARKETING_PR = 'Marketing and PR',
-	TECHNICAL = 'Technical',
-	PRODUCTION = 'Production',
-	CONSULTANT = 'Consultant',
-	OPERATIONS = 'Operations',
-	APPAREL = 'Apparel'
-}
+export { Department } from '../../schemas/manager.schema';
 
 export interface ManagerProps {
 	name: string;
@@ -77,21 +68,13 @@ export class Manager extends Entity<ManagerProps> {
 	}
 
 	public validate(): string[] {
-		const errors: string[] = [];
-
-		if (!this.props.name || this.props.name.trim().length === 0) {
-			errors.push('Manager name is required');
+		const result = ManagerSchema.safeParse(this.toRecord());
+		
+		if (result.success) {
+			return [];
 		}
-
-		if (!this.props.department) {
-			errors.push('Department is required');
-		}
-
-		if (this.props.email && !this.isValidEmail(this.props.email)) {
-			errors.push('Invalid email format');
-		}
-
-		return errors;
+		
+		return result.error.errors.map(err => `${err.path.join('.')}: ${err.message}`);
 	}
 
 	public toRecord(): Record<string, any> {
