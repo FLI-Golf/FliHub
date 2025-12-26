@@ -70,6 +70,7 @@ export const actions = {
 			throw redirect(303, '/dashboard');
 		} catch (error: any) {
 			console.error('Registration error:', error);
+			console.error('Error details:', JSON.stringify(error, null, 2));
 			
 			// Don't catch redirect errors
 			if (error?.status === 303) {
@@ -79,7 +80,7 @@ export const actions = {
 			// Handle specific PocketBase errors
 			if (error.data?.data) {
 				const errors = error.data.data;
-				console.error('PocketBase validation errors:', errors);
+				console.error('PocketBase validation errors:', JSON.stringify(errors, null, 2));
 				if (errors.email) {
 					return fail(400, {
 						error: 'Email already exists',
@@ -98,8 +99,14 @@ export const actions = {
 				}
 			}
 
+			// Return detailed error message
+			const errorMessage = error.message || 'Registration failed. Please try again.';
+			const detailedError = error.data ? `${errorMessage} - ${JSON.stringify(error.data)}` : errorMessage;
+			
+			console.error('Returning error to client:', detailedError);
+
 			return fail(400, {
-				error: error.message || 'Registration failed. Please try again.',
+				error: detailedError,
 				email,
 				firstName,
 				lastName
