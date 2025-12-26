@@ -1,7 +1,8 @@
 import Papa from 'papaparse';
-import type { Manager, Department } from '$lib/domain/modules/people';
 import type { Task, TaskStatus, TaskTrack, StrategicGoal, Quarter } from '$lib/domain/modules/projects';
 
+// DEPRECATED: Managers are now user_profiles with role='leader'
+// Keeping these types for backward compatibility
 export interface ManagerCSVRow {
 	Name: string;
 	Department: string;
@@ -24,6 +25,7 @@ export interface TaskCSVRow {
 	Income: string;
 }
 
+// DEPRECATED: Use import-managers.js script instead
 export function parseManagersCSV(csvText: string): ManagerCSVRow[] {
 	const result = Papa.parse<ManagerCSVRow>(csvText, {
 		header: true,
@@ -50,13 +52,17 @@ export function parseTasksCSV(csvText: string): TaskCSVRow[] {
 	);
 }
 
+// DEPRECATED: Managers are now user_profiles
 export function managerCSVToRecord(row: ManagerCSVRow) {
+	const nameParts = row.Name.split(' ');
 	return {
-		name: row.Name,
-		department: row.Department as Department,
+		firstName: nameParts[0] || row.Name,
+		lastName: nameParts.slice(1).join(' ') || row.Name,
 		email: row.Email || undefined,
 		phone: row.Phone || undefined,
-		goals: row.Goals || undefined
+		organization: row.Department,
+		role: 'leader' as const,
+		status: 'active' as const
 	};
 }
 

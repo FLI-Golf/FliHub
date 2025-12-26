@@ -50,6 +50,11 @@ export const actions = {
 			});
 			console.log('User created:', user.id);
 
+			// Authenticate immediately so we can create the profile
+			// (the create rule requires @request.auth.id != '')
+			await locals.pb.collection('users').authWithPassword(email, password);
+			console.log('User authenticated for profile creation');
+
 			// Create user profile with default role 'leader'
 			const profile = await locals.pb.collection('user_profiles').create({
 				userId: user.id,
@@ -60,12 +65,6 @@ export const actions = {
 				status: 'active'
 			});
 			console.log('User profile created:', profile.id);
-
-			// Auto-login after registration
-			const authData = await locals.pb.collection('users').authWithPassword(email, password);
-			console.log('User authenticated:', authData.token ? 'Token received' : 'No token');
-			console.log('Auth store valid:', locals.pb.authStore.isValid);
-			console.log('Auth store model:', locals.pb.authStore.model?.id);
 
 			throw redirect(303, '/dashboard');
 		} catch (error: any) {
