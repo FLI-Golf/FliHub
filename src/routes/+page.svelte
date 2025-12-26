@@ -17,7 +17,7 @@
 	<title>FliHub - Business OS for FLI Golf</title>
 </svelte:head>
 
-<div class="min-h-screen bg-white">
+<div class="min-h-screen bg-background">
 	<!-- Header -->
 	<header class="border-b">
 		<div class="container mx-auto px-6 py-4 flex items-center justify-between">
@@ -72,8 +72,8 @@
 			<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
 				<!-- Managers -->
 				<div class="border-2 rounded-lg p-8 hover:shadow-lg transition-shadow">
-					<div class="flex size-14 items-center justify-center rounded-xl bg-black dark:bg-white text-white dark:text-black mb-6">
-						<Users class="size-7 stroke-[2]" />
+					<div class="flex size-14 items-center justify-center rounded-xl bg-black dark:bg-white mb-6">
+						<Users class="size-7 stroke-[2] text-white dark:text-black" />
 					</div>
 					<h3 class="text-2xl font-bold mb-3">Managers</h3>
 					<p class="text-muted-foreground mb-4">
@@ -97,8 +97,8 @@
 
 				<!-- Tasks -->
 				<div class="border-2 rounded-lg p-8 hover:shadow-lg transition-shadow">
-					<div class="flex size-14 items-center justify-center rounded-xl bg-black dark:bg-white text-white dark:text-black mb-6">
-						<ListTodo class="size-7 stroke-[2]" />
+					<div class="flex size-14 items-center justify-center rounded-xl bg-black dark:bg-white mb-6">
+						<ListTodo class="size-7 stroke-[2] text-white dark:text-black" />
 					</div>
 					<h3 class="text-2xl font-bold mb-3">Tasks</h3>
 					<p class="text-muted-foreground mb-4">
@@ -122,8 +122,8 @@
 
 				<!-- People -->
 				<div class="border-2 rounded-lg p-8 hover:shadow-lg transition-shadow">
-					<div class="flex size-14 items-center justify-center rounded-xl bg-black dark:bg-white text-white dark:text-black mb-6">
-						<UserCircle class="size-7 stroke-[2]" />
+					<div class="flex size-14 items-center justify-center rounded-xl bg-black dark:bg-white mb-6">
+						<UserCircle class="size-7 stroke-[2] text-white dark:text-black" />
 					</div>
 					<h3 class="text-2xl font-bold mb-3">People</h3>
 					<p class="text-muted-foreground mb-4">
@@ -147,8 +147,8 @@
 
 				<!-- Projects -->
 				<div class="border-2 rounded-lg p-8 hover:shadow-lg transition-shadow">
-					<div class="flex size-14 items-center justify-center rounded-xl bg-black dark:bg-white text-white dark:text-black mb-6">
-						<FolderKanban class="size-7 stroke-[2]" />
+					<div class="flex size-14 items-center justify-center rounded-xl bg-black dark:bg-white mb-6">
+						<FolderKanban class="size-7 stroke-[2] text-white dark:text-black" />
 					</div>
 					<h3 class="text-2xl font-bold mb-3">Projects</h3>
 					<p class="text-muted-foreground mb-4">
@@ -172,8 +172,8 @@
 
 				<!-- Expenses -->
 				<div class="border-2 rounded-lg p-8 hover:shadow-lg transition-shadow">
-					<div class="flex size-14 items-center justify-center rounded-xl bg-black dark:bg-white text-white dark:text-black mb-6">
-						<Receipt class="size-7 stroke-[2]" />
+					<div class="flex size-14 items-center justify-center rounded-xl bg-black dark:bg-white mb-6">
+						<Receipt class="size-7 stroke-[2] text-white dark:text-black" />
 					</div>
 					<h3 class="text-2xl font-bold mb-3">Expenses</h3>
 					<p class="text-muted-foreground mb-4">
@@ -197,8 +197,8 @@
 
 				<!-- Dashboard -->
 				<div class="border-2 rounded-lg p-8 hover:shadow-lg transition-shadow">
-					<div class="flex size-14 items-center justify-center rounded-xl bg-black dark:bg-white text-white dark:text-black mb-6">
-						<LayoutDashboard class="size-7 stroke-[2]" />
+					<div class="flex size-14 items-center justify-center rounded-xl bg-black dark:bg-white mb-6">
+						<LayoutDashboard class="size-7 stroke-[2] text-white dark:text-black" />
 					</div>
 					<h3 class="text-2xl font-bold mb-3">Dashboard</h3>
 					<p class="text-muted-foreground mb-4">

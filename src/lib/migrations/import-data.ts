@@ -21,8 +21,8 @@ export async function importData(options: ImportOptions) {
 		await pb.admins.authWithPassword(email, password);
 		console.log('✅ Authenticated successfully\n');
 
-		// Import Managers
-		await importManagers(pb, `${dataDir}/Managers.csv`, dryRun);
+		// Note: Managers are now imported as user_profiles via the import-managers.js script
+		// await importManagers(pb, `${dataDir}/Managers.csv`, dryRun);
 
 		// Import Tasks
 		await importTasks(pb, `${dataDir}/Business Roadmap.csv`, dryRun);
@@ -37,44 +37,11 @@ export async function importData(options: ImportOptions) {
 	}
 }
 
-async function importManagers(pb: PocketBase, filePath: string, dryRun: boolean) {
-	console.log(`📥 Importing managers from ${filePath}...`);
-
-	try {
-		const content = readFileSync(filePath, 'utf-8');
-		const records = parse(content, { columns: true, skip_empty_lines: true });
-
-		let imported = 0;
-		let skipped = 0;
-
-		for (const record of records) {
-			try {
-				const data = {
-					name: record.Name,
-					department: record.Department,
-					email: record.Email || undefined,
-					phone: record.Phone || undefined,
-					goals: record.Goals || undefined
-				};
-
-				// Validate with Zod
-				const validated = ManagerSchema.parse(data);
-
-				if (!dryRun) {
-					await pb.collection('managers').create(validated);
-				}
-				imported++;
-			} catch (error: any) {
-				console.error(`  ⚠️  Skipped invalid record:`, error.message);
-				skipped++;
-			}
-		}
-
-		console.log(`✅ Managers: ${imported} imported, ${skipped} skipped\n`);
-	} catch (error: any) {
-		console.error(`❌ Error importing managers:`, error.message);
-	}
-}
+// DEPRECATED: Managers are now imported as user_profiles with role='leader'
+// Use the import-managers.js script instead
+// async function importManagers(pb: PocketBase, filePath: string, dryRun: boolean) {
+// 	...
+// }
 
 async function importTasks(pb: PocketBase, filePath: string, dryRun: boolean) {
 	console.log(`📥 Importing tasks from ${filePath}...`);
@@ -86,7 +53,7 @@ async function importTasks(pb: PocketBase, filePath: string, dryRun: boolean) {
 		let imported = 0;
 		let skipped = 0;
 
-		for (const record of records) {
+		for (const record of records as any[]) {
 			// Skip summary rows
 			if (
 				!record.Task ||
@@ -158,7 +125,7 @@ async function importBroadcastPartners(pb: PocketBase, filePath: string, dryRun:
 		let imported = 0;
 		let skipped = 0;
 
-		for (const record of records) {
+		for (const record of records as any[]) {
 			try {
 				const data = {
 					point: record.Point,

@@ -6,7 +6,7 @@
 	import * as Breadcrumb from '$lib/components/ui/breadcrumb/index.js';
 	import { Separator } from '$lib/components/ui/separator/index.js';
 	import * as DropdownMenu from '$lib/components/ui/dropdown-menu/index.js';
-	import { Button } from '$lib/components/ui/button/index.js';
+	import { buttonVariants } from '$lib/components/ui/button/index.js';
 	import { ChevronDown } from 'lucide-svelte';
 	
 	export let data: LayoutData;
@@ -30,11 +30,9 @@
 			<div class="flex items-center gap-2 px-6">
 				<ModeToggle />
 				<DropdownMenu.Root>
-					<DropdownMenu.Trigger asChild let:builder>
-						<Button builders={[builder]} variant="ghost" size="sm" class="gap-2 font-medium">
-							<span class="text-sm">{data.user?.email}</span>
-							<ChevronDown class="size-4 stroke-[2]" />
-						</Button>
+					<DropdownMenu.Trigger class={buttonVariants({ variant: 'ghost', size: 'sm' }) + ' gap-2'}>
+						<span class="text-sm">{data.user?.email}</span>
+						<ChevronDown class="size-4 stroke-[2]" />
 					</DropdownMenu.Trigger>
 					<DropdownMenu.Content align="end" class="w-48">
 						<DropdownMenu.Item>

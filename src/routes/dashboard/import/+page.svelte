@@ -1,51 +1,29 @@
 <script lang="ts">
 	import Card from '$lib/components/ui/card.svelte';
 	import { Button } from '$lib/components/ui/button/index.js';
-	import { parseManagersCSV, parseTasksCSV, managerCSVToRecord, taskCSVToRecord } from '$lib/utils/csv-import';
+	import { parseTasksCSV, taskCSVToRecord } from '$lib/utils/csv-import';
 
-	let managersFile: FileList | null = $state(null);
 	let tasksFile: FileList | null = $state(null);
 	let importing = $state(false);
+	let submitting = $state(false);
 	let result = $state<string>('');
+	let parsedTasks = $state<any[]>([]);
 
-	async function importManagers() {
-		if (!managersFile || managersFile.length === 0) return;
-
-		importing = true;
-		result = '';
-
-		try {
-			const text = await managersFile[0].text();
-			const rows = parseManagersCSV(text);
-			
-			result = `Parsed ${rows.length} managers:\n\n`;
-			rows.forEach(row => {
-				const record = managerCSVToRecord(row);
-				result += `- ${record.name} (${record.department})\n`;
-			});
-
-			result += '\n✅ Ready to import to PocketBase';
-		} catch (error) {
-			result = `❌ Error: ${error}`;
-		} finally {
-			importing = false;
-		}
-	}
-
-	async function importTasks() {
+	async function previewTasks() {
 		if (!tasksFile || tasksFile.length === 0) return;
 
 		importing = true;
 		result = '';
+		parsedTasks = [];
 
 		try {
 			const text = await tasksFile[0].text();
 			const rows = parseTasksCSV(text);
+			parsedTasks = rows.map(row => taskCSVToRecord(row));
 			
 			result = `Parsed ${rows.length} tasks:\n\n`;
-			rows.slice(0, 10).forEach(row => {
-				const record = taskCSVToRecord(row);
-				result += `- ${record.task} (${record.status})\n`;
+			parsedTasks.slice(0, 10).forEach(task => {
+				result += `- ${task.task} (${task.status})\n`;
 			});
 
 			if (rows.length > 10) {
@@ -59,6 +37,37 @@
 			importing = false;
 		}
 	}
+
+	async function submitImport() {
+		if (parsedTasks.length === 0) return;
+
+		submitting = true;
+
+		try {
+			const response = await fetch('/api/tasks/bulk-import', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ tasks: parsedTasks })
+			});
+
+			const data = await response.json();
+
+			if (response.ok) {
+				result = `✅ Successfully imported ${data.imported} tasks!\n\n`;
+				if (data.skipped > 0) {
+					result += `⚠️ Skipped ${data.skipped} tasks (already exist or errors)\n`;
+				}
+				parsedTasks = [];
+				tasksFile = null;
+			} else {
+				result = `❌ Import failed: ${data.error}`;
+			}
+		} catch (error) {
+			result = `❌ Error: ${error}`;
+		} finally {
+			submitting = false;
+		}
+	}
 </script>
 
 <svelte:head>
@@ -69,22 +78,10 @@
 	<h1 class="text-3xl font-bold mb-6">Import CSV Data</h1>
 
 	<div class="space-y-6">
-		<Card class="p-6">
+		<Card class="p-6 bg-muted/50">
 			<h2 class="text-xl font-semibold mb-4">Import Managers</h2>
-			<p class="text-slate-600 mb-4">Upload the Managers.csv file to preview the data.</p>
-			
-			<div class="space-y-4">
-				<input
-					type="file"
-					accept=".csv"
-					bind:files={managersFile}
-					class="block w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-primary file:text-primary-foreground hover:file:bg-primary/90"
-				/>
-				
-				<Button onclick={importManagers} disabled={!managersFile || importing}>
-					{importing ? 'Processing...' : 'Preview Managers'}
-				</Button>
-			</div>
+			<p class="text-muted-foreground mb-2">Managers are now imported as user accounts with profiles.</p>
+			<p class="text-sm text-muted-foreground">All managers from Managers.csv have been imported as users with role='leader'. View them in the <a href="/dashboard/managers" class="text-primary hover:underline">Managers</a> section.</p>
 		</Card>
 
 		<Card class="p-6">

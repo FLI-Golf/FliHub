@@ -1,0 +1,233 @@
+[
+  {
+    "id": "tasks_collection",
+    "listRule": "@request.auth.id != ''",
+    "viewRule": "@request.auth.id != ''",
+    "createRule": "@request.auth.id != ''",
+    "updateRule": "@request.auth.id != ''",
+    "deleteRule": "@request.auth.id != ''",
+    "name": "tasks",
+    "type": "base",
+    "fields": [
+      {
+        "autogeneratePattern": "[a-z0-9]{15}",
+        "hidden": false,
+        "id": "text3208210256",
+        "max": 15,
+        "min": 15,
+        "name": "id",
+        "pattern": "^[a-z0-9]+$",
+        "presentable": false,
+        "primaryKey": true,
+        "required": true,
+        "system": true,
+        "type": "text"
+      },
+      {
+        "autogeneratePattern": "",
+        "hidden": false,
+        "id": "title_22rv54e0n9",
+        "max": 500,
+        "min": 1,
+        "name": "title",
+        "pattern": "",
+        "presentable": false,
+        "primaryKey": false,
+        "required": true,
+        "system": false,
+        "type": "text"
+      },
+      {
+        "convertURLs": false,
+        "hidden": false,
+        "id": "description_7wm2jh3pze",
+        "maxSize": 0,
+        "name": "description",
+        "presentable": false,
+        "required": false,
+        "system": false,
+        "type": "editor"
+      },
+      {
+        "convertURLs": false,
+        "hidden": false,
+        "id": "subTasksChecklist_cjo8rqo53s",
+        "maxSize": 0,
+        "name": "subTasksChecklist",
+        "presentable": false,
+        "required": false,
+        "system": false,
+        "type": "json"
+      },
+      {
+        "hidden": false,
+        "id": "status_j4hisbtq7g",
+        "maxSelect": 1,
+        "name": "status",
+        "presentable": false,
+        "required": true,
+        "system": false,
+        "type": "select",
+        "values": [
+          "todo",
+          "in_progress",
+          "blocked",
+          "completed",
+          "cancelled"
+        ]
+      },
+      {
+        "hidden": false,
+        "id": "priority_9mk3p2n7xw",
+        "maxSelect": 1,
+        "name": "priority",
+        "presentable": false,
+        "required": false,
+        "system": false,
+        "type": "select",
+        "values": [
+          "low",
+          "medium",
+          "high",
+          "urgent"
+        ]
+      },
+      {
+        "hidden": false,
+        "id": "startDate_ck90nvwz2h",
+        "max": "",
+        "min": "",
+        "name": "startDate",
+        "presentable": false,
+        "required": false,
+        "system": false,
+        "type": "date"
+      },
+      {
+        "hidden": false,
+        "id": "dueDate_8bi3ku7jr1",
+        "max": "",
+        "min": "",
+        "name": "dueDate",
+        "presentable": false,
+        "required": false,
+        "system": false,
+        "type": "date"
+      },
+      {
+        "hidden": false,
+        "id": "completedDate_2nk8j4m9xw",
+        "max": "",
+        "min": "",
+        "name": "completedDate",
+        "presentable": false,
+        "required": false,
+        "system": false,
+        "type": "date"
+      },
+      {
+        "cascadeDelete": false,
+        "collectionId": "projects_collection",
+        "hidden": false,
+        "id": "projectId_8kj3m9p2qw",
+        "maxSelect": 1,
+        "minSelect": 0,
+        "name": "projectId",
+        "presentable": false,
+        "required": false,
+        "system": false,
+        "type": "relation"
+      },
+      {
+        "cascadeDelete": false,
+        "collectionId": "user_profiles_collection",
+        "hidden": false,
+        "id": "assignedTo_5pk2n7m4qw",
+        "maxSelect": 10,
+        "minSelect": 0,
+        "name": "assignedTo",
+        "presentable": false,
+        "required": false,
+        "system": false,
+        "type": "relation"
+      },
+      {
+        "cascadeDelete": false,
+        "collectionId": "user_profiles_collection",
+        "hidden": false,
+        "id": "createdBy_4nk8m2p9qw",
+        "maxSelect": 1,
+        "minSelect": 0,
+        "name": "createdBy",
+        "presentable": false,
+        "required": false,
+        "system": false,
+        "type": "relation"
+      },
+      {
+        "cascadeDelete": false,
+        "collectionId": "managers_collection",
+        "hidden": false,
+        "id": "managerId_7pk3n9m2xw",
+        "maxSelect": 1,
+        "minSelect": 0,
+        "name": "managerId",
+        "presentable": false,
+        "required": false,
+        "system": false,
+        "type": "relation"
+      },
+      {
+        "autogeneratePattern": "",
+        "hidden": false,
+        "id": "tags_06mmctkits",
+        "max": 0,
+        "min": 0,
+        "name": "tags",
+        "pattern": "",
+        "presentable": false,
+        "primaryKey": false,
+        "required": false,
+        "system": false,
+        "type": "text"
+      },
+      {
+        "hidden": false,
+        "id": "estimatedHours_1nk2m9p3xw",
+        "max": null,
+        "min": 0,
+        "name": "estimatedHours",
+        "onlyInt": false,
+        "presentable": false,
+        "required": false,
+        "system": false,
+        "type": "number"
+      },
+      {
+        "hidden": false,
+        "id": "actualHours_3mk8p4n7qw",
+        "max": null,
+        "min": 0,
+        "name": "actualHours",
+        "onlyInt": false,
+        "presentable": false,
+        "required": false,
+        "system": false,
+        "type": "number"
+      },
+      {
+        "convertURLs": false,
+        "hidden": false,
+        "id": "notes_95chcpsbn1",
+        "maxSize": 0,
+        "name": "notes",
+        "presentable": false,
+        "required": false,
+        "system": false,
+        "type": "editor"
+      }
+    ],
+    "indexes": [],
+    "system": false
+  }
+]

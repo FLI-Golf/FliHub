@@ -2,7 +2,7 @@ import { Entity } from '../../base/Entity';
 import { ManagerSchema, type Department, type ManagerInput } from '../../schemas/manager.schema';
 import type { z } from 'zod';
 
-export { Department } from '../../schemas/manager.schema';
+export type { Department } from '../../schemas/manager.schema';
 
 export interface ManagerProps {
 	name: string;
@@ -74,7 +74,7 @@ export class Manager extends Entity<ManagerProps> {
 			return [];
 		}
 		
-		return result.error.errors.map(err => `${err.path.join('.')}: ${err.message}`);
+		return result.error.issues.map((err: any) => `${err.path.join('.')}: ${err.message}`);
 	}
 
 	public toRecord(): Record<string, any> {

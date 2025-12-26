@@ -9,16 +9,14 @@ export const actions = {
 		const confirmPassword = data.get('confirmPassword') as string;
 		const firstName = data.get('firstName') as string;
 		const lastName = data.get('lastName') as string;
-		const role = data.get('role') as string;
 
 		// Validation
-		if (!email || !password || !confirmPassword || !firstName || !lastName || !role) {
+		if (!email || !password || !confirmPassword || !firstName || !lastName) {
 			return fail(400, {
 				error: 'All fields are required',
 				email,
 				firstName,
-				lastName,
-				role
+				lastName
 			});
 		}
 
@@ -27,8 +25,7 @@ export const actions = {
 				error: 'Passwords do not match',
 				email,
 				firstName,
-				lastName,
-				role
+				lastName
 			});
 		}
 
@@ -37,12 +34,13 @@ export const actions = {
 				error: 'Password must be at least 8 characters',
 				email,
 				firstName,
-				lastName,
-				role
+				lastName
 			});
 		}
 
 		try {
+			console.log('Starting registration for:', email);
+
 			// Create user account
 			const user = await locals.pb.collection('users').create({
 				email,
@@ -50,43 +48,67 @@ export const actions = {
 				passwordConfirm: password,
 				emailVisibility: true
 			});
+			console.log('User created:', user.id);
 
-			// Create user profile
-			await locals.pb.collection('user_profiles').create({
+			// Authenticate immediately so we can create the profile
+			// (the create rule requires @request.auth.id != '')
+			await locals.pb.collection('users').authWithPassword(email, password);
+			console.log('User authenticated for profile creation');
+
+			// Create user profile with default role 'leader'
+			const profile = await locals.pb.collection('user_profiles').create({
 				userId: user.id,
-				role,
+				role: 'leader',
 				firstName,
 				lastName,
-				isActive: true
+				email,
+				status: 'active'
 			});
-
-			// Auto-login after registration
-			await locals.pb.collection('users').authWithPassword(email, password);
+			console.log('User profile created:', profile.id);
 
 			throw redirect(303, '/dashboard');
 		} catch (error: any) {
 			console.error('Registration error:', error);
+			console.error('Error details:', JSON.stringify(error, null, 2));
+			
+			// Don't catch redirect errors
+			if (error?.status === 303) {
+				throw error;
+			}
 			
 			// Handle specific PocketBase errors
 			if (error.data?.data) {
 				const errors = error.data.data;
+				console.error('PocketBase validation errors:', JSON.stringify(errors, null, 2));
 				if (errors.email) {
 					return fail(400, {
 						error: 'Email already exists',
 						email,
 						firstName,
-						lastName,
-						role
+						lastName
+					});
+				}
+				if (errors.userId) {
+					return fail(400, {
+						error: 'User profile creation failed: ' + JSON.stringify(errors.userId),
+						email,
+						firstName,
+						lastName
 					});
 				}
 			}
 
+			// Return detailed error message
+			const errorMessage = error.message || 'Registration failed. Please try again.';
+			const detailedError = error.data ? `${errorMessage} - ${JSON.stringify(error.data)}` : errorMessage;
+			
+			console.error('Returning error to client:', detailedError);
+
 			return fail(400, {
-				error: 'Registration failed. Please try again.',
+				error: detailedError,
 				email,
 				firstName,
-				lastName,
-				role
+				lastName
 			});
 		}
 	}
