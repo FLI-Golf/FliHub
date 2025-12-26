@@ -5,22 +5,25 @@
 
 	let tasksFile: FileList | null = $state(null);
 	let importing = $state(false);
+	let submitting = $state(false);
 	let result = $state<string>('');
+	let parsedTasks = $state<any[]>([]);
 
-	async function importTasks() {
+	async function previewTasks() {
 		if (!tasksFile || tasksFile.length === 0) return;
 
 		importing = true;
 		result = '';
+		parsedTasks = [];
 
 		try {
 			const text = await tasksFile[0].text();
 			const rows = parseTasksCSV(text);
+			parsedTasks = rows.map(row => taskCSVToRecord(row));
 			
 			result = `Parsed ${rows.length} tasks:\n\n`;
-			rows.slice(0, 10).forEach(row => {
-				const record = taskCSVToRecord(row);
-				result += `- ${record.task} (${record.status})\n`;
+			parsedTasks.slice(0, 10).forEach(task => {
+				result += `- ${task.task} (${task.status})\n`;
 			});
 
 			if (rows.length > 10) {
@@ -32,6 +35,37 @@
 			result = `❌ Error: ${error}`;
 		} finally {
 			importing = false;
+		}
+	}
+
+	async function submitImport() {
+		if (parsedTasks.length === 0) return;
+
+		submitting = true;
+
+		try {
+			const response = await fetch('/api/tasks/bulk-import', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ tasks: parsedTasks })
+			});
+
+			const data = await response.json();
+
+			if (response.ok) {
+				result = `✅ Successfully imported ${data.imported} tasks!\n\n`;
+				if (data.skipped > 0) {
+					result += `⚠️ Skipped ${data.skipped} tasks (already exist or errors)\n`;
+				}
+				parsedTasks = [];
+				tasksFile = null;
+			} else {
+				result = `❌ Import failed: ${data.error}`;
+			}
+		} catch (error) {
+			result = `❌ Error: ${error}`;
+		} finally {
+			submitting = false;
 		}
 	}
 </script>
