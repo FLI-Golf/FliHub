@@ -6,6 +6,7 @@
 	import MetricCard from '$lib/components/metrics/metric-card.svelte';
 	import ProgressBar from '$lib/components/metrics/progress-bar.svelte';
 	import StatusBadge from '$lib/components/metrics/status-badge.svelte';
+	import AddProjectModal from '$lib/components/projects/add-project-modal.svelte';
 	import { 
 		FolderKanban, 
 		DollarSign, 
@@ -25,6 +26,8 @@
 	} from 'lucide-svelte';
 	
 	let { data }: { data: PageData } = $props();
+	
+	let showAddModal = $state(false);
 	
 	let projects = $derived(data.projects || []);
 	let stats = $derived(data.stats);
@@ -103,11 +106,14 @@
 			<h1 class="text-3xl font-bold mb-2">Projects</h1>
 			<p class="text-muted-foreground">Manage tournaments, events, activations, and campaigns</p>
 		</div>
-		<Button class="gap-2">
+		<Button class="gap-2" onclick={() => showAddModal = true}>
 			<Plus class="size-4" />
 			Add Project
 		</Button>
 	</div>
+
+	<!-- Add Project Modal -->
+	<AddProjectModal bind:open={showAddModal} />
 
 	<!-- Alerts -->
 	{#if alerts.overBudget > 0 || alerts.nearingBudget > 0}
@@ -311,8 +317,11 @@
 								</td>
 							</tr>
 						{:else}
-							{#each filteredProjects as project}
-								<tr class="hover:bg-slate-50 dark:hover:bg-slate-900/50 transition-colors">
+							{#each filteredProjects as project, i}
+								<tr 
+									class="hover:bg-green-800 dark:hover:bg-green-800/50 transition-colors cursor-pointer {i % 2 === 1 ? 'bg-blue-800 dark:bg-blue-800/30' : ''}"
+									onclick={() => window.location.href = `/dashboard/projects/${project.id}`}
+								>
 									<td class="px-6 py-4">
 										<div class="font-medium">{project.name}</div>
 										{#if project.description}

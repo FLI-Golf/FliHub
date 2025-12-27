@@ -14,15 +14,16 @@ export const ProjectSchema = z.object({
 	status: ProjectStatusEnum,
 	startDate: z.date().optional(),
 	endDate: z.date().optional(),
-	budget: z.number().nonnegative().optional(),
+	budget: z.number().min(0).optional(),
 	notes: z.string().optional(),
-	forecastedExpenses: z.number().nonnegative().optional(),
-	actualExpenses: z.number().nonnegative().optional(),
-	expenseCategories: ExpenseCategoriesSchema.optional(),
+	forecastedExpenses: z.number().min(0).optional(),
+	actualExpenses: z.number().min(0).optional(),
+	expenseCategories: z.any().optional(), // JSON field
 	approvalStatus: ApprovalStatusEnum.optional(),
 	fiscalYear: z.string().max(10).optional(),
-	managerId: z.string().optional(),
 	approvedBy: z.string().optional(),
+	department: z.string().optional(),
+	vendors: z.array(z.string()).optional(),
 	created: z.date().optional(),
 	updated: z.date().optional()
 }).refine(

@@ -1,37 +1,45 @@
 import { z } from 'zod';
 
 export const ExpenseCategoryEnum = z.enum([
-	// Staff & Personnel
-	'staff',
-	'executive_management',
-	'office_staff',
-	'consultants',
-	'commissions',
-	
-	// Marketing & PR
-	'marketing',
-	'advertising',
-	'public_relations',
-	
-	// Operations
-	'legal',
-	'tech_app_development',
-	'office_overhead',
-	'office_upgrades',
-	'travel',
-	
-	// Event & Competition
-	'venue',
-	'course_buildout',
-	'purse_prizes',
-	'player_sponsorships',
-	
-	// General
-	'equipment',
-	'accommodation',
-	'meals',
-	'documentary',
-	'other'
+	'Executive/Management Staff',
+	'Office Staff',
+	'Consultants',
+	'Commisions',
+	'Marketing',
+	'Public relations',
+	'Legal',
+	'Advertising',
+	'Tech/App Development',
+	'Course Build/Materials',
+	'Course Build/Tools',
+	'Course Build/Miscellaneous',
+	'Office/San Diego',
+	'Office/Scottsdale',
+	'Production Studio',
+	'Warehouse',
+	'Utilities',
+	'Internal Tech Budget',
+	'Hardware',
+	'Software',
+	'Mobile Data',
+	'Expenses/MPO (Male)',
+	'Expenses/FPO (Female)',
+	'Travel/Airefare',
+	'Travel/Lodging',
+	'Travel/Auto Rental',
+	'Travel/Miscellaneous',
+	'E-Commerce/Clothing',
+	'E-Commerce/Accesories',
+	'E-Commerce/Shoes',
+	'E-Commerce/Bags',
+	'Docunentary',
+	'Office Upgrades',
+	'Arizona/Warehouse',
+	'League Insurance',
+	'Payroll Processing Fees',
+	'Employee Relocation',
+	'Employee Insurance',
+	'Reserves'
 ]);
 
 export const ExpenseStatusEnum = z.enum(['draft', 'submitted', 'approved', 'rejected', 'paid']);
@@ -48,11 +56,11 @@ export const PaymentMethodEnum = z.enum([
 export const ExpenseSchema = z.object({
 	id: z.string().optional(),
 	description: z.string().min(1, 'Description is required').max(500),
-	amount: z.number().positive('Amount must be greater than 0'),
+	amount: z.number().min(0, 'Amount must be 0 or greater'),
 	category: ExpenseCategoryEnum,
 	status: ExpenseStatusEnum,
 	date: z.date(),
-	receiptUrl: z.string().url().optional(),
+	receipt: z.array(z.string()).optional(), // File field for receipts (max 99 files)
 	notes: z.string().optional(),
 	projectId: z.string().optional(),
 	submittedBy: z.string().optional(),

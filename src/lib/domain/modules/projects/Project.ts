@@ -15,6 +15,13 @@ export enum ProjectStatus {
 	CANCELLED = 'cancelled'
 }
 
+export enum ApprovalStatus {
+	PENDING = 'pending',
+	APPROVED = 'approved',
+	REJECTED = 'rejected',
+	REVISION_REQUESTED = 'revision_requested'
+}
+
 export interface ProjectProps {
 	name: string;
 	description?: string;
@@ -25,6 +32,14 @@ export interface ProjectProps {
 	budget?: number;
 	ownerId?: string;
 	notes?: string;
+	forecastedExpenses?: number;
+	actualExpenses?: number;
+	expenseCategories?: any;
+	approvalStatus?: ApprovalStatus;
+	fiscalYear?: string;
+	approvedBy?: string;
+	department?: string;
+	vendors?: string[];
 }
 
 export class Project extends Entity<ProjectProps> {
@@ -47,7 +62,15 @@ export class Project extends Entity<ProjectProps> {
 				endDate: record.endDate ? new Date(record.endDate) : undefined,
 				budget: record.budget,
 				ownerId: record.ownerId,
-				notes: record.notes
+				notes: record.notes,
+				forecastedExpenses: record.forecastedExpenses,
+				actualExpenses: record.actualExpenses,
+				expenseCategories: record.expenseCategories,
+				approvalStatus: record.approvalStatus,
+				fiscalYear: record.fiscalYear,
+				approvedBy: record.approvedBy,
+				department: record.department,
+				vendors: record.vendors
 			},
 			record.id,
 			new Date(record.created),
@@ -85,6 +108,38 @@ export class Project extends Entity<ProjectProps> {
 
 	public get ownerId(): string | undefined {
 		return this.props.ownerId;
+	}
+
+	public get forecastedExpenses(): number | undefined {
+		return this.props.forecastedExpenses;
+	}
+
+	public get actualExpenses(): number | undefined {
+		return this.props.actualExpenses;
+	}
+
+	public get expenseCategories(): any | undefined {
+		return this.props.expenseCategories;
+	}
+
+	public get approvalStatus(): ApprovalStatus | undefined {
+		return this.props.approvalStatus;
+	}
+
+	public get fiscalYear(): string | undefined {
+		return this.props.fiscalYear;
+	}
+
+	public get approvedBy(): string | undefined {
+		return this.props.approvedBy;
+	}
+
+	public get department(): string | undefined {
+		return this.props.department;
+	}
+
+	public get vendors(): string[] | undefined {
+		return this.props.vendors;
 	}
 
 	public updateStatus(status: ProjectStatus): void {
@@ -162,6 +217,14 @@ export class Project extends Entity<ProjectProps> {
 			budget: this.props.budget,
 			ownerId: this.props.ownerId,
 			notes: this.props.notes,
+			forecastedExpenses: this.props.forecastedExpenses,
+			actualExpenses: this.props.actualExpenses,
+			expenseCategories: this.props.expenseCategories,
+			approvalStatus: this.props.approvalStatus,
+			fiscalYear: this.props.fiscalYear,
+			approvedBy: this.props.approvedBy,
+			department: this.props.department,
+			vendors: this.props.vendors,
 			created: this._createdAt.toISOString(),
 			updated: this._updatedAt.toISOString()
 		};

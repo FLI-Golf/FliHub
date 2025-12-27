@@ -3,11 +3,22 @@ import type { PageServerLoad } from './$types';
 export const load: PageServerLoad = async ({ locals }) => {
 	const pb = locals.pb;
 
+	console.log('Loading vendors page...');
+	console.log('Auth state:', {
+		isValid: pb.authStore.isValid,
+		userId: pb.authStore.model?.id
+	});
+
 	try {
-		// Fetch all vendors
+		// Fetch all vendors - use -id instead of -created since created field may not exist
+		console.log('Fetching vendors from PocketBase...');
 		const vendors = await pb.collection('vendors').getFullList({
-			sort: '-created'
+			sort: '-id'
 		});
+		console.log(`Fetched ${vendors.length} vendors`);
+		if (vendors.length > 0) {
+			console.log('First vendor:', vendors[0]);
+		}
 
 		// Calculate statistics
 		const stats = {
@@ -24,6 +35,10 @@ export const load: PageServerLoad = async ({ locals }) => {
 		};
 	} catch (error) {
 		console.error('Error loading vendors:', error);
+		console.error('Error details:', JSON.stringify(error, null, 2));
+		if (error && typeof error === 'object' && 'response' in error) {
+			console.error('Response:', error.response);
+		}
 		return {
 			vendors: [],
 			stats: {
@@ -32,7 +47,8 @@ export const load: PageServerLoad = async ({ locals }) => {
 				inactive: 0,
 				withOpenInvoices: 0,
 				totalOpenInvoices: 0
-			}
+			},
+			error: error instanceof Error ? error.message : 'Unknown error'
 		};
 	}
 };
