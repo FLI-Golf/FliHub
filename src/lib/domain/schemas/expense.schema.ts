@@ -57,7 +57,7 @@ export const ExpenseSchema = z.object({
 	projectId: z.string().optional(),
 	submittedBy: z.string().optional(),
 	approvedBy: z.string().optional(),
-	vendor: z.string().max(255).optional(),
+	vendor: z.string().optional(), // Relation to vendors collection
 	paymentMethod: PaymentMethodEnum.optional(),
 	paidDate: z.date().optional(),
 	reimbursementTo: z.string().max(255).optional(),

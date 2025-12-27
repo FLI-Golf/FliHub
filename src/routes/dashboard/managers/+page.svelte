@@ -3,7 +3,24 @@
 	import Card from '$lib/components/ui/card.svelte';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import { Input } from '$lib/components/ui/input/index.js';
-	import { Mail, Phone, Building2, User, Calendar, Shield, Search } from 'lucide-svelte';
+	import VisualTabs from '$lib/components/ui/visual-tabs.svelte';
+	import { 
+		Mail, 
+		Phone, 
+		Building2, 
+		User, 
+		Calendar, 
+		Shield, 
+		Search,
+		ShieldCheck,
+		Users,
+		Store,
+		Award,
+		Home,
+		CheckCircle2,
+		XCircle,
+		Clock
+	} from 'lucide-svelte';
 	
 	let { data }: { data: PageData } = $props();
 	
@@ -16,25 +33,70 @@
 	];
 	
 	let searchQuery = $state('');
+	let roleFilter = $state<string>('all');
+	let statusFilter = $state<string>('all');
 	let updating = $state<Record<string, boolean>>({});
 	
-	// Filter managers based on search query
+	// Get counts for each role
+	function getRoleCount(role: string): number {
+		return data.managers.filter(m => m.role === role).length;
+	}
+	
+	// Get counts for each status
+	function getStatusCount(status: string): number {
+		return data.managers.filter(m => m.status === status).length;
+	}
+	
+	// Filter managers based on search query, role, and status
 	const filteredManagers = $derived(
 		data.managers.filter(manager => {
-			if (!searchQuery) return true;
+			// Search filter
+			if (searchQuery) {
+				const query = searchQuery.toLowerCase();
+				const fullName = `${manager.firstName} ${manager.lastName}`.toLowerCase();
+				const email = manager.email?.toLowerCase() || '';
+				const organization = manager.organization?.toLowerCase() || '';
+				const role = manager.role.toLowerCase();
+				
+				const matchesSearch = fullName.includes(query) || 
+					   email.includes(query) || 
+					   organization.includes(query) ||
+					   role.includes(query);
+				
+				if (!matchesSearch) return false;
+			}
 			
-			const query = searchQuery.toLowerCase();
-			const fullName = `${manager.firstName} ${manager.lastName}`.toLowerCase();
-			const email = manager.email?.toLowerCase() || '';
-			const organization = manager.organization?.toLowerCase() || '';
-			const role = manager.role.toLowerCase();
+			// Role filter
+			if (roleFilter !== 'all' && manager.role !== roleFilter) {
+				return false;
+			}
 			
-			return fullName.includes(query) || 
-				   email.includes(query) || 
-				   organization.includes(query) ||
-				   role.includes(query);
+			// Status filter
+			if (statusFilter !== 'all' && manager.status !== statusFilter) {
+				return false;
+			}
+			
+			return true;
 		})
 	);
+	
+	// Build role tabs
+	let roleTabs = $derived([
+		{ value: 'all', label: 'All Roles', count: data.managers.length },
+		{ value: 'admin', label: 'Admin', count: getRoleCount('admin'), icon: ShieldCheck },
+		{ value: 'leader', label: 'Leader', count: getRoleCount('leader'), icon: Users },
+		{ value: 'vendor', label: 'Vendor', count: getRoleCount('vendor'), icon: Store },
+		{ value: 'pro', label: 'Pro', count: getRoleCount('pro'), icon: Award },
+		{ value: 'franchise_owner', label: 'Franchise Owner', count: getRoleCount('franchise_owner'), icon: Home }
+	]);
+	
+	// Build status tabs
+	let statusTabs = $derived([
+		{ value: 'all', label: 'All Status', count: data.managers.length },
+		{ value: 'active', label: 'Active', count: getStatusCount('active'), icon: CheckCircle2 },
+		{ value: 'inactive', label: 'Inactive', count: getStatusCount('inactive'), icon: XCircle },
+		{ value: 'pending', label: 'Pending', count: getStatusCount('pending'), icon: Clock }
+	]);
 	
 	async function updateRole(managerId: string, newRole: string, currentRole: string) {
 		if (newRole === currentRole) return;
@@ -109,6 +171,28 @@
 				class="pl-10"
 			/>
 		</div>
+		
+		<!-- Role Filter Tabs -->
+		<div>
+			<h3 class="text-sm font-medium text-muted-foreground mb-3">Filter by Role</h3>
+			<VisualTabs
+				tabs={roleTabs}
+				activeTab={roleFilter}
+				onTabChange={(v) => roleFilter = v}
+				variant="button"
+			/>
+		</div>
+		
+		<!-- Status Filter Tabs -->
+		<div>
+			<h3 class="text-sm font-medium text-muted-foreground mb-3">Filter by Status</h3>
+			<VisualTabs
+				tabs={statusTabs}
+				activeTab={statusFilter}
+				onTabChange={(v) => statusFilter = v}
+				variant="pill"
+			/>
+		</div>
 	</div>
 
 	{#if filteredManagers.length === 0}
@@ -125,8 +209,8 @@
 		</Card>
 	{:else}
 		<div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-			{#each filteredManagers as manager}
-			<Card class="p-6 hover:shadow-lg transition-shadow">
+			{#each filteredManagers as manager, index}
+			<Card class="p-6 hover:shadow-lg transition-shadow {index % 2 === 0 ? '!bg-background' : '!bg-muted/50'}">
 				<div class="flex items-start justify-between mb-4">
 					<div class="flex-1">
 						<h3 class="text-xl font-bold mb-1">{manager.firstName} {manager.lastName}</h3>
@@ -191,10 +275,10 @@
 						value={manager.role}
 						onchange={(e) => updateRole(manager.id, e.currentTarget.value, manager.role)}
 						disabled={updating[manager.id]}
-						class="w-full px-3 py-2 rounded-md border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring disabled:opacity-50 disabled:cursor-not-allowed"
+						class="w-full px-3 py-2 rounded-md border border-input bg-background dark:bg-gray-900 text-foreground dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-ring disabled:opacity-50 disabled:cursor-not-allowed"
 					>
 						{#each roleOptions as option}
-							<option value={option.value}>{option.label}</option>
+							<option value={option.value} class="bg-background dark:bg-gray-900 text-foreground dark:text-white">{option.label}</option>
 						{/each}
 					</select>
 					

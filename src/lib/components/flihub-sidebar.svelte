@@ -3,10 +3,9 @@
 		LayoutDashboard,
 		Users,
 		ListTodo,
-		UserCircle,
+		Store,
 		FolderKanban,
-		Receipt,
-		Upload
+		Receipt
 	} from 'lucide-svelte';
 
 	const data = {
@@ -27,9 +26,9 @@
 				icon: ListTodo
 			},
 			{
-				title: 'People',
-				url: '/dashboard/people',
-				icon: UserCircle
+				title: 'Vendors',
+				url: '/dashboard/vendors',
+				icon: Store
 			},
 			{
 				title: 'Projects',
@@ -40,11 +39,6 @@
 				title: 'Expenses',
 				url: '/dashboard/expenses',
 				icon: Receipt
-			},
-			{
-				title: 'Import Data',
-				url: '/dashboard/import',
-				icon: Upload
 			}
 		]
 	};
@@ -80,7 +74,7 @@
 						<Sidebar.MenuItem>
 							<Sidebar.MenuButton isActive={isActive(item.url)}>
 								{#snippet child({ props })}
-									<a href={item.url} {...props} class="flex items-center gap-3 py-2">
+									<a href={item.url} {...props}>
 										<svelte:component this={item.icon} class="size-5 stroke-[2]" />
 										<span class="font-medium">{item.title}</span>
 									</a>
