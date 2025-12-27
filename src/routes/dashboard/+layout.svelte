@@ -1,7 +1,6 @@
 <script lang="ts">
 	import type { LayoutData } from './$types';
 	import FliHubSidebar from '$lib/components/flihub-sidebar.svelte';
-	import ModeToggle from '$lib/components/mode-toggle.svelte';
 	import * as Sidebar from '$lib/components/ui/sidebar/index.js';
 	import * as Breadcrumb from '$lib/components/ui/breadcrumb/index.js';
 	import { Separator } from '$lib/components/ui/separator/index.js';
@@ -28,7 +27,6 @@
 				</Breadcrumb.Root>
 			</div>
 			<div class="flex items-center gap-2 px-6">
-				<ModeToggle />
 				<DropdownMenu.Root>
 					<DropdownMenu.Trigger class={buttonVariants({ variant: 'ghost', size: 'sm' }) + ' gap-2'}>
 						<span class="text-sm">{data.user?.email}</span>
