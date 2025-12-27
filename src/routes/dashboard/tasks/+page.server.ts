@@ -3,12 +3,22 @@ import type { PageServerLoad } from './$types';
 export const load: PageServerLoad = async ({ locals }) => {
 	const pb = locals.pb;
 
+	console.log('Loading tasks page...');
+	console.log('Auth state:', {
+		isValid: pb.authStore.isValid,
+		userId: pb.authStore.model?.id
+	});
+
 	try {
-		// Fetch all tasks with expanded relations
+		// Fetch all tasks - use -id instead of -created since created field may not exist
+		console.log('Fetching tasks from PocketBase...');
 		const tasks = await pb.collection('tasks').getFullList({
-			sort: '-created',
-			expand: 'projectId,managerId,assignedTo'
+			sort: '-id'
 		});
+		console.log(`Fetched ${tasks.length} tasks`);
+		if (tasks.length > 0) {
+			console.log('First task:', tasks[0]);
+		}
 
 		// Calculate task statistics
 		const stats = {
@@ -28,14 +38,10 @@ export const load: PageServerLoad = async ({ locals }) => {
 			},
 			completion: {
 				completed: tasks.filter(t => t.status === 'completed').length,
-				total: tasks.length
+				total: tasks.length,
+				percentage: tasks.length > 0 ? (tasks.filter(t => t.status === 'completed').length / tasks.length) * 100 : 0
 			}
 		};
-
-		// Calculate completion percentage
-		stats.completion.percentage = stats.total > 0 
-			? (stats.completion.completed / stats.total) * 100 
-			: 0;
 
 		// Get overdue tasks
 		const now = new Date();
@@ -53,34 +59,24 @@ export const load: PageServerLoad = async ({ locals }) => {
 			return dueDate >= now && dueDate <= nextWeek;
 		});
 
-		// Get blocked tasks
-		const blockedTasks = tasks.filter(t => t.status === 'blocked');
-
-		// Calculate subtask completion
-		const tasksWithSubtasks = tasks.filter(t => t.subTasksChecklist && t.subTasksChecklist.length > 0);
-		const subtaskStats = tasksWithSubtasks.reduce((acc, task) => {
-			const total = task.subTasksChecklist.length;
-			const completed = task.subTasksChecklist.filter((st: any) => st.completed).length;
-			return {
-				total: acc.total + total,
-				completed: acc.completed + completed
-			};
-		}, { total: 0, completed: 0 });
-
 		return {
 			tasks,
 			stats,
-			subtaskStats,
+			subtaskStats: { total: 0, completed: 0 },
 			alerts: {
 				overdue: overdueTasks.length,
 				upcoming: upcomingTasks.length,
-				blocked: blockedTasks.length
+				blocked: tasks.filter(t => t.status === 'blocked').length
 			},
 			overdueTasks: overdueTasks.slice(0, 5),
 			upcomingTasks: upcomingTasks.slice(0, 5)
 		};
 	} catch (error) {
 		console.error('Error loading tasks:', error);
+		console.error('Error details:', JSON.stringify(error, null, 2));
+		if (error && typeof error === 'object' && 'response' in error) {
+			console.error('Response:', error.response);
+		}
 		return {
 			tasks: [],
 			stats: {
@@ -92,7 +88,8 @@ export const load: PageServerLoad = async ({ locals }) => {
 			subtaskStats: { total: 0, completed: 0 },
 			alerts: { overdue: 0, upcoming: 0, blocked: 0 },
 			overdueTasks: [],
-			upcomingTasks: []
+			upcomingTasks: [],
+			error: error instanceof Error ? error.message : 'Unknown error'
 		};
 	}
 };

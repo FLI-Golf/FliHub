@@ -5,6 +5,8 @@
 	import { Input } from '$lib/components/ui/input/index.js';
 	import VisualTabs from '$lib/components/ui/visual-tabs.svelte';
 	import MetricCard from '$lib/components/metrics/metric-card.svelte';
+	import AddVendorModal from '$lib/components/vendors/add-vendor-modal.svelte';
+	import EditVendorModal from '$lib/components/vendors/edit-vendor-modal.svelte';
 	import { 
 		Store, 
 		Plus, 
@@ -14,13 +16,33 @@
 		Globe,
 		DollarSign,
 		CheckCircle2,
-		XCircle
+		XCircle,
+		LayoutGrid,
+		Table
 	} from 'lucide-svelte';
 	
 	let { data }: { data: PageData } = $props();
 	
+	let showAddModal = $state(false);
+	let showEditModal = $state(false);
+	let selectedVendor = $state<any>(null);
+	let viewMode = $state<'grid' | 'table'>('table');
+	
+	function handleRowClick(vendor: any) {
+		selectedVendor = vendor;
+		showEditModal = true;
+	}
+	
 	let vendors = $derived(data.vendors || []);
 	let stats = $derived(data.stats);
+	
+	// Console log for debugging
+	console.log('Vendors page data:', {
+		vendorsCount: vendors.length,
+		stats,
+		firstVendor: vendors[0],
+		error: data.error
+	});
 	
 	let searchQuery = $state('');
 	let statusFilter = $state<string>('all');
@@ -83,11 +105,19 @@
 			<h1 class="text-3xl font-bold mb-2">Vendors</h1>
 			<p class="text-muted-foreground">Manage suppliers and service providers</p>
 		</div>
-		<Button class="gap-2">
+		<Button class="gap-2" onclick={() => showAddModal = true}>
 			<Plus class="size-4" />
 			Add Vendor
 		</Button>
 	</div>
+
+	<!-- Add Vendor Modal -->
+	<AddVendorModal bind:open={showAddModal} />
+	
+	<!-- Edit Vendor Modal -->
+	{#if selectedVendor}
+		<EditVendorModal bind:open={showEditModal} vendor={selectedVendor} />
+	{/if}
 
 	<!-- Statistics -->
 	<div>
@@ -125,16 +155,36 @@
 		</div>
 	</div>
 
-	<!-- Filters -->
+	<!-- Filters and View Toggle -->
 	<div class="flex flex-col gap-4">
-		<div class="relative max-w-md">
-			<Search class="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
-			<Input
-				type="text"
-				placeholder="Search by name, email, or phone..."
-				bind:value={searchQuery}
-				class="pl-10"
-			/>
+		<div class="flex items-center gap-4">
+			<div class="relative flex-1 max-w-md">
+				<Search class="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
+				<Input
+					type="text"
+					placeholder="Search by name, email, or phone..."
+					bind:value={searchQuery}
+					class="pl-10"
+				/>
+			</div>
+			
+			<!-- View Mode Toggle -->
+			<div class="flex gap-2">
+				<Button 
+					variant={viewMode === 'table' ? 'default' : 'outline'} 
+					size="icon"
+					onclick={() => viewMode = 'table'}
+				>
+					<Table class="size-4" />
+				</Button>
+				<Button 
+					variant={viewMode === 'grid' ? 'default' : 'outline'} 
+					size="icon"
+					onclick={() => viewMode = 'grid'}
+				>
+					<LayoutGrid class="size-4" />
+				</Button>
+			</div>
 		</div>
 		
 		<!-- Status Filter Tabs -->
@@ -149,7 +199,7 @@
 		</div>
 	</div>
 
-	<!-- Vendors Grid -->
+	<!-- Vendors Display -->
 	{#if filteredVendors.length === 0}
 		<Card class="p-12 text-center">
 			<div class="flex flex-col items-center gap-4">
@@ -166,7 +216,8 @@
 				</div>
 			</div>
 		</Card>
-	{:else}
+	{:else if viewMode === 'grid'}
+		<!-- Grid View -->
 		<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
 			{#each filteredVendors as vendor}
 				<Card class="p-6 hover:shadow-lg transition-shadow">
@@ -239,5 +290,128 @@
 				</Card>
 			{/each}
 		</div>
+	{:else}
+		<!-- Table View -->
+		<Card class="overflow-hidden">
+			<div class="overflow-x-auto">
+				<table class="w-full">
+					<thead class="bg-slate-50 dark:bg-slate-900 border-b">
+						<tr>
+							<th class="px-6 py-3 text-left text-xs font-semibold text-slate-900 dark:text-slate-100 uppercase tracking-wider">
+								Vendor Name
+							</th>
+							<th class="px-6 py-3 text-left text-xs font-semibold text-slate-900 dark:text-slate-100 uppercase tracking-wider">
+								Contact
+							</th>
+							<th class="px-6 py-3 text-left text-xs font-semibold text-slate-900 dark:text-slate-100 uppercase tracking-wider">
+								Type
+							</th>
+							<th class="px-6 py-3 text-left text-xs font-semibold text-slate-900 dark:text-slate-100 uppercase tracking-wider">
+								Status
+							</th>
+							<th class="px-6 py-3 text-left text-xs font-semibold text-slate-900 dark:text-slate-100 uppercase tracking-wider">
+								Open Invoices
+							</th>
+							<th class="px-6 py-3 text-left text-xs font-semibold text-slate-900 dark:text-slate-100 uppercase tracking-wider">
+								Website
+							</th>
+						</tr>
+					</thead>
+					<tbody class="divide-y divide-slate-200 dark:divide-slate-800">
+						{#each filteredVendors as vendor, i}
+							<tr 
+								class="hover:bg-green-800 dark:hover:bg-green-800/50 transition-colors cursor-pointer {i % 2 === 1 ? 'bg-blue-800 dark:bg-blue-800/30' : ''}"
+								onclick={() => handleRowClick(vendor)}
+							>
+								<td class="px-6 py-4">
+									<div class="font-medium">{vendor.name || 'Unnamed Vendor'}</div>
+									{#if vendor.about}
+										<div class="text-sm text-muted-foreground truncate max-w-xs">
+											{vendor.about}
+										</div>
+									{/if}
+								</td>
+								<td class="px-6 py-4 text-sm">
+									{#if vendor.contact_name}
+										<div class="font-medium mb-1">{vendor.contact_name}</div>
+									{/if}
+									{#if vendor.contact_email}
+										<a 
+											href="mailto:{vendor.contact_email}" 
+											onclick={(e) => e.stopPropagation()}
+											class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 hover:bg-blue-200 dark:hover:bg-blue-900/50 text-xs font-medium transition-colors mb-1"
+										>
+											<Mail class="size-3" />
+											{vendor.contact_email}
+										</a>
+									{/if}
+									{#if vendor.contact_phone}
+										<a 
+											href="tel:{vendor.contact_phone}" 
+											onclick={(e) => e.stopPropagation()}
+											class="text-muted-foreground hover:text-foreground block"
+										>
+											{vendor.contact_phone}
+										</a>
+									{/if}
+									{#if vendor.address}
+										<div class="text-muted-foreground text-xs mt-1">
+											{vendor.address}
+										</div>
+									{/if}
+								</td>
+								<td class="px-6 py-4 text-sm">
+									{#if vendor.type}
+										<span class="px-2 py-1 rounded-full bg-slate-100 dark:bg-slate-800 text-xs text-black dark:text-white">
+											{vendor.type}
+										</span>
+									{:else}
+										<span class="text-muted-foreground">-</span>
+									{/if}
+								</td>
+								<td class="px-6 py-4">
+									{#if vendor.active}
+										<div class="flex items-center gap-2 text-green-600 dark:text-green-400">
+											<CheckCircle2 class="size-4" />
+											<span class="text-sm font-medium">Active</span>
+										</div>
+									{:else}
+										<div class="flex items-center gap-2 text-red-600 dark:text-red-400">
+											<XCircle class="size-4" />
+											<span class="text-sm font-medium">Inactive</span>
+										</div>
+									{/if}
+								</td>
+								<td class="px-6 py-4 text-sm font-medium">
+									{#if vendor.open_invoices_total && vendor.open_invoices_total > 0}
+										<span class="text-orange-600 dark:text-orange-400">
+											{formatCurrency(vendor.open_invoices_total)}
+										</span>
+									{:else}
+										<span class="text-muted-foreground">-</span>
+									{/if}
+								</td>
+								<td class="px-6 py-4 text-sm">
+									{#if vendor.website}
+										<a 
+											href={vendor.website} 
+											target="_blank" 
+											rel="noopener noreferrer"
+											onclick={(e) => e.stopPropagation()}
+											class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-blue-600 hover:bg-blue-700 text-white text-xs font-medium transition-colors"
+										>
+											<Globe class="size-3" />
+											Visit
+										</a>
+									{:else}
+										<span class="text-muted-foreground">-</span>
+									{/if}
+								</td>
+							</tr>
+						{/each}
+					</tbody>
+				</table>
+			</div>
+		</Card>
 	{/if}
 </div>

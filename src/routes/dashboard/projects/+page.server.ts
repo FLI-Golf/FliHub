@@ -3,12 +3,21 @@ import type { PageServerLoad } from './$types';
 export const load: PageServerLoad = async ({ locals }) => {
 	const pb = locals.pb;
 
+	console.log('Loading projects page...');
+	console.log('Auth state:', {
+		isValid: pb.authStore.isValid,
+		userId: pb.authStore.model?.id,
+		email: pb.authStore.model?.email
+	});
+
 	try {
-		// Fetch all projects with expanded manager data
+		// Fetch all projects
+		console.log('Fetching projects from PocketBase...');
 		const projects = await pb.collection('projects').getFullList({
-			sort: '-created',
-			expand: 'managerId'
+			sort: '-id'
 		});
+		console.log(`Fetched ${projects.length} projects`);
+		console.log('First project:', projects[0]);
 
 		// Calculate project statistics
 		const stats = {
@@ -60,6 +69,10 @@ export const load: PageServerLoad = async ({ locals }) => {
 		};
 	} catch (error) {
 		console.error('Error loading projects:', error);
+		console.error('Error details:', JSON.stringify(error, null, 2));
+		if (error && typeof error === 'object' && 'response' in error) {
+			console.error('Response:', error.response);
+		}
 		return {
 			projects: [],
 			stats: {
@@ -71,7 +84,8 @@ export const load: PageServerLoad = async ({ locals }) => {
 			alerts: {
 				overBudget: 0,
 				nearingBudget: 0
-			}
+			},
+			error: error instanceof Error ? error.message : 'Unknown error'
 		};
 	}
 };

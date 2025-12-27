@@ -6,6 +6,8 @@
 	import MetricCard from '$lib/components/metrics/metric-card.svelte';
 	import ProgressBar from '$lib/components/metrics/progress-bar.svelte';
 	import StatusBadge from '$lib/components/metrics/status-badge.svelte';
+	import AddTaskModal from '$lib/components/tasks/add-task-modal.svelte';
+	import EditTaskModal from '$lib/components/tasks/edit-task-modal.svelte';
 	import { 
 		ListTodo, 
 		CheckCircle2, 
@@ -26,12 +28,37 @@
 	
 	let { data }: { data: PageData } = $props();
 	
+	let showAddModal = $state(false);
+	let showEditModal = $state(false);
+	let selectedTask = $state<any>(null);
+	
+	function handleRowClick(task: any) {
+		selectedTask = task;
+		showEditModal = true;
+	}
+	
 	let tasks = $derived(data.tasks || []);
 	let stats = $derived(data.stats);
 	let subtaskStats = $derived(data.subtaskStats);
 	let alerts = $derived(data.alerts);
 	let overdueTasks = $derived(data.overdueTasks || []);
 	let upcomingTasks = $derived(data.upcomingTasks || []);
+	
+	// Console log for debugging - use $effect to run after initialization
+	$effect(() => {
+		console.log('=== TASKS PAGE DEBUG ===');
+		console.log('Raw data object:', data);
+		console.log('Tasks array:', tasks);
+		console.log('Tasks count:', tasks.length);
+		console.log('Stats:', stats);
+		console.log('Alerts:', alerts);
+		console.log('Error (if any):', data.error);
+		console.log('First task:', tasks[0]);
+		console.log('Filtered tasks count:', filteredTasks.length);
+		console.log('Status filter:', statusFilter);
+		console.log('Priority filter:', priorityFilter);
+		console.log('========================');
+	});
 	
 	let statusFilter = $state<string>('all');
 	let priorityFilter = $state<string>('all');
@@ -75,10 +102,10 @@
 	}
 	
 	function getSubtaskProgress(task: any): { completed: number; total: number } {
-		if (!task.subTasksChecklist || task.subTasksChecklist.length === 0) {
+		if (!task.subTasksChecklist || !Array.isArray(task.subTasksChecklist) || task.subTasksChecklist.length === 0) {
 			return { completed: 0, total: 0 };
 		}
-		const completed = task.subTasksChecklist.filter((st: any) => st.completed).length;
+		const completed = task.subTasksChecklist.filter((st: any) => st && st.completed).length;
 		return { completed, total: task.subTasksChecklist.length };
 	}
 	
@@ -103,11 +130,19 @@
 			<h1 class="text-3xl font-bold mb-2">Tasks</h1>
 			<p class="text-muted-foreground">Business roadmap and project tasks</p>
 		</div>
-		<Button class="gap-2">
+		<Button class="gap-2" onclick={() => showAddModal = true}>
 			<Plus class="size-4" />
 			Add Task
 		</Button>
 	</div>
+	
+	<!-- Add Task Modal -->
+	<AddTaskModal bind:open={showAddModal} />
+	
+	<!-- Edit Task Modal -->
+	{#if selectedTask}
+		<EditTaskModal bind:open={showEditModal} task={selectedTask} />
+	{/if}
 
 	<!-- Alerts -->
 	{#if alerts.overdue > 0 || alerts.blocked > 0}
@@ -347,9 +382,12 @@
 								</td>
 							</tr>
 						{:else}
-							{#each filteredTasks as task}
+							{#each filteredTasks as task, i}
 								{@const progress = getSubtaskProgress(task)}
-								<tr class="hover:bg-slate-50 dark:hover:bg-slate-900/50 transition-colors">
+								<tr 
+									class="hover:bg-green-800 dark:hover:bg-green-800/50 transition-colors cursor-pointer {i % 2 === 1 ? 'bg-blue-800 dark:bg-blue-800/30' : ''}"
+									onclick={() => handleRowClick(task)}
+								>
 									<td class="px-6 py-4">
 										<div class="font-medium">{task.title}</div>
 										{#if task.description}

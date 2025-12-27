@@ -14,7 +14,7 @@ export class Expense {
 		public projectId?: string,
 		public submittedBy?: string,
 		public approvedBy?: string,
-		public receiptUrl?: string,
+		public receipt?: string[],
 		public notes?: string,
 		public vendor?: string,
 		public paymentMethod?: PaymentMethod,
@@ -63,7 +63,7 @@ export class Expense {
 	 * Check if expense has receipt
 	 */
 	hasReceipt(): boolean {
-		return !!this.receiptUrl;
+		return !!this.receipt && this.receipt.length > 0;
 	}
 
 	/**
@@ -90,7 +90,7 @@ export class Expense {
 			projectId: this.projectId,
 			submittedBy: this.submittedBy,
 			approvedBy: this.approvedBy,
-			receiptUrl: this.receiptUrl,
+			receipt: this.receipt,
 			notes: this.notes,
 			vendor: this.vendor,
 			paymentMethod: this.paymentMethod,
@@ -115,7 +115,7 @@ export class Expense {
 			data.projectId,
 			data.submittedBy,
 			data.approvedBy,
-			data.receiptUrl,
+			data.receipt,
 			data.notes,
 			data.vendor,
 			data.paymentMethod,
