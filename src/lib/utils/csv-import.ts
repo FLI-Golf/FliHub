@@ -25,6 +25,16 @@ export interface TaskCSVRow {
 	Income: string;
 }
 
+export interface BroadcastPartnerCSVRow {
+	Point: string;
+	Details: string;
+	Type: string;
+	Category: string;
+	'Importance Level': string;
+	Tags: string;
+	'Additional Notes': string;
+}
+
 // DEPRECATED: Use import-managers.js script instead
 export function parseManagersCSV(csvText: string): ManagerCSVRow[] {
 	const result = Papa.parse<ManagerCSVRow>(csvText, {
@@ -63,6 +73,31 @@ export function managerCSVToRecord(row: ManagerCSVRow) {
 		organization: row.Department,
 		role: 'leader' as const,
 		status: 'active' as const
+	};
+}
+
+export function parseBroadcastPartnersCSV(csvText: string): BroadcastPartnerCSVRow[] {
+	const result = Papa.parse<BroadcastPartnerCSVRow>(csvText, {
+		header: true,
+		skipEmptyLines: true,
+		transformHeader: (header) => header.trim()
+	});
+
+	return result.data.filter(row => 
+		row.Point && 
+		row.Point.trim().length > 0
+	);
+}
+
+export function broadcastPartnerCSVToRecord(row: BroadcastPartnerCSVRow) {
+	return {
+		point: row.Point,
+		details: row.Details || '',
+		type: row.Type,
+		category: row.Category,
+		importanceLevel: row['Importance Level'],
+		tags: row.Tags || '',
+		additionalNotes: row['Additional Notes'] || ''
 	};
 }
 

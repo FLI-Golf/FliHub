@@ -1,13 +1,36 @@
 import { z } from 'zod';
 
 export const ExpenseCategoryEnum = z.enum([
+	// Staff & Personnel
+	'staff',
+	'executive_management',
+	'office_staff',
+	'consultants',
+	'commissions',
+	
+	// Marketing & PR
+	'marketing',
+	'advertising',
+	'public_relations',
+	
+	// Operations
+	'legal',
+	'tech_app_development',
+	'office_overhead',
+	'office_upgrades',
 	'travel',
+	
+	// Event & Competition
+	'venue',
+	'course_buildout',
+	'purse_prizes',
+	'player_sponsorships',
+	
+	// General
+	'equipment',
 	'accommodation',
 	'meals',
-	'equipment',
-	'marketing',
-	'venue',
-	'staff',
+	'documentary',
 	'other'
 ]);
 
