@@ -353,19 +353,19 @@
 				<table class="w-full">
 					<thead class="bg-slate-50 dark:bg-slate-900 border-b">
 						<tr>
-							<th class="px-6 py-3 text-left text-xs font-medium text-foreground uppercase tracking-wider">
+							<th class="px-6 py-3 text-left text-xs font-medium text-black dark:text-black uppercase tracking-wider">
 								Task
 							</th>
-							<th class="px-6 py-3 text-left text-xs font-medium text-foreground uppercase tracking-wider">
+							<th class="px-6 py-3 text-left text-xs font-medium text-black dark:text-black uppercase tracking-wider">
 								Status
 							</th>
-							<th class="px-6 py-3 text-left text-xs font-medium text-foreground uppercase tracking-wider">
+							<th class="px-6 py-3 text-left text-xs font-medium text-black dark:text-black uppercase tracking-wider">
 								Priority
 							</th>
-							<th class="px-6 py-3 text-left text-xs font-medium text-foreground uppercase tracking-wider">
+							<th class="px-6 py-3 text-left text-xs font-medium text-black dark:text-black uppercase tracking-wider">
 								Progress
 							</th>
-							<th class="px-6 py-3 text-left text-xs font-medium text-foreground uppercase tracking-wider">
+							<th class="px-6 py-3 text-left text-xs font-medium text-black dark:text-black uppercase tracking-wider">
 								Due Date
 							</th>
 						</tr>
