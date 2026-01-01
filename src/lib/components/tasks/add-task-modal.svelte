@@ -5,7 +5,7 @@
 	import { Label } from '$lib/components/ui/label';
 	import { Plus, Save, X } from 'lucide-svelte';
 
-	let { open = $bindable(false) } = $props();
+	let { open = $bindable(false), projectId = '' } = $props();
 
 	let formData = $state({
 		title: '',
@@ -15,7 +15,8 @@
 		startDate: '',
 		dueDate: '',
 		estimatedHours: '',
-		notes: ''
+		notes: '',
+		projectId: projectId
 	});
 
 	let isSubmitting = $state(false);
@@ -42,18 +43,20 @@
 		error = '';
 
 		try {
+			const payload = {
+				...formData,
+				estimatedHours: formData.estimatedHours ? parseFloat(formData.estimatedHours) : undefined
+			};
+			
 			const response = await fetch('/api/tasks', {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({
-					...formData,
-					estimatedHours: formData.estimatedHours ? parseFloat(formData.estimatedHours) : undefined
-				})
+				body: JSON.stringify(payload)
 			});
 
 			if (!response.ok) {
 				const data = await response.json();
-				throw new Error(data.message || 'Failed to create task');
+				throw new Error(data.message || data.error || 'Failed to create task');
 			}
 
 			resetForm();
@@ -75,7 +78,8 @@
 			startDate: '',
 			dueDate: '',
 			estimatedHours: '',
-			notes: ''
+			notes: '',
+			projectId: projectId
 		};
 		error = '';
 	}

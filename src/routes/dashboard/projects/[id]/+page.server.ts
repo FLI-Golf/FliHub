@@ -16,6 +16,17 @@ export const load: PageServerLoad = async ({ locals, params }) => {
 			sort: '-date'
 		});
 
+		// Fetch tasks for this project
+		let tasks = [];
+		try {
+			const result = await pb.collection('tasks').getList(1, 50, {
+				filter: `projectId = "${params.id}"`
+			});
+			tasks = result.items;
+		} catch (taskErr: any) {
+			console.error('Error fetching tasks:', taskErr);
+		}
+
 		// Calculate expense totals
 		const expenseStats = {
 			total: expenses.reduce((sum, e) => sum + (e.amount || 0), 0),
@@ -35,9 +46,10 @@ export const load: PageServerLoad = async ({ locals, params }) => {
 		return {
 			project,
 			expenses,
-			expenseStats
+			expenseStats,
+			tasks
 		};
-	} catch (err) {
+	} catch (err: any) {
 		console.error('Error loading project:', err);
 		throw error(404, 'Project not found');
 	}
