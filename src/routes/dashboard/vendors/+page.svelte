@@ -164,7 +164,7 @@
 					type="text"
 					placeholder="Search by name, email, or phone..."
 					bind:value={searchQuery}
-					class="pl-10"
+					class="pl-10 text-white placeholder:text-slate-400"
 				/>
 			</div>
 			
