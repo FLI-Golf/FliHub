@@ -1,36 +1,40 @@
 # FliHub - Business OS for FLI Golf
 
-A scalable business operating system built with SvelteKit, PocketBase, and shadcn-svelte.
+A business operating system built with SvelteKit, PocketBase, and shadcn-svelte for managing projects, tasks, expenses, and team operations.
 
-## Architecture
+## Features
 
-FliHub follows a clean 4-layer architecture:
-
-1. **UI Layer** - Svelte components with shadcn-svelte
-2. **Application Layer** - Use-cases and business workflows
-3. **Domain Layer** - Business logic and rules
-4. **Data Layer** - PocketBase repositories
+- **Project Management** - Track tournaments, events, activations, and campaigns with budget monitoring
+- **Task Management** - Create and assign tasks to projects with priority levels and status tracking
+- **Expense Tracking** - Record and approve expenses linked to projects
+- **Team Management** - Manage team members across departments
+- **Vendor Management** - Track vendor relationships and contacts
+- **Dashboard** - Overview of projects, budgets, and key metrics
 
 ## Project Structure
 
 ```
 src/
   lib/
-    domain/
-      base/              # Entity, ValueObject, Result
-      modules/
-        people/          # Person, Manager classes
-        projects/        # Project, Task classes
-        money/           # Expense class
-    app/
-      usecases/          # Business workflows
+    components/
+      metrics/           # Metric cards, progress bars, status badges
+      projects/          # Project modals and components
+      tasks/             # Task modals and components
+      vendors/           # Vendor components
+      ui/                # shadcn-svelte UI components
+    domain/              # Domain models and business logic
     infra/
       pocketbase/        # PocketBase client and repositories
-    stores/              # Svelte stores
-    ui/                  # Shared UI components
+    migrations/          # Database schema and migrations
   routes/
-    auth/                # Authentication
+    auth/                # Authentication pages
     dashboard/           # Protected application pages
+      projects/          # Project list and detail pages
+      tasks/             # Task management
+      expenses/          # Expense tracking
+      managers/          # Team management
+      vendors/           # Vendor management
+    api/                 # API endpoints
 ```
 
 ## Setup
@@ -43,79 +47,96 @@ npm install
 
 ### 2. Configure PocketBase
 
-Update `.env` with your PocketBase instance URL:
+Create a `.env` file based on `.env.example`:
 
 ```env
-POCKETBASE_URL=http://127.0.0.1:8090
-POCKETBASE_ADMIN_EMAIL=ddinsmore8@gmail.com
-POCKETBASE_ADMIN_PASSWORD=MADcap(123)
+POCKETBASE_URL=https://pocketbase-production-6ab5.up.railway.app
+POCKETBASE_ADMIN_EMAIL=your-admin-email@example.com
+POCKETBASE_ADMIN_PASSWORD=your-admin-password
 ```
 
-### 3. Import PocketBase Schema
+For local development, you can use `http://127.0.0.1:8090` if running PocketBase locally.
 
-1. Start your PocketBase instance
-2. Go to PocketBase Admin UI (usually http://127.0.0.1:8090/_/)
-3. Navigate to Settings > Import collections
-4. Import `pocketbase-schema.json`
+### 3. Database Setup
 
-This will create the following collections:
-- **managers** - Team members and their departments
-- **tasks** - Business roadmap tasks with checklists
-- **people** - Contacts, sponsors, partners, pros, players
-- **projects** - Tournaments, events, campaigns
-- **expenses** - Financial tracking
+The application uses PocketBase with the following collections:
 
-### 4. Import Sample Data
+**Core Collections:**
+- **projects** - Tournaments, events, activations, campaigns with budget tracking
+- **tasks** - Project tasks with status, priority, hours, and due dates
+- **expenses** - Financial tracking linked to projects with approval workflow
+- **managers** - Team members across departments
+- **vendors** - Vendor contacts and relationships
+- **departments** - Organizational departments
 
-CSV files are located in `static/csv_data/`:
-- `Managers.csv` - Team members
-- `Business Roadmap.csv` - Tasks and roadmap
+**Strategic Planning Collections:**
+- **business_objectives** - Strategic business goals
+- **marketing_goals** - Marketing objectives and KPIs
+- **campaigns** - Marketing campaigns
+- **kpis** - Key performance indicators
+- **swot_analysis** - SWOT analysis entries
+- **broadcast_partners** - Broadcasting partnership details
+- **brand_positioning** - Brand positioning strategies
+- **digital_marketing_strategies** - Digital marketing plans
+- **continuous_improvements** - Process improvement tracking
+- **budgets** - Budget allocations
 
-You can import these manually through PocketBase admin or use the import utilities (coming soon).
+Schema definitions are in `src/lib/migrations/collections.ts`. Use the migration scripts to set up your database:
 
-### 5. Run Development Server
+```bash
+npm run migrate
+```
+
+### 4. Run Development Server
 
 ```bash
 npm run dev
 ```
 
-Visit the preview URL to access FliHub.
+The application will be available at the preview URL provided by your development environment.
 
-## Domain Models
-
-### Managers
-- Name, Department, Email, Phone, Goals
-- Departments: Publicist, Sales, Product Development, Finance, Marketing & PR, Technical, Production, Consultant, Operations, Apparel
-
-### Tasks
-- Task name, Sub-tasks checklist, Assigned managers
-- Track (Phase 1, Phase 2, Overall, Other)
-- Strategic Goal (Company Growth, Brand Awareness, Revenue, etc.)
-- Departments, Quarters, Start/End dates
-- Budget and Income tracking
-- Status (In Progress, Scheduled, Completed, Cancelled)
-
-### People
-- First/Last name, Email, Phone
-- Type (Contact, Sponsor, Partner, Pro, Player, Staff)
-- Status (Active, Inactive, Pending)
-- Organization, Notes
+## Data Models
 
 ### Projects
-- Name, Description, Type (Tournament, Activation, Event, Campaign)
-- Status (Draft, Planned, In Progress, Completed, Cancelled)
-- Start/End dates, Budget, Owner
-- Notes
+- **Name, Description, Type** - Tournament, Activation, Event, Campaign
+- **Status** - Draft, Planned, In Progress, Completed, Cancelled
+- **Dates** - Start date, end date, fiscal year
+- **Budget** - Allocated budget, actual expenses, forecasted expenses
+- **Relations** - Department, approved by, vendors
+- **Approval** - Approval status and workflow
+
+### Tasks
+- **Title, Description** - Task details with rich text support
+- **Project Relation** - Linked to specific projects
+- **Status** - Todo, In Progress, Blocked, Completed, Cancelled
+- **Priority** - Low, Medium, High, Urgent
+- **Time Tracking** - Estimated hours, actual hours
+- **Dates** - Start date, due date, completed date
+- **Assignment** - Assigned to users, created by
+- **Subtasks** - Checklist of subtasks (JSON)
 
 ### Expenses
-- Description, Amount, Category
-- Status workflow: Draft → Submitted → Approved → Paid
-- Date, Project link, Receipt URL
-- Submitted by, Approved by, Notes
+- **Description, Amount, Category** - Expense details
+- **Status** - Draft, Submitted, Approved, Rejected, Paid
+- **Project Link** - Associated with projects
+- **Dates** - Expense date, submission date
+- **Approval** - Submitted by, approved by
+- **Documentation** - Receipt URL, notes
+
+### Managers
+- **Name, Email, Phone** - Contact information
+- **Department** - Publicist, Sales, Product Development, Finance, Marketing & PR, Technical, Production, Consultant, Operations, Apparel
+- **Goals** - Department and personal goals (rich text)
+
+### Vendors
+- **Name, Email, Phone** - Vendor contact details
+- **Type** - Vendor classification
+- **Status** - Active, Inactive
+- **Relations** - Linked to projects
 
 ## Authentication
 
-Default admin credentials are in `.env`. Create user accounts through PocketBase admin panel.
+FliHub uses PocketBase authentication. Configure admin credentials in `.env` and create user accounts through the PocketBase admin panel. All dashboard routes require authentication.
 
 ## Tech Stack
 
@@ -128,17 +149,41 @@ Default admin credentials are in `.env`. Create user accounts through PocketBase
 ## Development
 
 ```bash
-npm run dev          # Start dev server
-npm run build        # Build for production
-npm run preview      # Preview production build
-npm run check        # Type check
+npm run dev              # Start dev server
+npm run build            # Build for production
+npm run preview          # Preview production build
+npm run check            # Type check
+npm run check:watch      # Type check in watch mode
+npm run migrate          # Run database migrations
+npm run import-data      # Import data from CSV files
 ```
 
-## Next Steps
+## Key Features
 
-1. Set up production PocketBase instance
-2. Import CSV data into collections
-3. Build CRUD interfaces for each module
-4. Add use-case workflows
-5. Implement role-based access control
-6. Add data visualization and reporting
+### Project Management
+- Create and track projects (tournaments, events, activations, campaigns)
+- Monitor budget vs actual expenses with visual progress bars
+- Link vendors and departments to projects
+- Track project status and approval workflow
+- View project-specific tasks and expenses
+
+### Task Management
+- Create tasks linked to projects
+- Set priority levels (low, medium, high, urgent)
+- Track estimated vs actual hours
+- Assign tasks to team members
+- Monitor task status with visual badges
+- Set due dates and track completion
+
+### Expense Tracking
+- Record expenses with categories
+- Link expenses to projects
+- Approval workflow (draft → submitted → approved → paid)
+- Track who submitted and approved expenses
+- Attach receipts and notes
+
+### Team & Vendor Management
+- Manage team members across departments
+- Track vendor relationships
+- Link vendors to specific projects
+- Store contact information and notes
