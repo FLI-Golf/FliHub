@@ -81,6 +81,23 @@
 		{/if}
 	</div>
 
+	{#if data.userDepartment}
+		<Card class="bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-950 dark:to-indigo-950 border-2 border-blue-200 dark:border-blue-800">
+			<div class="p-6">
+				<div class="flex items-center justify-between">
+					<div>
+						<h3 class="text-lg font-semibold mb-1">Your Department Dashboard</h3>
+						<p class="text-muted-foreground">{data.userDepartment.name}</p>
+						<p class="text-xs text-muted-foreground mt-1">ID: {data.userDepartment.id}</p>
+					</div>
+					<Button href="/dashboard/department/{data.userDepartment.id}">
+						View Department Dashboard
+					</Button>
+				</div>
+			</div>
+		</Card>
+	{/if}
+
 	<!-- Key Metrics -->
 	<div>
 		<h2 class="text-2xl font-bold mb-4">Overview</h2>

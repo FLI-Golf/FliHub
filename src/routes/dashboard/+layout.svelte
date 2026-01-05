@@ -32,7 +32,7 @@
 						<span class="text-sm">{data.user?.email}</span>
 						<ChevronDown class="size-4 stroke-[2]" />
 					</DropdownMenu.Trigger>
-					<DropdownMenu.Content align="end" class="w-48">
+					<DropdownMenu.Content align="end" class="w-48 bg-red-600">
 						<DropdownMenu.Item>
 							<form method="POST" action="/auth/logout" class="w-full">
 								<button type="submit" class="w-full text-left font-medium">Logout</button>
