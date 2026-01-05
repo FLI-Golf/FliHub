@@ -7,6 +7,7 @@
 	import StatusBadge from '$lib/components/metrics/status-badge.svelte';
 	import EditProjectModal from '$lib/components/projects/edit-project-modal.svelte';
 	import AddTaskModal from '$lib/components/tasks/add-task-modal.svelte';
+	import TaskDetailModal from '$lib/components/tasks/task-detail-modal.svelte';
 	import { 
 		ArrowLeft,
 		DollarSign,
@@ -134,6 +135,11 @@
 	
 	<!-- Add Task Modal -->
 	<AddTaskModal bind:open={showAddTaskModal} projectId={project.id} />
+	
+	<!-- Task Detail Modal -->
+	{#if selectedTask}
+		<TaskDetailModal bind:open={showTaskDetailModal} task={selectedTask} />
+	{/if}
 
 	<!-- Key Metrics -->
 	<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -350,6 +356,9 @@
 							Task
 						</th>
 						<th class="px-6 py-3 text-left text-xs font-semibold text-slate-900 dark:text-slate-100 uppercase tracking-wider">
+							Subtasks
+						</th>
+						<th class="px-6 py-3 text-left text-xs font-semibold text-slate-900 dark:text-slate-100 uppercase tracking-wider">
 							Priority
 						</th>
 						<th class="px-6 py-3 text-left text-xs font-semibold text-slate-900 dark:text-slate-100 uppercase tracking-wider">
@@ -366,19 +375,40 @@
 				<tbody class="divide-y divide-slate-200 dark:divide-slate-800">
 					{#if tasks.length === 0}
 						<tr>
-							<td colspan="5" class="px-6 py-8 text-center text-muted-foreground">
+							<td colspan="6" class="px-6 py-8 text-center text-muted-foreground">
 								No tasks recorded for this project
 							</td>
 						</tr>
 					{:else}
 						{#each tasks as task, i}
-							<tr class="hover:bg-green-800 dark:hover:bg-green-800/50 transition-colors cursor-pointer {i % 2 === 1 ? 'bg-blue-800 dark:bg-blue-800/30' : ''}">
+							{@const subtasks = parseSubtasks(task.subTasksChecklist)}
+							<tr 
+								class="hover:bg-green-800 dark:hover:bg-green-800/50 transition-colors cursor-pointer {i % 2 === 1 ? 'bg-blue-800 dark:bg-blue-800/30' : ''}"
+								onclick={() => handleTaskClick(task)}
+							>
 								<td class="px-6 py-4">
 									<div class="font-medium">{task.title}</div>
 									{#if task.description}
 										<div class="text-sm text-muted-foreground truncate max-w-xs">
 											{@html task.description}
 										</div>
+									{/if}
+								</td>
+								<td class="px-6 py-4 text-sm">
+									{#if subtasks.total > 0}
+										<div class="flex items-center gap-2">
+											<span class="text-xs font-medium">
+												{subtasks.completed}/{subtasks.total}
+											</span>
+											<div class="flex-1 bg-slate-200 dark:bg-slate-700 rounded-full h-2 max-w-[60px]">
+												<div 
+													class="bg-blue-600 h-2 rounded-full transition-all"
+													style="width: {subtasks.total > 0 ? (subtasks.completed / subtasks.total * 100) : 0}%"
+												></div>
+											</div>
+										</div>
+									{:else}
+										-
 									{/if}
 								</td>
 								<td class="px-6 py-4 text-sm">
