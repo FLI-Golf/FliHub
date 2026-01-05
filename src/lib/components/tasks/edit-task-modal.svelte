@@ -8,20 +8,37 @@
 	let { open = $bindable(false), task } = $props();
 
 	let formData = $state({
-		title: task.title || '',
-		description: task.description || '',
-		status: task.status || 'todo',
-		priority: task.priority || 'medium',
-		startDate: task.startDate ? task.startDate.split('T')[0] : '',
-		dueDate: task.dueDate ? task.dueDate.split('T')[0] : '',
-		estimatedHours: task.estimatedHours?.toString() || '',
-		actualHours: task.actualHours?.toString() || '',
-		notes: task.notes || ''
+		title: '',
+		description: '',
+		status: 'todo',
+		priority: 'medium',
+		startDate: '',
+		dueDate: '',
+		estimatedHours: '',
+		actualHours: '',
+		notes: ''
 	});
 
 	let isSubmitting = $state(false);
 	let isDeleting = $state(false);
 	let error = $state('');
+
+	// Update form data when task changes
+	$effect(() => {
+		if (task) {
+			formData = {
+				title: task.title || '',
+				description: task.description || '',
+				status: task.status || 'todo',
+				priority: task.priority || 'medium',
+				startDate: task.startDate ? task.startDate.split('T')[0] : '',
+				dueDate: task.dueDate ? task.dueDate.split('T')[0] : '',
+				estimatedHours: task.estimatedHours?.toString() || '',
+				actualHours: task.actualHours?.toString() || '',
+				notes: task.notes || ''
+			};
+		}
+	});
 
 	const statuses = [
 		{ value: 'todo', label: 'To Do' },
