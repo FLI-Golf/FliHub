@@ -24,11 +24,50 @@
 	
 	let showEditModal = $state(false);
 	let showAddTaskModal = $state(false);
+	let showTaskDetailModal = $state(false);
+	let selectedTask = $state<any>(null);
 	
 	let project = $derived(data.project);
 	let expenses = $derived(data.expenses || []);
 	let expenseStats = $derived(data.expenseStats);
 	let tasks = $derived(data.tasks || []);
+	
+	function parseSubtasks(subtasksData: any) {
+		if (!subtasksData) return { total: 0, completed: 0, items: [] };
+		
+		// If it's a string (markdown format), parse it
+		if (typeof subtasksData === 'string') {
+			const lines = subtasksData.split('\n').filter(line => line.trim());
+			const items = lines
+				.filter(line => line.includes('[ ]') || line.includes('[x]') || line.includes('[X]'))
+				.map(line => ({
+					text: line.replace(/^[*-]\s*\[([ xX])\]\s*/, '').trim(),
+					completed: line.includes('[x]') || line.includes('[X]')
+				}));
+			
+			return {
+				total: items.length,
+				completed: items.filter(item => item.completed).length,
+				items
+			};
+		}
+		
+		// If it's already parsed JSON
+		if (Array.isArray(subtasksData)) {
+			return {
+				total: subtasksData.length,
+				completed: subtasksData.filter((item: any) => item.completed).length,
+				items: subtasksData
+			};
+		}
+		
+		return { total: 0, completed: 0, items: [] };
+	}
+	
+	function handleTaskClick(task: any) {
+		selectedTask = task;
+		showTaskDetailModal = true;
+	}
 	
 	function formatCurrency(amount: number): string {
 		return new Intl.NumberFormat('en-US', {
