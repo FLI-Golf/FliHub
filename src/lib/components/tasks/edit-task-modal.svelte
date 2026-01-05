@@ -16,7 +16,8 @@
 		dueDate: '',
 		estimatedHours: '',
 		actualHours: '',
-		notes: ''
+		notes: '',
+		subTasksChecklist: ''
 	});
 
 	let isSubmitting = $state(false);
@@ -52,8 +53,29 @@
 			formData.estimatedHours = task.estimatedHours?.toString() || '';
 			formData.actualHours = task.actualHours?.toString() || '';
 			formData.notes = task.notes || '';
+			
+			// If no subtasks, provide sample
+			if (!task.subTasksChecklist || task.subTasksChecklist === '') {
+				formData.subTasksChecklist = `- [ ] Research and planning
+- [ ] Design mockups
+- [ ] Development
+- [ ] Testing
+- [ ] Documentation
+- [ ] Review and approval`;
+			} else {
+				formData.subTasksChecklist = task.subTasksChecklist;
+			}
 		}
 	});
+	
+	function insertSample() {
+		formData.subTasksChecklist = `- [ ] Research and planning
+- [ ] Design mockups
+- [ ] Development
+- [ ] Testing
+- [ ] Documentation
+- [ ] Review and approval`;
+	}
 
 	const statuses = [
 		{ value: 'todo', label: 'To Do' },
@@ -266,6 +288,29 @@
 						class="bg-slate-800 border-slate-700 text-white placeholder:text-slate-400"
 					/>
 				</div>
+			</div>
+
+			<div class="space-y-2">
+				<div class="flex items-center justify-between">
+					<Label for="edit-subtasks" class="text-slate-200">Subtasks Checklist</Label>
+					<Button
+						type="button"
+						variant="ghost"
+						size="sm"
+						onclick={insertSample}
+						class="text-xs text-blue-400 hover:text-blue-300"
+					>
+						Insert Sample
+					</Button>
+				</div>
+				<textarea
+					id="edit-subtasks"
+					bind:value={formData.subTasksChecklist}
+					placeholder="- [ ] First subtask&#10;- [ ] Second subtask&#10;- [ ] Third subtask"
+					rows="6"
+					class="flex w-full rounded-md border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-white placeholder:text-slate-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-500 font-mono"
+				></textarea>
+				<p class="text-xs text-slate-400">Use markdown format: - [ ] for unchecked, - [x] for checked</p>
 			</div>
 
 			<div class="space-y-2">

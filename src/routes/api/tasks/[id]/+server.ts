@@ -11,7 +11,7 @@ export const PATCH: RequestHandler = async ({ request, locals, params }) => {
 	try {
 		const data = await request.json();
 
-		const task = await pb.collection('tasks').update(params.id, {
+		const updateData: any = {
 			title: data.title,
 			description: data.description || '',
 			status: data.status,
@@ -22,7 +22,14 @@ export const PATCH: RequestHandler = async ({ request, locals, params }) => {
 			actualHours: data.actualHours !== undefined ? data.actualHours : null,
 			notes: data.notes || '',
 			completedDate: data.status === 'completed' ? new Date().toISOString() : null
-		});
+		};
+
+		// Only update subTasksChecklist if it's provided in the request
+		if (data.subTasksChecklist !== undefined) {
+			updateData.subTasksChecklist = data.subTasksChecklist;
+		}
+
+		const task = await pb.collection('tasks').update(params.id, updateData);
 
 		return json(task, { status: 200 });
 	} catch (error) {
