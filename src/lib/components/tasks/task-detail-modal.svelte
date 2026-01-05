@@ -80,21 +80,22 @@
 </script>
 
 <Sheet.Root bind:open>
-	<Sheet.Content side="left" class="w-full sm:max-w-3xl overflow-y-auto">
-		<Sheet.Header>
-			<Sheet.Title class="text-2xl">{task?.title || 'Task Details'}</Sheet.Title>
+	<Sheet.Content side="left" class="w-full sm:max-w-3xl overflow-y-auto bg-slate-900 text-white border-slate-800">
+		<Sheet.Header class="border-b border-slate-800 pb-4">
+			<Sheet.Title class="text-2xl text-white">{task?.title || 'Task Details'}</Sheet.Title>
+			<Sheet.Description class="text-slate-400">View task details and manage subtasks</Sheet.Description>
 		</Sheet.Header>
 
 		{#if task}
-			<div class="space-y-6">
+			<div class="space-y-6 py-6">
 				<!-- Task Info -->
 				<div class="grid grid-cols-2 gap-4">
 					<div>
-						<div class="text-sm text-muted-foreground mb-1">Status</div>
+						<div class="text-sm text-slate-400 mb-1">Status</div>
 						<StatusBadge status={task.status} />
 					</div>
 					<div>
-						<div class="text-sm text-muted-foreground mb-1">Priority</div>
+						<div class="text-sm text-slate-400 mb-1">Priority</div>
 						<span class="px-2 py-1 rounded-full text-xs font-medium capitalize
 							{task.priority === 'urgent' ? 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300' : ''}
 							{task.priority === 'high' ? 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-300' : ''}
@@ -109,14 +110,14 @@
 				<!-- Dates and Hours -->
 				<div class="grid grid-cols-2 gap-4">
 					<div>
-						<div class="text-sm text-muted-foreground mb-1 flex items-center gap-1">
+						<div class="text-sm text-slate-400 mb-1 flex items-center gap-1">
 							<Calendar class="size-3" />
 							Due Date
 						</div>
 						<div class="font-medium">{formatDate(task.dueDate)}</div>
 					</div>
 					<div>
-						<div class="text-sm text-muted-foreground mb-1 flex items-center gap-1">
+						<div class="text-sm text-slate-400 mb-1 flex items-center gap-1">
 							<Clock class="size-3" />
 							Hours
 						</div>
@@ -129,7 +130,7 @@
 				<!-- Description -->
 				{#if task.description}
 					<div>
-						<div class="text-sm text-muted-foreground mb-2">Description</div>
+						<div class="text-sm text-slate-400 mb-2">Description</div>
 						<div class="prose prose-sm dark:prose-invert max-w-none">
 							{@html task.description}
 						</div>
@@ -139,7 +140,7 @@
 				<!-- Subtasks Checklist -->
 				{#if subtasks.length > 0}
 					<div>
-						<div class="text-sm text-muted-foreground mb-3 flex items-center justify-between">
+						<div class="text-sm text-slate-400 mb-3 flex items-center justify-between">
 							<span>Subtasks ({subtasks.filter(s => s.completed).length}/{subtasks.length})</span>
 							<div class="flex-1 bg-slate-200 dark:bg-slate-700 rounded-full h-2 max-w-[200px] ml-4">
 								<div 
@@ -154,14 +155,14 @@
 									type="button"
 									onclick={() => toggleSubtask(index)}
 									disabled={isUpdating}
-									class="flex items-start gap-3 w-full p-3 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors text-left disabled:opacity-50"
+									class="flex items-start gap-3 w-full p-3 rounded-lg hover:bg-green-800 hover:bg-green-800/50 transition-colors text-left disabled:opacity-50"
 								>
 									{#if subtask.completed}
 										<CheckSquare class="size-5 text-green-600 dark:text-green-400 flex-shrink-0 mt-0.5" />
 									{:else}
 										<Square class="size-5 text-slate-400 flex-shrink-0 mt-0.5" />
 									{/if}
-									<span class="flex-1 {subtask.completed ? 'line-through text-muted-foreground' : ''}">
+									<span class="flex-1 {subtask.completed ? 'line-through text-slate-500' : 'text-white'}">
 										{subtask.text}
 									</span>
 								</button>
@@ -173,7 +174,7 @@
 				<!-- Notes -->
 				{#if task.notes}
 					<div>
-						<div class="text-sm text-muted-foreground mb-2">Notes</div>
+						<div class="text-sm text-slate-400 mb-2">Notes</div>
 						<div class="prose prose-sm dark:prose-invert max-w-none">
 							{@html task.notes}
 						</div>
@@ -183,7 +184,7 @@
 		{/if}
 
 		<Sheet.Footer class="pt-6 border-t border-slate-700 mt-6">
-			<Button variant="outline" onclick={() => (open = false)} class="w-full">
+			<Button variant="outline" onclick={() => (open = false)} class="w-full bg-slate-800 border-slate-700 text-white hover:bg-slate-700">
 				<X class="size-4 mr-2" />
 				Close
 			</Button>
