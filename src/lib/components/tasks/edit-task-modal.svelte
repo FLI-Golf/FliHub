@@ -31,11 +31,18 @@
 				if (!dateStr) return '';
 				try {
 					const date = new Date(dateStr);
-					return date.toISOString().split('T')[0];
-				} catch {
+					const formatted = date.toISOString().split('T')[0];
+					console.log('Formatting date:', dateStr, '→', formatted);
+					return formatted;
+				} catch (e) {
+					console.error('Error formatting date:', dateStr, e);
 					return '';
 				}
 			};
+
+			console.log('Task data:', task);
+			console.log('Start date:', task.startDate);
+			console.log('Due date:', task.dueDate);
 
 			formData = {
 				title: task.title || '',
@@ -48,6 +55,8 @@
 				actualHours: task.actualHours?.toString() || '',
 				notes: task.notes || ''
 			};
+			
+			console.log('Form data after update:', formData);
 		}
 	});
 
@@ -221,7 +230,7 @@
 						id="edit-startDate"
 						type="date"
 						bind:value={formData.startDate}
-						class="bg-slate-800 border-slate-700 text-white"
+						class="bg-slate-800 border-slate-700 text-white [color-scheme:dark]"
 					/>
 				</div>
 
@@ -231,7 +240,7 @@
 						id="edit-dueDate"
 						type="date"
 						bind:value={formData.dueDate}
-						class="bg-slate-800 border-slate-700 text-white"
+						class="bg-slate-800 border-slate-700 text-white [color-scheme:dark]"
 					/>
 				</div>
 			</div>
