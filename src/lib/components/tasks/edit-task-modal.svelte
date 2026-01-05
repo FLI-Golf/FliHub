@@ -26,13 +26,24 @@
 	// Update form data when task changes
 	$effect(() => {
 		if (task) {
+			// Format dates for input[type="date"] which expects YYYY-MM-DD
+			const formatDate = (dateStr: string) => {
+				if (!dateStr) return '';
+				try {
+					const date = new Date(dateStr);
+					return date.toISOString().split('T')[0];
+				} catch {
+					return '';
+				}
+			};
+
 			formData = {
 				title: task.title || '',
 				description: task.description || '',
 				status: task.status || 'todo',
 				priority: task.priority || 'medium',
-				startDate: task.startDate ? task.startDate.split('T')[0] : '',
-				dueDate: task.dueDate ? task.dueDate.split('T')[0] : '',
+				startDate: formatDate(task.startDate),
+				dueDate: formatDate(task.dueDate),
 				estimatedHours: task.estimatedHours?.toString() || '',
 				actualHours: task.actualHours?.toString() || '',
 				notes: task.notes || ''
