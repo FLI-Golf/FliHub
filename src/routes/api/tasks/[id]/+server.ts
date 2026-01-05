@@ -33,3 +33,22 @@ export const PATCH: RequestHandler = async ({ request, locals, params }) => {
 		);
 	}
 };
+
+export const DELETE: RequestHandler = async ({ locals, params }) => {
+	const pb = locals.pb;
+
+	if (!pb.authStore.isValid) {
+		return json({ message: 'Unauthorized' }, { status: 401 });
+	}
+
+	try {
+		await pb.collection('tasks').delete(params.id);
+		return json({ success: true }, { status: 200 });
+	} catch (error) {
+		console.error('Error deleting task:', error);
+		return json(
+			{ message: 'Failed to delete task', error: String(error) },
+			{ status: 500 }
+		);
+	}
+};

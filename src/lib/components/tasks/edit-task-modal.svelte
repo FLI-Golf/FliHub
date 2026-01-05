@@ -3,7 +3,7 @@
 	import { Button } from '$lib/components/ui/button';
 	import { Input } from '$lib/components/ui/input';
 	import { Label } from '$lib/components/ui/label';
-	import { Edit, Save, X } from 'lucide-svelte';
+	import { Edit, Save, X, Trash2 } from 'lucide-svelte';
 
 	let { open = $bindable(false), task } = $props();
 
@@ -20,6 +20,7 @@
 	});
 
 	let isSubmitting = $state(false);
+	let isDeleting = $state(false);
 	let error = $state('');
 
 	const statuses = [
@@ -64,6 +65,33 @@
 			error = err instanceof Error ? err.message : 'An error occurred';
 		} finally {
 			isSubmitting = false;
+		}
+	}
+
+	async function handleDelete() {
+		if (!confirm('Are you sure you want to delete this task? This action cannot be undone.')) {
+			return;
+		}
+
+		isDeleting = true;
+		error = '';
+
+		try {
+			const response = await fetch(`/api/tasks/${task.id}`, {
+				method: 'DELETE'
+			});
+
+			if (!response.ok) {
+				const data = await response.json();
+				throw new Error(data.message || 'Failed to delete task');
+			}
+
+			open = false;
+			window.location.reload();
+		} catch (err) {
+			error = err instanceof Error ? err.message : 'An error occurred';
+		} finally {
+			isDeleting = false;
 		}
 	}
 
@@ -223,17 +251,29 @@
 				<Button
 					type="button"
 					variant="outline"
-					onclick={() => (open = false)}
-					disabled={isSubmitting}
-					class="flex-1 bg-slate-800 border-slate-700 text-white hover:bg-slate-700"
+					onclick={handleDelete}
+					disabled={isSubmitting || isDeleting}
+					class="bg-red-600 border-red-700 text-white hover:bg-red-700"
 				>
-					<X class="size-4 mr-2" />
-					Cancel
+					<Trash2 class="size-4 mr-2" />
+					{isDeleting ? 'Deleting...' : 'Delete'}
 				</Button>
-				<Button type="submit" disabled={isSubmitting} class="flex-1 bg-blue-600 hover:bg-blue-700 text-white">
-					<Save class="size-4 mr-2" />
-					{isSubmitting ? 'Saving...' : 'Save Changes'}
-				</Button>
+				<div class="flex-1 flex gap-2">
+					<Button
+						type="button"
+						variant="outline"
+						onclick={() => (open = false)}
+						disabled={isSubmitting || isDeleting}
+						class="flex-1 bg-slate-800 border-slate-700 text-white hover:bg-slate-700"
+					>
+						<X class="size-4 mr-2" />
+						Cancel
+					</Button>
+					<Button type="submit" disabled={isSubmitting || isDeleting} class="flex-1 bg-blue-600 hover:bg-blue-700 text-white">
+						<Save class="size-4 mr-2" />
+						{isSubmitting ? 'Saving...' : 'Save Changes'}
+					</Button>
+				</div>
 			</Sheet.Footer>
 		</form>
 	</Sheet.Content>
