@@ -23,40 +23,35 @@
 	let isDeleting = $state(false);
 	let error = $state('');
 
-	// Update form data when task changes
-	$effect(() => {
-		if (task) {
-			// Format dates for input[type="date"] which expects YYYY-MM-DD
-			const formatDate = (dateStr: string) => {
-				if (!dateStr) return '';
-				try {
-					const date = new Date(dateStr);
-					const formatted = date.toISOString().split('T')[0];
-					console.log('Formatting date:', dateStr, '→', formatted);
-					return formatted;
-				} catch (e) {
-					console.error('Error formatting date:', dateStr, e);
-					return '';
-				}
-			};
-
-			console.log('Task data:', task);
-			console.log('Start date:', task.startDate);
-			console.log('Due date:', task.dueDate);
-
-			formData = {
-				title: task.title || '',
-				description: task.description || '',
-				status: task.status || 'todo',
-				priority: task.priority || 'medium',
-				startDate: formatDate(task.startDate),
-				dueDate: formatDate(task.dueDate),
-				estimatedHours: task.estimatedHours?.toString() || '',
-				actualHours: task.actualHours?.toString() || '',
-				notes: task.notes || ''
-			};
+	// Format dates for input[type="date"] which expects YYYY-MM-DD
+	function formatDateForInput(dateStr: string): string {
+		if (!dateStr) return '';
+		try {
+			// Handle both date-only and datetime formats
+			const date = new Date(dateStr);
+			if (isNaN(date.getTime())) return '';
 			
-			console.log('Form data after update:', formData);
+			const year = date.getFullYear();
+			const month = String(date.getMonth() + 1).padStart(2, '0');
+			const day = String(date.getDate()).padStart(2, '0');
+			return `${year}-${month}-${day}`;
+		} catch {
+			return '';
+		}
+	}
+
+	// Update form data when task or open state changes
+	$effect(() => {
+		if (task && open) {
+			formData.title = task.title || '';
+			formData.description = task.description || '';
+			formData.status = task.status || 'todo';
+			formData.priority = task.priority || 'medium';
+			formData.startDate = formatDateForInput(task.startDate);
+			formData.dueDate = formatDateForInput(task.dueDate);
+			formData.estimatedHours = task.estimatedHours?.toString() || '';
+			formData.actualHours = task.actualHours?.toString() || '';
+			formData.notes = task.notes || '';
 		}
 	});
 
