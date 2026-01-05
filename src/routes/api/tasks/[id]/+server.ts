@@ -11,7 +11,7 @@ export const PATCH: RequestHandler = async ({ request, locals, params }) => {
 	try {
 		const data = await request.json();
 
-		const task = await pb.collection('tasks').update(params.id, {
+		const updateData: any = {
 			title: data.title,
 			description: data.description || '',
 			status: data.status,
@@ -22,13 +22,39 @@ export const PATCH: RequestHandler = async ({ request, locals, params }) => {
 			actualHours: data.actualHours !== undefined ? data.actualHours : null,
 			notes: data.notes || '',
 			completedDate: data.status === 'completed' ? new Date().toISOString() : null
-		});
+		};
+
+		// Only update subTasksChecklist if it's provided in the request
+		if (data.subTasksChecklist !== undefined) {
+			updateData.subTasksChecklist = data.subTasksChecklist;
+		}
+
+		const task = await pb.collection('tasks').update(params.id, updateData);
 
 		return json(task, { status: 200 });
 	} catch (error) {
 		console.error('Error updating task:', error);
 		return json(
 			{ message: 'Failed to update task', error: String(error) },
+			{ status: 500 }
+		);
+	}
+};
+
+export const DELETE: RequestHandler = async ({ locals, params }) => {
+	const pb = locals.pb;
+
+	if (!pb.authStore.isValid) {
+		return json({ message: 'Unauthorized' }, { status: 401 });
+	}
+
+	try {
+		await pb.collection('tasks').delete(params.id);
+		return json({ success: true }, { status: 200 });
+	} catch (error) {
+		console.error('Error deleting task:', error);
+		return json(
+			{ message: 'Failed to delete task', error: String(error) },
 			{ status: 500 }
 		);
 	}

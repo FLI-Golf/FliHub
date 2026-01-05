@@ -7,6 +7,7 @@
 	import ProgressBar from '$lib/components/metrics/progress-bar.svelte';
 	import StatusBadge from '$lib/components/metrics/status-badge.svelte';
 	import AddProjectModal from '$lib/components/projects/add-project-modal.svelte';
+	import { Input } from '$lib/components/ui/input/index.js';
 	import { 
 		FolderKanban, 
 		DollarSign, 
@@ -14,6 +15,7 @@
 		AlertTriangle,
 		Calendar,
 		Plus,
+		Search,
 		FileText,
 		ClipboardList,
 		PlayCircle,
@@ -35,9 +37,20 @@
 	
 	let statusFilter = $state<string>('all');
 	let typeFilter = $state<string>('all');
+	let searchQuery = $state('');
 	
-	// Filter projects based on selected tabs
+	// Filter projects based on selected tabs and search
 	let filteredProjects = $derived(projects.filter(project => {
+		// Search filter
+		if (searchQuery) {
+			const query = searchQuery.toLowerCase();
+			const name = project.name?.toLowerCase() || '';
+			const description = project.description?.toLowerCase() || '';
+			const matchesSearch = name.includes(query) || description.includes(query);
+			if (!matchesSearch) return false;
+		}
+		
+		// Status and type filters
 		const statusMatch = statusFilter === 'all' || project.status === statusFilter;
 		const typeMatch = typeFilter === 'all' || project.type === typeFilter;
 		return statusMatch && typeMatch;
@@ -93,6 +106,14 @@
 		if (percentage >= 100) return 'danger';
 		if (percentage >= 80) return 'warning';
 		return 'success';
+	}
+	
+	function stripHtml(html: string): string {
+		if (!html) return '';
+		// Create a temporary div to parse HTML
+		const tmp = document.createElement('div');
+		tmp.innerHTML = html;
+		return tmp.textContent || tmp.innerText || '';
 	}
 </script>
 
@@ -246,13 +267,26 @@
 	<div>
 		<div class="flex items-center justify-between mb-4">
 			<h2 class="text-xl font-semibold">All Projects</h2>
-			{#if statusFilter !== 'all' || typeFilter !== 'all'}
+			{#if statusFilter !== 'all' || typeFilter !== 'all' || searchQuery}
 				<div class="text-sm text-muted-foreground">
 					Showing {filteredProjects.length} {filteredProjects.length === 1 ? 'project' : 'projects'} • 
 					Budget: <span class="font-semibold">{formatCurrency(filteredBudget)}</span> • 
 					Spent: <span class="font-semibold">{formatCurrency(filteredActual)}</span>
 				</div>
 			{/if}
+		</div>
+		
+		<!-- Search Bar -->
+		<div class="mb-4">
+			<div class="relative max-w-md">
+				<Search class="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
+				<Input
+					type="text"
+					placeholder="Search projects by name or description..."
+					bind:value={searchQuery}
+					class="pl-10 text-white placeholder:text-slate-400"
+				/>
+			</div>
 		</div>
 		
 		<!-- Status Filter Tabs -->
@@ -326,7 +360,7 @@
 										<div class="font-medium">{project.name}</div>
 										{#if project.description}
 											<div class="text-sm text-muted-foreground truncate max-w-xs">
-												{project.description}
+												{stripHtml(project.description)}
 											</div>
 										{/if}
 									</td>

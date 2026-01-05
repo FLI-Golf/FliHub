@@ -118,6 +118,11 @@
 			default: return 'text-slate-600 dark:text-slate-400';
 		}
 	}
+	
+	function isOverdue(task: any): boolean {
+		if (!task.dueDate || task.status === 'completed' || task.status === 'cancelled') return false;
+		return new Date(task.dueDate) < new Date();
+	}
 </script>
 
 <svelte:head>
@@ -353,19 +358,19 @@
 				<table class="w-full">
 					<thead class="bg-slate-50 dark:bg-slate-900 border-b">
 						<tr>
-							<th class="px-6 py-3 text-left text-xs font-medium text-foreground uppercase tracking-wider">
+							<th class="px-6 py-3 text-left text-xs font-medium text-black dark:text-black uppercase tracking-wider">
 								Task
 							</th>
-							<th class="px-6 py-3 text-left text-xs font-medium text-foreground uppercase tracking-wider">
+							<th class="px-6 py-3 text-left text-xs font-medium text-black dark:text-black uppercase tracking-wider">
 								Status
 							</th>
-							<th class="px-6 py-3 text-left text-xs font-medium text-foreground uppercase tracking-wider">
+							<th class="px-6 py-3 text-left text-xs font-medium text-black dark:text-black uppercase tracking-wider">
 								Priority
 							</th>
-							<th class="px-6 py-3 text-left text-xs font-medium text-foreground uppercase tracking-wider">
+							<th class="px-6 py-3 text-left text-xs font-medium text-black dark:text-black uppercase tracking-wider">
 								Progress
 							</th>
-							<th class="px-6 py-3 text-left text-xs font-medium text-foreground uppercase tracking-wider">
+							<th class="px-6 py-3 text-left text-xs font-medium text-black dark:text-black uppercase tracking-wider">
 								Due Date
 							</th>
 						</tr>
@@ -384,8 +389,9 @@
 						{:else}
 							{#each filteredTasks as task, i}
 								{@const progress = getSubtaskProgress(task)}
+								{@const overdue = isOverdue(task)}
 								<tr 
-									class="hover:bg-green-800 dark:hover:bg-green-800/50 transition-colors cursor-pointer {i % 2 === 1 ? 'bg-blue-800 dark:bg-blue-800/30' : ''}"
+									class="hover:bg-green-800 dark:hover:bg-green-800/50 transition-colors cursor-pointer {overdue ? 'bg-red-900/20 dark:bg-red-900/30 border-l-4 border-red-500' : i % 2 === 1 ? 'bg-blue-800 dark:bg-blue-800/30' : ''}"
 									onclick={() => handleRowClick(task)}
 								>
 									<td class="px-6 py-4">

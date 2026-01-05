@@ -19,7 +19,8 @@
 		Home,
 		CheckCircle2,
 		XCircle,
-		Clock
+		Clock,
+		Trash2
 	} from 'lucide-svelte';
 	
 	let { data }: { data: PageData } = $props();
@@ -119,6 +120,32 @@
 		} catch (error) {
 			console.error('Error updating role:', error);
 			alert('Failed to update role');
+		} finally {
+			updating[managerId] = false;
+		}
+	}
+	
+	async function deleteManager(managerId: string, managerName: string) {
+		if (!confirm(`Are you sure you want to delete ${managerName}? This action cannot be undone.`)) {
+			return;
+		}
+		
+		updating[managerId] = true;
+		
+		try {
+			const response = await fetch(`/api/user-profiles/${managerId}`, {
+				method: 'DELETE'
+			});
+			
+			if (response.ok) {
+				window.location.reload();
+			} else {
+				const error = await response.json();
+				alert(error.error || 'Failed to delete manager');
+			}
+		} catch (error) {
+			console.error('Error deleting manager:', error);
+			alert('Failed to delete manager');
 		} finally {
 			updating[managerId] = false;
 		}
@@ -285,6 +312,17 @@
 					{#if updating[manager.id]}
 						<p class="text-xs text-muted-foreground">Updating...</p>
 					{/if}
+					
+					<Button
+						variant="outline"
+						size="sm"
+						onclick={() => deleteManager(manager.id, `${manager.firstName} ${manager.lastName}`)}
+						disabled={updating[manager.id]}
+						class="w-full mt-3 bg-red-600 border-red-700 text-white hover:bg-red-700"
+					>
+						<Trash2 class="size-4 mr-2" />
+						Delete Manager
+					</Button>
 				</div>
 			</Card>
 			{/each}

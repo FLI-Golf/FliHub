@@ -93,6 +93,13 @@
 			year: 'numeric'
 		});
 	}
+	
+	function stripHtml(html: string): string {
+		if (!html) return '';
+		const tmp = document.createElement('div');
+		tmp.innerHTML = html;
+		return tmp.textContent || tmp.innerText || '';
+	}
 </script>
 
 <svelte:head>
@@ -164,7 +171,7 @@
 					type="text"
 					placeholder="Search by name, email, or phone..."
 					bind:value={searchQuery}
-					class="pl-10"
+					class="pl-10 text-white placeholder:text-slate-400"
 				/>
 			</div>
 			
@@ -327,7 +334,7 @@
 									<div class="font-medium">{vendor.name || 'Unnamed Vendor'}</div>
 									{#if vendor.about}
 										<div class="text-sm text-muted-foreground truncate max-w-xs">
-											{vendor.about}
+											{stripHtml(vendor.about)}
 										</div>
 									{/if}
 								</td>

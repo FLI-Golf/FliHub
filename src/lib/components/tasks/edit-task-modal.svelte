@@ -3,24 +3,79 @@
 	import { Button } from '$lib/components/ui/button';
 	import { Input } from '$lib/components/ui/input';
 	import { Label } from '$lib/components/ui/label';
-	import { Edit, Save, X } from 'lucide-svelte';
+	import { Edit, Save, X, Trash2 } from 'lucide-svelte';
 
 	let { open = $bindable(false), task } = $props();
 
 	let formData = $state({
-		title: task.title || '',
-		description: task.description || '',
-		status: task.status || 'todo',
-		priority: task.priority || 'medium',
-		startDate: task.startDate ? task.startDate.split('T')[0] : '',
-		dueDate: task.dueDate ? task.dueDate.split('T')[0] : '',
-		estimatedHours: task.estimatedHours?.toString() || '',
-		actualHours: task.actualHours?.toString() || '',
-		notes: task.notes || ''
+		title: '',
+		description: '',
+		status: 'todo',
+		priority: 'medium',
+		startDate: '',
+		dueDate: '',
+		estimatedHours: '',
+		actualHours: '',
+		notes: '',
+		subTasksChecklist: ''
 	});
 
 	let isSubmitting = $state(false);
+	let isDeleting = $state(false);
 	let error = $state('');
+
+	// Format dates for input[type="date"] which expects YYYY-MM-DD
+	function formatDateForInput(dateStr: string): string {
+		if (!dateStr) return '';
+		try {
+			// Handle both date-only and datetime formats
+			const date = new Date(dateStr);
+			if (isNaN(date.getTime())) return '';
+			
+			const year = date.getFullYear();
+			const month = String(date.getMonth() + 1).padStart(2, '0');
+			const day = String(date.getDate()).padStart(2, '0');
+			return `${year}-${month}-${day}`;
+		} catch {
+			return '';
+		}
+	}
+
+	// Update form data when task or open state changes
+	$effect(() => {
+		if (task && open) {
+			formData.title = task.title || '';
+			formData.description = task.description || '';
+			formData.status = task.status || 'todo';
+			formData.priority = task.priority || 'medium';
+			formData.startDate = formatDateForInput(task.startDate);
+			formData.dueDate = formatDateForInput(task.dueDate);
+			formData.estimatedHours = task.estimatedHours?.toString() || '';
+			formData.actualHours = task.actualHours?.toString() || '';
+			formData.notes = task.notes || '';
+			
+			// If no subtasks, provide sample
+			if (!task.subTasksChecklist || task.subTasksChecklist === '') {
+				formData.subTasksChecklist = `- [ ] Research and planning
+- [ ] Design mockups
+- [ ] Development
+- [ ] Testing
+- [ ] Documentation
+- [ ] Review and approval`;
+			} else {
+				formData.subTasksChecklist = task.subTasksChecklist;
+			}
+		}
+	});
+	
+	function insertSample() {
+		formData.subTasksChecklist = `- [ ] Research and planning
+- [ ] Design mockups
+- [ ] Development
+- [ ] Testing
+- [ ] Documentation
+- [ ] Review and approval`;
+	}
 
 	const statuses = [
 		{ value: 'todo', label: 'To Do' },
@@ -64,6 +119,33 @@
 			error = err instanceof Error ? err.message : 'An error occurred';
 		} finally {
 			isSubmitting = false;
+		}
+	}
+
+	async function handleDelete() {
+		if (!confirm('Are you sure you want to delete this task? This action cannot be undone.')) {
+			return;
+		}
+
+		isDeleting = true;
+		error = '';
+
+		try {
+			const response = await fetch(`/api/tasks/${task.id}`, {
+				method: 'DELETE'
+			});
+
+			if (!response.ok) {
+				const data = await response.json();
+				throw new Error(data.message || 'Failed to delete task');
+			}
+
+			open = false;
+			window.location.reload();
+		} catch (err) {
+			error = err instanceof Error ? err.message : 'An error occurred';
+		} finally {
+			isDeleting = false;
 		}
 	}
 
@@ -165,7 +247,7 @@
 						id="edit-startDate"
 						type="date"
 						bind:value={formData.startDate}
-						class="bg-slate-800 border-slate-700 text-white"
+						class="bg-slate-800 border-slate-700 text-white [color-scheme:dark]"
 					/>
 				</div>
 
@@ -175,7 +257,7 @@
 						id="edit-dueDate"
 						type="date"
 						bind:value={formData.dueDate}
-						class="bg-slate-800 border-slate-700 text-white"
+						class="bg-slate-800 border-slate-700 text-white [color-scheme:dark]"
 					/>
 				</div>
 			</div>
@@ -209,6 +291,29 @@
 			</div>
 
 			<div class="space-y-2">
+				<div class="flex items-center justify-between">
+					<Label for="edit-subtasks" class="text-slate-200">Subtasks Checklist</Label>
+					<Button
+						type="button"
+						variant="ghost"
+						size="sm"
+						onclick={insertSample}
+						class="text-xs text-blue-400 hover:text-blue-300"
+					>
+						Insert Sample
+					</Button>
+				</div>
+				<textarea
+					id="edit-subtasks"
+					bind:value={formData.subTasksChecklist}
+					placeholder="- [ ] First subtask&#10;- [ ] Second subtask&#10;- [ ] Third subtask"
+					rows="6"
+					class="flex w-full rounded-md border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-white placeholder:text-slate-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-500 font-mono"
+				></textarea>
+				<p class="text-xs text-slate-400">Use markdown format: - [ ] for unchecked, - [x] for checked</p>
+			</div>
+
+			<div class="space-y-2">
 				<Label for="edit-notes" class="text-slate-200">Notes</Label>
 				<textarea
 					id="edit-notes"
@@ -223,17 +328,29 @@
 				<Button
 					type="button"
 					variant="outline"
-					onclick={() => (open = false)}
-					disabled={isSubmitting}
-					class="flex-1 bg-slate-800 border-slate-700 text-white hover:bg-slate-700"
+					onclick={handleDelete}
+					disabled={isSubmitting || isDeleting}
+					class="bg-red-600 border-red-700 text-white hover:bg-red-700"
 				>
-					<X class="size-4 mr-2" />
-					Cancel
+					<Trash2 class="size-4 mr-2" />
+					{isDeleting ? 'Deleting...' : 'Delete'}
 				</Button>
-				<Button type="submit" disabled={isSubmitting} class="flex-1 bg-blue-600 hover:bg-blue-700 text-white">
-					<Save class="size-4 mr-2" />
-					{isSubmitting ? 'Saving...' : 'Save Changes'}
-				</Button>
+				<div class="flex-1 flex gap-2">
+					<Button
+						type="button"
+						variant="outline"
+						onclick={() => (open = false)}
+						disabled={isSubmitting || isDeleting}
+						class="flex-1 bg-slate-800 border-slate-700 text-white hover:bg-slate-700"
+					>
+						<X class="size-4 mr-2" />
+						Cancel
+					</Button>
+					<Button type="submit" disabled={isSubmitting || isDeleting} class="flex-1 bg-blue-600 hover:bg-blue-700 text-white">
+						<Save class="size-4 mr-2" />
+						{isSubmitting ? 'Saving...' : 'Save Changes'}
+					</Button>
+				</div>
 			</Sheet.Footer>
 		</form>
 	</Sheet.Content>
