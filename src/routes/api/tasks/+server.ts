@@ -24,6 +24,7 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 		if (data.dueDate && data.dueDate !== '') taskData.dueDate = data.dueDate;
 		if (data.estimatedHours) taskData.estimatedHours = parseFloat(data.estimatedHours);
 		if (data.notes) taskData.notes = data.notes;
+		if (data.subTasksChecklist) taskData.subTasksChecklist = data.subTasksChecklist;
 		if (data.projectId && data.projectId !== '') taskData.projectId = data.projectId;
 
 		const task = await pb.collection('tasks').create(taskData);
