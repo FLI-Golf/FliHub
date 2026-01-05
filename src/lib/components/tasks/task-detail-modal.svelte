@@ -80,7 +80,7 @@
 </script>
 
 <Sheet.Root bind:open>
-	<Sheet.Content class="w-full sm:max-w-3xl overflow-y-auto">
+	<Sheet.Content side="left" class="w-full sm:max-w-3xl overflow-y-auto">
 		<Sheet.Header>
 			<Sheet.Title class="text-2xl">{task?.title || 'Task Details'}</Sheet.Title>
 		</Sheet.Header>
