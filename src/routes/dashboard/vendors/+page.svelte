@@ -93,6 +93,13 @@
 			year: 'numeric'
 		});
 	}
+	
+	function stripHtml(html: string): string {
+		if (!html) return '';
+		const tmp = document.createElement('div');
+		tmp.innerHTML = html;
+		return tmp.textContent || tmp.innerText || '';
+	}
 </script>
 
 <svelte:head>
@@ -327,7 +334,7 @@
 									<div class="font-medium">{vendor.name || 'Unnamed Vendor'}</div>
 									{#if vendor.about}
 										<div class="text-sm text-muted-foreground truncate max-w-xs">
-											{vendor.about}
+											{stripHtml(vendor.about)}
 										</div>
 									{/if}
 								</td>
