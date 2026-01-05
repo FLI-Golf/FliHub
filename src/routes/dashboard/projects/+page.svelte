@@ -107,6 +107,14 @@
 		if (percentage >= 80) return 'warning';
 		return 'success';
 	}
+	
+	function stripHtml(html: string): string {
+		if (!html) return '';
+		// Create a temporary div to parse HTML
+		const tmp = document.createElement('div');
+		tmp.innerHTML = html;
+		return tmp.textContent || tmp.innerText || '';
+	}
 </script>
 
 <svelte:head>
@@ -352,7 +360,7 @@
 										<div class="font-medium">{project.name}</div>
 										{#if project.description}
 											<div class="text-sm text-muted-foreground truncate max-w-xs">
-												{project.description}
+												{stripHtml(project.description)}
 											</div>
 										{/if}
 									</td>
