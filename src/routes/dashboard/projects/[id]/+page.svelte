@@ -9,6 +9,7 @@
 	import AddTaskModal from '$lib/components/tasks/add-task-modal.svelte';
 	import TaskDetailModal from '$lib/components/tasks/task-detail-modal.svelte';
 	import SelectOrAddVendorModal from '$lib/components/vendors/select-or-add-vendor-modal.svelte';
+	import AddExpenseModal from '$lib/components/expenses/add-expense-modal.svelte';
 	import { 
 		ArrowLeft,
 		DollarSign,
@@ -29,6 +30,7 @@
 	let showAddTaskModal = $state(false);
 	let showTaskDetailModal = $state(false);
 	let showAddVendorModal = $state(false);
+	let showAddExpenseModal = $state(false);
 	let selectedTask = $state<any>(null);
 	let removingVendorId = $state<string | null>(null);
 	
@@ -190,6 +192,9 @@
 		existingVendors={data.allVendors}
 	/>
 
+	<!-- Add Expense Modal -->
+	<AddExpenseModal bind:open={showAddExpenseModal} projectId={project.id} />
+
 	<!-- Key Metrics -->
 	<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
 		<MetricCard
@@ -340,11 +345,15 @@
 
 	<!-- Expenses Table -->
 	<Card class="overflow-hidden">
-		<div class="p-6 border-b">
+		<div class="p-6 border-b flex items-center justify-between">
 			<h2 class="text-xl font-semibold flex items-center gap-2">
 				<Package class="size-5" />
 				Expenses ({expenses.length})
 			</h2>
+			<Button onclick={() => showAddExpenseModal = true} class="gap-2">
+				<Plus class="size-4" />
+				Add Expense
+			</Button>
 		</div>
 		<div class="overflow-x-auto">
 			<table class="w-full">
