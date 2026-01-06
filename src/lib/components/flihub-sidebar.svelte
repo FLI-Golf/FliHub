@@ -58,6 +58,27 @@
 	let { ref = $bindable(null), ...restProps }: ComponentProps<typeof Sidebar.Root> = $props();
 
 	const isActive = (url: string) => $page.url.pathname === url;
+	
+	// Get user role from page data
+	const userRole = $derived($page.data?.userProfile?.role || 'leader');
+	
+	// Filter navigation based on role
+	const filteredNav = $derived(data.navMain.filter(item => {
+		if (userRole === 'vendor') {
+			// Vendors only see: Dashboard, Projects (their projects), Expenses (their invoices)
+			return ['Dashboard', 'Projects', 'Expenses'].includes(item.title);
+		}
+		if (userRole === 'leader') {
+			// Leaders only see: Dashboard (their department), Projects, Tasks, Expenses (view only)
+			return ['Dashboard', 'Projects', 'Tasks', 'Expenses'].includes(item.title);
+		}
+		if (userRole === 'pro' || userRole === 'franchise_owner') {
+			// Pros and franchise owners see limited views
+			return !['Managers', 'Vendors'].includes(item.title);
+		}
+		// Admin sees everything
+		return true;
+	}));
 </script>
 
 <Sidebar.Root {...restProps} bind:ref>
@@ -76,7 +97,7 @@
 		<Sidebar.Group>
 			<Sidebar.GroupContent>
 				<Sidebar.Menu>
-					{#each data.navMain as item (item.title)}
+					{#each filteredNav as item (item.title)}
 						<Sidebar.MenuItem>
 							<Sidebar.MenuButton isActive={isActive(item.url)}>
 								{#snippet child({ props })}

@@ -3,6 +3,28 @@ import type { Actions, PageServerLoad } from './$types';
 
 export const load: PageServerLoad = async ({ locals }) => {
 	if (locals.pb.authStore.isValid) {
+		// Check user role before redirecting
+		const userId = locals.pb.authStore.model?.id;
+		if (userId) {
+			const profiles = await locals.pb.collection('user_profiles').getFullList({
+				filter: `userId = "${userId}"`
+			});
+			const userProfile = profiles[0];
+
+			// Redirect vendor users to their dashboard
+			if (userProfile?.role === 'vendor') {
+				throw redirect(303, '/dashboard/vendors');
+			}
+
+			// Redirect leader users to their department
+			if (userProfile?.role === 'leader') {
+				if (!userProfile.departmentId) {
+					throw redirect(303, '/dashboard/departments');
+				}
+				throw redirect(303, `/dashboard/department/${userProfile.departmentId}`);
+			}
+		}
+		
 		throw redirect(303, '/dashboard');
 	}
 };
@@ -24,7 +46,7 @@ export const actions: Actions = {
 			return fail(400, { error: 'Invalid email or password', email });
 		}
 
-		// Check if user is a leader and has a department
+		// Check user role and redirect accordingly
 		try {
 			const userId = locals.pb.authStore.model?.id;
 
@@ -34,20 +56,33 @@ export const actions: Actions = {
 			});
 			const userProfile = profiles[0];
 
-			// If user is a leader, check for their department
-			if (userProfile?.role === 'leader' && userProfile?.id) {
-				const departments = await locals.pb.collection('departments_collection').getFullList({
-					filter: `headOfDepartment = "${userProfile.id}"`
-				});
+			if (userProfile) {
+				// Vendor users - redirect to vendor dashboard or setup
+				if (userProfile.role === 'vendor') {
+					if (!userProfile.vendorId) {
+						// Vendor not linked yet - redirect to setup message
+						throw redirect(303, '/dashboard/vendors');
+					}
+					// Redirect to vendor-specific view
+					throw redirect(303, '/dashboard/vendors');
+				}
 
-				if (departments.length > 0) {
-					const department = departments[0];
+				// Leader users - redirect to their department
+				if (userProfile.role === 'leader') {
+					if (!userProfile.departmentId) {
+						// Leader not assigned to department yet
+						throw redirect(303, '/dashboard/departments');
+					}
 					// Redirect to department-specific dashboard
-					throw redirect(303, `/dashboard/department/${department.id}`);
+					throw redirect(303, `/dashboard/department/${userProfile.departmentId}`);
 				}
 			}
 		} catch (error) {
-			console.error('Error checking department:', error);
+			// If it's a redirect, re-throw it
+			if (error instanceof Response && error.status === 303) {
+				throw error;
+			}
+			console.error('Error checking user profile:', error);
 			// Continue to default dashboard if there's an error
 		}
 

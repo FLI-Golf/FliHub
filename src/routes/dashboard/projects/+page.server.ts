@@ -12,6 +12,13 @@ export const load: PageServerLoad = async ({ locals }) => {
 	try {
 		projects = await pb.collection('projects').getFullList({ sort: '-id' });
 		console.log(`4. ✓ Fetched ${projects.length} projects`);
+		if (projects.length > 0) {
+			console.log('First project sample:', {
+				id: projects[0].id,
+				name: projects[0].name,
+				status: projects[0].status
+			});
+		}
 	} catch (err: any) {
 		console.error('4. ✗ Error fetching projects:', err?.message);
 	}
