@@ -15,6 +15,7 @@
 		startDate: '',
 		dueDate: '',
 		estimatedHours: '',
+		tags: '',
 		notes: '',
 		subTasksChecklist: '',
 		projectId: projectId
@@ -86,6 +87,7 @@
 			startDate: '',
 			dueDate: '',
 			estimatedHours: '',
+			tags: '',
 			notes: '',
 			subTasksChecklist: '',
 			projectId: projectId
@@ -209,9 +211,22 @@
 					step="0.5"
 					min="0"
 					bind:value={formData.estimatedHours}
-					placeholder="0"
+					placeholder="e.g., 2.5"
 					class="bg-slate-800 border-slate-700 text-white placeholder:text-slate-400"
 				/>
+				<p class="text-xs text-slate-400">Estimate time needed to complete this task (e.g., 1.5 for 1.5 hours)</p>
+			</div>
+
+			<div class="space-y-2">
+				<Label for="tags" class="text-slate-200">Tags</Label>
+				<Input
+					id="tags"
+					type="text"
+					bind:value={formData.tags}
+					placeholder="e.g., urgent, client-facing, design"
+					class="bg-slate-800 border-slate-700 text-white placeholder:text-slate-400"
+				/>
+				<p class="text-xs text-slate-400">Comma-separated tags to categorize this task</p>
 			</div>
 
 			<div class="space-y-2">
