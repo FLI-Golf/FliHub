@@ -79,8 +79,8 @@
 					organization: formData.organization,
 					role: formData.role,
 					status: formData.status,
-					vendorId: formData.vendorId || null
-					departmentId: formData.departmentId || null,
+					vendorId: formData.vendorId || null,
+					departmentId: formData.departmentId || null
 				})
 			});
 
