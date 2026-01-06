@@ -5,7 +5,11 @@
 	import { Label } from '$lib/components/ui/label';
 	import { X, Save } from 'lucide-svelte';
 
-	let { open = $bindable(false), projectId = '' } = $props();
+	let { 
+		open = $bindable(false), 
+		taskId = '',
+		projectTasks = []
+	} = $props();
 
 	let formData = $state({
 		description: '',
@@ -16,13 +20,13 @@
 		notes: '',
 		paymentMethod: '',
 		reimbursementTo: '',
-		projectId: projectId
+		taskId: taskId
 	});
 
-	// Update projectId in formData when prop changes
+	// Update taskId in formData when prop changes
 	$effect(() => {
-		if (projectId) {
-			formData.projectId = projectId;
+		if (taskId) {
+			formData.taskId = taskId;
 		}
 	});
 
@@ -122,7 +126,7 @@
 			notes: '',
 			paymentMethod: '',
 			reimbursementTo: '',
-			projectId: projectId
+			taskId: taskId
 		};
 		error = '';
 	}
@@ -146,6 +150,24 @@
 			{#if error}
 				<div class="p-3 rounded-lg bg-red-900/30 border border-red-700">
 					<p class="text-sm text-red-300">{error}</p>
+				</div>
+			{/if}
+
+			<!-- Task Selection (if multiple tasks available) -->
+			{#if projectTasks.length > 0 && !taskId}
+				<div class="space-y-2">
+					<Label for="taskId" class="text-slate-200">Related Task</Label>
+					<select
+						id="taskId"
+						bind:value={formData.taskId}
+						class="flex h-10 w-full rounded-md border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-500 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-900"
+					>
+						<option value="">No task (general expense)</option>
+						{#each projectTasks as task}
+							<option value={task.id}>{task.title}</option>
+						{/each}
+					</select>
+					<p class="text-xs text-slate-400">Optional: Link this expense to a specific task</p>
 				</div>
 			{/if}
 
