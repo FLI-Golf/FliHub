@@ -153,6 +153,7 @@
 		updating[selectedManager.id] = true;
 		
 		try {
+			// Update user profile with role and assignments
 			const response = await fetch('/api/user-profiles/update-role', {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
