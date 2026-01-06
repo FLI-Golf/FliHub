@@ -183,21 +183,23 @@
 
 			<div class="grid grid-cols-2 gap-4">
 				<div class="space-y-2">
-					<Label for="startDate" class="text-slate-200">Start Date</Label>
+					<Label for="startDate" class="text-slate-200">Start Date *</Label>
 					<Input
 						id="startDate"
 						type="date"
 						bind:value={formData.startDate}
+						required
 						class="bg-slate-800 border-slate-700 text-white"
 					/>
 				</div>
 
 				<div class="space-y-2">
-					<Label for="dueDate" class="text-slate-200">Due Date</Label>
+					<Label for="dueDate" class="text-slate-200">Due Date *</Label>
 					<Input
 						id="dueDate"
 						type="date"
 						bind:value={formData.dueDate}
+						required
 						class="bg-slate-800 border-slate-700 text-white"
 					/>
 				</div>
