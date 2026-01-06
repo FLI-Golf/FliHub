@@ -5,7 +5,10 @@
 	import { Label } from '$lib/components/ui/label';
 	import { Plus, Save, X } from 'lucide-svelte';
 
-	let { open = $bindable(false) } = $props();
+	let { 
+		open = $bindable(false),
+		departments = []
+	} = $props();
 
 	// Form state
 	let formData = $state({
@@ -13,11 +16,12 @@
 		description: '',
 		type: 'tournament',
 		status: 'draft',
+		department: '',
 		startDate: '',
 		endDate: '',
 		budget: '',
 		forecastedExpenses: '',
-		fiscalYear: '',
+		fiscalYear: '2026',
 		notes: ''
 	});
 
@@ -81,11 +85,12 @@
 			description: '',
 			type: 'tournament',
 			status: 'draft',
+			department: '',
 			startDate: '',
 			endDate: '',
 			budget: '',
 			forecastedExpenses: '',
-			fiscalYear: '',
+			fiscalYear: '2026',
 			notes: ''
 		};
 		error = '';
@@ -142,6 +147,23 @@
 				></textarea>
 			</div>
 
+			<!-- Department -->
+			<div class="space-y-2">
+				<Label for="department" class="text-slate-200">Department *</Label>
+				<select
+					id="department"
+					bind:value={formData.department}
+					required
+					class="flex h-10 w-full rounded-md border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-500 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-900"
+				>
+					<option value="">Select a department...</option>
+					{#each departments as dept}
+						<option value={dept.id}>{dept.name}</option>
+					{/each}
+				</select>
+				<p class="text-xs text-slate-400">Found {departments.length} department(s)</p>
+			</div>
+
 			<!-- Type and Status -->
 			<div class="grid grid-cols-2 gap-4">
 				<div class="space-y-2">
@@ -176,21 +198,23 @@
 			<!-- Dates -->
 			<div class="grid grid-cols-2 gap-4">
 				<div class="space-y-2">
-					<Label for="startDate" class="text-slate-200">Start Date</Label>
+					<Label for="startDate" class="text-slate-200">Start Date *</Label>
 					<Input
 						id="startDate"
 						type="date"
 						bind:value={formData.startDate}
+						required
 						class="bg-slate-800 border-slate-700 text-white"
 					/>
 				</div>
 
 				<div class="space-y-2">
-					<Label for="endDate" class="text-slate-200">End Date</Label>
+					<Label for="endDate" class="text-slate-200">End Date *</Label>
 					<Input
 						id="endDate"
 						type="date"
 						bind:value={formData.endDate}
+						required
 						class="bg-slate-800 border-slate-700 text-white"
 					/>
 				</div>
@@ -199,7 +223,7 @@
 			<!-- Budget and Forecasted -->
 			<div class="grid grid-cols-2 gap-4">
 				<div class="space-y-2">
-					<Label for="budget" class="text-slate-200">Budget</Label>
+					<Label for="budget" class="text-slate-200">Budget *</Label>
 					<Input
 						id="budget"
 						type="number"
@@ -207,6 +231,7 @@
 						min="0"
 						bind:value={formData.budget}
 						placeholder="0.00"
+						required
 						class="bg-slate-800 border-slate-700 text-white placeholder:text-slate-400"
 					/>
 				</div>
@@ -231,7 +256,7 @@
 				<Input
 					id="fiscalYear"
 					bind:value={formData.fiscalYear}
-					placeholder="e.g., 2024"
+					placeholder="2026"
 					maxlength="10"
 					class="bg-slate-800 border-slate-700 text-white placeholder:text-slate-400"
 				/>

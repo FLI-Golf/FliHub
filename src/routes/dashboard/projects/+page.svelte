@@ -134,7 +134,7 @@
 	</div>
 
 	<!-- Add Project Modal -->
-	<AddProjectModal bind:open={showAddModal} />
+	<AddProjectModal bind:open={showAddModal} departments={data.departments} />
 
 	<!-- Alerts -->
 	{#if alerts.overBudget > 0 || alerts.nearingBudget > 0}

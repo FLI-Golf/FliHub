@@ -3,7 +3,7 @@ import type { PageServerLoad } from './$types';
 export const load: PageServerLoad = async ({ locals }) => {
 	const pb = locals.pb;
 
-	console.log('Loading projects page...');
+	console.log('=== PROJECTS PAGE LOAD START ===');
 	console.log('Auth state:', {
 		isValid: pb.authStore.isValid,
 		userId: pb.authStore.model?.id,
@@ -13,11 +13,19 @@ export const load: PageServerLoad = async ({ locals }) => {
 	try {
 		// Fetch all projects
 		console.log('Fetching projects from PocketBase...');
-		const projects = await pb.collection('projects').getFullList({
-			sort: '-id'
-		});
-		console.log(`Fetched ${projects.length} projects`);
-		console.log('First project:', projects[0]);
+		let projects = [];
+		try {
+			projects = await pb.collection('projects').getFullList({
+				sort: '-id'
+			});
+			console.log(`Fetched ${projects.length} projects`);
+			if (projects.length > 0) {
+				console.log('First project:', projects[0]);
+			}
+		} catch (projectError) {
+			console.error('Error fetching projects:', projectError);
+			// Continue with empty projects array
+		}
 
 		// Calculate project statistics
 		const stats = {
@@ -59,13 +67,26 @@ export const load: PageServerLoad = async ({ locals }) => {
 			return percentage >= 80 && percentage <= 100;
 		});
 
+		// Fetch departments for the add project modal
+		let departments = [];
+		try {
+			departments = await pb.collection('departments').getFullList({
+				sort: 'name'
+			});
+			console.log(`Fetched ${departments.length} departments`);
+		} catch (err) {
+			console.error('Error fetching departments:', err);
+			console.error('Department error details:', err);
+		}
+
 		return {
 			projects,
 			stats,
 			alerts: {
 				overBudget: overBudget.length,
 				nearingBudget: nearingBudget.length
-			}
+			},
+			departments
 		};
 	} catch (error) {
 		console.error('Error loading projects:', error);
@@ -75,6 +96,7 @@ export const load: PageServerLoad = async ({ locals }) => {
 		}
 		return {
 			projects: [],
+			departments: [],
 			stats: {
 				total: 0,
 				byStatus: { draft: 0, planned: 0, in_progress: 0, completed: 0, cancelled: 0 },

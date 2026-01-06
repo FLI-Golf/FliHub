@@ -8,6 +8,7 @@
 	import EditProjectModal from '$lib/components/projects/edit-project-modal.svelte';
 	import AddTaskModal from '$lib/components/tasks/add-task-modal.svelte';
 	import TaskDetailModal from '$lib/components/tasks/task-detail-modal.svelte';
+	import SelectOrAddVendorModal from '$lib/components/vendors/select-or-add-vendor-modal.svelte';
 	import { 
 		ArrowLeft,
 		DollarSign,
@@ -18,7 +19,8 @@
 		TrendingUp,
 		Package,
 		Edit,
-		Plus
+		Plus,
+		X
 	} from 'lucide-svelte';
 	
 	let { data }: { data: PageData } = $props();
@@ -26,7 +28,9 @@
 	let showEditModal = $state(false);
 	let showAddTaskModal = $state(false);
 	let showTaskDetailModal = $state(false);
+	let showAddVendorModal = $state(false);
 	let selectedTask = $state<any>(null);
+	let removingVendorId = $state<string | null>(null);
 	
 	let project = $derived(data.project);
 	let expenses = $derived(data.expenses || []);
@@ -98,6 +102,44 @@
 		if (percentage >= 80) return 'warning';
 		return 'success';
 	}
+
+	async function handleRemoveVendor(vendorId: string, event: Event) {
+		event.stopPropagation(); // Prevent opening the modal
+		
+		if (!confirm('Are you sure you want to remove this vendor from the project?')) {
+			return;
+		}
+
+		removingVendorId = vendorId;
+
+		try {
+			// Get current vendor IDs and remove the selected one
+			const currentVendorIds = project.vendors || [];
+			const updatedVendorIds = currentVendorIds.filter((id: string) => id !== vendorId);
+
+			const response = await fetch(`/api/projects/${project.id}`, {
+				method: 'PATCH',
+				headers: {
+					'Content-Type': 'application/json'
+				},
+				body: JSON.stringify({
+					vendors: updatedVendorIds
+				})
+			});
+
+			if (!response.ok) {
+				throw new Error('Failed to remove vendor');
+			}
+
+			// Reload the page to show updated vendors
+			window.location.reload();
+		} catch (err) {
+			alert('Failed to remove vendor. Please try again.');
+			console.error('Error removing vendor:', err);
+		} finally {
+			removingVendorId = null;
+		}
+	}
 </script>
 
 <svelte:head>
@@ -140,6 +182,13 @@
 	{#if selectedTask}
 		<TaskDetailModal bind:open={showTaskDetailModal} task={selectedTask} />
 	{/if}
+
+	<!-- Select or Add Vendor Modal -->
+	<SelectOrAddVendorModal 
+		bind:open={showAddVendorModal} 
+		projectId={project.id}
+		existingVendors={data.allVendors}
+	/>
 
 	<!-- Key Metrics -->
 	<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -244,28 +293,48 @@
 		</Card>
 
 		<!-- Vendors Card -->
-		<Card class="p-6">
-			<h2 class="text-xl font-semibold mb-4 flex items-center gap-2">
-				<Building2 class="size-5" />
-				Vendors
-			</h2>
-			{#if project.expand?.vendors && project.expand.vendors.length > 0}
-				<div class="space-y-3">
-					{#each project.expand.vendors as vendor}
-						<div class="p-3 rounded-lg border bg-slate-50 dark:bg-slate-900">
-							<p class="font-medium text-slate-900 dark:text-slate-100">{vendor.name}</p>
-							{#if vendor.email}
-								<p class="text-sm text-slate-700 dark:text-slate-300">{vendor.email}</p>
-							{/if}
-							{#if vendor.phone}
-								<p class="text-sm text-slate-700 dark:text-slate-300">{vendor.phone}</p>
-							{/if}
-						</div>
-					{/each}
-				</div>
-			{:else}
-				<p class="text-muted-foreground text-center py-8">No vendors assigned to this project</p>
-			{/if}
+		<Card class="p-6 relative">
+			<!-- Clickable overlay -->
+			<button 
+				onclick={() => showAddVendorModal = true}
+				class="absolute inset-0 w-full h-full cursor-pointer hover:bg-accent/50 transition-colors rounded-lg"
+				aria-label="Add vendor"
+			></button>
+			
+			<div class="relative pointer-events-none">
+				<h2 class="text-xl font-semibold mb-4 flex items-center gap-2">
+					<Building2 class="size-5" />
+					Vendors
+					<Plus class="size-4 ml-auto text-muted-foreground" />
+				</h2>
+				{#if project.expand?.vendors && project.expand.vendors.length > 0}
+					<div class="space-y-3">
+						{#each project.expand.vendors as vendor}
+							<div class="p-3 rounded-lg border bg-slate-50 dark:bg-slate-900 flex items-start justify-between gap-3">
+								<div class="flex-1">
+									<p class="font-medium text-slate-900 dark:text-slate-100">{vendor.name}</p>
+									{#if vendor.contact_email}
+										<p class="text-sm text-slate-700 dark:text-slate-300">{vendor.contact_email}</p>
+									{/if}
+									{#if vendor.contact_phone}
+										<p class="text-sm text-slate-700 dark:text-slate-300">{vendor.contact_phone}</p>
+									{/if}
+								</div>
+								<button
+									onclick={(e) => handleRemoveVendor(vendor.id, e)}
+									disabled={removingVendorId === vendor.id}
+									class="pointer-events-auto p-1 rounded-md hover:bg-red-100 dark:hover:bg-red-900/30 text-slate-500 hover:text-red-600 dark:hover:text-red-400 transition-colors disabled:opacity-50"
+									aria-label="Remove vendor"
+								>
+									<X class="size-4" />
+								</button>
+							</div>
+						{/each}
+					</div>
+				{:else}
+					<p class="text-muted-foreground text-center py-8">No vendors assigned to this project</p>
+				{/if}
+			</div>
 		</Card>
 	</div>
 
