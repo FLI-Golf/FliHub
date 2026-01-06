@@ -153,14 +153,15 @@
 		updating[selectedManager.id] = true;
 		
 		try {
+			// Update user profile with role and assignments
 			const response = await fetch('/api/user-profiles/update-role', {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ 
-					profileId: selectedManager.id, 
+				body: JSON.stringify({
+					profileId: selectedManager.id,
 					role: editForm.role,
-					vendorId: editForm.vendorId || null
-					departmentId: editForm.departmentId || null,
+					vendorId: editForm.vendorId || null,
+					departmentId: editForm.departmentId || null
 				})
 			});
 			
