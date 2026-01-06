@@ -16,11 +16,37 @@ export const load: PageServerLoad = async ({ locals }) => {
 	const filter = isAdmin ? '' : `role = "leader"`;
 	const managers = await locals.pb.collection('user_profiles').getFullList({
 		filter,
-		sort: 'firstName,lastName'
+		sort: 'firstName,lastName',
+		expand: 'vendorId'
 	});
+
+	// Fetch all vendors for the dropdown
+	let vendors = [];
+	let departments = [];
+	if (isAdmin) {
+		try {
+			vendors = await locals.pb.collection('vendors').getFullList({
+				sort: 'name',
+				fields: 'id,name,active'
+			});
+		} catch (error) {
+			console.error('Error fetching vendors:', error);
+		}
+
+		try {
+			departments = await locals.pb.collection('departments').getFullList({
+				sort: 'name',
+				fields: 'id,name,status'
+			});
+		} catch (error) {
+			console.error('Error fetching departments:', error);
+		}
+	}
 
 	return {
 		managers,
+		vendors,
+		departments,
 		isAdmin
 	};
 };

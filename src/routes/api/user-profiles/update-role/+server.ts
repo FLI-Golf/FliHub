@@ -17,7 +17,7 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 	}
 
 	try {
-		const { profileId, role } = await request.json();
+		const { profileId, role, vendorId, departmentId } = await request.json();
 
 		if (!profileId || !role) {
 			return json({ error: 'Missing profileId or role' }, { status: 400 });
@@ -29,10 +29,21 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 			return json({ error: 'Invalid role' }, { status: 400 });
 		}
 
+		// Prepare update data
+		const updateData: any = { role };
+		
+		// Add vendorId if provided (or explicitly set to null)
+		if (vendorId !== undefined) {
+			updateData.vendorId = vendorId || null;
+		}
+
+		// Add departmentId if provided (or explicitly set to null)
+		if (departmentId !== undefined) {
+			updateData.departmentId = departmentId || null;
+		}
+
 		// Update the user profile
-		const updated = await locals.pb.collection('user_profiles').update(profileId, {
-			role
-		});
+		const updated = await locals.pb.collection('user_profiles').update(profileId, updateData);
 
 		return json({ success: true, profile: updated });
 	} catch (error: any) {

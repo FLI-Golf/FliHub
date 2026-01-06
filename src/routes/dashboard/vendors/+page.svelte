@@ -107,15 +107,34 @@
 </svelte:head>
 
 <div class="flex flex-col gap-6">
+	<!-- Error Message for Vendor Users without Assignment -->
+	{#if data.error && data.isVendorUser}
+		<Card class="p-6 bg-orange-50 dark:bg-orange-900/20 border-orange-200 dark:border-orange-800">
+			<div class="flex items-start gap-3">
+				<XCircle class="size-5 text-orange-600 dark:text-orange-400 mt-0.5" />
+				<div>
+					<h3 class="font-semibold text-orange-900 dark:text-orange-100 mb-1">No Vendor Assigned</h3>
+					<p class="text-sm text-orange-800 dark:text-orange-200">{data.error}</p>
+				</div>
+			</div>
+		</Card>
+	{/if}
+
 	<div class="flex justify-between items-center">
 		<div>
-			<h1 class="text-3xl font-bold mb-2">Vendors</h1>
-			<p class="text-muted-foreground">Manage suppliers and service providers</p>
+			<h1 class="text-3xl font-bold mb-2">
+				{data.isVendorUser ? 'My Vendor' : 'Vendors'}
+			</h1>
+			<p class="text-muted-foreground">
+				{data.isVendorUser ? 'View your vendor information' : 'Manage suppliers and service providers'}
+			</p>
 		</div>
-		<Button class="gap-2" onclick={() => showAddModal = true}>
-			<Plus class="size-4" />
-			Add Vendor
-		</Button>
+		{#if !data.isVendorUser}
+			<Button class="gap-2" onclick={() => showAddModal = true}>
+				<Plus class="size-4" />
+				Add Vendor
+			</Button>
+		{/if}
 	</div>
 
 	<!-- Add Vendor Modal -->

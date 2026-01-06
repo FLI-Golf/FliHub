@@ -6,6 +6,7 @@
 	import MetricCard from '$lib/components/metrics/metric-card.svelte';
 	import ProgressBar from '$lib/components/metrics/progress-bar.svelte';
 	import StatusBadge from '$lib/components/metrics/status-badge.svelte';
+	import * as Sheet from '$lib/components/ui/sheet/index.js';
 	import { 
 		Users, 
 		ListTodo, 
@@ -20,7 +21,12 @@
 		AlertCircle,
 		FileText,
 		ClipboardList,
-		PlayCircle
+		PlayCircle,
+		ArrowRight,
+		Building2,
+		XCircle,
+		Calendar,
+		UserCircle
 	} from 'lucide-svelte';
 	
 	let { data }: { data: PageData } = $props();
@@ -28,10 +34,47 @@
 	let role = $derived(data.userProfile?.role || 'leader');
 	let isAdmin = $derived(role === 'admin');
 	let userName = $derived(data.userProfile ? `${data.userProfile.firstName} ${data.userProfile.lastName}` : data.user?.email);
-	let metrics = $derived(data.metrics);
+	
+	let projectStatusTab = $state<string>('in_progress');
+	
+	let metrics = $derived(data.metrics || {
+		projects: { total: 0, draft: 0, planned: 0, active: 0, completed: 0, cancelled: 0 },
+		projectsByStatus: { draft: [], planned: [], in_progress: [], completed: [], cancelled: [] },
+		departments: { total: 0, active: 0, inactive: 0 },
+		departmentsByStatus: { active: [], inactive: [] },
+		expenses: { total: 0, totalAmount: 0, approvedAmount: 0, draft: 0, submitted: 0, approved: 0, paid: 0 },
+		budget: { total: 0, forecasted: 0, actual: 0, remaining: 0 },
+		managers: { total: 0 }
+	});
 	let recentProjects = $derived(data.recentProjects || []);
 	
+	// Get projects for selected tab
+	let filteredProjects = $derived(metrics.projectsByStatus?.[projectStatusTab] || []);
+	
+	// Get departments for selected tab
+	let filteredDepartments = $derived(metrics.departmentsByStatus?.[departmentStatusTab] || []);
+	
+	// Debug: Log received data
+	$effect(() => {
+		console.log('=== DASHBOARD CLIENT DATA ===');
+		console.log('Full data object:', data);
+		console.log('Metrics object:', metrics);
+		console.log('Projects:', metrics?.projects);
+		console.log('Projects by status:', metrics?.projectsByStatus);
+		console.log('Current tab:', projectStatusTab);
+		console.log('Filtered projects:', filteredProjects);
+		console.log('Departments:', metrics?.departments);
+		console.log('Expenses:', metrics?.expenses);
+		console.log('Budget:', metrics?.budget);
+		console.log('Managers:', metrics?.managers);
+	});
+	
 	let projectStatusFilter = $state<string>('all');
+	let showProjectsModal = $state(false);
+	let showDepartmentsModal = $state(false);
+	let showExpensesModal = $state(false);
+	let showTeamModal = $state(false);
+	let departmentStatusTab = $state<string>('active');
 	
 	// Filter recent projects by status
 	let filteredRecentProjects = $derived(projectStatusFilter === 'all' 
@@ -62,6 +105,34 @@
 			day: 'numeric',
 			year: 'numeric'
 		});
+	}
+	
+	function getCountdown(endDate: string): { text: string; color: string; isOverdue: boolean } {
+		if (!endDate) return { text: 'No end date', color: 'text-slate-400', isOverdue: false };
+		
+		const now = new Date();
+		const due = new Date(endDate);
+		const diffTime = due.getTime() - now.getTime();
+		const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+		
+		if (diffDays < 0) {
+			return { 
+				text: `${Math.abs(diffDays)} days overdue`, 
+				color: 'text-red-400', 
+				isOverdue: true 
+			};
+		} else if (diffDays === 0) {
+			return { text: 'Due today', color: 'text-orange-400', isOverdue: false };
+		} else if (diffDays === 1) {
+			return { text: 'Due tomorrow', color: 'text-yellow-400', isOverdue: false };
+		} else if (diffDays <= 7) {
+			return { text: `${diffDays} days left`, color: 'text-yellow-400', isOverdue: false };
+		} else if (diffDays <= 30) {
+			return { text: `${diffDays} days left`, color: 'text-green-400', isOverdue: false };
+		} else {
+			const weeks = Math.floor(diffDays / 7);
+			return { text: `${weeks} weeks left`, color: 'text-green-400', isOverdue: false };
+		}
 	}
 </script>
 
@@ -102,33 +173,45 @@
 	<div>
 		<h2 class="text-2xl font-bold mb-4">Overview</h2>
 		<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-			<MetricCard
-				title="Total Projects"
-				value={metrics.projects.total}
-				subtitle="{metrics.projects.active} active, {metrics.projects.completed} completed"
-				icon={FolderKanban}
-			/>
+			<button onclick={() => showProjectsModal = true} class="text-left cursor-pointer">
+				<MetricCard
+					title="Total Projects"
+					value={metrics.projects.total}
+					subtitle="{metrics.projects.active} in progress, {metrics.projects.completed} completed"
+					icon={FolderKanban}
+					class="hover:shadow-xl hover:bg-slate-600 dark:hover:bg-slate-600 hover:scale-[1.02] transition-all duration-200"
+				/>
+			</button>
 			
-			<MetricCard
-				title="Tasks"
-				value={metrics.tasks.total}
-				subtitle="{metrics.tasks.inProgress} in progress"
-				icon={ListTodo}
-			/>
+			<button onclick={() => showDepartmentsModal = true} class="text-left cursor-pointer">
+				<MetricCard
+					title="Departments"
+					value={metrics.departments.total}
+					subtitle="{metrics.departments.active} active departments"
+					icon={Building2}
+					class="hover:shadow-xl hover:bg-slate-600 dark:hover:bg-slate-600 hover:scale-[1.02] transition-all duration-200"
+				/>
+			</button>
 			
-			<MetricCard
-				title="Total Expenses"
-				value={formatCurrency(metrics.expenses.totalAmount)}
-				subtitle="{metrics.expenses.total} transactions"
-				icon={Receipt}
-			/>
+			<button onclick={() => showExpensesModal = true} class="text-left cursor-pointer">
+				<MetricCard
+					title="Total Expenses"
+					value={formatCurrency(metrics.expenses.totalAmount)}
+					subtitle="{metrics.expenses.total} transactions"
+					icon={Receipt}
+					class="hover:shadow-xl hover:bg-slate-600 dark:hover:bg-slate-600 hover:scale-[1.02] transition-all duration-200"
+				/>
+			</button>
 			
-			<MetricCard
-				title="Team Members"
-				value={metrics.managers.total}
-				subtitle="Active managers"
-				icon={Users}
-			/>
+			<button onclick={() => showTeamModal = true} class="text-left cursor-pointer">
+				<MetricCard
+					title="Team Members"
+					value={metrics.managers.total}
+					subtitle="Active team members"
+					icon={Users}
+					class="hover:shadow-xl hover:bg-slate-600 dark:hover:bg-slate-600 hover:scale-[1.02] transition-all duration-200"
+				/>
+			</button>
 		</div>
 	</div>
 
@@ -204,50 +287,6 @@
 				</div>
 			</Card>
 		</div>
-	</div>
-
-	<!-- Task Progress -->
-	<div>
-		<div class="flex items-center justify-between mb-4">
-			<h2 class="text-2xl font-bold">Task Progress</h2>
-			<Button href="/dashboard/tasks" variant="outline" size="sm">View All Tasks</Button>
-		</div>
-		<Card class="p-6">
-			<div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-				<div>
-					<div class="flex items-center gap-2 mb-2">
-						<div class="size-3 rounded-full bg-slate-400"></div>
-						<span class="text-sm font-medium text-muted-foreground">To Do</span>
-					</div>
-					<p class="text-3xl font-bold">{metrics.tasks.todo}</p>
-				</div>
-				<div>
-					<div class="flex items-center gap-2 mb-2">
-						<div class="size-3 rounded-full bg-blue-500"></div>
-						<span class="text-sm font-medium text-muted-foreground">In Progress</span>
-					</div>
-					<p class="text-3xl font-bold">{metrics.tasks.inProgress}</p>
-				</div>
-				<div>
-					<div class="flex items-center gap-2 mb-2">
-						<div class="size-3 rounded-full bg-green-500"></div>
-						<span class="text-sm font-medium text-muted-foreground">Completed</span>
-					</div>
-					<p class="text-3xl font-bold">{metrics.tasks.completed}</p>
-				</div>
-			</div>
-			{#if metrics.tasks.total > 0}
-				<div class="mt-6">
-					<ProgressBar
-						value={metrics.tasks.completed}
-						max={metrics.tasks.total}
-						label="Overall Completion"
-						variant="success"
-						size="lg"
-					/>
-				</div>
-			{/if}
-		</Card>
 	</div>
 
 	<!-- Recent Projects -->
@@ -334,18 +373,7 @@
 	<div>
 		<h2 class="text-2xl font-bold mb-4">Quick Actions</h2>
 		<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-			{#if isAdmin}
-				<Card class="p-6 hover:shadow-lg transition-shadow border-2 border-primary/50">
-					<div class="flex items-center gap-4 mb-4">
-						<div class="flex size-12 items-center justify-center rounded-xl bg-primary text-primary-foreground">
-							<Users class="size-6 stroke-[2]" />
-						</div>
-						<h3 class="text-xl font-bold">Managers</h3>
-					</div>
-					<p class="text-muted-foreground mb-6">Manage user roles and permissions</p>
-					<Button href="/dashboard/managers" class="w-full font-semibold">Manage Users</Button>
-				</Card>
-			{:else}
+			{#if !isAdmin}
 				<Card class="p-6 hover:shadow-lg transition-shadow border-2">
 					<div class="flex items-center gap-4 mb-4">
 						<div class="flex size-12 items-center justify-center rounded-xl bg-black dark:bg-white text-white dark:text-black">
@@ -382,3 +410,243 @@
 		</div>
 	</div>
 </div>
+
+<!-- Projects Modal -->
+<Sheet.Root bind:open={showProjectsModal}>
+	<Sheet.Content side="left" class="w-full sm:max-w-2xl overflow-y-auto bg-slate-900 text-white p-6 h-full">
+		<Sheet.Header class="mb-6">
+			<Sheet.Title class="flex items-center gap-2 text-xl text-white">
+				<FolderKanban class="size-5" />
+				Projects Overview
+			</Sheet.Title>
+		</Sheet.Header>
+		
+		<div class="space-y-6">
+			<!-- Status Tabs -->
+			<div class="border-b border-slate-700">
+				<div class="flex gap-1 overflow-x-auto">
+					{#each [
+						{ value: 'draft', label: 'Draft', count: metrics.projects.draft, icon: FileText },
+						{ value: 'planned', label: 'Planned', count: metrics.projects.planned, icon: ClipboardList },
+						{ value: 'in_progress', label: 'In Progress', count: metrics.projects.active, icon: PlayCircle },
+						{ value: 'completed', label: 'Completed', count: metrics.projects.completed, icon: CheckCircle2 },
+						{ value: 'cancelled', label: 'Cancelled', count: metrics.projects.cancelled, icon: XCircle }
+					] as tab}
+						<button
+							type="button"
+							onclick={() => projectStatusTab = tab.value}
+							class="px-4 py-3 font-medium text-sm transition-all border-b-2 whitespace-nowrap {projectStatusTab === tab.value ? 'border-blue-500 text-white bg-slate-800' : 'border-transparent text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'}"
+						>
+							<div class="flex items-center gap-2">
+								<svelte:component this={tab.icon} class="size-4" />
+								<span>{tab.label}</span>
+								<span class="ml-1 px-2 py-0.5 rounded-full text-xs font-semibold {projectStatusTab === tab.value ? 'bg-blue-500/20 text-blue-300' : 'bg-slate-700 text-slate-400'}">
+									{tab.count}
+								</span>
+							</div>
+						</button>
+					{/each}
+				</div>
+			</div>
+			
+			<!-- Projects List -->
+			<div class="space-y-3">
+				{#if filteredProjects.length === 0}
+					<div class="text-center py-8 text-slate-400">
+						<p>No projects in this status</p>
+					</div>
+				{:else}
+					{#each filteredProjects as project}
+						{@const countdown = getCountdown(project.endDate)}
+						<div class="p-4 rounded-lg bg-slate-800 border border-slate-700 hover:border-slate-600 transition-colors">
+							<h4 class="font-semibold text-white mb-3">{project.name}</h4>
+							
+							<div class="space-y-2 text-sm">
+								{#if project.startDate}
+									<div class="flex items-center gap-2 text-slate-300">
+										<Calendar class="size-4" />
+										<span>Start: {formatDate(project.startDate)}</span>
+									</div>
+								{/if}
+								
+								{#if project.endDate}
+									<div class="flex items-center gap-2 text-slate-300">
+										<Calendar class="size-4" />
+										<span>End: {formatDate(project.endDate)}</span>
+									</div>
+									<div class="flex items-center gap-2 {countdown.color}">
+										<Clock class="size-4" />
+										<span class="font-medium">{countdown.text}</span>
+									</div>
+								{/if}
+								
+								{#if project.budget}
+									<div class="flex items-center gap-2 text-slate-300">
+										<DollarSign class="size-4" />
+										<span>Budget: {formatCurrency(project.budget)}</span>
+									</div>
+								{/if}
+							</div>
+						</div>
+					{/each}
+				{/if}
+			</div>
+			
+			<Button href="/dashboard/projects" class="w-full bg-blue-600 hover:bg-blue-700 text-white">
+				View All Projects
+				<ArrowRight class="size-4 ml-2" />
+			</Button>
+		</div>
+	</Sheet.Content>
+</Sheet.Root>
+
+<!-- Departments Modal -->
+<Sheet.Root bind:open={showDepartmentsModal}>
+	<Sheet.Content side="left" class="w-full sm:max-w-2xl overflow-y-auto bg-slate-900 text-white p-6 h-full">
+		<Sheet.Header class="mb-6">
+			<Sheet.Title class="flex items-center gap-2 text-xl text-white">
+				<Building2 class="size-5" />
+				Departments Overview
+			</Sheet.Title>
+		</Sheet.Header>
+		
+		<div class="space-y-6">
+			<!-- Status Tabs -->
+			<div class="border-b border-slate-700">
+				<div class="flex gap-1">
+					{#each [
+						{ value: 'active', label: 'Active', count: metrics.departments.active },
+						{ value: 'inactive', label: 'Inactive', count: metrics.departments.inactive }
+					] as tab}
+						<button
+							type="button"
+							onclick={() => departmentStatusTab = tab.value}
+							class="px-4 py-3 font-medium text-sm transition-all border-b-2 whitespace-nowrap {departmentStatusTab === tab.value ? 'border-blue-500 text-white bg-slate-800' : 'border-transparent text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'}"
+						>
+							<div class="flex items-center gap-2">
+								<span>{tab.label}</span>
+								<span class="ml-1 px-2 py-0.5 rounded-full text-xs font-semibold {departmentStatusTab === tab.value ? 'bg-blue-500/20 text-blue-300' : 'bg-slate-700 text-slate-400'}">
+									{tab.count}
+								</span>
+							</div>
+						</button>
+					{/each}
+				</div>
+			</div>
+			
+			<!-- Departments List -->
+			<div class="space-y-3">
+				{#if filteredDepartments.length === 0}
+					<div class="text-center py-8 text-slate-400">
+						<p>No departments in this status</p>
+					</div>
+				{:else}
+					{#each filteredDepartments as department}
+						<div class="p-4 rounded-lg bg-slate-800 border border-slate-700 hover:border-slate-600 transition-colors">
+							<h4 class="font-semibold text-white mb-3">{department.name}</h4>
+							
+							<div class="space-y-2 text-sm">
+								{#if department.annualBudget}
+									<div class="flex items-center gap-2 text-slate-300">
+										<DollarSign class="size-4" />
+										<span>Annual Budget: {formatCurrency(department.annualBudget)}</span>
+									</div>
+								{/if}
+								
+								{#if department.expand?.headOfDepartment}
+									<div class="flex items-center gap-2 text-slate-300">
+										<UserCircle class="size-4" />
+										<span>Head: {department.expand.headOfDepartment.firstName} {department.expand.headOfDepartment.lastName}</span>
+									</div>
+								{:else if department.headOfDepartment}
+									<div class="flex items-center gap-2 text-slate-300">
+										<UserCircle class="size-4" />
+										<span>Head: Assigned</span>
+									</div>
+								{/if}
+							</div>
+						</div>
+					{/each}
+				{/if}
+			</div>
+			
+			<Button href="/dashboard/departments" class="w-full bg-blue-600 hover:bg-blue-700 text-white">
+				View All Departments
+				<ArrowRight class="size-4 ml-2" />
+			</Button>
+		</div>
+	</Sheet.Content>
+</Sheet.Root>
+
+<!-- Expenses Modal -->
+<Sheet.Root bind:open={showExpensesModal}>
+	<Sheet.Content side="left" class="w-full sm:max-w-2xl overflow-y-auto bg-slate-900 text-white p-6 h-full">
+		<Sheet.Header class="mb-6">
+			<Sheet.Title class="flex items-center gap-2 text-xl text-white">
+				<Receipt class="size-5" />
+				Expenses Overview
+			</Sheet.Title>
+		</Sheet.Header>
+		<div class="space-y-6">
+			<div class="space-y-3">
+				<div class="flex justify-between items-center p-4 rounded-lg bg-slate-800 border border-slate-700">
+					<span class="font-medium text-slate-200">Total Amount</span>
+					<span class="text-2xl font-bold text-white">{formatCurrency(metrics.expenses.totalAmount)}</span>
+				</div>
+				<div class="flex justify-between items-center p-4 rounded-lg bg-slate-800 border border-slate-700">
+					<span class="font-medium text-slate-200">Total Transactions</span>
+					<span class="text-xl font-bold text-white">{metrics.expenses.total}</span>
+				</div>
+				<div class="grid grid-cols-2 gap-3">
+					<div class="p-4 rounded-lg bg-yellow-900/30 border border-yellow-700 text-center">
+						<div class="text-sm text-slate-300">Draft</div>
+						<div class="text-lg font-bold text-yellow-400">{metrics.expenses.draft}</div>
+					</div>
+					<div class="p-4 rounded-lg bg-blue-900/30 border border-blue-700 text-center">
+						<div class="text-sm text-slate-300">Submitted</div>
+						<div class="text-lg font-bold text-blue-400">{metrics.expenses.submitted}</div>
+					</div>
+					<div class="p-4 rounded-lg bg-green-900/30 border border-green-700 text-center">
+						<div class="text-sm text-slate-300">Approved</div>
+						<div class="text-lg font-bold text-green-400">{metrics.expenses.approved}</div>
+					</div>
+					<div class="p-4 rounded-lg bg-purple-900/30 border border-purple-700 text-center">
+						<div class="text-sm text-slate-300">Paid</div>
+						<div class="text-lg font-bold text-purple-400">{metrics.expenses.paid}</div>
+					</div>
+				</div>
+			</div>
+			<Button href="/dashboard/expenses" class="w-full bg-blue-600 hover:bg-blue-700 text-white">
+				View All Expenses
+				<ArrowRight class="size-4 ml-2" />
+			</Button>
+		</div>
+	</Sheet.Content>
+</Sheet.Root>
+
+<!-- Team Modal -->
+<Sheet.Root bind:open={showTeamModal}>
+	<Sheet.Content side="left" class="w-full sm:max-w-2xl overflow-y-auto bg-slate-900 text-white p-6 h-full">
+		<Sheet.Header class="mb-6">
+			<Sheet.Title class="flex items-center gap-2 text-xl text-white">
+				<Users class="size-5" />
+				Team Overview
+			</Sheet.Title>
+		</Sheet.Header>
+		<div class="space-y-6">
+			<div class="space-y-3">
+				<div class="flex justify-between items-center p-4 rounded-lg bg-slate-800 border border-slate-700">
+					<span class="font-medium text-slate-200">Total Team Members</span>
+					<span class="text-2xl font-bold text-white">{metrics.managers.total}</span>
+				</div>
+				<p class="text-sm text-slate-300">
+					View and manage all team members, their roles, and permissions.
+				</p>
+			</div>
+			<Button href="/dashboard/managers" class="w-full bg-blue-600 hover:bg-blue-700 text-white">
+				Manage Team
+				<ArrowRight class="size-4 ml-2" />
+			</Button>
+		</div>
+	</Sheet.Content>
+</Sheet.Root>
