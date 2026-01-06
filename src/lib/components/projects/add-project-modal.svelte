@@ -10,6 +10,15 @@
 		departments = []
 	} = $props();
 
+	// Debug: Log departments when modal opens
+	$effect(() => {
+		if (open) {
+			console.log('=== ADD PROJECT MODAL OPENED ===');
+			console.log('Departments prop:', departments);
+			console.log('Departments length:', departments?.length);
+		}
+	});
+
 	// Form state
 	let formData = $state({
 		name: '',
