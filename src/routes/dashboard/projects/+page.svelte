@@ -31,9 +31,14 @@
 	
 	let showAddModal = $state(false);
 	
-	let projects = $derived(data.projects || []);
-	let stats = $derived(data.stats);
-	let alerts = $derived(data.alerts);
+	let projects = $derived(data?.projects || []);
+	let stats = $derived(data?.stats || {
+		total: 0,
+		byStatus: { draft: 0, planned: 0, in_progress: 0, completed: 0, cancelled: 0 },
+		byType: { tournament: 0, activation: 0, event: 0, campaign: 0 },
+		budget: { total: 0, forecasted: 0, actual: 0, variance: 0, remaining: 0 }
+	});
+	let alerts = $derived(data?.alerts || { overBudget: 0, nearingBudget: 0 });
 	
 	let statusFilter = $state<string>('all');
 	let typeFilter = $state<string>('all');
@@ -110,10 +115,8 @@
 	
 	function stripHtml(html: string): string {
 		if (!html) return '';
-		// Create a temporary div to parse HTML
-		const tmp = document.createElement('div');
-		tmp.innerHTML = html;
-		return tmp.textContent || tmp.innerText || '';
+		// Simple regex-based HTML stripping (works on both server and client)
+		return html.replace(/<[^>]*>/g, '').replace(/&nbsp;/g, ' ').trim();
 	}
 </script>
 

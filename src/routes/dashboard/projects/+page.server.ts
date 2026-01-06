@@ -1,30 +1,34 @@
 import type { PageServerLoad } from './$types';
 
 export const load: PageServerLoad = async ({ locals }) => {
+	console.log('1. Function started');
+	
 	const pb = locals.pb;
-
-	console.log('=== PROJECTS PAGE LOAD START ===');
+	console.log('2. Got pb instance');
 
 	// Fetch projects
 	let projects = [];
+	console.log('3. About to fetch projects...');
 	try {
 		projects = await pb.collection('projects').getFullList({ sort: '-id' });
-		console.log(`✓ Fetched ${projects.length} projects`);
+		console.log(`4. ✓ Fetched ${projects.length} projects`);
 	} catch (err: any) {
-		console.error('✗ Error fetching projects:', err?.message);
+		console.error('4. ✗ Error fetching projects:', err?.message);
 	}
 
 	// Fetch departments
 	let departments = [];
+	console.log('5. About to fetch departments...');
 	try {
 		departments = await pb.collection('departments').getFullList({ sort: 'name' });
-		console.log(`✓ Fetched ${departments.length} departments`);
+		console.log(`6. ✓ Fetched ${departments.length} departments`);
 	} catch (err: any) {
-		console.error('✗ Error fetching departments:', err?.message);
+		console.error('6. ✗ Error fetching departments:', err?.message);
 	}
 
-	// Return data
-	return {
+	// Build return object
+	console.log('7. Building return object...');
+	const returnData = {
 		projects,
 		departments,
 		stats: {
@@ -37,5 +41,9 @@ export const load: PageServerLoad = async ({ locals }) => {
 			overBudget: 0,
 			nearingBudget: 0
 		}
-	}
+	};
+	
+	console.log('8. Return object built successfully');
+	console.log('9. Returning data...');
+	return returnData;
 };

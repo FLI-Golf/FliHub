@@ -20,6 +20,13 @@
 		projectId: projectId
 	});
 
+	// Update projectId in formData when prop changes
+	$effect(() => {
+		if (projectId) {
+			formData.projectId = projectId;
+		}
+	});
+
 	let isSubmitting = $state(false);
 	let error = $state('');
 
