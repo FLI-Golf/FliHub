@@ -43,11 +43,22 @@ export const load: PageServerLoad = async ({ locals, params }) => {
 			}, {} as Record<string, number>)
 		};
 
+		// Fetch all vendors for selection
+		let allVendors = [];
+		try {
+			allVendors = await pb.collection('vendors').getFullList({
+				sort: 'name'
+			});
+		} catch (vendorErr: any) {
+			console.error('Error fetching vendors:', vendorErr);
+		}
+
 		return {
 			project,
 			expenses,
 			expenseStats,
-			tasks
+			tasks,
+			allVendors
 		};
 	} catch (err: any) {
 		console.error('Error loading project:', err);

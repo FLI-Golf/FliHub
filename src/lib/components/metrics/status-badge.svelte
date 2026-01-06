@@ -32,11 +32,11 @@
 	const autoVariant = $derived(variant || statusVariants[status] || 'default');
 	
 	const variantClasses = {
-		default: 'bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-slate-100 border-slate-300 dark:border-slate-600',
-		success: 'bg-green-100 dark:bg-green-900/30 text-green-900 dark:text-green-100 border-green-300 dark:border-green-600',
-		warning: 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-900 dark:text-yellow-100 border-yellow-300 dark:border-yellow-600',
-		danger: 'bg-red-100 dark:bg-red-900/30 text-red-900 dark:text-red-100 border-red-300 dark:border-red-600',
-		info: 'bg-blue-100 dark:bg-blue-900/30 text-blue-900 dark:text-blue-100 border-blue-300 dark:border-blue-600'
+		default: 'bg-slate-100 dark:bg-slate-800 text-black dark:text-slate-100 border-slate-300 dark:border-slate-600',
+		success: 'bg-green-100 dark:bg-green-900/30 text-black dark:text-green-100 border-green-300 dark:border-green-600',
+		warning: 'bg-yellow-100 dark:bg-yellow-900/30 text-black dark:text-yellow-100 border-yellow-300 dark:border-yellow-600',
+		danger: 'bg-red-100 dark:bg-red-900/30 text-black dark:text-red-100 border-red-300 dark:border-red-600',
+		info: 'bg-blue-100 dark:bg-blue-900/30 text-black dark:text-blue-100 border-blue-300 dark:border-blue-600'
 	};
 	
 	const formattedStatus = $derived(

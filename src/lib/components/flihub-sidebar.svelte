@@ -5,7 +5,8 @@
 		ListTodo,
 		Store,
 		FolderKanban,
-		Receipt
+		Receipt,
+		Building2
 	} from 'lucide-svelte';
 
 	const data = {
@@ -14,6 +15,11 @@
 				title: 'Dashboard',
 				url: '/dashboard',
 				icon: LayoutDashboard
+			},
+			{
+				title: 'Departments',
+				url: '/dashboard/departments',
+				icon: Building2
 			},
 			{
 				title: 'Managers',

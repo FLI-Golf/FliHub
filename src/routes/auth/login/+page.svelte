@@ -60,7 +60,12 @@
 					/>
 				</div>
 
-				<Button type="submit" class="w-full py-6 text-base font-semibold">Login</Button>
+				<button 
+					type="submit" 
+					class="w-full px-4 py-3 bg-black text-white rounded-lg font-semibold hover:bg-gray-800 hover:scale-[1.02] active:scale-[0.98] transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-black focus:ring-offset-2 shadow-md hover:shadow-lg"
+				>
+					Login
+				</button>
 			</form>
 
 			<div class="mt-6 text-center space-y-2">

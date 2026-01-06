@@ -17,6 +17,7 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 			description: data.description || '',
 			type: data.type,
 			status: data.status,
+			department: data.department,
 			startDate: data.startDate || null,
 			endDate: data.endDate || null,
 			budget: data.budget || null,
