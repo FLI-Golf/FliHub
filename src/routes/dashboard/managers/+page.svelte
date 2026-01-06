@@ -159,8 +159,8 @@
 				body: JSON.stringify({ 
 					profileId: selectedManager.id, 
 					role: editForm.role,
-					vendorId: editForm.vendorId || null
-					departmentId: editForm.departmentId || null,
+					vendorId: editForm.vendorId || null,
+					departmentId: editForm.departmentId || null
 				})
 			});
 			
