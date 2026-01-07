@@ -56,6 +56,7 @@
 		departmentsByStatus: { active: [], inactive: [] },
 		departmentBudgets: [],
 		expenses: { total: 0, totalAmount: 0, approvedAmount: 0, draft: 0, submitted: 0, approved: 0, paid: 0 },
+		approvals: { total: 0, pending: 0, approved: 0, rejected: 0, revision_requested: 0 },
 		budget: { total: 0, forecasted: 0, actual: 0, remaining: 0 },
 		managers: { total: 0 },
 		phases: {
@@ -67,6 +68,10 @@
 	
 	// Phase filter state
 	let selectedPhase = $state<string>('all');
+	
+	// Chart type toggles
+	let budgetChartType = $state<'donut' | 'bar'>('donut');
+	let departmentChartType = $state<'bar' | 'table'>('bar');
 	
 	// Calculate phase-filtered metrics
 	let phaseFilteredBudget = $derived.by(() => {
@@ -347,7 +352,7 @@
 					value={metrics.projects.total}
 					subtitle="{metrics.projects.active} in progress, {metrics.projects.completed} completed"
 					icon={FolderKanban}
-					class="hover:shadow-xl hover:bg-slate-600 dark:hover:bg-slate-600 hover:scale-[1.02] transition-all duration-200"
+					class="hover:shadow-xl bg-gradient-to-br from-blue-950 to-blue-900 border-blue-800 hover:scale-[1.02] transition-all duration-200"
 				/>
 			</button>
 			
@@ -357,7 +362,7 @@
 					value={metrics.departments.total}
 					subtitle="{metrics.departments.active} active departments"
 					icon={Building2}
-					class="hover:shadow-xl hover:bg-slate-600 dark:hover:bg-slate-600 hover:scale-[1.02] transition-all duration-200"
+					class="hover:shadow-xl bg-gradient-to-br from-purple-950 to-purple-900 border-purple-800 hover:scale-[1.02] transition-all duration-200"
 				/>
 			</button>
 			
@@ -367,7 +372,7 @@
 					value={formatCurrency(metrics.expenses.totalAmount)}
 					subtitle="{metrics.expenses.total} transactions"
 					icon={Receipt}
-					class="hover:shadow-xl hover:bg-slate-600 dark:hover:bg-slate-600 hover:scale-[1.02] transition-all duration-200"
+					class="hover:shadow-xl bg-gradient-to-br from-amber-950 to-amber-900 border-amber-800 hover:scale-[1.02] transition-all duration-200"
 				/>
 			</button>
 			
@@ -377,9 +382,103 @@
 					value={metrics.managers.total}
 					subtitle="Active team members"
 					icon={Users}
-					class="hover:shadow-xl hover:bg-slate-600 dark:hover:bg-slate-600 hover:scale-[1.02] transition-all duration-200"
+					class="hover:shadow-xl bg-gradient-to-br from-green-950 to-green-900 border-green-800 hover:scale-[1.02] transition-all duration-200"
 				/>
 			</button>
+		</div>
+	</div>
+
+	<!-- Expenses & Approvals Breakdown -->
+	<div>
+		<h2 class="text-2xl font-bold mb-4">Expenses & Approvals</h2>
+		<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+			<!-- Expense Status Breakdown -->
+			<Card class="p-6 bg-gradient-to-br from-blue-950 to-blue-900 border-blue-800">
+				<div class="flex items-center justify-between mb-4">
+					<h3 class="text-lg font-semibold">Expense Pipeline</h3>
+					<Receipt class="size-5 text-blue-400" />
+				</div>
+				<div class="space-y-3">
+					<div class="flex items-center justify-between p-3 bg-black/20 rounded-lg border border-gray-800">
+						<div class="flex items-center gap-2">
+							<div class="size-3 rounded-full bg-gray-400"></div>
+							<span class="text-sm font-medium">Draft</span>
+						</div>
+						<span class="text-sm font-bold">{metrics.expenses.draft}</span>
+					</div>
+					<div class="flex items-center justify-between p-3 bg-black/20 rounded-lg border border-gray-800">
+						<div class="flex items-center gap-2">
+							<div class="size-3 rounded-full bg-blue-500"></div>
+							<span class="text-sm font-medium">Submitted</span>
+						</div>
+						<span class="text-sm font-bold">{metrics.expenses.submitted}</span>
+					</div>
+					<div class="flex items-center justify-between p-3 bg-black/20 rounded-lg border border-gray-800">
+						<div class="flex items-center gap-2">
+							<div class="size-3 rounded-full bg-green-500"></div>
+							<span class="text-sm font-medium">Approved</span>
+						</div>
+						<span class="text-sm font-bold">{metrics.expenses.approved}</span>
+					</div>
+					<div class="flex items-center justify-between p-3 bg-black/20 rounded-lg border border-gray-800">
+						<div class="flex items-center gap-2">
+							<div class="size-3 rounded-full bg-emerald-600"></div>
+							<span class="text-sm font-medium">Paid</span>
+						</div>
+						<span class="text-sm font-bold">{metrics.expenses.paid}</span>
+					</div>
+				</div>
+				<div class="mt-4 pt-4 border-t border-blue-800">
+					<Button href="/dashboard/expenses" class="w-full" variant="outline">
+						View All Expenses
+						<ArrowRight class="size-4 ml-2" />
+					</Button>
+				</div>
+			</Card>
+
+			<!-- Approval Status Breakdown -->
+			<Card class="p-6 bg-gradient-to-br from-indigo-950 to-purple-950 border-indigo-800">
+				<div class="flex items-center justify-between mb-4">
+					<h3 class="text-lg font-semibold">Approval Workflow</h3>
+					<CheckSquare class="size-5 text-indigo-400" />
+				</div>
+				<div class="space-y-3">
+					<div class="flex items-center justify-between p-3 bg-black/20 rounded-lg border border-gray-800">
+						<div class="flex items-center gap-2">
+							<div class="size-3 rounded-full bg-yellow-500"></div>
+							<span class="text-sm font-medium">Pending</span>
+						</div>
+						<span class="text-sm font-bold">{metrics.approvals.pending}</span>
+					</div>
+					<div class="flex items-center justify-between p-3 bg-black/20 rounded-lg border border-gray-800">
+						<div class="flex items-center gap-2">
+							<div class="size-3 rounded-full bg-green-500"></div>
+							<span class="text-sm font-medium">Approved</span>
+						</div>
+						<span class="text-sm font-bold">{metrics.approvals.approved}</span>
+					</div>
+					<div class="flex items-center justify-between p-3 bg-black/20 rounded-lg border border-gray-800">
+						<div class="flex items-center gap-2">
+							<div class="size-3 rounded-full bg-red-500"></div>
+							<span class="text-sm font-medium">Rejected</span>
+						</div>
+						<span class="text-sm font-bold">{metrics.approvals.rejected}</span>
+					</div>
+					<div class="flex items-center justify-between p-3 bg-black/20 rounded-lg border border-gray-800">
+						<div class="flex items-center gap-2">
+							<div class="size-3 rounded-full bg-orange-500"></div>
+							<span class="text-sm font-medium">Revision Requested</span>
+						</div>
+						<span class="text-sm font-bold">{metrics.approvals.revision_requested}</span>
+					</div>
+				</div>
+				<div class="mt-4 pt-4 border-t border-indigo-800">
+					<Button href="/dashboard/approvals" class="w-full" variant="outline">
+						View All Approvals
+						<ArrowRight class="size-4 ml-2" />
+					</Button>
+				</div>
+			</Card>
 		</div>
 	</div>
 
@@ -492,13 +591,38 @@
 			<Card class="p-6">
 				<div class="flex items-center justify-between mb-4">
 					<h3 class="text-lg font-semibold">Budget Utilization</h3>
-					<DollarSign class="size-5 text-muted-foreground" />
+					<div class="flex items-center gap-2">
+						<Button 
+							size="sm" 
+							variant={budgetChartType === 'donut' ? 'default' : 'outline'}
+							onclick={() => budgetChartType = 'donut'}
+							class="h-8 px-2"
+						>
+							Donut
+						</Button>
+						<Button 
+							size="sm" 
+							variant={budgetChartType === 'bar' ? 'default' : 'outline'}
+							onclick={() => budgetChartType = 'bar'}
+							class="h-8 px-2"
+						>
+							Bar
+						</Button>
+					</div>
 				</div>
-				<BudgetDonutChart 
-					actual={metrics.budget.actual}
-					remaining={metrics.budget.remaining}
-					total={metrics.budget.total}
-				/>
+				{#if budgetChartType === 'donut'}
+					<BudgetDonutChart 
+						actual={metrics.budget.actual}
+						remaining={metrics.budget.remaining}
+						total={metrics.budget.total}
+					/>
+				{:else}
+					<BurnRateChart 
+						totalBudget={metrics.budget.total}
+						actualSpent={metrics.budget.actual}
+						forecasted={metrics.budget.forecasted}
+					/>
+				{/if}
 				<div class="mt-6 pt-4 border-t space-y-2">
 					<div class="flex justify-between text-sm">
 						<span class="text-muted-foreground">Total Budget</span>

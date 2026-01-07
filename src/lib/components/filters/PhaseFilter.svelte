@@ -33,24 +33,28 @@
 </script>
 
 <div class="flex flex-col gap-2">
-	<div class="flex items-center gap-2 text-sm text-muted-foreground">
+	<div class="flex items-center gap-2 text-sm text-muted-foreground mb-2">
 		<Calendar class="size-4" />
 		<span>Filter by Phase</span>
 	</div>
-	<div class="flex flex-wrap gap-2">
+	<div class="flex flex-wrap gap-1 border-b border-border">
 		{#each phases as phase}
 			<button
 				onclick={() => onPhaseChange(phase.value)}
-				class="px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 {
+				class="relative px-6 py-3 text-sm font-medium transition-all duration-200 {
 					activePhase === phase.value
-						? 'bg-primary text-primary-foreground shadow-md'
-						: 'bg-muted hover:bg-muted/80 text-foreground'
+						? 'bg-card text-foreground border-t-2 border-x border-primary rounded-t-lg -mb-px z-10'
+						: 'bg-muted/50 text-muted-foreground hover:bg-muted hover:text-foreground rounded-t-lg'
 				}"
+				style={activePhase === phase.value ? 'border-bottom: 2px solid hsl(var(--card))' : ''}
 			>
-				<div class="flex flex-col items-start">
-					<span>{phase.label}</span>
+				<div class="flex flex-col items-start gap-0.5">
+					<span class="font-semibold">{phase.label}</span>
 					<span class="text-xs opacity-70">{phase.dateRange}</span>
 				</div>
+				{#if activePhase === phase.value}
+					<div class="absolute inset-x-0 -bottom-px h-0.5 bg-card"></div>
+				{/if}
 			</button>
 		{/each}
 	</div>

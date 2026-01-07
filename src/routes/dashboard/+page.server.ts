@@ -31,13 +31,14 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 	try {
 		// Fetch counts and metrics with error handling for each collection
 		console.log('Fetching collection counts...');
-		const [projects, departments, expenses, userProfiles] = await Promise.allSettled([
+		const [projects, departments, expenses, userProfiles, approvals] = await Promise.allSettled([
 			pb.collection('projects').getList(1, 1, { fields: 'id' }),
 			pb.collection('departments').getList(1, 1, { fields: 'id' }),
 			pb.collection('expenses').getList(1, 1, { fields: 'id' }),
-			pb.collection('user_profiles').getList(1, 1, { fields: 'id' })
+			pb.collection('user_profiles').getList(1, 1, { fields: 'id' }),
+			pb.collection('approvals').getList(1, 1, { fields: 'id' })
 		]).then(results => results.map((r, i) => {
-			const collectionName = ['projects', 'departments', 'expenses', 'user_profiles'][i];
+			const collectionName = ['projects', 'departments', 'expenses', 'user_profiles', 'approvals'][i];
 			if (r.status === 'fulfilled') {
 				console.log(`✓ ${collectionName}: ${r.value.totalItems} items`);
 				return r.value;
@@ -108,7 +109,7 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 		let approvedExpenses = 0;
 		try {
 			allExpenses = await pb.collection('expenses').getFullList({
-				fields: 'amount,status'
+				fields: 'amount,status,category,taskId'
 			});
 			totalExpenses = allExpenses.reduce((sum, exp) => sum + (exp.amount || 0), 0);
 			approvedExpenses = allExpenses
@@ -118,6 +119,35 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 		} catch (err: any) {
 			console.error('✗ Failed to fetch expenses:', err.message);
 		}
+
+		// Fetch approvals by status
+		console.log('Fetching approvals by status...');
+		const approvalsByStatus = await Promise.allSettled([
+			pb.collection('approvals').getList(1, 1, { 
+				filter: 'status = "pending"',
+				fields: 'id'
+			}),
+			pb.collection('approvals').getList(1, 1, { 
+				filter: 'status = "approved"',
+				fields: 'id'
+			}),
+			pb.collection('approvals').getList(1, 1, { 
+				filter: 'status = "rejected"',
+				fields: 'id'
+			}),
+			pb.collection('approvals').getList(1, 1, { 
+				filter: 'status = "revision_requested"',
+				fields: 'id'
+			})
+		]).then(results => results.map((r, i) => {
+			const status = ['pending', 'approved', 'rejected', 'revision_requested'][i];
+			if (r.status === 'fulfilled') {
+				console.log(`✓ Approvals ${status}: ${r.value.totalItems}`);
+				return r.value;
+			}
+			console.error(`✗ Failed to fetch approvals ${status}:`, r.reason?.message);
+			return { totalItems: 0 };
+		}));
 
 		// Fetch ALL project details using the SAME method as the count query
 		let projectsWithBudget = [];
@@ -136,9 +166,17 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 			console.log(`✓ Total budget from departments: $${totalBudget}`);
 			
 			// Calculate forecasted and actual from projects
-			totalForecasted = projectsWithBudget.reduce((sum, proj) => sum + (proj.forecastedExpenses || 0), 0);
-			totalActual = projectsWithBudget.reduce((sum, proj) => sum + (proj.actualExpenses || 0), 0);
-			console.log(`✓ Total forecasted: $${totalForecasted}, Total actual: $${totalActual}`);
+			const projectForecasted = projectsWithBudget.reduce((sum, proj) => sum + (proj.forecastedExpenses || 0), 0);
+			const projectActual = projectsWithBudget.reduce((sum, proj) => sum + (proj.actualExpenses || 0), 0);
+			
+			// Add approved/paid expenses to actual, and submitted/approved/paid to forecasted
+			totalActual = projectActual + approvedExpenses;
+			totalForecasted = projectForecasted + allExpenses
+				.filter(exp => exp.status === 'submitted' || exp.status === 'approved' || exp.status === 'paid')
+				.reduce((sum, exp) => sum + (exp.amount || 0), 0);
+			
+			console.log(`✓ Total forecasted: $${totalForecasted} (projects: $${projectForecasted}, expenses: $${totalForecasted - projectForecasted})`);
+			console.log(`✓ Total actual: $${totalActual} (projects: $${projectActual}, expenses: $${approvedExpenses})`);
 		} catch (err: any) {
 			console.error('Failed to fetch full project details:', err.message);
 		}
@@ -178,18 +216,89 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 			phase3: projectsWithBudget.filter(p => getProjectPhase(p) === 'phase3')
 		};
 
+		// Fetch all tasks to link expenses to departments
+		console.log('Fetching tasks to link expenses...');
+		let allTasks = [];
+		try {
+			allTasks = await pb.collection('tasks').getFullList({
+				fields: 'id,projectId'
+			});
+			console.log(`✓ Fetched ${allTasks.length} tasks`);
+		} catch (err: any) {
+			console.error('✗ Failed to fetch tasks:', err.message);
+		}
+
+		// Build task -> project -> department mapping
+		const taskToDept = new Map();
+		allTasks.forEach(task => {
+			const project = projectsWithBudget.find(p => p.id === task.projectId);
+			if (project && project.department) {
+				taskToDept.set(task.id, project.department);
+			}
+		});
+
+		// Map expense categories to department names
+		const categoryToDepartment: Record<string, string> = {
+			'Marketing': 'Marketing',
+			'Advertising': 'Marketing',
+			'Public relations': 'Marketing',
+			'Internal Tech Budget': 'Technology',
+			'Tech/App Development': 'Technology',
+			'Software': 'Technology',
+			'Cloud hosting': 'Technology',
+			'Production Studio': 'Content & Media',
+			'Video production': 'Content & Media',
+			'Content creation': 'Content & Media'
+		};
+
+		// Build a map of department name to ID
+		const deptNameToId = new Map<string, string>();
+		allDepartments.forEach(dept => {
+			deptNameToId.set(dept.name, dept.id);
+		});
+
 		// Calculate department budget allocations with phase breakdown
 		console.log('Calculating department budget allocations...');
 		const departmentBudgets = allDepartments.map(dept => {
-			const deptProjects = projectsWithBudget.filter(p => p.departmentId === dept.id);
+			const deptProjects = projectsWithBudget.filter(p => p.department === dept.id);
 			const budget = dept.department_annual_budget || 0;
-			const actual = deptProjects.reduce((sum, p) => sum + (p.actualExpenses || 0), 0);
-			const forecasted = deptProjects.reduce((sum, p) => sum + (p.forecastedExpenses || 0), 0);
 			
-			// Calculate by phase
+			// Calculate actual from project expenses
+			const projectActual = deptProjects.reduce((sum, p) => sum + (p.actualExpenses || 0), 0);
+			
+			// Add expenses linked through tasks OR category mapping
+			const deptExpenses = allExpenses.filter(e => {
+				// First try task linkage
+				if (e.taskId && taskToDept.has(e.taskId)) {
+					return taskToDept.get(e.taskId) === dept.id;
+				}
+				// Fall back to category mapping
+				if (e.category && categoryToDepartment[e.category]) {
+					const mappedDeptName = categoryToDepartment[e.category];
+					const mappedDeptId = deptNameToId.get(mappedDeptName);
+					return mappedDeptId === dept.id;
+				}
+				return false;
+			});
+			
+			const expenseActual = deptExpenses
+				.filter(e => e.status === 'approved' || e.status === 'paid')
+				.reduce((sum, e) => sum + (e.amount || 0), 0);
+			
+			const expenseForecasted = deptExpenses
+				.filter(e => e.status === 'submitted' || e.status === 'approved' || e.status === 'paid')
+				.reduce((sum, e) => sum + (e.amount || 0), 0);
+			
+			const actual = projectActual + expenseActual;
+			const forecasted = deptProjects.reduce((sum, p) => sum + (p.forecastedExpenses || 0), 0) + expenseForecasted;
+			
+			// Calculate by phase (distribute expenses evenly across phases for now)
 			const phase1Projects = deptProjects.filter(p => getProjectPhase(p) === 'phase1');
 			const phase2Projects = deptProjects.filter(p => getProjectPhase(p) === 'phase2');
 			const phase3Projects = deptProjects.filter(p => getProjectPhase(p) === 'phase3');
+			
+			const expenseActualPerPhase = expenseActual / 3;
+			const expenseForecastedPerPhase = expenseForecasted / 3;
 			
 			return {
 				id: dept.id,
@@ -200,18 +309,18 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 				projectCount: deptProjects.length,
 				phases: {
 					phase1: {
-						actual: phase1Projects.reduce((sum, p) => sum + (p.actualExpenses || 0), 0),
-						forecasted: phase1Projects.reduce((sum, p) => sum + (p.forecastedExpenses || 0), 0),
+						actual: phase1Projects.reduce((sum, p) => sum + (p.actualExpenses || 0), 0) + expenseActualPerPhase,
+						forecasted: phase1Projects.reduce((sum, p) => sum + (p.forecastedExpenses || 0), 0) + expenseForecastedPerPhase,
 						projectCount: phase1Projects.length
 					},
 					phase2: {
-						actual: phase2Projects.reduce((sum, p) => sum + (p.actualExpenses || 0), 0),
-						forecasted: phase2Projects.reduce((sum, p) => sum + (p.forecastedExpenses || 0), 0),
+						actual: phase2Projects.reduce((sum, p) => sum + (p.actualExpenses || 0), 0) + expenseActualPerPhase,
+						forecasted: phase2Projects.reduce((sum, p) => sum + (p.forecastedExpenses || 0), 0) + expenseForecastedPerPhase,
 						projectCount: phase2Projects.length
 					},
 					phase3: {
-						actual: phase3Projects.reduce((sum, p) => sum + (p.actualExpenses || 0), 0),
-						forecasted: phase3Projects.reduce((sum, p) => sum + (p.forecastedExpenses || 0), 0),
+						actual: phase3Projects.reduce((sum, p) => sum + (p.actualExpenses || 0), 0) + expenseActualPerPhase,
+						forecasted: phase3Projects.reduce((sum, p) => sum + (p.forecastedExpenses || 0), 0) + expenseForecastedPerPhase,
 						projectCount: phase3Projects.length
 					}
 				}
@@ -220,23 +329,29 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 		console.log(`✓ Department budgets calculated: ${departmentBudgets.length} departments with budgets`);
 
 		// Calculate phase-specific metrics
+		// For now, distribute expenses evenly across phases since expenses don't have phase info
+		const expenseActualPerPhase = approvedExpenses / 3;
+		const expenseForecastedPerPhase = allExpenses
+			.filter(exp => exp.status === 'submitted' || exp.status === 'approved' || exp.status === 'paid')
+			.reduce((sum, exp) => sum + (exp.amount || 0), 0) / 3;
+		
 		const phaseMetrics = {
 			phase1: {
 				budget: totalBudget / 3, // Distribute budget evenly across phases
-				actual: projectsByPhase.phase1.reduce((sum, p) => sum + (p.actualExpenses || 0), 0),
-				forecasted: projectsByPhase.phase1.reduce((sum, p) => sum + (p.forecastedExpenses || 0), 0),
+				actual: projectsByPhase.phase1.reduce((sum, p) => sum + (p.actualExpenses || 0), 0) + expenseActualPerPhase,
+				forecasted: projectsByPhase.phase1.reduce((sum, p) => sum + (p.forecastedExpenses || 0), 0) + expenseForecastedPerPhase,
 				projectCount: projectsByPhase.phase1.length
 			},
 			phase2: {
 				budget: totalBudget / 3,
-				actual: projectsByPhase.phase2.reduce((sum, p) => sum + (p.actualExpenses || 0), 0),
-				forecasted: projectsByPhase.phase2.reduce((sum, p) => sum + (p.forecastedExpenses || 0), 0),
+				actual: projectsByPhase.phase2.reduce((sum, p) => sum + (p.actualExpenses || 0), 0) + expenseActualPerPhase,
+				forecasted: projectsByPhase.phase2.reduce((sum, p) => sum + (p.forecastedExpenses || 0), 0) + expenseForecastedPerPhase,
 				projectCount: projectsByPhase.phase2.length
 			},
 			phase3: {
 				budget: totalBudget / 3,
-				actual: projectsByPhase.phase3.reduce((sum, p) => sum + (p.actualExpenses || 0), 0),
-				forecasted: projectsByPhase.phase3.reduce((sum, p) => sum + (p.forecastedExpenses || 0), 0),
+				actual: projectsByPhase.phase3.reduce((sum, p) => sum + (p.actualExpenses || 0), 0) + expenseActualPerPhase,
+				forecasted: projectsByPhase.phase3.reduce((sum, p) => sum + (p.forecastedExpenses || 0), 0) + expenseForecastedPerPhase,
 				projectCount: projectsByPhase.phase3.length
 			}
 		};
@@ -276,6 +391,13 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 					submitted: expensesByStatus[1].totalItems,
 					approved: expensesByStatus[2].totalItems,
 					paid: expensesByStatus[3].totalItems
+				},
+				approvals: {
+					total: approvals.totalItems,
+					pending: approvalsByStatus[0].totalItems,
+					approved: approvalsByStatus[1].totalItems,
+					rejected: approvalsByStatus[2].totalItems,
+					revision_requested: approvalsByStatus[3].totalItems
 				},
 				budget: {
 					total: totalBudget,
