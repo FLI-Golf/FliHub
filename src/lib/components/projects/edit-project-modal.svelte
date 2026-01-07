@@ -4,6 +4,7 @@
 	import { Input } from '$lib/components/ui/input';
 	import { Label } from '$lib/components/ui/label';
 	import { Edit, Save, X } from 'lucide-svelte';
+	import { invalidateAll } from '$app/navigation';
 
 	let { open = $bindable(false), project } = $props();
 
@@ -62,9 +63,9 @@
 				throw new Error(data.message || 'Failed to update project');
 			}
 
-			// Close modal and reload page
+			// Close modal and invalidate data
 			open = false;
-			window.location.reload();
+			await invalidateAll();
 		} catch (err) {
 			error = err instanceof Error ? err.message : 'An error occurred';
 		} finally {
@@ -173,21 +174,23 @@
 			<!-- Dates -->
 			<div class="grid grid-cols-2 gap-4">
 				<div class="space-y-2">
-					<Label for="edit-startDate" class="text-slate-200">Start Date</Label>
+					<Label for="edit-startDate" class="text-slate-200">Start Date *</Label>
 					<Input
 						id="edit-startDate"
 						type="date"
 						bind:value={formData.startDate}
+						required
 						class="bg-slate-800 border-slate-700 text-white"
 					/>
 				</div>
 
 				<div class="space-y-2">
-					<Label for="edit-endDate" class="text-slate-200">End Date</Label>
+					<Label for="edit-endDate" class="text-slate-200">End Date *</Label>
 					<Input
 						id="edit-endDate"
 						type="date"
 						bind:value={formData.endDate}
+						required
 						class="bg-slate-800 border-slate-700 text-white"
 					/>
 				</div>

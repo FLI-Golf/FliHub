@@ -4,6 +4,7 @@
 	import { Input } from '$lib/components/ui/input';
 	import { Label } from '$lib/components/ui/label';
 	import { Edit, Save, X } from 'lucide-svelte';
+	import { invalidateAll } from '$app/navigation';
 
 	let { 
 		open = $bindable(false),
@@ -57,11 +58,9 @@
 				throw new Error(data.message || 'Failed to update department');
 			}
 
-			// Close modal
+			// Close modal and invalidate data
 			open = false;
-			
-			// Reload the page to show the updated department
-			window.location.reload();
+			await invalidateAll();
 		} catch (err) {
 			error = err instanceof Error ? err.message : 'An error occurred';
 		} finally {

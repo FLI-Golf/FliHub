@@ -18,21 +18,21 @@
 	const variantClasses = {
 		folder: {
 			container: 'flex gap-1 border-b border-border',
-			tab: 'px-4 py-2.5 rounded-t-lg font-medium text-sm transition-all relative',
+			tab: 'px-4 py-2.5 rounded-t-lg font-medium text-sm transition-all relative cursor-pointer',
 			active: 'bg-background text-foreground border-t-2 border-x border-primary -mb-px',
-			inactive: 'bg-muted/50 text-muted-foreground hover:bg-muted hover:text-foreground'
+			inactive: 'bg-muted/50 text-muted-foreground hover:bg-slate-700 dark:hover:bg-slate-700 hover:text-foreground hover:shadow-md'
 		},
 		button: {
 			container: 'flex flex-wrap gap-2',
-			tab: 'px-4 py-2 rounded-lg font-medium text-sm transition-all border-2',
+			tab: 'px-4 py-2 rounded-lg font-medium text-sm transition-all border-2 cursor-pointer',
 			active: 'bg-primary text-primary-foreground border-primary shadow-sm',
-			inactive: 'bg-background text-foreground border-border hover:bg-muted hover:border-primary/50'
+			inactive: 'bg-background text-foreground border-border hover:bg-blue-600/20 dark:hover:bg-blue-600/20 hover:border-blue-500 dark:hover:border-blue-500 hover:shadow-md hover:scale-105'
 		},
 		pill: {
 			container: 'flex flex-wrap gap-2',
-			tab: 'px-4 py-2 rounded-full font-medium text-sm transition-all',
+			tab: 'px-4 py-2 rounded-full font-medium text-sm transition-all cursor-pointer',
 			active: 'bg-primary text-primary-foreground shadow-sm',
-			inactive: 'bg-muted text-muted-foreground hover:bg-muted/80 hover:text-foreground'
+			inactive: 'bg-muted text-muted-foreground hover:bg-blue-600/20 dark:hover:bg-blue-600/20 hover:text-foreground hover:shadow-md hover:scale-105'
 		}
 	};
 	

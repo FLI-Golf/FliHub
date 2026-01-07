@@ -1,13 +1,15 @@
 <script lang="ts">
 	import * as Sheet from '$lib/components/ui/sheet';
 	import { Button } from '$lib/components/ui/button';
-	import { CheckSquare, Square, X, Calendar, Clock } from 'lucide-svelte';
+	import { CheckSquare, Square, X, Calendar, Clock, Info, ListChecks, FileText } from 'lucide-svelte';
 	import StatusBadge from '$lib/components/metrics/status-badge.svelte';
+	import VisualTabs from '$lib/components/ui/visual-tabs.svelte';
 
 	let { open = $bindable(false), task } = $props();
 
 	let subtasks = $state<any[]>([]);
 	let isUpdating = $state(false);
+	let activeTab = $state<string>('details');
 
 	// Parse subtasks when task changes
 	$effect(() => {
@@ -27,7 +29,7 @@
 				.filter((line: string) => line.includes('[ ]') || line.includes('[x]') || line.includes('[X]'))
 				.map((line: string, index: number) => ({
 					id: index,
-					text: line.replace(/^[*-]\s*\[([ xX])\]\s*/, '').trim(),
+					text: line.replace(/^[*-]\s*\[([ xX)]\]\s*/, '').trim(),
 					completed: line.includes('[x]') || line.includes('[X]')
 				}));
 		}
@@ -77,6 +79,13 @@
 			year: 'numeric'
 		});
 	}
+
+	// Build tabs
+	let tabs = $derived([
+		{ value: 'details', label: 'Details', icon: Info },
+		{ value: 'checklist', label: 'Checklist', count: subtasks.length, icon: ListChecks },
+		{ value: 'notes', label: 'Notes', icon: FileText }
+	]);
 </script>
 
 <Sheet.Root bind:open>
@@ -87,99 +96,123 @@
 		</Sheet.Header>
 
 		{#if task}
-			<div class="space-y-6 py-6">
-				<!-- Task Info -->
-				<div class="grid grid-cols-2 gap-4">
-					<div>
-						<div class="text-sm text-slate-400 mb-1">Status</div>
-						<StatusBadge status={task.status} />
-					</div>
-					<div>
-						<div class="text-sm text-slate-400 mb-1">Priority</div>
-						<span class="px-2 py-1 rounded-full text-xs font-medium capitalize
-							{task.priority === 'urgent' ? 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300' : ''}
-							{task.priority === 'high' ? 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-300' : ''}
-							{task.priority === 'medium' ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300' : ''}
-							{task.priority === 'low' ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300' : ''}
-						">
-							{task.priority || 'medium'}
-						</span>
-					</div>
+			<div class="py-6">
+				<!-- Tabs -->
+				<div class="mb-6">
+					<VisualTabs
+						tabs={tabs}
+						activeTab={activeTab}
+						onTabChange={(v) => activeTab = v}
+						variant="button"
+					/>
 				</div>
 
-				<!-- Dates and Hours -->
-				<div class="grid grid-cols-2 gap-4">
-					<div>
-						<div class="text-sm text-slate-400 mb-1 flex items-center gap-1">
-							<Calendar class="size-3" />
-							Due Date
-						</div>
-						<div class="font-medium">{formatDate(task.dueDate)}</div>
-					</div>
-					<div>
-						<div class="text-sm text-slate-400 mb-1 flex items-center gap-1">
-							<Clock class="size-3" />
-							Hours
-						</div>
-						<div class="font-medium">
-							{task.actualHours || 0} / {task.estimatedHours || 0}h
-						</div>
-					</div>
-				</div>
-
-				<!-- Description -->
-				{#if task.description}
-					<div>
-						<div class="text-sm text-slate-400 mb-2">Description</div>
-						<div class="prose prose-sm dark:prose-invert max-w-none">
-							{@html task.description}
-						</div>
-					</div>
-				{/if}
-
-				<!-- Subtasks Checklist -->
-				{#if subtasks.length > 0}
-					<div>
-						<div class="text-sm text-slate-400 mb-3 flex items-center justify-between">
-							<span>Subtasks ({subtasks.filter(s => s.completed).length}/{subtasks.length})</span>
-							<div class="flex-1 bg-slate-200 dark:bg-slate-700 rounded-full h-2 max-w-[200px] ml-4">
-								<div 
-									class="bg-blue-600 h-2 rounded-full transition-all"
-									style="width: {subtasks.length > 0 ? (subtasks.filter(s => s.completed).length / subtasks.length * 100) : 0}%"
-								></div>
+				<!-- Tab Content -->
+				<div class="space-y-6">
+					{#if activeTab === 'details'}
+						<!-- Task Info -->
+						<div class="grid grid-cols-2 gap-6">
+							<div class="space-y-4">
+								<div>
+									<div class="text-sm text-slate-400 mb-2">Status</div>
+									<StatusBadge status={task.status} />
+								</div>
+								<div>
+									<div class="text-sm text-slate-400 mb-2 flex items-center gap-1">
+										<Calendar class="size-3" />
+										Due Date
+									</div>
+									<div class="font-medium text-lg">{formatDate(task.dueDate)}</div>
+								</div>
+							</div>
+							<div class="space-y-4">
+								<div>
+									<div class="text-sm text-slate-400 mb-2">Priority</div>
+									<span class="px-3 py-1.5 rounded-full text-sm font-medium capitalize
+										{task.priority === 'urgent' ? 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300' : ''}
+										{task.priority === 'high' ? 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-300' : ''}
+										{task.priority === 'medium' ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300' : ''}
+										{task.priority === 'low' ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300' : ''}
+									">
+										{task.priority || 'medium'}
+									</span>
+								</div>
+								<div>
+									<div class="text-sm text-slate-400 mb-2 flex items-center gap-1">
+										<Clock class="size-3" />
+										Hours
+									</div>
+									<div class="font-medium text-lg">
+										{task.actualHours || 0} / {task.estimatedHours || 0}h
+									</div>
+								</div>
 							</div>
 						</div>
-						<div class="space-y-2 max-h-[300px] overflow-y-auto">
-							{#each subtasks as subtask, index}
-								<button
-									type="button"
-									onclick={() => toggleSubtask(index)}
-									disabled={isUpdating}
-									class="flex items-start gap-3 w-full p-3 rounded-lg hover:bg-green-800 hover:bg-green-800/50 transition-colors text-left disabled:opacity-50"
-								>
-									{#if subtask.completed}
-										<CheckSquare class="size-5 text-green-600 dark:text-green-400 flex-shrink-0 mt-0.5" />
-									{:else}
-										<Square class="size-5 text-slate-400 flex-shrink-0 mt-0.5" />
-									{/if}
-									<span class="flex-1 {subtask.completed ? 'line-through text-slate-500' : 'text-white'}">
-										{subtask.text}
-									</span>
-								</button>
-							{/each}
-						</div>
-					</div>
-				{/if}
 
-				<!-- Notes -->
-				{#if task.notes}
-					<div>
-						<div class="text-sm text-slate-400 mb-2">Notes</div>
-						<div class="prose prose-sm dark:prose-invert max-w-none">
-							{@html task.notes}
-						</div>
-					</div>
-				{/if}
+						<!-- Description -->
+						{#if task.description}
+							<div class="pt-4 border-t border-slate-700">
+								<div class="text-sm text-slate-400 mb-3">Description</div>
+								<div class="prose prose-sm dark:prose-invert max-w-none bg-slate-800/50 p-4 rounded-lg">
+									{@html task.description}
+								</div>
+							</div>
+						{/if}
+
+					{:else if activeTab === 'checklist'}
+						<!-- Subtasks Checklist -->
+						{#if subtasks.length > 0}
+							<div>
+								<div class="flex items-center justify-between mb-6 p-4 bg-slate-800/50 rounded-lg">
+									<span class="text-sm font-medium">Progress: {subtasks.filter(s => s.completed).length} of {subtasks.length} completed</span>
+									<div class="flex-1 bg-slate-700 rounded-full h-3 max-w-[300px] ml-6">
+										<div 
+											class="bg-green-600 h-3 rounded-full transition-all"
+											style="width: {subtasks.length > 0 ? (subtasks.filter(s => s.completed).length / subtasks.length * 100) : 0}%"
+										></div>
+									</div>
+								</div>
+								<div class="space-y-3">
+									{#each subtasks as subtask, index}
+										<button
+											type="button"
+											onclick={() => toggleSubtask(index)}
+											disabled={isUpdating}
+											class="flex items-start gap-4 w-full p-4 rounded-lg bg-slate-800/30 hover:bg-slate-800 transition-colors text-left disabled:opacity-50 border border-slate-700 hover:border-slate-600"
+										>
+											{#if subtask.completed}
+												<CheckSquare class="size-6 text-green-500 flex-shrink-0 mt-0.5" />
+											{:else}
+												<Square class="size-6 text-slate-400 flex-shrink-0 mt-0.5" />
+											{/if}
+											<span class="flex-1 text-base {subtask.completed ? 'line-through text-slate-500' : 'text-white'}">
+												{subtask.text}
+											</span>
+										</button>
+									{/each}
+								</div>
+							</div>
+						{:else}
+							<div class="text-center py-12 text-slate-400">
+								<ListChecks class="size-12 mx-auto mb-3 opacity-50" />
+								<p>No checklist items for this task</p>
+							</div>
+						{/if}
+
+					{:else if activeTab === 'notes'}
+						<!-- Notes -->
+						{#if task.notes}
+							<div class="prose prose-sm dark:prose-invert max-w-none bg-slate-800/50 p-6 rounded-lg">
+								{@html task.notes}
+							</div>
+						{:else}
+							<div class="text-center py-12 text-slate-400">
+								<FileText class="size-12 mx-auto mb-3 opacity-50" />
+								<p>No notes for this task</p>
+							</div>
+						{/if}
+					{/if}
+				</div>
 			</div>
 		{/if}
 

@@ -239,32 +239,7 @@
 		</Card>
 	</div>
 
-	<!-- Status Breakdown -->
-	<div>
-		<h2 class="text-xl font-semibold mb-4">Project Status</h2>
-		<div class="grid grid-cols-2 md:grid-cols-5 gap-4">
-			<Card class="p-4">
-				<p class="text-sm text-muted-foreground mb-1">Draft</p>
-				<p class="text-2xl font-bold">{stats.byStatus.draft}</p>
-			</Card>
-			<Card class="p-4">
-				<p class="text-sm text-muted-foreground mb-1">Planned</p>
-				<p class="text-2xl font-bold">{stats.byStatus.planned}</p>
-			</Card>
-			<Card class="p-4">
-				<p class="text-sm text-muted-foreground mb-1">In Progress</p>
-				<p class="text-2xl font-bold">{stats.byStatus.in_progress}</p>
-			</Card>
-			<Card class="p-4">
-				<p class="text-sm text-muted-foreground mb-1">Completed</p>
-				<p class="text-2xl font-bold">{stats.byStatus.completed}</p>
-			</Card>
-			<Card class="p-4">
-				<p class="text-sm text-muted-foreground mb-1">Cancelled</p>
-				<p class="text-2xl font-bold">{stats.byStatus.cancelled}</p>
-			</Card>
-		</div>
-	</div>
+
 
 	<!-- Projects Table with Tabs -->
 	<div>

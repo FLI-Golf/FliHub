@@ -36,6 +36,7 @@
 	let userName = $derived(data.userProfile ? `${data.userProfile.firstName} ${data.userProfile.lastName}` : data.user?.email);
 	
 	let projectStatusTab = $state<string>('in_progress');
+	let departmentStatusTab = $state<string>('active');
 	
 	let metrics = $derived(data.metrics || {
 		projects: { total: 0, draft: 0, planned: 0, active: 0, completed: 0, cancelled: 0 },
@@ -74,7 +75,6 @@
 	let showDepartmentsModal = $state(false);
 	let showExpensesModal = $state(false);
 	let showTeamModal = $state(false);
-	let departmentStatusTab = $state<string>('active');
 	
 	// Filter recent projects by status
 	let filteredRecentProjects = $derived(projectStatusFilter === 'all' 
