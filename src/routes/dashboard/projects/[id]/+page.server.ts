@@ -32,8 +32,7 @@ export const load: PageServerLoad = async ({ locals, params }) => {
 		let expenses = [];
 		try {
 			expenses = await pb.collection('expenses').getFullList({
-				filter: `projectId = "${params.id}"`,
-				sort: '-date'
+				filter: `projectId = "${params.id}"`
 			});
 			console.log(`Loaded ${expenses.length} expenses for project`);
 		} catch (expenseErr: any) {
