@@ -19,8 +19,8 @@ export const PATCH: RequestHandler = async ({ request, locals, params }) => {
 			status: data.status,
 			startDate: data.startDate || null,
 			endDate: data.endDate || null,
-			budget: data.budget !== undefined ? data.budget : null,
-			forecastedExpenses: data.forecastedExpenses !== undefined ? data.forecastedExpenses : null,
+			project_budget: data.project_budget !== undefined ? data.project_budget : null,
+			project_forecasted_expenses: data.project_forecasted_expenses !== undefined ? data.project_forecasted_expenses : null,
 			fiscalYear: data.fiscalYear || null,
 			notes: data.notes || ''
 		});

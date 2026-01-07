@@ -16,8 +16,8 @@
 		status: project.status || 'draft',
 		startDate: project.startDate ? project.startDate.split('T')[0] : '',
 		endDate: project.endDate ? project.endDate.split('T')[0] : '',
-		budget: project.budget?.toString() || '',
-		forecastedExpenses: project.forecastedExpenses?.toString() || '',
+		project_budget: project.project_budget?.toString() || '',
+		project_forecasted_expenses: project.project_forecasted_expenses?.toString() || '',
 		fiscalYear: project.fiscalYear || '',
 		notes: project.notes || ''
 	});
@@ -53,8 +53,8 @@
 				},
 				body: JSON.stringify({
 					...formData,
-					budget: formData.budget ? parseFloat(formData.budget) : undefined,
-					forecastedExpenses: formData.forecastedExpenses ? parseFloat(formData.forecastedExpenses) : undefined
+					project_budget: formData.project_budget ? parseFloat(formData.project_budget) : undefined,
+					project_forecasted_expenses: formData.project_forecasted_expenses ? parseFloat(formData.project_forecasted_expenses) : undefined
 				})
 			});
 
@@ -89,8 +89,8 @@
 			status: project.status || 'draft',
 			startDate: project.startDate ? project.startDate.split('T')[0] : '',
 			endDate: project.endDate ? project.endDate.split('T')[0] : '',
-			budget: project.budget?.toString() || '',
-			forecastedExpenses: project.forecastedExpenses?.toString() || '',
+			project_budget: project.project_budget?.toString() || '',
+			project_forecasted_expenses: project.project_forecasted_expenses?.toString() || '',
 			fiscalYear: project.fiscalYear || '',
 			notes: project.notes || ''
 		};
@@ -205,7 +205,7 @@
 						type="number"
 						step="0.01"
 						min="0"
-						bind:value={formData.budget}
+						bind:value={formData.project_budget}
 						placeholder="0.00"
 						class="bg-slate-800 border-slate-700 text-white placeholder:text-slate-400"
 					/>
@@ -218,7 +218,7 @@
 						type="number"
 						step="0.01"
 						min="0"
-						bind:value={formData.forecastedExpenses}
+						bind:value={formData.project_forecasted_expenses}
 						placeholder="0.00"
 						class="bg-slate-800 border-slate-700 text-white placeholder:text-slate-400"
 					/>

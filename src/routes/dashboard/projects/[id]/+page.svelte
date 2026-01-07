@@ -95,8 +95,8 @@
 	}
 	
 	function getBudgetPercentage(): number {
-		if (!project.budget || !project.actualExpenses) return 0;
-		return Math.min((project.actualExpenses / project.budget) * 100, 100);
+		if (!project.project_budget || !project.project_actual_expenses) return 0;
+		return Math.min((project.project_actual_expenses / project.project_budget) * 100, 100);
 	}
 	
 	function getBudgetVariant(percentage: number): 'success' | 'warning' | 'danger' {
@@ -199,22 +199,22 @@
 	<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
 		<MetricCard
 			title="Total Budget"
-			value={project.budget ? formatCurrency(project.budget) : '-'}
+			value={project.project_budget ? formatCurrency(project.project_budget) : '-'}
 			subtitle="Allocated"
 			icon={DollarSign}
 		/>
 		
 		<MetricCard
 			title="Actual Spent"
-			value={project.actualExpenses ? formatCurrency(project.actualExpenses) : '-'}
-			subtitle={project.budget ? `${getBudgetPercentage().toFixed(0)}% of budget` : ''}
+			value={project.project_actual_expenses ? formatCurrency(project.project_actual_expenses) : '-'}
+			subtitle={project.project_budget ? `${getBudgetPercentage().toFixed(0)}% of budget` : ''}
 			icon={TrendingUp}
 			variant={getBudgetVariant(getBudgetPercentage())}
 		/>
 		
 		<MetricCard
 			title="Forecasted"
-			value={project.forecastedExpenses ? formatCurrency(project.forecastedExpenses) : '-'}
+			value={project.project_forecasted_expenses ? formatCurrency(project.project_forecasted_expenses) : '-'}
 			subtitle="Expected expenses"
 			icon={FileText}
 		/>
@@ -228,13 +228,13 @@
 	</div>
 
 	<!-- Budget Progress -->
-	{#if project.budget && project.actualExpenses}
+	{#if project.project_budget && project.project_actual_expenses}
 		<Card class="p-6">
 			<h2 class="text-xl font-semibold mb-4">Budget Utilization</h2>
 			<div class="space-y-4">
 				<ProgressBar
-					value={project.actualExpenses}
-					max={project.budget}
+					value={project.project_actual_expenses}
+					max={project.project_budget}
 					label="Budget Used"
 					size="lg"
 					variant={getBudgetVariant(getBudgetPercentage())}
@@ -242,15 +242,15 @@
 				<div class="grid grid-cols-3 gap-4 text-sm">
 					<div>
 						<p class="text-muted-foreground">Allocated</p>
-						<p class="font-semibold">{formatCurrency(project.budget)}</p>
+						<p class="font-semibold">{formatCurrency(project.project_budget)}</p>
 					</div>
 					<div>
 						<p class="text-muted-foreground">Spent</p>
-						<p class="font-semibold">{formatCurrency(project.actualExpenses)}</p>
+						<p class="font-semibold">{formatCurrency(project.project_actual_expenses)}</p>
 					</div>
 					<div>
 						<p class="text-muted-foreground">Remaining</p>
-						<p class="font-semibold">{formatCurrency(project.budget - project.actualExpenses)}</p>
+						<p class="font-semibold">{formatCurrency(project.project_budget - project.project_actual_expenses)}</p>
 					</div>
 				</div>
 			</div>
