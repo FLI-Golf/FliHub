@@ -36,7 +36,11 @@
 	
 	let project = $derived(data.project);
 	let expenses = $derived(data.expenses || []);
-	let expenseStats = $derived(data.expenseStats);
+	let expenseStats = $derived(data.expenseStats || {
+		total: 0,
+		byStatus: { draft: 0, submitted: 0, approved: 0, rejected: 0, paid: 0 },
+		byCategory: {}
+	});
 	let tasks = $derived(data.tasks || []);
 	
 	function parseSubtasks(subtasksData: any) {
