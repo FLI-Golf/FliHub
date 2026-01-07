@@ -29,7 +29,7 @@
 				.filter((line: string) => line.includes('[ ]') || line.includes('[x]') || line.includes('[X]'))
 				.map((line: string, index: number) => ({
 					id: index,
-					text: line.replace(/^[*-]\s*\[([ xX)]\]\s*/, '').trim(),
+					text: line.replace(/^[*-]\s*\[([ xX])\]\s*/, '').trim(),
 					completed: line.includes('[x]') || line.includes('[X]')
 				}));
 		}
