@@ -34,13 +34,21 @@ export const PATCH: RequestHandler = async ({ request, locals, params }) => {
 		const task = await pb.collection('tasks').update(params.id, updateData);
 
 		// Recalculate budget hierarchy if task has a project
+		console.log('Task updated:', task.title);
+		console.log('Task projectId:', task.projectId);
+		console.log('Task budget:', task.task_budget);
+		
 		if (task.projectId) {
+			console.log('🔄 Recalculating budget hierarchy for project:', task.projectId);
 			try {
 				await recalculateBudgetHierarchy(pb, task.projectId);
+				console.log('✅ Budget hierarchy recalculated successfully');
 			} catch (budgetErr) {
-				console.error('Error recalculating budgets:', budgetErr);
+				console.error('❌ Error recalculating budgets:', budgetErr);
 				// Don't fail the task update if budget calculation fails
 			}
+		} else {
+			console.log('⚠️  Task has no projectId, skipping budget recalculation');
 		}
 
 		return json(task, { status: 200 });
