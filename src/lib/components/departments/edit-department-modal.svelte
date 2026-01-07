@@ -17,7 +17,10 @@
 		name: '',
 		code: '',
 		description: '',
-		annualBudget: 0,
+		department_budget_mode: 'auto',
+		department_annual_budget: 0,
+		department_budget_cap: 0,
+		department_manual_budget_override: 0,
 		status: 'active',
 		headOfDepartment: ''
 	});
@@ -32,7 +35,10 @@
 				name: department.name || '',
 				code: department.code || '',
 				description: department.description || '',
-				annualBudget: department.annualBudget || 0,
+				department_budget_mode: department.department_budget_mode || 'auto',
+				department_annual_budget: department.department_annual_budget || 0,
+				department_budget_cap: department.department_budget_cap || 0,
+				department_manual_budget_override: department.department_manual_budget_override || 0,
 				status: department.status || 'active',
 				headOfDepartment: department.headOfDepartment || ''
 			};
@@ -119,13 +125,61 @@
 				/>
 			</div>
 
-			<!-- Annual Budget -->
+			<!-- Budget Mode -->
 			<div class="space-y-2">
+				<Label for="edit-budget-mode" class="text-slate-200">Budget Mode</Label>
+				<select
+					id="edit-budget-mode"
+					bind:value={formData.department_budget_mode}
+					class="flex h-10 w-full rounded-md border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-500"
+				>
+					<option value="auto">Auto (from projects)</option>
+					<option value="annual_cap">Annual Cap</option>
+					<option value="allocated">Allocated</option>
+				</select>
+			</div>
+
+			<!-- Conditional Budget Fields -->
+			{#if formData.department_budget_mode === 'annual_cap'}
+				<div class="space-y-2">
+					<Label for="edit-budget-cap" class="text-slate-200">Annual Budget Cap *</Label>
+					<Input
+						id="edit-budget-cap"
+						type="number"
+						bind:value={formData.department_budget_cap}
+						placeholder="0"
+						class="bg-slate-800 border-slate-700 text-white placeholder:text-slate-400"
+					/>
+				</div>
+			{:else if formData.department_budget_mode === 'allocated'}
+				<div class="space-y-2">
+					<Label for="edit-allocated" class="text-slate-200">Allocated Budget *</Label>
+					<Input
+						id="edit-allocated"
+						type="number"
+						bind:value={formData.department_manual_budget_override}
+						placeholder="0"
+						class="bg-slate-800 border-slate-700 text-white placeholder:text-slate-400"
+					/>
+				</div>
+			{/if}
+
+			<!-- Read-only Budget Display (for auto) -->
+			{#if formData.department_budget_mode === 'auto'}
+				<div class="p-4 bg-slate-800/50 rounded-lg border border-slate-700">
+					<div class="text-sm text-slate-400 mb-1">Current Budget (calculated)</div>
+					<div class="text-2xl font-bold text-white">${department.department_annual_budget || 0}</div>
+					<div class="text-xs text-slate-500 mt-1">Sum of all project budgets</div>
+				</div>
+			{/if}
+
+			<!-- Annual Budget (hidden, kept for compatibility) -->
+			<div class="space-y-2 hidden">
 				<Label for="edit-annualBudget" class="text-slate-200">Annual Budget</Label>
 				<Input
 					id="edit-annualBudget"
 					type="number"
-					bind:value={formData.annualBudget}
+					bind:value={formData.department_annual_budget}
 					placeholder="0"
 					min="0"
 					step="1000"
