@@ -7,6 +7,14 @@
 	import ProgressBar from '$lib/components/metrics/progress-bar.svelte';
 	import StatusBadge from '$lib/components/metrics/status-badge.svelte';
 	import * as Sheet from '$lib/components/ui/sheet/index.js';
+	import BudgetDonutChart from '$lib/components/charts/BudgetDonutChart.svelte';
+	import ExpenseBarChart from '$lib/components/charts/ExpenseBarChart.svelte';
+	import ProjectStatusChart from '$lib/components/charts/ProjectStatusChart.svelte';
+	import DepartmentBudgetChart from '$lib/components/charts/DepartmentBudgetChart.svelte';
+	import BurnRateChart from '$lib/components/charts/BurnRateChart.svelte';
+	import FinancialHealthCard from '$lib/components/charts/FinancialHealthCard.svelte';
+	import PhaseFilter from '$lib/components/filters/PhaseFilter.svelte';
+	import DepartmentBreakdownTable from '$lib/components/charts/DepartmentBreakdownTable.svelte';
 	import { 
 		Users, 
 		ListTodo, 
@@ -26,7 +34,10 @@
 		Building2,
 		XCircle,
 		Calendar,
-		UserCircle
+		UserCircle,
+		Database,
+		RotateCcw,
+		CheckSquare
 	} from 'lucide-svelte';
 	
 	let { data }: { data: PageData } = $props();
@@ -43,10 +54,63 @@
 		projectsByStatus: { draft: [], planned: [], in_progress: [], completed: [], cancelled: [] },
 		departments: { total: 0, active: 0, inactive: 0 },
 		departmentsByStatus: { active: [], inactive: [] },
+		departmentBudgets: [],
 		expenses: { total: 0, totalAmount: 0, approvedAmount: 0, draft: 0, submitted: 0, approved: 0, paid: 0 },
+		approvals: { total: 0, pending: 0, approved: 0, rejected: 0, revision_requested: 0 },
 		budget: { total: 0, forecasted: 0, actual: 0, remaining: 0 },
-		managers: { total: 0 }
+		managers: { total: 0 },
+		phases: {
+			phase1: { budget: 0, actual: 0, forecasted: 0, projectCount: 0 },
+			phase2: { budget: 0, actual: 0, forecasted: 0, projectCount: 0 },
+			phase3: { budget: 0, actual: 0, forecasted: 0, projectCount: 0 }
+		}
 	});
+	
+	// Phase filter state
+	let selectedPhase = $state<string>('all');
+	
+	// Chart type toggles
+	let budgetChartType = $state<'donut' | 'bar'>('donut');
+	let departmentChartType = $state<'bar' | 'table'>('bar');
+	
+	// Calculate phase-filtered metrics
+	let phaseFilteredBudget = $derived.by(() => {
+		if (selectedPhase === 'all') {
+			return {
+				total: metrics.budget.total,
+				actual: metrics.budget.actual,
+				forecasted: metrics.budget.forecasted
+			};
+		}
+		const phase = metrics.phases[selectedPhase as keyof typeof metrics.phases];
+		return {
+			total: phase?.budget || 0,
+			actual: phase?.actual || 0,
+			forecasted: phase?.forecasted || 0
+		};
+	});
+	
+	// Filter departments by phase
+	let phaseFilteredDepartments = $derived.by(() => {
+		if (selectedPhase === 'all') {
+			return metrics.departmentBudgets;
+		}
+		return metrics.departmentBudgets.map(dept => {
+			const phase = dept.phases?.[selectedPhase as keyof typeof dept.phases];
+			return {
+				...dept,
+				actual: phase?.actual || 0,
+				forecasted: phase?.forecasted || 0,
+				projectCount: phase?.projectCount || 0
+			};
+		}).filter(d => d.actual > 0 || d.forecasted > 0 || d.projectCount > 0);
+	});
+	
+	// Calculate pending expenses (draft + submitted)
+	let pendingExpenses = $derived(
+		(metrics.expenses.draft + metrics.expenses.submitted) * 
+		(metrics.expenses.totalAmount / Math.max(metrics.expenses.total, 1))
+	);
 	let recentProjects = $derived(data.recentProjects || []);
 	
 	// Get projects for selected tab
@@ -75,6 +139,11 @@
 	let showDepartmentsModal = $state(false);
 	let showExpensesModal = $state(false);
 	let showTeamModal = $state(false);
+	let seedingData = $state(false);
+	let restoringData = $state(false);
+	let seedingApprovals = $state(false);
+	let removingApprovals = $state(false);
+	let testDataMessage = $state<string>('');
 	
 	// Filter recent projects by status
 	let filteredRecentProjects = $derived(projectStatusFilter === 'all' 
@@ -105,6 +174,110 @@
 			day: 'numeric',
 			year: 'numeric'
 		});
+	}
+
+	async function seedTestData() {
+		seedingData = true;
+		testDataMessage = '⏳ Creating backup and seeding test data...';
+
+		try {
+			const response = await fetch('/api/test-data/seed', {
+				method: 'POST'
+			});
+
+			const result = await response.json();
+
+			if (result.success) {
+				testDataMessage = '✅ Test data seeded successfully! Refreshing page...';
+				setTimeout(() => {
+					window.location.reload();
+				}, 1500);
+			} else {
+				testDataMessage = `❌ Error: ${result.error || 'Failed to seed data'}`;
+			}
+		} catch (error: any) {
+			testDataMessage = `❌ Error: ${error.message}`;
+		} finally {
+			seedingData = false;
+		}
+	}
+
+	async function restoreTestData() {
+		restoringData = true;
+		testDataMessage = '⏳ Removing test data...';
+
+		try {
+			const response = await fetch('/api/test-data/restore', {
+				method: 'POST'
+			});
+
+			const result = await response.json();
+
+			if (result.success) {
+				testDataMessage = `✅ ${result.message} Refreshing page...`;
+				setTimeout(() => {
+					window.location.reload();
+				}, 1500);
+			} else {
+				testDataMessage = `❌ Error: ${result.error || 'Failed to remove test data'}`;
+			}
+		} catch (error: any) {
+			testDataMessage = `❌ Error: ${error.message}`;
+		} finally {
+			restoringData = false;
+		}
+	}
+
+	async function seedApprovals() {
+		seedingApprovals = true;
+		testDataMessage = '⏳ Creating approval workflow test data...';
+
+		try {
+			const response = await fetch('/api/test-data/seed-approvals', {
+				method: 'POST'
+			});
+
+			const result = await response.json();
+
+			if (result.success) {
+				testDataMessage = '✅ Approval workflow test data seeded successfully! Refreshing page...';
+				setTimeout(() => {
+					window.location.reload();
+				}, 1500);
+			} else {
+				testDataMessage = `❌ Error: ${result.error || 'Failed to seed approvals'}`;
+			}
+		} catch (error: any) {
+			testDataMessage = `❌ Error: ${error.message}`;
+		} finally {
+			seedingApprovals = false;
+		}
+	}
+
+	async function removeApprovals() {
+		removingApprovals = true;
+		testDataMessage = '⏳ Removing approval test data...';
+
+		try {
+			const response = await fetch('/api/test-data/remove-approvals', {
+				method: 'POST'
+			});
+
+			const result = await response.json();
+
+			if (result.success) {
+				testDataMessage = `✅ ${result.message} Refreshing page...`;
+				setTimeout(() => {
+					window.location.reload();
+				}, 1500);
+			} else {
+				testDataMessage = `❌ Error: ${result.error || 'Failed to remove approvals'}`;
+			}
+		} catch (error: any) {
+			testDataMessage = `❌ Error: ${error.message}`;
+		} finally {
+			removingApprovals = false;
+		}
 	}
 	
 	function getCountdown(endDate: string): { text: string; color: string; isOverdue: boolean } {
@@ -179,7 +352,7 @@
 					value={metrics.projects.total}
 					subtitle="{metrics.projects.active} in progress, {metrics.projects.completed} completed"
 					icon={FolderKanban}
-					class="hover:shadow-xl hover:bg-slate-600 dark:hover:bg-slate-600 hover:scale-[1.02] transition-all duration-200"
+					class="hover:shadow-xl bg-gradient-to-br from-blue-950 to-blue-900 border-blue-800 hover:scale-[1.02] transition-all duration-200"
 				/>
 			</button>
 			
@@ -189,7 +362,7 @@
 					value={metrics.departments.total}
 					subtitle="{metrics.departments.active} active departments"
 					icon={Building2}
-					class="hover:shadow-xl hover:bg-slate-600 dark:hover:bg-slate-600 hover:scale-[1.02] transition-all duration-200"
+					class="hover:shadow-xl bg-gradient-to-br from-purple-950 to-purple-900 border-purple-800 hover:scale-[1.02] transition-all duration-200"
 				/>
 			</button>
 			
@@ -199,7 +372,7 @@
 					value={formatCurrency(metrics.expenses.totalAmount)}
 					subtitle="{metrics.expenses.total} transactions"
 					icon={Receipt}
-					class="hover:shadow-xl hover:bg-slate-600 dark:hover:bg-slate-600 hover:scale-[1.02] transition-all duration-200"
+					class="hover:shadow-xl bg-gradient-to-br from-amber-950 to-amber-900 border-amber-800 hover:scale-[1.02] transition-all duration-200"
 				/>
 			</button>
 			
@@ -209,44 +382,256 @@
 					value={metrics.managers.total}
 					subtitle="Active team members"
 					icon={Users}
-					class="hover:shadow-xl hover:bg-slate-600 dark:hover:bg-slate-600 hover:scale-[1.02] transition-all duration-200"
+					class="hover:shadow-xl bg-gradient-to-br from-green-950 to-green-900 border-green-800 hover:scale-[1.02] transition-all duration-200"
 				/>
 			</button>
 		</div>
 	</div>
 
-	<!-- Budget Overview -->
+	<!-- Expenses & Approvals Breakdown -->
 	<div>
-		<h2 class="text-2xl font-bold mb-4">Budget Overview</h2>
+		<h2 class="text-2xl font-bold mb-4">Expenses & Approvals</h2>
+		<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+			<!-- Expense Status Breakdown -->
+			<Card class="p-6 bg-gradient-to-br from-blue-950 to-blue-900 border-blue-800">
+				<div class="flex items-center justify-between mb-4">
+					<h3 class="text-lg font-semibold">Expense Pipeline</h3>
+					<Receipt class="size-5 text-blue-400" />
+				</div>
+				<div class="space-y-3">
+					<div class="flex items-center justify-between p-3 bg-black/20 rounded-lg border border-gray-800">
+						<div class="flex items-center gap-2">
+							<div class="size-3 rounded-full bg-gray-400"></div>
+							<span class="text-sm font-medium">Draft</span>
+						</div>
+						<span class="text-sm font-bold">{metrics.expenses.draft}</span>
+					</div>
+					<div class="flex items-center justify-between p-3 bg-black/20 rounded-lg border border-gray-800">
+						<div class="flex items-center gap-2">
+							<div class="size-3 rounded-full bg-blue-500"></div>
+							<span class="text-sm font-medium">Submitted</span>
+						</div>
+						<span class="text-sm font-bold">{metrics.expenses.submitted}</span>
+					</div>
+					<div class="flex items-center justify-between p-3 bg-black/20 rounded-lg border border-gray-800">
+						<div class="flex items-center gap-2">
+							<div class="size-3 rounded-full bg-green-500"></div>
+							<span class="text-sm font-medium">Approved</span>
+						</div>
+						<span class="text-sm font-bold">{metrics.expenses.approved}</span>
+					</div>
+					<div class="flex items-center justify-between p-3 bg-black/20 rounded-lg border border-gray-800">
+						<div class="flex items-center gap-2">
+							<div class="size-3 rounded-full bg-emerald-600"></div>
+							<span class="text-sm font-medium">Paid</span>
+						</div>
+						<span class="text-sm font-bold">{metrics.expenses.paid}</span>
+					</div>
+				</div>
+				<div class="mt-4 pt-4 border-t border-blue-800">
+					<Button href="/dashboard/expenses" class="w-full" variant="outline">
+						View All Expenses
+						<ArrowRight class="size-4 ml-2" />
+					</Button>
+				</div>
+			</Card>
+
+			<!-- Approval Status Breakdown -->
+			<Card class="p-6 bg-gradient-to-br from-indigo-950 to-purple-950 border-indigo-800">
+				<div class="flex items-center justify-between mb-4">
+					<h3 class="text-lg font-semibold">Approval Workflow</h3>
+					<CheckSquare class="size-5 text-indigo-400" />
+				</div>
+				<div class="space-y-3">
+					<div class="flex items-center justify-between p-3 bg-black/20 rounded-lg border border-gray-800">
+						<div class="flex items-center gap-2">
+							<div class="size-3 rounded-full bg-yellow-500"></div>
+							<span class="text-sm font-medium">Pending</span>
+						</div>
+						<span class="text-sm font-bold">{metrics.approvals.pending}</span>
+					</div>
+					<div class="flex items-center justify-between p-3 bg-black/20 rounded-lg border border-gray-800">
+						<div class="flex items-center gap-2">
+							<div class="size-3 rounded-full bg-green-500"></div>
+							<span class="text-sm font-medium">Approved</span>
+						</div>
+						<span class="text-sm font-bold">{metrics.approvals.approved}</span>
+					</div>
+					<div class="flex items-center justify-between p-3 bg-black/20 rounded-lg border border-gray-800">
+						<div class="flex items-center gap-2">
+							<div class="size-3 rounded-full bg-red-500"></div>
+							<span class="text-sm font-medium">Rejected</span>
+						</div>
+						<span class="text-sm font-bold">{metrics.approvals.rejected}</span>
+					</div>
+					<div class="flex items-center justify-between p-3 bg-black/20 rounded-lg border border-gray-800">
+						<div class="flex items-center gap-2">
+							<div class="size-3 rounded-full bg-orange-500"></div>
+							<span class="text-sm font-medium">Revision Requested</span>
+						</div>
+						<span class="text-sm font-bold">{metrics.approvals.revision_requested}</span>
+					</div>
+				</div>
+				<div class="mt-4 pt-4 border-t border-indigo-800">
+					<Button href="/dashboard/approvals" class="w-full" variant="outline">
+						View All Approvals
+						<ArrowRight class="size-4 ml-2" />
+					</Button>
+				</div>
+			</Card>
+		</div>
+	</div>
+
+	<!-- Phase Filter -->
+	<div>
+		<PhaseFilter 
+			activePhase={selectedPhase}
+			onPhaseChange={(phase) => selectedPhase = phase}
+		/>
+	</div>
+
+	<!-- Investor Overview -->
+	<div>
+		<h2 class="text-2xl font-bold mb-4">
+			Financial Overview
+			{#if selectedPhase !== 'all'}
+				<span class="text-lg font-normal text-muted-foreground">
+					- {selectedPhase === 'phase1' ? 'Phase 1' : selectedPhase === 'phase2' ? 'Phase 2' : 'Phase 3'}
+				</span>
+			{/if}
+		</h2>
 		<div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+			<!-- Financial Health Card -->
+			<FinancialHealthCard 
+				totalBudget={phaseFilteredBudget.total}
+				actualSpent={phaseFilteredBudget.actual}
+				forecasted={phaseFilteredBudget.forecasted}
+				approvedExpenses={metrics.expenses.approvedAmount}
+				pendingExpenses={pendingExpenses}
+			/>
+
+			<!-- Burn Rate Analysis -->
+			<Card class="p-6">
+				<div class="flex items-center justify-between mb-4">
+					<h3 class="text-lg font-semibold">Budget vs Spending</h3>
+					<TrendingUp class="size-5 text-muted-foreground" />
+				</div>
+				<BurnRateChart 
+					totalBudget={phaseFilteredBudget.total}
+					actualSpent={phaseFilteredBudget.actual}
+					forecasted={phaseFilteredBudget.forecasted}
+				/>
+			</Card>
+		</div>
+	</div>
+
+	<!-- Department Budget Allocation Chart -->
+	{#if phaseFilteredDepartments.length > 0}
+		<div>
+			<h2 class="text-2xl font-bold mb-4">
+				Budget Allocation by Department
+				{#if selectedPhase !== 'all'}
+					<span class="text-lg font-normal text-muted-foreground">
+						- {selectedPhase === 'phase1' ? 'Phase 1' : selectedPhase === 'phase2' ? 'Phase 2' : 'Phase 3'}
+					</span>
+				{/if}
+			</h2>
+			<Card class="p-6">
+				<div class="flex items-center justify-between mb-6">
+					<div>
+						<h3 class="text-lg font-semibold">Where Your Investment Goes</h3>
+						<p class="text-sm text-muted-foreground mt-1">
+							{selectedPhase === 'all' 
+								? 'Budget allocation and spending across all departments' 
+								: `Spending breakdown for ${selectedPhase === 'phase1' ? 'Phase 1 (Jan-Sep 2026)' : selectedPhase === 'phase2' ? 'Phase 2 (Oct 2026-Mar 2027)' : 'Phase 3 (Apr-Dec 2027)'}`
+							}
+						</p>
+					</div>
+					<Building2 class="size-5 text-muted-foreground" />
+				</div>
+				<DepartmentBudgetChart departments={phaseFilteredDepartments} />
+			</Card>
+		</div>
+	{/if}
+
+	<!-- Department Breakdown Table -->
+	<div>
+		<h2 class="text-2xl font-bold mb-4">
+			Department Financial Breakdown
+			{#if selectedPhase !== 'all'}
+				<span class="text-lg font-normal text-muted-foreground">
+					- {selectedPhase === 'phase1' ? 'Phase 1' : selectedPhase === 'phase2' ? 'Phase 2' : 'Phase 3'}
+				</span>
+			{/if}
+		</h2>
+		<DepartmentBreakdownTable 
+			departments={phaseFilteredDepartments}
+			phase={selectedPhase}
+		/>
+	</div>
+
+	<!-- Project & Expense Analytics -->
+	<div>
+		<h2 class="text-2xl font-bold mb-4">Project & Expense Analytics</h2>
+		<div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+			<Card class="p-6">
+				<div class="flex items-center justify-between mb-4">
+					<h3 class="text-lg font-semibold">Project Status</h3>
+					<FolderKanban class="size-5 text-muted-foreground" />
+				</div>
+				<ProjectStatusChart 
+					draft={metrics.projects.draft}
+					planned={metrics.projects.planned}
+					active={metrics.projects.active}
+					completed={metrics.projects.completed}
+					cancelled={metrics.projects.cancelled}
+				/>
+			</Card>
+
 			<Card class="p-6">
 				<div class="flex items-center justify-between mb-4">
 					<h3 class="text-lg font-semibold">Budget Utilization</h3>
-					<DollarSign class="size-5 text-muted-foreground" />
-				</div>
-				<div class="space-y-4">
-					<div>
-						<div class="flex justify-between text-sm mb-2">
-							<span class="text-muted-foreground">Total Budget</span>
-							<span class="font-semibold">{formatCurrency(metrics.budget.total)}</span>
-						</div>
-						<div class="flex justify-between text-sm mb-2">
-							<span class="text-muted-foreground">Actual Spent</span>
-							<span class="font-semibold">{formatCurrency(metrics.budget.actual)}</span>
-						</div>
-						<div class="flex justify-between text-sm mb-2">
-							<span class="text-muted-foreground">Remaining</span>
-							<span class="font-semibold text-green-600 dark:text-green-400">
-								{formatCurrency(metrics.budget.remaining)}
-							</span>
-						</div>
+					<div class="flex items-center gap-2">
+						<Button 
+							size="sm" 
+							variant={budgetChartType === 'donut' ? 'default' : 'outline'}
+							onclick={() => budgetChartType = 'donut'}
+							class="h-8 px-2"
+						>
+							Donut
+						</Button>
+						<Button 
+							size="sm" 
+							variant={budgetChartType === 'bar' ? 'default' : 'outline'}
+							onclick={() => budgetChartType = 'bar'}
+							class="h-8 px-2"
+						>
+							Bar
+						</Button>
 					</div>
-					<ProgressBar
-						value={metrics.budget.actual}
-						max={metrics.budget.total}
-						label="Budget Used"
-						size="lg"
+				</div>
+				{#if budgetChartType === 'donut'}
+					<BudgetDonutChart 
+						actual={metrics.budget.actual}
+						remaining={metrics.budget.remaining}
+						total={metrics.budget.total}
 					/>
+				{:else}
+					<BurnRateChart 
+						totalBudget={metrics.budget.total}
+						actualSpent={metrics.budget.actual}
+						forecasted={metrics.budget.forecasted}
+					/>
+				{/if}
+				<div class="mt-6 pt-4 border-t space-y-2">
+					<div class="flex justify-between text-sm">
+						<span class="text-muted-foreground">Total Budget</span>
+						<span class="font-semibold">{formatCurrency(metrics.budget.total)}</span>
+					</div>
+					<div class="flex justify-between text-sm">
+						<span class="text-muted-foreground">Forecasted</span>
+						<span class="font-semibold">{formatCurrency(metrics.budget.forecasted)}</span>
+					</div>
 				</div>
 			</Card>
 
@@ -255,36 +640,12 @@
 					<h3 class="text-lg font-semibold">Expense Status</h3>
 					<Receipt class="size-5 text-muted-foreground" />
 				</div>
-				<div class="space-y-3">
-					<div class="flex items-center justify-between">
-						<div class="flex items-center gap-2">
-							<Clock class="size-4 text-slate-500" />
-							<span class="text-sm">Draft</span>
-						</div>
-						<span class="font-semibold">{metrics.expenses.draft}</span>
-					</div>
-					<div class="flex items-center justify-between">
-						<div class="flex items-center gap-2">
-							<AlertCircle class="size-4 text-blue-500" />
-							<span class="text-sm">Submitted</span>
-						</div>
-						<span class="font-semibold">{metrics.expenses.submitted}</span>
-					</div>
-					<div class="flex items-center justify-between">
-						<div class="flex items-center gap-2">
-							<CheckCircle2 class="size-4 text-green-500" />
-							<span class="text-sm">Approved</span>
-						</div>
-						<span class="font-semibold">{metrics.expenses.approved}</span>
-					</div>
-					<div class="flex items-center justify-between">
-						<div class="flex items-center gap-2">
-							<DollarSign class="size-4 text-green-600" />
-							<span class="text-sm">Paid</span>
-						</div>
-						<span class="font-semibold">{metrics.expenses.paid}</span>
-					</div>
-				</div>
+				<ExpenseBarChart 
+					draft={metrics.expenses.draft}
+					submitted={metrics.expenses.submitted}
+					approved={metrics.expenses.approved}
+					paid={metrics.expenses.paid}
+				/>
 			</Card>
 		</div>
 	</div>
@@ -372,7 +733,88 @@
 	<!-- Quick Actions -->
 	<div>
 		<h2 class="text-2xl font-bold mb-4">Quick Actions</h2>
-		<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+		
+		{#if testDataMessage}
+			<div class="mb-4 p-4 rounded-lg {testDataMessage.includes('✅') ? 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-200' : 'bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-200'}">
+				{testDataMessage}
+			</div>
+		{/if}
+
+		<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+			{#if isAdmin}
+				<Card class="p-6 hover:shadow-lg transition-shadow border-2 border-blue-200 dark:border-blue-800">
+					<div class="flex items-center gap-4 mb-4">
+						<div class="flex size-12 items-center justify-center rounded-xl bg-blue-600 text-white">
+							<Database class="size-6 stroke-[2]" />
+						</div>
+						<h3 class="text-lg font-bold">Seed Expenses</h3>
+					</div>
+					<p class="text-muted-foreground mb-6 text-sm">Add test vendors and expenses</p>
+					<button 
+						type="button"
+						onclick={seedTestData} 
+						disabled={seedingData || restoringData || seedingApprovals || removingApprovals}
+						class="w-full px-4 py-3 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 active:bg-blue-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors cursor-pointer"
+					>
+						{seedingData ? 'Seeding...' : 'Seed Expenses Data'}
+					</button>
+				</Card>
+
+				<Card class="p-6 hover:shadow-lg transition-shadow border-2 border-red-200 dark:border-red-800">
+					<div class="flex items-center gap-4 mb-4">
+						<div class="flex size-12 items-center justify-center rounded-xl bg-red-600 text-white">
+							<XCircle class="size-6 stroke-[2]" />
+						</div>
+						<h3 class="text-lg font-bold">Remove Expenses</h3>
+					</div>
+					<p class="text-muted-foreground mb-6 text-sm">Delete test vendors and expenses</p>
+					<button 
+						type="button"
+						onclick={restoreTestData} 
+						disabled={seedingData || restoringData || seedingApprovals || removingApprovals}
+						class="w-full px-4 py-3 bg-red-600 text-white rounded-lg font-semibold hover:bg-red-700 active:bg-red-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors cursor-pointer"
+					>
+						{restoringData ? 'Removing...' : 'Remove Expenses Data'}
+					</button>
+				</Card>
+
+				<Card class="p-6 hover:shadow-lg transition-shadow border-2 border-green-200 dark:border-green-800">
+					<div class="flex items-center gap-4 mb-4">
+						<div class="flex size-12 items-center justify-center rounded-xl bg-green-600 text-white">
+							<CheckSquare class="size-6 stroke-[2]" />
+						</div>
+						<h3 class="text-lg font-bold">Seed Approvals</h3>
+					</div>
+					<p class="text-muted-foreground mb-6 text-sm">Add approval workflow test data</p>
+					<button 
+						type="button"
+						onclick={seedApprovals} 
+						disabled={seedingData || restoringData || seedingApprovals || removingApprovals}
+						class="w-full px-4 py-3 bg-green-600 text-white rounded-lg font-semibold hover:bg-green-700 active:bg-green-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors cursor-pointer"
+					>
+						{seedingApprovals ? 'Seeding...' : 'Seed Approval Data'}
+					</button>
+				</Card>
+
+				<Card class="p-6 hover:shadow-lg transition-shadow border-2 border-orange-200 dark:border-orange-800">
+					<div class="flex items-center gap-4 mb-4">
+						<div class="flex size-12 items-center justify-center rounded-xl bg-orange-600 text-white">
+							<RotateCcw class="size-6 stroke-[2]" />
+						</div>
+						<h3 class="text-lg font-bold">Remove Approvals</h3>
+					</div>
+					<p class="text-muted-foreground mb-6 text-sm">Delete approval test data</p>
+					<button 
+						type="button"
+						onclick={removeApprovals} 
+						disabled={seedingData || restoringData || seedingApprovals || removingApprovals}
+						class="w-full px-4 py-3 bg-orange-600 text-white rounded-lg font-semibold hover:bg-orange-700 active:bg-orange-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors cursor-pointer"
+					>
+						{removingApprovals ? 'Removing...' : 'Remove Approval Data'}
+					</button>
+				</Card>
+			{/if}
+			
 			{#if !isAdmin}
 				<Card class="p-6 hover:shadow-lg transition-shadow border-2">
 					<div class="flex items-center gap-4 mb-4">

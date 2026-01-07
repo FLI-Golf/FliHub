@@ -6,7 +6,8 @@
 		Store,
 		FolderKanban,
 		Receipt,
-		Building2
+		Building2,
+		CheckSquare
 	} from 'lucide-svelte';
 
 	const data = {
@@ -45,6 +46,11 @@
 				title: 'Expenses',
 				url: '/dashboard/expenses',
 				icon: Receipt
+			},
+			{
+				title: 'Approvals',
+				url: '/dashboard/approvals',
+				icon: CheckSquare
 			}
 		]
 	};
@@ -69,12 +75,12 @@
 			return ['Dashboard', 'Projects', 'Expenses'].includes(item.title);
 		}
 		if (userRole === 'leader') {
-			// Leaders only see: Dashboard (their department), Projects, Tasks, Expenses (view only)
-			return ['Dashboard', 'Projects', 'Tasks', 'Expenses'].includes(item.title);
+			// Leaders see: Dashboard (their department), Projects, Tasks, Expenses, Approvals
+			return ['Dashboard', 'Projects', 'Tasks', 'Expenses', 'Approvals'].includes(item.title);
 		}
 		if (userRole === 'pro' || userRole === 'franchise_owner') {
 			// Pros and franchise owners see limited views
-			return !['Managers', 'Vendors'].includes(item.title);
+			return !['Managers', 'Vendors', 'Approvals'].includes(item.title);
 		}
 		// Admin sees everything
 		return true;

@@ -96,9 +96,8 @@
 	
 	function stripHtml(html: string): string {
 		if (!html) return '';
-		const tmp = document.createElement('div');
-		tmp.innerHTML = html;
-		return tmp.textContent || tmp.innerText || '';
+		// Use regex to strip HTML tags for SSR compatibility
+		return html.replace(/<[^>]*>/g, '').trim();
 	}
 </script>
 
