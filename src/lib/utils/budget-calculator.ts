@@ -76,21 +76,28 @@ export async function updateProjectBudget(
 ): Promise<void> {
 	try {
 		const project = await pb.collection('projects').getOne(projectId);
+		console.log(`[Budget] Updating project: ${project.name}`);
 
-		// If manual override is set, use that instead
+		// If manual override is set (and not 0), use that instead
 		if (project.project_manual_budget_override !== null && 
-		    project.project_manual_budget_override !== undefined) {
+		    project.project_manual_budget_override !== undefined &&
+		    project.project_manual_budget_override > 0) {
+			console.log(`[Budget] Manual override set to ${project.project_manual_budget_override}, skipping calculation`);
 			return;
 		}
 
 		const { budget, actualCost } = await calculateProjectBudget(pb, projectId);
 		const actualExpenses = await calculateProjectActualExpenses(pb, projectId);
 
+		console.log(`[Budget] Calculated budget: ${budget}, actualCost: ${actualCost}, actualExpenses: ${actualExpenses}`);
+
 		await pb.collection('projects').update(projectId, {
 			project_budget: budget,
 			project_forecasted_expenses: budget,
 			project_actual_expenses: actualExpenses + actualCost
 		});
+		
+		console.log(`[Budget] Project budget updated successfully`);
 	} catch (error) {
 		console.error('Error updating project budget:', error);
 		throw error;
@@ -132,9 +139,10 @@ export async function updateDepartmentBudget(
 	try {
 		const department = await pb.collection('departments').getOne(departmentId);
 
-		// If manual override is set, use that instead
+		// If manual override is set (and not 0), use that instead
 		if (department.department_manual_budget_override !== null && 
-		    department.department_manual_budget_override !== undefined) {
+		    department.department_manual_budget_override !== undefined &&
+		    department.department_manual_budget_override > 0) {
 			return;
 		}
 
