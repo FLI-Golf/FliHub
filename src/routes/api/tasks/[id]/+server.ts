@@ -1,5 +1,6 @@
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
+import { recalculateBudgetHierarchy } from '$lib/utils/budget-calculator';
 
 export const PATCH: RequestHandler = async ({ request, locals, params }) => {
 	const pb = locals.pb;
@@ -20,6 +21,7 @@ export const PATCH: RequestHandler = async ({ request, locals, params }) => {
 			dueDate: data.dueDate || null,
 			estimatedHours: data.estimatedHours !== undefined ? data.estimatedHours : null,
 			actualHours: data.actualHours !== undefined ? data.actualHours : null,
+			task_budget: data.task_budget !== undefined ? parseFloat(data.task_budget) || 0 : null,
 			notes: data.notes || '',
 			completedDate: data.status === 'completed' ? new Date().toISOString() : null
 		};
@@ -30,6 +32,16 @@ export const PATCH: RequestHandler = async ({ request, locals, params }) => {
 		}
 
 		const task = await pb.collection('tasks').update(params.id, updateData);
+
+		// Recalculate budget hierarchy if task has a project
+		if (task.projectId) {
+			try {
+				await recalculateBudgetHierarchy(pb, task.projectId);
+			} catch (budgetErr) {
+				console.error('Error recalculating budgets:', budgetErr);
+				// Don't fail the task update if budget calculation fails
+			}
+		}
 
 		return json(task, { status: 200 });
 	} catch (error) {
@@ -49,7 +61,22 @@ export const DELETE: RequestHandler = async ({ locals, params }) => {
 	}
 
 	try {
+		// Get task before deleting to know which project to recalculate
+		const task = await pb.collection('tasks').getOne(params.id);
+		const projectId = task.projectId;
+
 		await pb.collection('tasks').delete(params.id);
+
+		// Recalculate budget hierarchy if task had a project
+		if (projectId) {
+			try {
+				await recalculateBudgetHierarchy(pb, projectId);
+			} catch (budgetErr) {
+				console.error('Error recalculating budgets:', budgetErr);
+				// Don't fail the task deletion if budget calculation fails
+			}
+		}
+
 		return json({ success: true }, { status: 200 });
 	} catch (error) {
 		console.error('Error deleting task:', error);

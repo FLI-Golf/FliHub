@@ -15,6 +15,7 @@
 		startDate: '',
 		dueDate: '',
 		estimatedHours: '',
+		task_budget: '',
 		tags: '',
 		notes: '',
 		subTasksChecklist: '',
@@ -54,7 +55,8 @@
 		try {
 			const payload = {
 				...formData,
-				estimatedHours: formData.estimatedHours ? parseFloat(formData.estimatedHours) : undefined
+				estimatedHours: formData.estimatedHours ? parseFloat(formData.estimatedHours) : undefined,
+				task_budget: formData.task_budget ? parseFloat(formData.task_budget) : 0
 			};
 			
 			const response = await fetch('/api/tasks', {
@@ -87,6 +89,7 @@
 			startDate: '',
 			dueDate: '',
 			estimatedHours: '',
+			task_budget: '',
 			tags: '',
 			notes: '',
 			subTasksChecklist: '',
@@ -205,18 +208,33 @@
 				</div>
 			</div>
 
-			<div class="space-y-2">
-				<Label for="estimatedHours" class="text-slate-200">Estimated Hours</Label>
-				<Input
-					id="estimatedHours"
-					type="number"
-					step="0.5"
-					min="0"
-					bind:value={formData.estimatedHours}
-					placeholder="e.g., 2.5"
-					class="bg-slate-800 border-slate-700 text-white placeholder:text-slate-400"
-				/>
-				<p class="text-xs text-slate-400">Estimate time needed to complete this task (e.g., 1.5 for 1.5 hours)</p>
+			<div class="grid grid-cols-2 gap-4">
+				<div class="space-y-2">
+					<Label for="estimatedHours" class="text-slate-200">Estimated Hours</Label>
+					<Input
+						id="estimatedHours"
+						type="number"
+						step="0.5"
+						min="0"
+						bind:value={formData.estimatedHours}
+						placeholder="e.g., 2.5"
+						class="bg-slate-800 border-slate-700 text-white placeholder:text-slate-400"
+					/>
+				</div>
+
+				<div class="space-y-2">
+					<Label for="task_budget" class="text-slate-200">Task Budget *</Label>
+					<Input
+						id="task_budget"
+						type="number"
+						step="0.01"
+						min="0"
+						bind:value={formData.task_budget}
+						placeholder="0.00"
+						required
+						class="bg-slate-800 border-slate-700 text-white placeholder:text-slate-400"
+					/>
+				</div>
 			</div>
 
 			<div class="space-y-2">
