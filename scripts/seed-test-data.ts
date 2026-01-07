@@ -42,23 +42,24 @@ const VENDORS = [
   { name: 'Disc Golf Manufacturers Inc', category: 'Equipment', contact: 'Sales Team', email: 'sales@discgolf.com' }
 ];
 
-// Realistic expense descriptions
+// Realistic expense descriptions with valid categories
 const EXPENSE_TEMPLATES = [
   { desc: 'Monthly marketing campaign services', category: 'Marketing', range: [5000, 15000] },
-  { desc: 'Social media advertising spend', category: 'Marketing', range: [2000, 8000] },
-  { desc: 'PR campaign materials and distribution', category: 'PR', range: [3000, 10000] },
-  { desc: 'Video production services', category: 'Production', range: [10000, 50000] },
-  { desc: 'Office supplies and equipment', category: 'Office', range: [500, 2000] },
-  { desc: 'Software licenses and subscriptions', category: 'Technology', range: [1000, 5000] },
-  { desc: 'Cloud hosting and infrastructure', category: 'Technology', range: [2000, 8000] },
-  { desc: 'Shipping and logistics', category: 'Operations', range: [300, 1500] },
-  { desc: 'Player sponsorship payment', category: 'Player Development', range: [5000, 25000] },
-  { desc: 'Event venue rental', category: 'Events', range: [5000, 20000] },
-  { desc: 'Catering for event', category: 'Events', range: [1000, 5000] },
-  { desc: 'Travel expenses for partnership meetings', category: 'Travel', range: [1000, 5000] },
+  { desc: 'Social media advertising spend', category: 'Advertising', range: [2000, 8000] },
+  { desc: 'PR campaign materials and distribution', category: 'Public relations', range: [3000, 10000] },
+  { desc: 'Video production services', category: 'Production Studio', range: [10000, 50000] },
+  { desc: 'Office supplies and equipment', category: 'Office/San Diego', range: [500, 2000] },
+  { desc: 'Software licenses and subscriptions', category: 'Software', range: [1000, 5000] },
+  { desc: 'Cloud hosting and infrastructure', category: 'Internal Tech Budget', range: [2000, 8000] },
+  { desc: 'Tech development services', category: 'Tech/App Development', range: [5000, 15000] },
+  { desc: 'Player sponsorship payment', category: 'Expenses/MPO (Male)', range: [5000, 25000] },
+  { desc: 'Course materials purchase', category: 'Course Build/Materials', range: [3000, 10000] },
+  { desc: 'Course tools and equipment', category: 'Course Build/Tools', range: [2000, 8000] },
+  { desc: 'Travel airfare for events', category: 'Travel/Airefare', range: [500, 2000] },
+  { desc: 'Hotel accommodations', category: 'Travel/Lodging', range: [1000, 3000] },
   { desc: 'Legal consultation fees', category: 'Legal', range: [2000, 10000] },
-  { desc: 'Insurance premium payment', category: 'Insurance', range: [5000, 15000] },
-  { desc: 'Apparel inventory order', category: 'Merchandise', range: [3000, 10000] }
+  { desc: 'Apparel inventory order', category: 'E-Commerce/Clothing', range: [3000, 10000] },
+  { desc: 'Consultant services', category: 'Consultants', range: [5000, 15000] }
 ];
 
 const STATUSES = ['draft', 'submitted', 'approved', 'paid', 'rejected'];
@@ -137,6 +138,8 @@ async function main() {
     // Get existing data
     const projects = await pb.collection('projects').getFullList();
     const departments = await pb.collection('departments').getFullList();
+    const userProfiles = await pb.collection('user_profiles').getFullList();
+    const adminUser = userProfiles.find(u => u.role === 'admin') || userProfiles[0];
 
     if (projects.length === 0) {
       console.error('❌ No projects found. Run Phase 1 migration first.');
@@ -189,30 +192,32 @@ async function main() {
       const date = getRandomDate(config.dateRange);
 
       const expenseData: any = {
-        expense_description: template.desc,
-        expense_amount: amount,
-        expense_date: date,
-        expense_vendor_id: vendor,
-        expense_project_id: project.id,
-        expense_category: template.category,
-        expense_status: status,
-        expense_notes: `Test expense for ${scenario} scenario`
+        description: template.desc,
+        amount: amount,
+        date: date,
+        vendor: vendor,
+        project: project.id,
+        category: template.category,
+        status: status,
+        notes: `Test expense for ${scenario} scenario`
       };
 
       // Add approval data for approved/paid expenses
       if (status === 'approved' || status === 'paid') {
-        expenseData.expense_approved_by = 'admin';
-        expenseData.expense_approved_date = date;
+        if (adminUser) {
+          expenseData.approvedBy = adminUser.id;
+          expenseData.approvedDate = date;
+        }
       }
 
       // Add payment data for paid expenses
       if (status === 'paid') {
-        expenseData.expense_paid_date = date;
+        expenseData.paidDate = date;
       }
 
       // Add rejection reason for rejected expenses
       if (status === 'rejected') {
-        expenseData.expense_rejection_reason = 'Insufficient documentation provided';
+        expenseData.rejectionReason = 'Insufficient documentation provided';
       }
 
       await pb.collection('expenses').create(expenseData);

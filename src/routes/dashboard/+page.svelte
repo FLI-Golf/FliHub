@@ -34,7 +34,9 @@
 		Building2,
 		XCircle,
 		Calendar,
-		UserCircle
+		UserCircle,
+		Database,
+		RotateCcw
 	} from 'lucide-svelte';
 	
 	let { data }: { data: PageData } = $props();
@@ -131,6 +133,9 @@
 	let showDepartmentsModal = $state(false);
 	let showExpensesModal = $state(false);
 	let showTeamModal = $state(false);
+	let seedingData = $state(false);
+	let restoringData = $state(false);
+	let testDataMessage = $state<string>('');
 	
 	// Filter recent projects by status
 	let filteredRecentProjects = $derived(projectStatusFilter === 'all' 
@@ -161,6 +166,58 @@
 			day: 'numeric',
 			year: 'numeric'
 		});
+	}
+
+	async function seedTestData() {
+		seedingData = true;
+		testDataMessage = '⏳ Creating backup and seeding test data...';
+
+		try {
+			const response = await fetch('/api/test-data/seed', {
+				method: 'POST'
+			});
+
+			const result = await response.json();
+
+			if (result.success) {
+				testDataMessage = '✅ Test data seeded successfully! Refreshing page...';
+				setTimeout(() => {
+					window.location.reload();
+				}, 1500);
+			} else {
+				testDataMessage = `❌ Error: ${result.error || 'Failed to seed data'}`;
+			}
+		} catch (error: any) {
+			testDataMessage = `❌ Error: ${error.message}`;
+		} finally {
+			seedingData = false;
+		}
+	}
+
+	async function restoreTestData() {
+		restoringData = true;
+		testDataMessage = '⏳ Removing test data...';
+
+		try {
+			const response = await fetch('/api/test-data/restore', {
+				method: 'POST'
+			});
+
+			const result = await response.json();
+
+			if (result.success) {
+				testDataMessage = `✅ ${result.message} Refreshing page...`;
+				setTimeout(() => {
+					window.location.reload();
+				}, 1500);
+			} else {
+				testDataMessage = `❌ Error: ${result.error || 'Failed to remove test data'}`;
+			}
+		} catch (error: any) {
+			testDataMessage = `❌ Error: ${error.message}`;
+		} finally {
+			restoringData = false;
+		}
 	}
 	
 	function getCountdown(endDate: string): { text: string; color: string; isOverdue: boolean } {
@@ -497,7 +554,52 @@
 	<!-- Quick Actions -->
 	<div>
 		<h2 class="text-2xl font-bold mb-4">Quick Actions</h2>
+		
+		{#if testDataMessage}
+			<div class="mb-4 p-4 rounded-lg {testDataMessage.includes('✅') ? 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-200' : 'bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-200'}">
+				{testDataMessage}
+			</div>
+		{/if}
+
 		<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+			{#if isAdmin}
+				<Card class="p-6 hover:shadow-lg transition-shadow border-2 border-blue-200 dark:border-blue-800">
+					<div class="flex items-center gap-4 mb-4">
+						<div class="flex size-12 items-center justify-center rounded-xl bg-blue-600 text-white">
+							<Database class="size-6 stroke-[2]" />
+						</div>
+						<h3 class="text-xl font-bold">Seed Test Data</h3>
+					</div>
+					<p class="text-muted-foreground mb-6">Add test vendors and expenses for testing workflows</p>
+					<button 
+						type="button"
+						onclick={seedTestData} 
+						disabled={seedingData || restoringData}
+						class="w-full px-4 py-3 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 active:bg-blue-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors cursor-pointer"
+					>
+						{seedingData ? 'Seeding...' : 'Seed Test Data'}
+					</button>
+				</Card>
+
+				<Card class="p-6 hover:shadow-lg transition-shadow border-2 border-red-200 dark:border-red-800">
+					<div class="flex items-center gap-4 mb-4">
+						<div class="flex size-12 items-center justify-center rounded-xl bg-red-600 text-white">
+							<XCircle class="size-6 stroke-[2]" />
+						</div>
+						<h3 class="text-xl font-bold">Remove Test Data</h3>
+					</div>
+					<p class="text-muted-foreground mb-6">Delete all test vendors and expenses</p>
+					<button 
+						type="button"
+						onclick={restoreTestData} 
+						disabled={seedingData || restoringData}
+						class="w-full px-4 py-3 bg-red-600 text-white rounded-lg font-semibold hover:bg-red-700 active:bg-red-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors cursor-pointer"
+					>
+						{restoringData ? 'Removing...' : 'Remove Test Data'}
+					</button>
+				</Card>
+			{/if}
+			
 			{#if !isAdmin}
 				<Card class="p-6 hover:shadow-lg transition-shadow border-2">
 					<div class="flex items-center gap-4 mb-4">

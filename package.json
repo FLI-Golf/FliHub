@@ -10,7 +10,13 @@
     "check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
     "check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch",
     "migrate": "tsx src/lib/migrations/migrate.ts",
-    "import-data": "tsx src/lib/migrations/import-data.ts"
+    "import-data": "tsx src/lib/migrations/import-data.ts",
+    "test:backup": "tsx scripts/backup-before-seed.ts",
+    "test:seed": "tsx scripts/seed-test-data.ts",
+    "test:seed:quick": "tsx scripts/seed-test-data.ts quick",
+    "test:seed:full": "tsx scripts/seed-test-data.ts full",
+    "test:restore": "tsx scripts/restore-from-seed-backup.ts latest",
+    "test:flow": "npm run test:backup && npm run test:seed:quick"
   },
   "repository": {
     "type": "git",
