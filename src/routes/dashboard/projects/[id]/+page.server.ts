@@ -29,7 +29,7 @@ export const load: PageServerLoad = async ({ locals, params }) => {
 		}
 
 		// Fetch all expenses for this project
-		let expenses = [];
+		let expenses: any[] = [];
 		try {
 			expenses = await pb.collection('expenses').getFullList({
 				filter: `projectId = "${params.id}"`
@@ -39,7 +39,7 @@ export const load: PageServerLoad = async ({ locals, params }) => {
 			console.error('Error fetching expenses:', expenseErr);
 			console.error('Expenses error details:', expenseErr.message);
 			console.warn('⚠️  Expenses collection may not exist or user lacks permission. Continuing without expenses.');
-			// Continue without expenses rather than failing the whole page
+			expenses = []; // Explicitly ensure it's an empty array
 		}
 
 		// Fetch tasks for this project
@@ -53,20 +53,20 @@ export const load: PageServerLoad = async ({ locals, params }) => {
 			console.error('Error fetching tasks:', taskErr);
 		}
 
-		// Calculate expense totals
+		// Calculate expense totals (safely handle empty expenses array)
 		const expenseStats = {
-			total: expenses.reduce((sum, e) => sum + (e.amount || 0), 0),
+			total: Array.isArray(expenses) ? expenses.reduce((sum, e) => sum + (e.amount || 0), 0) : 0,
 			byStatus: {
-				draft: expenses.filter(e => e.status === 'draft').length,
-				submitted: expenses.filter(e => e.status === 'submitted').length,
-				approved: expenses.filter(e => e.status === 'approved').length,
-				rejected: expenses.filter(e => e.status === 'rejected').length,
-				paid: expenses.filter(e => e.status === 'paid').length
+				draft: Array.isArray(expenses) ? expenses.filter(e => e.status === 'draft').length : 0,
+				submitted: Array.isArray(expenses) ? expenses.filter(e => e.status === 'submitted').length : 0,
+				approved: Array.isArray(expenses) ? expenses.filter(e => e.status === 'approved').length : 0,
+				rejected: Array.isArray(expenses) ? expenses.filter(e => e.status === 'rejected').length : 0,
+				paid: Array.isArray(expenses) ? expenses.filter(e => e.status === 'paid').length : 0
 			},
-			byCategory: expenses.reduce((acc, e) => {
+			byCategory: Array.isArray(expenses) ? expenses.reduce((acc, e) => {
 				acc[e.category] = (acc[e.category] || 0) + e.amount;
 				return acc;
-			}, {} as Record<string, number>)
+			}, {} as Record<string, number>) : {}
 		};
 
 		// Fetch all vendors for selection
