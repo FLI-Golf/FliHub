@@ -58,10 +58,10 @@
 				body: JSON.stringify({
 					...formData,
 					project_budget: formData.project_budget ? parseFloat(formData.project_budget) : undefined,
-					project_forecasted_expenses: formData.project_forecasted_expenses ? parseFloat(formData.project_forecasted_expenses) : undefined
-				project_budget_buffer: formData.project_budget_buffer ? parseFloat(formData.project_budget_buffer) : undefined,
-				project_budget_cap: formData.project_budget_cap ? parseFloat(formData.project_budget_cap) : undefined,
-				project_manual_budget_override: formData.project_manual_budget_override ? parseFloat(formData.project_manual_budget_override) : undefined
+					project_forecasted_expenses: formData.project_forecasted_expenses ? parseFloat(formData.project_forecasted_expenses) : undefined,
+					project_budget_buffer: formData.project_budget_buffer ? parseFloat(formData.project_budget_buffer) : undefined,
+					project_budget_cap: formData.project_budget_cap ? parseFloat(formData.project_budget_cap) : undefined,
+					project_manual_budget_override: formData.project_manual_budget_override ? parseFloat(formData.project_manual_budget_override) : undefined
 				})
 			});
 
