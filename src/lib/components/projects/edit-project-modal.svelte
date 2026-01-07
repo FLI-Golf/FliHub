@@ -4,6 +4,7 @@
 	import { Input } from '$lib/components/ui/input';
 	import { Label } from '$lib/components/ui/label';
 	import { Edit, Save, X } from 'lucide-svelte';
+	import { invalidateAll } from '$app/navigation';
 
 	let { open = $bindable(false), project } = $props();
 
@@ -15,8 +16,12 @@
 		status: project.status || 'draft',
 		startDate: project.startDate ? project.startDate.split('T')[0] : '',
 		endDate: project.endDate ? project.endDate.split('T')[0] : '',
-		budget: project.budget?.toString() || '',
-		forecastedExpenses: project.forecastedExpenses?.toString() || '',
+		project_budget_mode: project.project_budget_mode || 'auto',
+		project_budget: project.project_budget?.toString() || '',
+		project_forecasted_expenses: project.project_forecasted_expenses?.toString() || '',
+		project_budget_buffer: project.project_budget_buffer?.toString() || '',
+		project_budget_cap: project.project_budget_cap?.toString() || '',
+		project_manual_budget_override: project.project_manual_budget_override?.toString() || '',
 		fiscalYear: project.fiscalYear || '',
 		notes: project.notes || ''
 	});
@@ -52,8 +57,11 @@
 				},
 				body: JSON.stringify({
 					...formData,
-					budget: formData.budget ? parseFloat(formData.budget) : undefined,
-					forecastedExpenses: formData.forecastedExpenses ? parseFloat(formData.forecastedExpenses) : undefined
+					project_budget: formData.project_budget ? parseFloat(formData.project_budget) : undefined,
+					project_forecasted_expenses: formData.project_forecasted_expenses ? parseFloat(formData.project_forecasted_expenses) : undefined
+				project_budget_buffer: formData.project_budget_buffer ? parseFloat(formData.project_budget_buffer) : undefined,
+				project_budget_cap: formData.project_budget_cap ? parseFloat(formData.project_budget_cap) : undefined,
+				project_manual_budget_override: formData.project_manual_budget_override ? parseFloat(formData.project_manual_budget_override) : undefined
 				})
 			});
 
@@ -62,9 +70,9 @@
 				throw new Error(data.message || 'Failed to update project');
 			}
 
-			// Close modal and reload page
+			// Close modal and invalidate data
 			open = false;
-			window.location.reload();
+			await invalidateAll();
 		} catch (err) {
 			error = err instanceof Error ? err.message : 'An error occurred';
 		} finally {
@@ -88,8 +96,12 @@
 			status: project.status || 'draft',
 			startDate: project.startDate ? project.startDate.split('T')[0] : '',
 			endDate: project.endDate ? project.endDate.split('T')[0] : '',
-			budget: project.budget?.toString() || '',
-			forecastedExpenses: project.forecastedExpenses?.toString() || '',
+			project_budget_mode: project.project_budget_mode || 'auto',
+			project_budget: project.project_budget?.toString() || '',
+			project_forecasted_expenses: project.project_forecasted_expenses?.toString() || '',
+			project_budget_buffer: project.project_budget_buffer?.toString() || '',
+			project_budget_cap: project.project_budget_cap?.toString() || '',
+			project_manual_budget_override: project.project_manual_budget_override?.toString() || '',
 			fiscalYear: project.fiscalYear || '',
 			notes: project.notes || ''
 		};
@@ -173,25 +185,84 @@
 			<!-- Dates -->
 			<div class="grid grid-cols-2 gap-4">
 				<div class="space-y-2">
-					<Label for="edit-startDate" class="text-slate-200">Start Date</Label>
+					<Label for="edit-startDate" class="text-slate-200">Start Date *</Label>
 					<Input
 						id="edit-startDate"
 						type="date"
 						bind:value={formData.startDate}
+						required
 						class="bg-slate-800 border-slate-700 text-white"
 					/>
 				</div>
 
 				<div class="space-y-2">
-					<Label for="edit-endDate" class="text-slate-200">End Date</Label>
+					<Label for="edit-endDate" class="text-slate-200">End Date *</Label>
 					<Input
 						id="edit-endDate"
 						type="date"
 						bind:value={formData.endDate}
+						required
 						class="bg-slate-800 border-slate-700 text-white"
 					/>
 				</div>
 			</div>
+
+			<!-- Budget Mode -->
+			<div class="space-y-2">
+				<Label for="edit-budget-mode" class="text-slate-200">Budget Mode</Label>
+				<select
+					id="edit-budget-mode"
+					bind:value={formData.project_budget_mode}
+					class="flex h-10 w-full rounded-md border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-500"
+				>
+					<option value="auto">Auto (from tasks)</option>
+					<option value="fixed">Fixed Budget</option>
+					<option value="hybrid">Hybrid (tasks + buffer)</option>
+					<option value="capped">Capped (max limit)</option>
+				</select>
+			</div>
+
+			<!-- Conditional Budget Fields -->
+			{#if formData.project_budget_mode === 'fixed'}
+				<div class="space-y-2">
+					<Label for="edit-fixed-budget" class="text-slate-200">Fixed Budget Amount *</Label>
+					<Input
+						id="edit-fixed-budget"
+						type="number"
+						step="0.01"
+						min="0"
+						bind:value={formData.project_manual_budget_override}
+						placeholder="0.00"
+						class="bg-slate-800 border-slate-700 text-white placeholder:text-slate-400"
+					/>
+				</div>
+			{:else if formData.project_budget_mode === 'hybrid'}
+				<div class="space-y-2">
+					<Label for="edit-buffer" class="text-slate-200">Buffer/Contingency</Label>
+					<Input
+						id="edit-buffer"
+						type="number"
+						step="0.01"
+						min="0"
+						bind:value={formData.project_budget_buffer}
+						placeholder="0.00"
+						class="bg-slate-800 border-slate-700 text-white placeholder:text-slate-400"
+					/>
+				</div>
+			{:else if formData.project_budget_mode === 'capped'}
+				<div class="space-y-2">
+					<Label for="edit-cap" class="text-slate-200">Budget Cap *</Label>
+					<Input
+						id="edit-cap"
+						type="number"
+						step="0.01"
+						min="0"
+						bind:value={formData.project_budget_cap}
+						placeholder="0.00"
+						class="bg-slate-800 border-slate-700 text-white placeholder:text-slate-400"
+					/>
+				</div>
+			{/if}
 
 			<!-- Budget and Forecasted -->
 			<div class="grid grid-cols-2 gap-4">
@@ -202,7 +273,7 @@
 						type="number"
 						step="0.01"
 						min="0"
-						bind:value={formData.budget}
+						bind:value={formData.project_budget}
 						placeholder="0.00"
 						class="bg-slate-800 border-slate-700 text-white placeholder:text-slate-400"
 					/>
@@ -215,7 +286,7 @@
 						type="number"
 						step="0.01"
 						min="0"
-						bind:value={formData.forecastedExpenses}
+						bind:value={formData.project_forecasted_expenses}
 						placeholder="0.00"
 						class="bg-slate-800 border-slate-700 text-white placeholder:text-slate-400"
 					/>

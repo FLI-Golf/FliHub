@@ -25,6 +25,8 @@ export const TaskSchema = z.object({
 	tags: z.string().optional(),
 	estimatedHours: z.number().nonnegative().optional(),
 	actualHours: z.number().nonnegative().optional(),
+	task_budget: z.number().min(0).optional(),
+	task_actual_cost: z.number().min(0).optional(),
 	notes: z.string().optional(),
 	created: z.date().optional(),
 	updated: z.date().optional()

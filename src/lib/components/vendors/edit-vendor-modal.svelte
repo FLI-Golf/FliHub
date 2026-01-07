@@ -4,6 +4,7 @@
 	import { Input } from '$lib/components/ui/input';
 	import { Label } from '$lib/components/ui/label';
 	import { Edit, Save, X } from 'lucide-svelte';
+	import { invalidateAll } from '$app/navigation';
 
 	let { open = $bindable(false), vendor } = $props();
 
@@ -64,7 +65,7 @@
 
 			// Close modal and reload page
 			open = false;
-			window.location.reload();
+			await invalidateAll();
 		} catch (err) {
 			error = err instanceof Error ? err.message : 'An error occurred';
 		} finally {

@@ -1,0 +1,80 @@
+{
+  "departments_missing_fields": [
+    {
+      "hidden": false,
+      "id": "department_actual_expenses",
+      "max": null,
+      "min": 0,
+      "name": "department_actual_expenses",
+      "onlyInt": false,
+      "presentable": false,
+      "required": false,
+      "system": false,
+      "type": "number"
+    },
+    {
+      "hidden": false,
+      "id": "department_manual_budget_override",
+      "max": null,
+      "min": 0,
+      "name": "department_manual_budget_override",
+      "onlyInt": false,
+      "presentable": false,
+      "required": false,
+      "system": false,
+      "type": "number"
+    }
+  ],
+  "projects_missing_fields": [
+    {
+      "hidden": false,
+      "id": "project_forecasted_expenses",
+      "max": null,
+      "min": 0,
+      "name": "project_forecasted_expenses",
+      "onlyInt": false,
+      "presentable": false,
+      "required": false,
+      "system": false,
+      "type": "number"
+    },
+    {
+      "hidden": false,
+      "id": "project_actual_expenses",
+      "max": null,
+      "min": 0,
+      "name": "project_actual_expenses",
+      "onlyInt": false,
+      "presentable": false,
+      "required": false,
+      "system": false,
+      "type": "number"
+    },
+    {
+      "hidden": false,
+      "id": "project_manual_budget_override",
+      "max": null,
+      "min": 0,
+      "name": "project_manual_budget_override",
+      "onlyInt": false,
+      "presentable": false,
+      "required": false,
+      "system": false,
+      "type": "number"
+    }
+  ],
+  "tasks_missing_fields": [
+    {
+      "hidden": false,
+      "id": "task_actual_cost",
+      "max": null,
+      "min": 0,
+      "name": "task_actual_cost",
+      "onlyInt": false,
+      "presentable": false,
+      "required": false,
+      "system": false,
+      "type": "number"
+    }
+  ]
+}

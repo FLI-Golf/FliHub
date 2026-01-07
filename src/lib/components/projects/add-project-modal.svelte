@@ -28,8 +28,8 @@
 		department: '',
 		startDate: '',
 		endDate: '',
-		budget: '',
-		forecastedExpenses: '',
+		project_budget: '',
+		project_forecasted_expenses: '',
 		fiscalYear: '2026',
 		notes: ''
 	});
@@ -65,8 +65,8 @@
 				},
 				body: JSON.stringify({
 					...formData,
-					budget: formData.budget ? parseFloat(formData.budget) : undefined,
-					forecastedExpenses: formData.forecastedExpenses ? parseFloat(formData.forecastedExpenses) : undefined
+					budget: formData.project_budget ? parseFloat(formData.project_budget) : undefined,
+					forecastedExpenses: formData.project_forecasted_expenses ? parseFloat(formData.project_forecasted_expenses) : undefined
 				})
 			});
 
@@ -97,8 +97,8 @@
 			department: '',
 			startDate: '',
 			endDate: '',
-			budget: '',
-			forecastedExpenses: '',
+			project_budget: '',
+			project_forecasted_expenses: '',
 			fiscalYear: '2026',
 			notes: ''
 		};
@@ -238,7 +238,7 @@
 						type="number"
 						step="0.01"
 						min="0"
-						bind:value={formData.budget}
+						bind:value={formData.project_budget}
 						placeholder="0.00"
 						required
 						class="bg-slate-800 border-slate-700 text-white placeholder:text-slate-400"
@@ -252,7 +252,7 @@
 						type="number"
 						step="0.01"
 						min="0"
-						bind:value={formData.forecastedExpenses}
+						bind:value={formData.project_forecasted_expenses}
 						placeholder="0.00"
 						class="bg-slate-800 border-slate-700 text-white placeholder:text-slate-400"
 					/>

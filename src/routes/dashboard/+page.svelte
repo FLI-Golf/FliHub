@@ -36,6 +36,7 @@
 	let userName = $derived(data.userProfile ? `${data.userProfile.firstName} ${data.userProfile.lastName}` : data.user?.email);
 	
 	let projectStatusTab = $state<string>('in_progress');
+	let departmentStatusTab = $state<string>('active');
 	
 	let metrics = $derived(data.metrics || {
 		projects: { total: 0, draft: 0, planned: 0, active: 0, completed: 0, cancelled: 0 },
@@ -74,7 +75,6 @@
 	let showDepartmentsModal = $state(false);
 	let showExpensesModal = $state(false);
 	let showTeamModal = $state(false);
-	let departmentStatusTab = $state<string>('active');
 	
 	// Filter recent projects by status
 	let filteredRecentProjects = $derived(projectStatusFilter === 'all' 
@@ -354,7 +354,7 @@
 											<StatusBadge status={project.status} />
 										</td>
 										<td class="px-6 py-4 text-sm font-medium">
-											{project.budget ? formatCurrency(project.budget) : '-'}
+											{project.project_budget ? formatCurrency(project.project_budget) : '-'}
 										</td>
 										<td class="px-6 py-4 text-sm text-muted-foreground">
 											{formatDate(project.created)}
@@ -480,10 +480,10 @@
 									</div>
 								{/if}
 								
-								{#if project.budget}
+								{#if project.project_budget}
 									<div class="flex items-center gap-2 text-slate-300">
 										<DollarSign class="size-4" />
-										<span>Budget: {formatCurrency(project.budget)}</span>
+										<span>Budget: {formatCurrency(project.project_budget)}</span>
 									</div>
 								{/if}
 							</div>
@@ -546,10 +546,10 @@
 							<h4 class="font-semibold text-white mb-3">{department.name}</h4>
 							
 							<div class="space-y-2 text-sm">
-								{#if department.annualBudget}
+								{#if department.department_annual_budget}
 									<div class="flex items-center gap-2 text-slate-300">
 										<DollarSign class="size-4" />
-										<span>Annual Budget: {formatCurrency(department.annualBudget)}</span>
+										<span>Annual Budget: {formatCurrency(department.department_annual_budget)}</span>
 									</div>
 								{/if}
 								

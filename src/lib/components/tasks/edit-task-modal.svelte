@@ -15,6 +15,7 @@
 		startDate: '',
 		dueDate: '',
 		estimatedHours: '',
+		task_budget: '',
 		actualHours: '',
 		notes: '',
 		subTasksChecklist: ''
@@ -51,6 +52,7 @@
 			formData.startDate = formatDateForInput(task.startDate);
 			formData.dueDate = formatDateForInput(task.dueDate);
 			formData.estimatedHours = task.estimatedHours?.toString() || '';
+			formData.task_budget = task.task_budget?.toString() || '';
 			formData.actualHours = task.actualHours?.toString() || '';
 			formData.notes = task.notes || '';
 			
@@ -104,6 +106,7 @@
 				body: JSON.stringify({
 					...formData,
 					estimatedHours: formData.estimatedHours ? parseFloat(formData.estimatedHours) : undefined,
+					task_budget: formData.task_budget ? parseFloat(formData.task_budget) : 0,
 					actualHours: formData.actualHours ? parseFloat(formData.actualHours) : undefined
 				})
 			});
@@ -288,6 +291,20 @@
 						class="bg-slate-800 border-slate-700 text-white placeholder:text-slate-400"
 					/>
 				</div>
+			</div>
+
+			<div class="space-y-2">
+				<Label for="edit-task_budget" class="text-slate-200">Task Budget *</Label>
+				<Input
+					id="edit-task_budget"
+					type="number"
+					step="0.01"
+					min="0"
+					bind:value={formData.task_budget}
+					placeholder="0.00"
+					required
+					class="bg-slate-800 border-slate-700 text-white placeholder:text-slate-400"
+				/>
 			</div>
 
 			<div class="space-y-2">
