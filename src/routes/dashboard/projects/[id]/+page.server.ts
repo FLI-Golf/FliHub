@@ -79,6 +79,12 @@ export const load: PageServerLoad = async ({ locals, params }) => {
 			console.error('Error fetching vendors:', vendorErr);
 		}
 
+		console.log('✅ Successfully loaded all project data');
+		console.log('Project:', project.name);
+		console.log('Expenses count:', expenses.length);
+		console.log('Tasks count:', tasks.length);
+		console.log('Vendors count:', allVendors.length);
+		
 		return {
 			project,
 			expenses,
