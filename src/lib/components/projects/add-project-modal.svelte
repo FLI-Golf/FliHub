@@ -28,8 +28,8 @@
 		department: '',
 		startDate: '',
 		endDate: '',
-		budget: '',
-		forecastedExpenses: '',
+		project_budget: '',
+		project_forecasted_expenses: '',
 		fiscalYear: '2026',
 		notes: ''
 	});
@@ -97,8 +97,8 @@
 			department: '',
 			startDate: '',
 			endDate: '',
-			budget: '',
-			forecastedExpenses: '',
+			project_budget: '',
+			project_forecasted_expenses: '',
 			fiscalYear: '2026',
 			notes: ''
 		};

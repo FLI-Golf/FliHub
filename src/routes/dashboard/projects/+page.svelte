@@ -62,8 +62,8 @@
 	}));
 	
 	// Calculate filtered totals
-	let filteredBudget = $derived(filteredProjects.reduce((sum, p) => sum + (p.budget || 0), 0));
-	let filteredActual = $derived(filteredProjects.reduce((sum, p) => sum + (p.actualExpenses || 0), 0));
+	let filteredBudget = $derived(filteredProjects.reduce((sum, p) => sum + (p.project_budget || 0), 0));
+	let filteredActual = $derived(filteredProjects.reduce((sum, p) => sum + (p.project_actual_expenses || 0), 0));
 	
 	// Build status tabs
 	let statusTabs = $derived([
@@ -103,8 +103,8 @@
 	}
 	
 	function getBudgetPercentage(project: any): number {
-		if (!project.budget || !project.actualExpenses) return 0;
-		return Math.min((project.actualExpenses / project.budget) * 100, 100);
+		if (!project.project_budget || !project.project_actual_expenses) return 0;
+		return Math.min((project.project_actual_expenses / project.project_budget) * 100, 100);
 	}
 	
 	function getBudgetVariant(percentage: number): 'success' | 'warning' | 'danger' {
@@ -349,17 +349,17 @@
 										<StatusBadge status={project.status} />
 									</td>
 									<td class="px-6 py-4 text-sm font-medium">
-										{project.budget ? formatCurrency(project.budget) : '-'}
+										{project.project_budget ? formatCurrency(project.project_budget) : '-'}
 									</td>
 									<td class="px-6 py-4 text-sm font-medium">
-										{project.actualExpenses ? formatCurrency(project.actualExpenses) : '-'}
+										{project.project_actual_expenses ? formatCurrency(project.project_actual_expenses) : '-'}
 									</td>
 									<td class="px-6 py-4">
-										{#if project.budget && project.actualExpenses}
+										{#if project.project_budget && project.project_actual_expenses}
 											<div class="w-32">
 												<ProgressBar
-													value={project.actualExpenses}
-													max={project.budget}
+													value={project.project_actual_expenses}
+													max={project.project_budget}
 													showPercentage={false}
 													variant={getBudgetVariant(getBudgetPercentage(project))}
 													size="sm"
