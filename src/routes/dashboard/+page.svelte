@@ -7,6 +7,14 @@
 	import ProgressBar from '$lib/components/metrics/progress-bar.svelte';
 	import StatusBadge from '$lib/components/metrics/status-badge.svelte';
 	import * as Sheet from '$lib/components/ui/sheet/index.js';
+	import BudgetDonutChart from '$lib/components/charts/BudgetDonutChart.svelte';
+	import ExpenseBarChart from '$lib/components/charts/ExpenseBarChart.svelte';
+	import ProjectStatusChart from '$lib/components/charts/ProjectStatusChart.svelte';
+	import DepartmentBudgetChart from '$lib/components/charts/DepartmentBudgetChart.svelte';
+	import BurnRateChart from '$lib/components/charts/BurnRateChart.svelte';
+	import FinancialHealthCard from '$lib/components/charts/FinancialHealthCard.svelte';
+	import PhaseFilter from '$lib/components/filters/PhaseFilter.svelte';
+	import DepartmentBreakdownTable from '$lib/components/charts/DepartmentBreakdownTable.svelte';
 	import { 
 		Users, 
 		ListTodo, 
@@ -43,10 +51,58 @@
 		projectsByStatus: { draft: [], planned: [], in_progress: [], completed: [], cancelled: [] },
 		departments: { total: 0, active: 0, inactive: 0 },
 		departmentsByStatus: { active: [], inactive: [] },
+		departmentBudgets: [],
 		expenses: { total: 0, totalAmount: 0, approvedAmount: 0, draft: 0, submitted: 0, approved: 0, paid: 0 },
 		budget: { total: 0, forecasted: 0, actual: 0, remaining: 0 },
-		managers: { total: 0 }
+		managers: { total: 0 },
+		phases: {
+			phase1: { budget: 0, actual: 0, forecasted: 0, projectCount: 0 },
+			phase2: { budget: 0, actual: 0, forecasted: 0, projectCount: 0 },
+			phase3: { budget: 0, actual: 0, forecasted: 0, projectCount: 0 }
+		}
 	});
+	
+	// Phase filter state
+	let selectedPhase = $state<string>('all');
+	
+	// Calculate phase-filtered metrics
+	let phaseFilteredBudget = $derived.by(() => {
+		if (selectedPhase === 'all') {
+			return {
+				total: metrics.budget.total,
+				actual: metrics.budget.actual,
+				forecasted: metrics.budget.forecasted
+			};
+		}
+		const phase = metrics.phases[selectedPhase as keyof typeof metrics.phases];
+		return {
+			total: phase?.budget || 0,
+			actual: phase?.actual || 0,
+			forecasted: phase?.forecasted || 0
+		};
+	});
+	
+	// Filter departments by phase
+	let phaseFilteredDepartments = $derived.by(() => {
+		if (selectedPhase === 'all') {
+			return metrics.departmentBudgets;
+		}
+		return metrics.departmentBudgets.map(dept => {
+			const phase = dept.phases?.[selectedPhase as keyof typeof dept.phases];
+			return {
+				...dept,
+				actual: phase?.actual || 0,
+				forecasted: phase?.forecasted || 0,
+				projectCount: phase?.projectCount || 0
+			};
+		}).filter(d => d.actual > 0 || d.forecasted > 0 || d.projectCount > 0);
+	});
+	
+	// Calculate pending expenses (draft + submitted)
+	let pendingExpenses = $derived(
+		(metrics.expenses.draft + metrics.expenses.submitted) * 
+		(metrics.expenses.totalAmount / Math.max(metrics.expenses.total, 1))
+	);
 	let recentProjects = $derived(data.recentProjects || []);
 	
 	// Get projects for selected tab
@@ -215,38 +271,131 @@
 		</div>
 	</div>
 
-	<!-- Budget Overview -->
+	<!-- Phase Filter -->
 	<div>
-		<h2 class="text-2xl font-bold mb-4">Budget Overview</h2>
+		<PhaseFilter 
+			activePhase={selectedPhase}
+			onPhaseChange={(phase) => selectedPhase = phase}
+		/>
+	</div>
+
+	<!-- Investor Overview -->
+	<div>
+		<h2 class="text-2xl font-bold mb-4">
+			Financial Overview
+			{#if selectedPhase !== 'all'}
+				<span class="text-lg font-normal text-muted-foreground">
+					- {selectedPhase === 'phase1' ? 'Phase 1' : selectedPhase === 'phase2' ? 'Phase 2' : 'Phase 3'}
+				</span>
+			{/if}
+		</h2>
 		<div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+			<!-- Financial Health Card -->
+			<FinancialHealthCard 
+				totalBudget={phaseFilteredBudget.total}
+				actualSpent={phaseFilteredBudget.actual}
+				forecasted={phaseFilteredBudget.forecasted}
+				approvedExpenses={metrics.expenses.approvedAmount}
+				pendingExpenses={pendingExpenses}
+			/>
+
+			<!-- Burn Rate Analysis -->
+			<Card class="p-6">
+				<div class="flex items-center justify-between mb-4">
+					<h3 class="text-lg font-semibold">Budget vs Spending</h3>
+					<TrendingUp class="size-5 text-muted-foreground" />
+				</div>
+				<BurnRateChart 
+					totalBudget={phaseFilteredBudget.total}
+					actualSpent={phaseFilteredBudget.actual}
+					forecasted={phaseFilteredBudget.forecasted}
+				/>
+			</Card>
+		</div>
+	</div>
+
+	<!-- Department Budget Allocation Chart -->
+	{#if phaseFilteredDepartments.length > 0}
+		<div>
+			<h2 class="text-2xl font-bold mb-4">
+				Budget Allocation by Department
+				{#if selectedPhase !== 'all'}
+					<span class="text-lg font-normal text-muted-foreground">
+						- {selectedPhase === 'phase1' ? 'Phase 1' : selectedPhase === 'phase2' ? 'Phase 2' : 'Phase 3'}
+					</span>
+				{/if}
+			</h2>
+			<Card class="p-6">
+				<div class="flex items-center justify-between mb-6">
+					<div>
+						<h3 class="text-lg font-semibold">Where Your Investment Goes</h3>
+						<p class="text-sm text-muted-foreground mt-1">
+							{selectedPhase === 'all' 
+								? 'Budget allocation and spending across all departments' 
+								: `Spending breakdown for ${selectedPhase === 'phase1' ? 'Phase 1 (Jan-Sep 2026)' : selectedPhase === 'phase2' ? 'Phase 2 (Oct 2026-Mar 2027)' : 'Phase 3 (Apr-Dec 2027)'}`
+							}
+						</p>
+					</div>
+					<Building2 class="size-5 text-muted-foreground" />
+				</div>
+				<DepartmentBudgetChart departments={phaseFilteredDepartments} />
+			</Card>
+		</div>
+	{/if}
+
+	<!-- Department Breakdown Table -->
+	<div>
+		<h2 class="text-2xl font-bold mb-4">
+			Department Financial Breakdown
+			{#if selectedPhase !== 'all'}
+				<span class="text-lg font-normal text-muted-foreground">
+					- {selectedPhase === 'phase1' ? 'Phase 1' : selectedPhase === 'phase2' ? 'Phase 2' : 'Phase 3'}
+				</span>
+			{/if}
+		</h2>
+		<DepartmentBreakdownTable 
+			departments={phaseFilteredDepartments}
+			phase={selectedPhase}
+		/>
+	</div>
+
+	<!-- Project & Expense Analytics -->
+	<div>
+		<h2 class="text-2xl font-bold mb-4">Project & Expense Analytics</h2>
+		<div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+			<Card class="p-6">
+				<div class="flex items-center justify-between mb-4">
+					<h3 class="text-lg font-semibold">Project Status</h3>
+					<FolderKanban class="size-5 text-muted-foreground" />
+				</div>
+				<ProjectStatusChart 
+					draft={metrics.projects.draft}
+					planned={metrics.projects.planned}
+					active={metrics.projects.active}
+					completed={metrics.projects.completed}
+					cancelled={metrics.projects.cancelled}
+				/>
+			</Card>
+
 			<Card class="p-6">
 				<div class="flex items-center justify-between mb-4">
 					<h3 class="text-lg font-semibold">Budget Utilization</h3>
 					<DollarSign class="size-5 text-muted-foreground" />
 				</div>
-				<div class="space-y-4">
-					<div>
-						<div class="flex justify-between text-sm mb-2">
-							<span class="text-muted-foreground">Total Budget</span>
-							<span class="font-semibold">{formatCurrency(metrics.budget.total)}</span>
-						</div>
-						<div class="flex justify-between text-sm mb-2">
-							<span class="text-muted-foreground">Actual Spent</span>
-							<span class="font-semibold">{formatCurrency(metrics.budget.actual)}</span>
-						</div>
-						<div class="flex justify-between text-sm mb-2">
-							<span class="text-muted-foreground">Remaining</span>
-							<span class="font-semibold text-green-600 dark:text-green-400">
-								{formatCurrency(metrics.budget.remaining)}
-							</span>
-						</div>
+				<BudgetDonutChart 
+					actual={metrics.budget.actual}
+					remaining={metrics.budget.remaining}
+					total={metrics.budget.total}
+				/>
+				<div class="mt-6 pt-4 border-t space-y-2">
+					<div class="flex justify-between text-sm">
+						<span class="text-muted-foreground">Total Budget</span>
+						<span class="font-semibold">{formatCurrency(metrics.budget.total)}</span>
 					</div>
-					<ProgressBar
-						value={metrics.budget.actual}
-						max={metrics.budget.total}
-						label="Budget Used"
-						size="lg"
-					/>
+					<div class="flex justify-between text-sm">
+						<span class="text-muted-foreground">Forecasted</span>
+						<span class="font-semibold">{formatCurrency(metrics.budget.forecasted)}</span>
+					</div>
 				</div>
 			</Card>
 
@@ -255,36 +404,12 @@
 					<h3 class="text-lg font-semibold">Expense Status</h3>
 					<Receipt class="size-5 text-muted-foreground" />
 				</div>
-				<div class="space-y-3">
-					<div class="flex items-center justify-between">
-						<div class="flex items-center gap-2">
-							<Clock class="size-4 text-slate-500" />
-							<span class="text-sm">Draft</span>
-						</div>
-						<span class="font-semibold">{metrics.expenses.draft}</span>
-					</div>
-					<div class="flex items-center justify-between">
-						<div class="flex items-center gap-2">
-							<AlertCircle class="size-4 text-blue-500" />
-							<span class="text-sm">Submitted</span>
-						</div>
-						<span class="font-semibold">{metrics.expenses.submitted}</span>
-					</div>
-					<div class="flex items-center justify-between">
-						<div class="flex items-center gap-2">
-							<CheckCircle2 class="size-4 text-green-500" />
-							<span class="text-sm">Approved</span>
-						</div>
-						<span class="font-semibold">{metrics.expenses.approved}</span>
-					</div>
-					<div class="flex items-center justify-between">
-						<div class="flex items-center gap-2">
-							<DollarSign class="size-4 text-green-600" />
-							<span class="text-sm">Paid</span>
-						</div>
-						<span class="font-semibold">{metrics.expenses.paid}</span>
-					</div>
-				</div>
+				<ExpenseBarChart 
+					draft={metrics.expenses.draft}
+					submitted={metrics.expenses.submitted}
+					approved={metrics.expenses.approved}
+					paid={metrics.expenses.paid}
+				/>
 			</Card>
 		</div>
 	</div>

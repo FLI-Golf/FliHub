@@ -130,12 +130,116 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 			const fullProjectsResult = await pb.collection('projects').getList(1, 100);
 			projectsWithBudget = fullProjectsResult.items;
 			console.log(`Fetched ${projectsWithBudget.length} full projects`);
-			totalBudget = projectsWithBudget.reduce((sum, proj) => sum + (proj.budget || 0), 0);
+			
+			// Calculate total budget from department annual budgets
+			totalBudget = allDepartments.reduce((sum, dept) => sum + (dept.department_annual_budget || 0), 0);
+			console.log(`✓ Total budget from departments: $${totalBudget}`);
+			
+			// Calculate forecasted and actual from projects
 			totalForecasted = projectsWithBudget.reduce((sum, proj) => sum + (proj.forecastedExpenses || 0), 0);
 			totalActual = projectsWithBudget.reduce((sum, proj) => sum + (proj.actualExpenses || 0), 0);
+			console.log(`✓ Total forecasted: $${totalForecasted}, Total actual: $${totalActual}`);
 		} catch (err: any) {
 			console.error('Failed to fetch full project details:', err.message);
 		}
+
+		// Define phase date ranges
+		const PHASE1_START = new Date('2026-01-01');
+		const PHASE1_END = new Date('2026-09-30');
+		const PHASE2_START = new Date('2026-10-01');
+		const PHASE2_END = new Date('2027-03-31');
+		const PHASE3_START = new Date('2027-04-01');
+		const PHASE3_END = new Date('2027-12-31');
+
+		// Helper function to determine project phase
+		function getProjectPhase(project: any): string {
+			const startDate = project.startDate ? new Date(project.startDate) : null;
+			const name = project.name || '';
+			
+			// Check name prefix first
+			if (name.match(/^P1[\s-]/i)) return 'phase1';
+			if (name.match(/^P2[\s-]/i)) return 'phase2';
+			if (name.match(/^P3[\s-]/i)) return 'phase3';
+			
+			// Fall back to date range
+			if (startDate) {
+				if (startDate >= PHASE1_START && startDate <= PHASE1_END) return 'phase1';
+				if (startDate >= PHASE2_START && startDate <= PHASE2_END) return 'phase2';
+				if (startDate >= PHASE3_START && startDate <= PHASE3_END) return 'phase3';
+			}
+			
+			return 'phase1'; // Default to phase 1
+		}
+
+		// Organize projects by phase
+		const projectsByPhase = {
+			phase1: projectsWithBudget.filter(p => getProjectPhase(p) === 'phase1'),
+			phase2: projectsWithBudget.filter(p => getProjectPhase(p) === 'phase2'),
+			phase3: projectsWithBudget.filter(p => getProjectPhase(p) === 'phase3')
+		};
+
+		// Calculate department budget allocations with phase breakdown
+		console.log('Calculating department budget allocations...');
+		const departmentBudgets = allDepartments.map(dept => {
+			const deptProjects = projectsWithBudget.filter(p => p.departmentId === dept.id);
+			const budget = dept.department_annual_budget || 0;
+			const actual = deptProjects.reduce((sum, p) => sum + (p.actualExpenses || 0), 0);
+			const forecasted = deptProjects.reduce((sum, p) => sum + (p.forecastedExpenses || 0), 0);
+			
+			// Calculate by phase
+			const phase1Projects = deptProjects.filter(p => getProjectPhase(p) === 'phase1');
+			const phase2Projects = deptProjects.filter(p => getProjectPhase(p) === 'phase2');
+			const phase3Projects = deptProjects.filter(p => getProjectPhase(p) === 'phase3');
+			
+			return {
+				id: dept.id,
+				name: dept.name,
+				budget,
+				actual,
+				forecasted,
+				projectCount: deptProjects.length,
+				phases: {
+					phase1: {
+						actual: phase1Projects.reduce((sum, p) => sum + (p.actualExpenses || 0), 0),
+						forecasted: phase1Projects.reduce((sum, p) => sum + (p.forecastedExpenses || 0), 0),
+						projectCount: phase1Projects.length
+					},
+					phase2: {
+						actual: phase2Projects.reduce((sum, p) => sum + (p.actualExpenses || 0), 0),
+						forecasted: phase2Projects.reduce((sum, p) => sum + (p.forecastedExpenses || 0), 0),
+						projectCount: phase2Projects.length
+					},
+					phase3: {
+						actual: phase3Projects.reduce((sum, p) => sum + (p.actualExpenses || 0), 0),
+						forecasted: phase3Projects.reduce((sum, p) => sum + (p.forecastedExpenses || 0), 0),
+						projectCount: phase3Projects.length
+					}
+				}
+			};
+		}).filter(d => d.budget > 0 || d.actual > 0);
+		console.log(`✓ Department budgets calculated: ${departmentBudgets.length} departments with budgets`);
+
+		// Calculate phase-specific metrics
+		const phaseMetrics = {
+			phase1: {
+				budget: totalBudget / 3, // Distribute budget evenly across phases
+				actual: projectsByPhase.phase1.reduce((sum, p) => sum + (p.actualExpenses || 0), 0),
+				forecasted: projectsByPhase.phase1.reduce((sum, p) => sum + (p.forecastedExpenses || 0), 0),
+				projectCount: projectsByPhase.phase1.length
+			},
+			phase2: {
+				budget: totalBudget / 3,
+				actual: projectsByPhase.phase2.reduce((sum, p) => sum + (p.actualExpenses || 0), 0),
+				forecasted: projectsByPhase.phase2.reduce((sum, p) => sum + (p.forecastedExpenses || 0), 0),
+				projectCount: projectsByPhase.phase2.length
+			},
+			phase3: {
+				budget: totalBudget / 3,
+				actual: projectsByPhase.phase3.reduce((sum, p) => sum + (p.actualExpenses || 0), 0),
+				forecasted: projectsByPhase.phase3.reduce((sum, p) => sum + (p.forecastedExpenses || 0), 0),
+				projectCount: projectsByPhase.phase3.length
+			}
+		};
 
 		const result = {
 			metrics: {
@@ -163,6 +267,7 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 					active: allDepartments.filter(d => d.status === 'active'),
 					inactive: allDepartments.filter(d => d.status === 'inactive')
 				},
+				departmentBudgets,
 				expenses: {
 					total: expenses.totalItems,
 					totalAmount: totalExpenses,
@@ -180,7 +285,8 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 				},
 				managers: {
 					total: userProfiles.totalItems
-				}
+				},
+				phases: phaseMetrics
 			},
 			recentProjects: recentProjects.items
 		};
