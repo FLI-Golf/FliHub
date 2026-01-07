@@ -36,7 +36,8 @@
 		Calendar,
 		UserCircle,
 		Database,
-		RotateCcw
+		RotateCcw,
+		CheckSquare
 	} from 'lucide-svelte';
 	
 	let { data }: { data: PageData } = $props();
@@ -135,6 +136,8 @@
 	let showTeamModal = $state(false);
 	let seedingData = $state(false);
 	let restoringData = $state(false);
+	let seedingApprovals = $state(false);
+	let removingApprovals = $state(false);
 	let testDataMessage = $state<string>('');
 	
 	// Filter recent projects by status
@@ -217,6 +220,58 @@
 			testDataMessage = `❌ Error: ${error.message}`;
 		} finally {
 			restoringData = false;
+		}
+	}
+
+	async function seedApprovals() {
+		seedingApprovals = true;
+		testDataMessage = '⏳ Creating approval workflow test data...';
+
+		try {
+			const response = await fetch('/api/test-data/seed-approvals', {
+				method: 'POST'
+			});
+
+			const result = await response.json();
+
+			if (result.success) {
+				testDataMessage = '✅ Approval workflow test data seeded successfully! Refreshing page...';
+				setTimeout(() => {
+					window.location.reload();
+				}, 1500);
+			} else {
+				testDataMessage = `❌ Error: ${result.error || 'Failed to seed approvals'}`;
+			}
+		} catch (error: any) {
+			testDataMessage = `❌ Error: ${error.message}`;
+		} finally {
+			seedingApprovals = false;
+		}
+	}
+
+	async function removeApprovals() {
+		removingApprovals = true;
+		testDataMessage = '⏳ Removing approval test data...';
+
+		try {
+			const response = await fetch('/api/test-data/remove-approvals', {
+				method: 'POST'
+			});
+
+			const result = await response.json();
+
+			if (result.success) {
+				testDataMessage = `✅ ${result.message} Refreshing page...`;
+				setTimeout(() => {
+					window.location.reload();
+				}, 1500);
+			} else {
+				testDataMessage = `❌ Error: ${result.error || 'Failed to remove approvals'}`;
+			}
+		} catch (error: any) {
+			testDataMessage = `❌ Error: ${error.message}`;
+		} finally {
+			removingApprovals = false;
 		}
 	}
 	
@@ -561,23 +616,23 @@
 			</div>
 		{/if}
 
-		<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+		<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
 			{#if isAdmin}
 				<Card class="p-6 hover:shadow-lg transition-shadow border-2 border-blue-200 dark:border-blue-800">
 					<div class="flex items-center gap-4 mb-4">
 						<div class="flex size-12 items-center justify-center rounded-xl bg-blue-600 text-white">
 							<Database class="size-6 stroke-[2]" />
 						</div>
-						<h3 class="text-xl font-bold">Seed Test Data</h3>
+						<h3 class="text-lg font-bold">Seed Expenses</h3>
 					</div>
-					<p class="text-muted-foreground mb-6">Add test vendors and expenses for testing workflows</p>
+					<p class="text-muted-foreground mb-6 text-sm">Add test vendors and expenses</p>
 					<button 
 						type="button"
 						onclick={seedTestData} 
-						disabled={seedingData || restoringData}
+						disabled={seedingData || restoringData || seedingApprovals || removingApprovals}
 						class="w-full px-4 py-3 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 active:bg-blue-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors cursor-pointer"
 					>
-						{seedingData ? 'Seeding...' : 'Seed Test Data'}
+						{seedingData ? 'Seeding...' : 'Seed Expenses Data'}
 					</button>
 				</Card>
 
@@ -586,16 +641,52 @@
 						<div class="flex size-12 items-center justify-center rounded-xl bg-red-600 text-white">
 							<XCircle class="size-6 stroke-[2]" />
 						</div>
-						<h3 class="text-xl font-bold">Remove Test Data</h3>
+						<h3 class="text-lg font-bold">Remove Expenses</h3>
 					</div>
-					<p class="text-muted-foreground mb-6">Delete all test vendors and expenses</p>
+					<p class="text-muted-foreground mb-6 text-sm">Delete test vendors and expenses</p>
 					<button 
 						type="button"
 						onclick={restoreTestData} 
-						disabled={seedingData || restoringData}
+						disabled={seedingData || restoringData || seedingApprovals || removingApprovals}
 						class="w-full px-4 py-3 bg-red-600 text-white rounded-lg font-semibold hover:bg-red-700 active:bg-red-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors cursor-pointer"
 					>
-						{restoringData ? 'Removing...' : 'Remove Test Data'}
+						{restoringData ? 'Removing...' : 'Remove Expenses Data'}
+					</button>
+				</Card>
+
+				<Card class="p-6 hover:shadow-lg transition-shadow border-2 border-green-200 dark:border-green-800">
+					<div class="flex items-center gap-4 mb-4">
+						<div class="flex size-12 items-center justify-center rounded-xl bg-green-600 text-white">
+							<CheckSquare class="size-6 stroke-[2]" />
+						</div>
+						<h3 class="text-lg font-bold">Seed Approvals</h3>
+					</div>
+					<p class="text-muted-foreground mb-6 text-sm">Add approval workflow test data</p>
+					<button 
+						type="button"
+						onclick={seedApprovals} 
+						disabled={seedingData || restoringData || seedingApprovals || removingApprovals}
+						class="w-full px-4 py-3 bg-green-600 text-white rounded-lg font-semibold hover:bg-green-700 active:bg-green-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors cursor-pointer"
+					>
+						{seedingApprovals ? 'Seeding...' : 'Seed Approval Data'}
+					</button>
+				</Card>
+
+				<Card class="p-6 hover:shadow-lg transition-shadow border-2 border-orange-200 dark:border-orange-800">
+					<div class="flex items-center gap-4 mb-4">
+						<div class="flex size-12 items-center justify-center rounded-xl bg-orange-600 text-white">
+							<RotateCcw class="size-6 stroke-[2]" />
+						</div>
+						<h3 class="text-lg font-bold">Remove Approvals</h3>
+					</div>
+					<p class="text-muted-foreground mb-6 text-sm">Delete approval test data</p>
+					<button 
+						type="button"
+						onclick={removeApprovals} 
+						disabled={seedingData || restoringData || seedingApprovals || removingApprovals}
+						class="w-full px-4 py-3 bg-orange-600 text-white rounded-lg font-semibold hover:bg-orange-700 active:bg-orange-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors cursor-pointer"
+					>
+						{removingApprovals ? 'Removing...' : 'Remove Approval Data'}
 					</button>
 				</Card>
 			{/if}

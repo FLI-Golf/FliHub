@@ -15,6 +15,7 @@
     "test:seed": "tsx scripts/seed-test-data.ts",
     "test:seed:quick": "tsx scripts/seed-test-data.ts quick",
     "test:seed:full": "tsx scripts/seed-test-data.ts full",
+    "test:seed:approvals": "tsx scripts/seed-approval-workflow.ts",
     "test:restore": "tsx scripts/restore-from-seed-backup.ts latest",
     "test:flow": "npm run test:backup && npm run test:seed:quick"
   },
