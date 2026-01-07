@@ -24,8 +24,7 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 			project_forecasted_expenses: data.project_forecasted_expenses || null,
 			project_actual_expenses: 0,
 			fiscalYear: data.fiscalYear || null,
-			notes: data.notes || '',
-			approvalStatus: 'pending'
+			notes: data.notes || ''
 		});
 
 		return json(project, { status: 201 });

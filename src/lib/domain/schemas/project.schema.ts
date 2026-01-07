@@ -20,7 +20,6 @@ export const ProjectSchema = z.object({
 	project_manual_budget_override: z.number().min(0).optional(),
 	notes: z.string().optional(),
 	expenseCategories: z.any().optional(), // JSON field
-	approvalStatus: ApprovalStatusEnum.optional(),
 	fiscalYear: z.string().max(10).optional(),
 	approvedBy: z.string().optional(),
 	department: z.string().optional(),

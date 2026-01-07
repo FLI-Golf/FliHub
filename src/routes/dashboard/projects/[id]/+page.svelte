@@ -282,10 +282,6 @@
 					<span class="text-muted-foreground">Fiscal Year</span>
 					<span class="font-medium">{project.fiscalYear || '-'}</span>
 				</div>
-				<div class="flex justify-between">
-					<span class="text-muted-foreground">Approval Status</span>
-					<span class="font-medium capitalize">{project.approvalStatus?.replace('_', ' ') || '-'}</span>
-				</div>
 				{#if project.expand?.department}
 					<div class="flex justify-between">
 						<span class="text-muted-foreground">Department</span>
