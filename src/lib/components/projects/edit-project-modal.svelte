@@ -16,8 +16,12 @@
 		status: project.status || 'draft',
 		startDate: project.startDate ? project.startDate.split('T')[0] : '',
 		endDate: project.endDate ? project.endDate.split('T')[0] : '',
+		project_budget_mode: project.project_budget_mode || 'auto',
 		project_budget: project.project_budget?.toString() || '',
 		project_forecasted_expenses: project.project_forecasted_expenses?.toString() || '',
+		project_budget_buffer: project.project_budget_buffer?.toString() || '',
+		project_budget_cap: project.project_budget_cap?.toString() || '',
+		project_manual_budget_override: project.project_manual_budget_override?.toString() || '',
 		fiscalYear: project.fiscalYear || '',
 		notes: project.notes || ''
 	});
@@ -55,6 +59,9 @@
 					...formData,
 					project_budget: formData.project_budget ? parseFloat(formData.project_budget) : undefined,
 					project_forecasted_expenses: formData.project_forecasted_expenses ? parseFloat(formData.project_forecasted_expenses) : undefined
+				project_budget_buffer: formData.project_budget_buffer ? parseFloat(formData.project_budget_buffer) : undefined,
+				project_budget_cap: formData.project_budget_cap ? parseFloat(formData.project_budget_cap) : undefined,
+				project_manual_budget_override: formData.project_manual_budget_override ? parseFloat(formData.project_manual_budget_override) : undefined
 				})
 			});
 

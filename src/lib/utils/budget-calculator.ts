@@ -76,28 +76,52 @@ export async function updateProjectBudget(
 ): Promise<void> {
 	try {
 		const project = await pb.collection('projects').getOne(projectId);
-		console.log(`[Budget] Updating project: ${project.name}`);
+		console.log(`[Budget] Updating project: ${project.name} (mode: ${project.project_budget_mode || 'auto'})`);
 
-		// If manual override is set (and not 0), use that instead
-		if (project.project_manual_budget_override !== null && 
-		    project.project_manual_budget_override !== undefined &&
-		    project.project_manual_budget_override > 0) {
-			console.log(`[Budget] Manual override set to ${project.project_manual_budget_override}, skipping calculation`);
-			return;
-		}
-
-		const { budget, actualCost } = await calculateProjectBudget(pb, projectId);
+		const mode = project.project_budget_mode || 'auto';
+		const { budget: tasksBudget, actualCost } = await calculateProjectBudget(pb, projectId);
 		const actualExpenses = await calculateProjectActualExpenses(pb, projectId);
 
-		console.log(`[Budget] Calculated budget: ${budget}, actualCost: ${actualCost}, actualExpenses: ${actualExpenses}`);
+		let finalBudget = 0;
+
+		switch (mode) {
+			case 'auto':
+				// Sum all task budgets
+				finalBudget = tasksBudget;
+				console.log(`[Budget] Auto mode: ${finalBudget} from tasks`);
+				break;
+
+			case 'fixed':
+				// Use manual override
+				finalBudget = project.project_manual_budget_override || 0;
+				console.log(`[Budget] Fixed mode: ${finalBudget} from manual override`);
+				break;
+
+			case 'hybrid':
+				// Tasks + buffer
+				const buffer = project.project_budget_buffer || 0;
+				finalBudget = tasksBudget + buffer;
+				console.log(`[Budget] Hybrid mode: ${tasksBudget} (tasks) + ${buffer} (buffer) = ${finalBudget}`);
+				break;
+
+			case 'capped':
+				// Tasks but capped at maximum
+				const cap = project.project_budget_cap || Infinity;
+				finalBudget = Math.min(tasksBudget, cap);
+				console.log(`[Budget] Capped mode: ${tasksBudget} (tasks) capped at ${cap} = ${finalBudget}`);
+				break;
+
+			default:
+				finalBudget = tasksBudget;
+		}
 
 		await pb.collection('projects').update(projectId, {
-			project_budget: budget,
-			project_forecasted_expenses: budget,
+			project_budget: finalBudget,
+			project_forecasted_expenses: finalBudget,
 			project_actual_expenses: actualExpenses + actualCost
 		});
 		
-		console.log(`[Budget] Project budget updated successfully`);
+		console.log(`[Budget] Project budget updated successfully to ${finalBudget}`);
 	} catch (error) {
 		console.error('Error updating project budget:', error);
 		throw error;
@@ -138,20 +162,42 @@ export async function updateDepartmentBudget(
 ): Promise<void> {
 	try {
 		const department = await pb.collection('departments').getOne(departmentId);
+		console.log(`[Budget] Updating department: ${department.name} (mode: ${department.department_budget_mode || 'auto'})`);
 
-		// If manual override is set (and not 0), use that instead
-		if (department.department_manual_budget_override !== null && 
-		    department.department_manual_budget_override !== undefined &&
-		    department.department_manual_budget_override > 0) {
-			return;
+		const mode = department.department_budget_mode || 'auto';
+		const { budget: projectsBudget, actualExpenses } = await calculateDepartmentBudget(pb, departmentId);
+
+		let finalBudget = 0;
+
+		switch (mode) {
+			case 'auto':
+				// Sum all project budgets
+				finalBudget = projectsBudget;
+				console.log(`[Budget] Auto mode: ${finalBudget} from projects`);
+				break;
+
+			case 'annual_cap':
+				// Use manual override or cap
+				finalBudget = department.department_manual_budget_override || department.department_budget_cap || 0;
+				console.log(`[Budget] Annual cap mode: ${finalBudget}`);
+				break;
+
+			case 'allocated':
+				// Use pre-allocated amount
+				finalBudget = department.department_manual_budget_override || 0;
+				console.log(`[Budget] Allocated mode: ${finalBudget}`);
+				break;
+
+			default:
+				finalBudget = projectsBudget;
 		}
 
-		const { budget, actualExpenses } = await calculateDepartmentBudget(pb, departmentId);
-
 		await pb.collection('departments').update(departmentId, {
-			department_annual_budget: budget,
+			department_annual_budget: finalBudget,
 			department_actual_expenses: actualExpenses
 		});
+
+		console.log(`[Budget] Department budget updated successfully to ${finalBudget}`);
 	} catch (error) {
 		console.error('Error updating department budget:', error);
 		throw error;
