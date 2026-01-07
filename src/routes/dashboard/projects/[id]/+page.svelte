@@ -163,7 +163,7 @@
 				<h1 class="text-3xl font-bold">{project.name}</h1>
 				<StatusBadge status={project.status} />
 				<span class="text-sm px-3 py-1 rounded-full bg-slate-100 dark:bg-slate-800 text-black dark:text-slate-100 capitalize">
-					{project.type.replace('_', ' ')}
+					{project.type?.replace('_', ' ') || project.type || '-'}
 				</span>
 			</div>
 			{#if project.description}
