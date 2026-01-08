@@ -58,7 +58,7 @@
 		expenses: { total: 0, totalAmount: 0, approvedAmount: 0, draft: 0, submitted: 0, approved: 0, paid: 0 },
 		approvals: { total: 0, pending: 0, approved: 0, rejected: 0, revision_requested: 0 },
 		budget: { total: 0, forecasted: 0, actual: 0, remaining: 0 },
-		managers: { total: 0 },
+		people: { total: 0 },
 		phases: {
 			phase1: { budget: 0, actual: 0, forecasted: 0, projectCount: 0 },
 			phase2: { budget: 0, actual: 0, forecasted: 0, projectCount: 0 },
@@ -379,7 +379,7 @@
 			<button onclick={() => showTeamModal = true} class="text-left cursor-pointer">
 				<MetricCard
 					title="Team Members"
-					value={metrics.managers.total}
+					value={metrics.people.total}
 					subtitle="Active team members"
 					icon={Users}
 					class="hover:shadow-xl bg-gradient-to-br from-green-950 to-green-900 border-green-800 hover:scale-[1.02] transition-all duration-200"
@@ -1079,13 +1079,13 @@
 			<div class="space-y-3">
 				<div class="flex justify-between items-center p-4 rounded-lg bg-slate-800 border border-slate-700">
 					<span class="font-medium text-slate-200">Total Team Members</span>
-					<span class="text-2xl font-bold text-white">{metrics.managers.total}</span>
+					<span class="text-2xl font-bold text-white">{metrics.people.total}</span>
 				</div>
 				<p class="text-sm text-slate-300">
 					View and manage all team members, their roles, and permissions.
 				</p>
 			</div>
-			<Button href="/dashboard/managers" class="w-full bg-blue-600 hover:bg-blue-700 text-white">
+			<Button href="/dashboard/people" class="w-full bg-blue-600 hover:bg-blue-700 text-white">
 				Manage Team
 				<ArrowRight class="size-4 ml-2" />
 			</Button>

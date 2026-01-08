@@ -123,10 +123,10 @@
 		<Sheet.Header class="mb-6">
 			<Sheet.Title class="flex items-center gap-2 text-xl text-white">
 				<UserPlus class="size-5" />
-				Add Manager
+				Add Person
 			</Sheet.Title>
 			<Sheet.Description class="text-slate-300">
-				Create a new user account and manager profile
+				Create a new user account and person profile
 			</Sheet.Description>
 		</Sheet.Header>
 
@@ -277,7 +277,7 @@
 					class="flex-1 bg-blue-600 hover:bg-blue-700 text-white"
 				>
 					<Save class="size-4 mr-2" />
-					{isSubmitting ? 'Creating...' : 'Create Manager'}
+					{isSubmitting ? 'Creating...' : 'Create Person'}
 				</Button>
 				
 				<Button

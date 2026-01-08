@@ -23,8 +23,8 @@
 				icon: Building2
 			},
 			{
-				title: 'Managers',
-				url: '/dashboard/managers',
+				title: 'People',
+				url: '/dashboard/people',
 				icon: Users
 			},
 			{
@@ -80,7 +80,7 @@
 		}
 		if (userRole === 'pro' || userRole === 'franchise_owner') {
 			// Pros and franchise owners see limited views
-			return !['Managers', 'Vendors', 'Approvals'].includes(item.title);
+			return !['People', 'Vendors', 'Approvals'].includes(item.title);
 		}
 		// Admin sees everything
 		return true;

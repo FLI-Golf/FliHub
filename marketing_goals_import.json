@@ -1,0 +1,156 @@
+[
+    {
+        "id": "pbc_3428453785",
+        "listRule": "@request.auth.id != \"\"",
+        "viewRule": "@request.auth.id != \"\"",
+        "createRule": "@request.auth.id != \"\"",
+        "updateRule": "@request.auth.id != \"\"",
+        "deleteRule": "@request.auth.id != \"\"",
+        "name": "marketing_goals",
+        "type": "base",
+        "fields": [
+            {
+                "autogeneratePattern": "[a-z0-9]{15}",
+                "hidden": false,
+                "id": "text3208210256",
+                "max": 15,
+                "min": 15,
+                "name": "id",
+                "pattern": "^[a-z0-9]+$",
+                "presentable": false,
+                "primaryKey": true,
+                "required": true,
+                "system": true,
+                "type": "text"
+            },
+            {
+                "autogeneratePattern": "",
+                "hidden": false,
+                "id": "goalName_field",
+                "max": 255,
+                "min": 1,
+                "name": "goalName",
+                "pattern": "",
+                "presentable": false,
+                "primaryKey": false,
+                "required": true,
+                "system": false,
+                "type": "text"
+            },
+            {
+                "convertURLs": false,
+                "hidden": false,
+                "id": "description_field",
+                "maxSize": 0,
+                "name": "description",
+                "presentable": false,
+                "required": false,
+                "system": false,
+                "type": "editor"
+            },
+            {
+                "hidden": false,
+                "id": "category_field",
+                "maxSelect": 1,
+                "name": "category",
+                "presentable": false,
+                "required": true,
+                "system": false,
+                "type": "select",
+                "values": [
+                    "Brand Awareness",
+                    "Lead Generation",
+                    "Customer Acquisition",
+                    "Customer Retention",
+                    "Revenue Growth",
+                    "Market Share",
+                    "Engagement"
+                ]
+            },
+            {
+                "autogeneratePattern": "",
+                "hidden": false,
+                "id": "targetMetric_field",
+                "max": 255,
+                "min": null,
+                "name": "targetMetric",
+                "pattern": "",
+                "presentable": false,
+                "primaryKey": false,
+                "required": false,
+                "system": false,
+                "type": "text"
+            },
+            {
+                "hidden": false,
+                "id": "targetValue_field",
+                "max": null,
+                "min": null,
+                "name": "targetValue",
+                "noDecimal": false,
+                "presentable": false,
+                "required": false,
+                "system": false,
+                "type": "number"
+            },
+            {
+                "hidden": false,
+                "id": "currentValue_field",
+                "max": null,
+                "min": null,
+                "name": "currentValue",
+                "noDecimal": false,
+                "presentable": false,
+                "required": false,
+                "system": false,
+                "type": "number"
+            },
+            {
+                "hidden": false,
+                "id": "deadline_field",
+                "max": "",
+                "min": "",
+                "name": "deadline",
+                "presentable": false,
+                "required": false,
+                "system": false,
+                "type": "date"
+            },
+            {
+                "hidden": false,
+                "id": "status_field",
+                "maxSelect": 1,
+                "name": "status",
+                "presentable": false,
+                "required": true,
+                "system": false,
+                "type": "select",
+                "values": [
+                    "Not Started",
+                    "In Progress",
+                    "On Track",
+                    "At Risk",
+                    "Achieved",
+                    "Missed"
+                ]
+            },
+            {
+                "hidden": false,
+                "id": "priority_field",
+                "maxSelect": 1,
+                "name": "priority",
+                "presentable": false,
+                "required": false,
+                "system": false,
+                "type": "select",
+                "values": [
+                    "High",
+                    "Medium",
+                    "Low"
+                ]
+            }
+        ],
+        "indexes": [],
+        "system": false
+    }
+]

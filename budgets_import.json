@@ -1,0 +1,119 @@
+[
+    {
+        "id": "pbc_1308224162",
+        "listRule": "@request.auth.id != \"\"",
+        "viewRule": "@request.auth.id != \"\"",
+        "createRule": "@request.auth.id != \"\"",
+        "updateRule": "@request.auth.id != \"\"",
+        "deleteRule": "@request.auth.id != \"\"",
+        "name": "budgets",
+        "type": "base",
+        "fields": [
+            {
+                "autogeneratePattern": "[a-z0-9]{15}",
+                "hidden": false,
+                "id": "text3208210256",
+                "max": 15,
+                "min": 15,
+                "name": "id",
+                "pattern": "^[a-z0-9]+$",
+                "presentable": false,
+                "primaryKey": true,
+                "required": true,
+                "system": true,
+                "type": "text"
+            },
+            {
+                "autogeneratePattern": "",
+                "hidden": false,
+                "id": "departmentArea_field",
+                "max": 255,
+                "min": 1,
+                "name": "departmentArea",
+                "pattern": "",
+                "presentable": false,
+                "primaryKey": false,
+                "required": true,
+                "system": false,
+                "type": "text"
+            },
+            {
+                "hidden": false,
+                "id": "fiscalYear_field",
+                "max": 2100,
+                "min": 2020,
+                "name": "fiscalYear",
+                "noDecimal": true,
+                "presentable": false,
+                "required": true,
+                "system": false,
+                "type": "number"
+            },
+            {
+                "hidden": false,
+                "id": "quarter_field",
+                "maxSelect": 1,
+                "name": "quarter",
+                "presentable": false,
+                "required": false,
+                "system": false,
+                "type": "select",
+                "values": [
+                    "Q1",
+                    "Q2",
+                    "Q3",
+                    "Q4"
+                ]
+            },
+            {
+                "hidden": false,
+                "id": "allocatedAmount_field",
+                "max": null,
+                "min": 0,
+                "name": "allocatedAmount",
+                "noDecimal": false,
+                "presentable": false,
+                "required": true,
+                "system": false,
+                "type": "number"
+            },
+            {
+                "hidden": false,
+                "id": "spentAmount_field",
+                "max": null,
+                "min": 0,
+                "name": "spentAmount",
+                "noDecimal": false,
+                "presentable": false,
+                "required": false,
+                "system": false,
+                "type": "number"
+            },
+            {
+                "hidden": false,
+                "id": "remainingAmount_field",
+                "max": null,
+                "min": null,
+                "name": "remainingAmount",
+                "noDecimal": false,
+                "presentable": false,
+                "required": false,
+                "system": false,
+                "type": "number"
+            },
+            {
+                "convertURLs": false,
+                "hidden": false,
+                "id": "notes_field",
+                "maxSize": 0,
+                "name": "notes",
+                "presentable": false,
+                "required": false,
+                "system": false,
+                "type": "editor"
+            }
+        ],
+        "indexes": [],
+        "system": false
+    }
+]

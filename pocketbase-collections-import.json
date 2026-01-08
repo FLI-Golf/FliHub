@@ -1,0 +1,1092 @@
+[
+    {
+        "id": "pbc_3619113213",
+        "name": "brand_positioning",
+        "type": "base",
+        "system": false,
+        "schema": [
+            {
+                "system": false,
+                "id": "field1",
+                "name": "title",
+                "type": "text",
+                "required": true,
+                "presentable": false,
+                "unique": false,
+                "options": {
+                    "min": 1,
+                    "max": 255,
+                    "pattern": ""
+                }
+            },
+            {
+                "system": false,
+                "id": "field2",
+                "name": "description",
+                "type": "editor",
+                "required": false,
+                "presentable": false,
+                "unique": false,
+                "options": {
+                    "convertURLs": false
+                }
+            },
+            {
+                "system": false,
+                "id": "field3",
+                "name": "category",
+                "type": "select",
+                "required": true,
+                "presentable": false,
+                "unique": false,
+                "options": {
+                    "maxSelect": 1,
+                    "values": [
+                        "Mission",
+                        "Vision",
+                        "Values",
+                        "Target Audience",
+                        "Unique Value Proposition",
+                        "Brand Personality",
+                        "Competitive Advantage"
+                    ]
+                }
+            },
+            {
+                "system": false,
+                "id": "field4",
+                "name": "priority",
+                "type": "select",
+                "required": false,
+                "presentable": false,
+                "unique": false,
+                "options": {
+                    "maxSelect": 1,
+                    "values": [
+                        "High",
+                        "Medium",
+                        "Low"
+                    ]
+                }
+            },
+            {
+                "system": false,
+                "id": "field5",
+                "name": "status",
+                "type": "select",
+                "required": true,
+                "presentable": false,
+                "unique": false,
+                "options": {
+                    "maxSelect": 1,
+                    "values": [
+                        "Draft",
+                        "Active",
+                        "Under Review",
+                        "Archived"
+                    ]
+                }
+            }
+        ],
+        "indexes": [],
+        "listRule": "@request.auth.id != \"\"",
+        "viewRule": "@request.auth.id != \"\"",
+        "createRule": "@request.auth.id != \"\"",
+        "updateRule": "@request.auth.id != \"\"",
+        "deleteRule": "@request.auth.id != \"\""
+    },
+    {
+        "id": "pbc_1308224162",
+        "name": "budgets",
+        "type": "base",
+        "system": false,
+        "schema": [
+            {
+                "system": false,
+                "id": "field1",
+                "name": "departmentArea",
+                "type": "text",
+                "required": true,
+                "presentable": false,
+                "unique": false,
+                "options": {
+                    "min": 1,
+                    "max": 255,
+                    "pattern": ""
+                }
+            },
+            {
+                "system": false,
+                "id": "field2",
+                "name": "fiscalYear",
+                "type": "number",
+                "required": true,
+                "presentable": false,
+                "unique": false,
+                "options": {
+                    "min": 2020,
+                    "max": 2100,
+                    "noDecimal": true
+                }
+            },
+            {
+                "system": false,
+                "id": "field3",
+                "name": "quarter",
+                "type": "select",
+                "required": false,
+                "presentable": false,
+                "unique": false,
+                "options": {
+                    "maxSelect": 1,
+                    "values": [
+                        "Q1",
+                        "Q2",
+                        "Q3",
+                        "Q4"
+                    ]
+                }
+            },
+            {
+                "system": false,
+                "id": "field4",
+                "name": "allocatedAmount",
+                "type": "number",
+                "required": true,
+                "presentable": false,
+                "unique": false,
+                "options": {
+                    "min": 0,
+                    "max": null,
+                    "noDecimal": false
+                }
+            },
+            {
+                "system": false,
+                "id": "field5",
+                "name": "spentAmount",
+                "type": "number",
+                "required": false,
+                "presentable": false,
+                "unique": false,
+                "options": {
+                    "min": 0,
+                    "max": null,
+                    "noDecimal": false
+                }
+            },
+            {
+                "system": false,
+                "id": "field6",
+                "name": "remainingAmount",
+                "type": "number",
+                "required": false,
+                "presentable": false,
+                "unique": false,
+                "options": {
+                    "min": null,
+                    "max": null,
+                    "noDecimal": false
+                }
+            },
+            {
+                "system": false,
+                "id": "field7",
+                "name": "notes",
+                "type": "editor",
+                "required": false,
+                "presentable": false,
+                "unique": false,
+                "options": {
+                    "convertURLs": false
+                }
+            }
+        ],
+        "indexes": [],
+        "listRule": "@request.auth.id != \"\"",
+        "viewRule": "@request.auth.id != \"\"",
+        "createRule": "@request.auth.id != \"\"",
+        "updateRule": "@request.auth.id != \"\"",
+        "deleteRule": "@request.auth.id != \"\""
+    },
+    {
+        "id": "pbc_3970320205",
+        "name": "business_objectives",
+        "type": "base",
+        "system": false,
+        "schema": [
+            {
+                "system": false,
+                "id": "field1",
+                "name": "objective",
+                "type": "text",
+                "required": true,
+                "presentable": false,
+                "unique": false,
+                "options": {
+                    "min": 1,
+                    "max": 500,
+                    "pattern": ""
+                }
+            },
+            {
+                "system": false,
+                "id": "field2",
+                "name": "description",
+                "type": "editor",
+                "required": false,
+                "presentable": false,
+                "unique": false,
+                "options": {
+                    "convertURLs": false
+                }
+            },
+            {
+                "system": false,
+                "id": "field3",
+                "name": "category",
+                "type": "select",
+                "required": true,
+                "presentable": false,
+                "unique": false,
+                "options": {
+                    "maxSelect": 1,
+                    "values": [
+                        "Revenue Growth",
+                        "Market Expansion",
+                        "Operational Efficiency",
+                        "Customer Satisfaction",
+                        "Brand Awareness",
+                        "Innovation",
+                        "Sustainability"
+                    ]
+                }
+            },
+            {
+                "system": false,
+                "id": "field4",
+                "name": "targetDate",
+                "type": "date",
+                "required": false,
+                "presentable": false,
+                "unique": false,
+                "options": {
+                    "min": "",
+                    "max": ""
+                }
+            },
+            {
+                "system": false,
+                "id": "field5",
+                "name": "status",
+                "type": "select",
+                "required": true,
+                "presentable": false,
+                "unique": false,
+                "options": {
+                    "maxSelect": 1,
+                    "values": [
+                        "Not Started",
+                        "In Progress",
+                        "On Track",
+                        "At Risk",
+                        "Completed",
+                        "Cancelled"
+                    ]
+                }
+            },
+            {
+                "system": false,
+                "id": "field6",
+                "name": "progress",
+                "type": "number",
+                "required": false,
+                "presentable": false,
+                "unique": false,
+                "options": {
+                    "min": 0,
+                    "max": 100,
+                    "noDecimal": true
+                }
+            },
+            {
+                "system": false,
+                "id": "field7",
+                "name": "keyResults",
+                "type": "editor",
+                "required": false,
+                "presentable": false,
+                "unique": false,
+                "options": {
+                    "convertURLs": false
+                }
+            }
+        ],
+        "indexes": [],
+        "listRule": "@request.auth.id != \"\"",
+        "viewRule": "@request.auth.id != \"\"",
+        "createRule": "@request.auth.id != \"\"",
+        "updateRule": "@request.auth.id != \"\"",
+        "deleteRule": "@request.auth.id != \"\""
+    },
+    {
+        "id": "pbc_2270728936",
+        "name": "campaigns",
+        "type": "base",
+        "system": false,
+        "schema": [
+            {
+                "system": false,
+                "id": "field1",
+                "name": "name",
+                "type": "text",
+                "required": true,
+                "presentable": false,
+                "unique": false,
+                "options": {
+                    "min": 1,
+                    "max": 255,
+                    "pattern": ""
+                }
+            },
+            {
+                "system": false,
+                "id": "field2",
+                "name": "description",
+                "type": "editor",
+                "required": false,
+                "presentable": false,
+                "unique": false,
+                "options": {
+                    "convertURLs": false
+                }
+            },
+            {
+                "system": false,
+                "id": "field3",
+                "name": "type",
+                "type": "select",
+                "required": true,
+                "presentable": false,
+                "unique": false,
+                "options": {
+                    "maxSelect": 1,
+                    "values": [
+                        "Marketing",
+                        "Sales",
+                        "Product Launch",
+                        "Brand Awareness",
+                        "Lead Generation",
+                        "Customer Retention",
+                        "Event"
+                    ]
+                }
+            },
+            {
+                "system": false,
+                "id": "field4",
+                "name": "startDate",
+                "type": "date",
+                "required": false,
+                "presentable": false,
+                "unique": false,
+                "options": {
+                    "min": "",
+                    "max": ""
+                }
+            },
+            {
+                "system": false,
+                "id": "field5",
+                "name": "endDate",
+                "type": "date",
+                "required": false,
+                "presentable": false,
+                "unique": false,
+                "options": {
+                    "min": "",
+                    "max": ""
+                }
+            },
+            {
+                "system": false,
+                "id": "field6",
+                "name": "budget",
+                "type": "number",
+                "required": false,
+                "presentable": false,
+                "unique": false,
+                "options": {
+                    "min": 0,
+                    "max": null,
+                    "noDecimal": false
+                }
+            },
+            {
+                "system": false,
+                "id": "field7",
+                "name": "actualSpend",
+                "type": "number",
+                "required": false,
+                "presentable": false,
+                "unique": false,
+                "options": {
+                    "min": 0,
+                    "max": null,
+                    "noDecimal": false
+                }
+            },
+            {
+                "system": false,
+                "id": "field8",
+                "name": "status",
+                "type": "select",
+                "required": true,
+                "presentable": false,
+                "unique": false,
+                "options": {
+                    "maxSelect": 1,
+                    "values": [
+                        "Planning",
+                        "Active",
+                        "Paused",
+                        "Completed",
+                        "Cancelled"
+                    ]
+                }
+            },
+            {
+                "system": false,
+                "id": "field9",
+                "name": "targetAudience",
+                "type": "text",
+                "required": false,
+                "presentable": false,
+                "unique": false,
+                "options": {
+                    "min": null,
+                    "max": 500,
+                    "pattern": ""
+                }
+            },
+            {
+                "system": false,
+                "id": "field10",
+                "name": "goals",
+                "type": "editor",
+                "required": false,
+                "presentable": false,
+                "unique": false,
+                "options": {
+                    "convertURLs": false
+                }
+            },
+            {
+                "system": false,
+                "id": "field11",
+                "name": "metrics",
+                "type": "editor",
+                "required": false,
+                "presentable": false,
+                "unique": false,
+                "options": {
+                    "convertURLs": false
+                }
+            }
+        ],
+        "indexes": [],
+        "listRule": "@request.auth.id != \"\"",
+        "viewRule": "@request.auth.id != \"\"",
+        "createRule": "@request.auth.id != \"\"",
+        "updateRule": "@request.auth.id != \"\"",
+        "deleteRule": "@request.auth.id != \"\""
+    },
+    {
+        "id": "pbc_1773462427",
+        "name": "continuous_improvements",
+        "type": "base",
+        "system": false,
+        "schema": [
+            {
+                "system": false,
+                "id": "field1",
+                "name": "title",
+                "type": "text",
+                "required": true,
+                "presentable": false,
+                "unique": false,
+                "options": {
+                    "min": 1,
+                    "max": 255,
+                    "pattern": ""
+                }
+            },
+            {
+                "system": false,
+                "id": "field2",
+                "name": "description",
+                "type": "editor",
+                "required": false,
+                "presentable": false,
+                "unique": false,
+                "options": {
+                    "convertURLs": false
+                }
+            },
+            {
+                "system": false,
+                "id": "field3",
+                "name": "category",
+                "type": "select",
+                "required": true,
+                "presentable": false,
+                "unique": false,
+                "options": {
+                    "maxSelect": 1,
+                    "values": [
+                        "Process Improvement",
+                        "Quality Enhancement",
+                        "Cost Reduction",
+                        "Time Efficiency",
+                        "Customer Experience",
+                        "Technology Upgrade",
+                        "Training & Development"
+                    ]
+                }
+            },
+            {
+                "system": false,
+                "id": "field4",
+                "name": "currentState",
+                "type": "editor",
+                "required": false,
+                "presentable": false,
+                "unique": false,
+                "options": {
+                    "convertURLs": false
+                }
+            },
+            {
+                "system": false,
+                "id": "field5",
+                "name": "proposedSolution",
+                "type": "editor",
+                "required": false,
+                "presentable": false,
+                "unique": false,
+                "options": {
+                    "convertURLs": false
+                }
+            },
+            {
+                "system": false,
+                "id": "field6",
+                "name": "expectedBenefit",
+                "type": "editor",
+                "required": false,
+                "presentable": false,
+                "unique": false,
+                "options": {
+                    "convertURLs": false
+                }
+            },
+            {
+                "system": false,
+                "id": "field7",
+                "name": "status",
+                "type": "select",
+                "required": true,
+                "presentable": false,
+                "unique": false,
+                "options": {
+                    "maxSelect": 1,
+                    "values": [
+                        "Proposed",
+                        "Under Review",
+                        "Approved",
+                        "In Progress",
+                        "Implemented",
+                        "Rejected"
+                    ]
+                }
+            },
+            {
+                "system": false,
+                "id": "field8",
+                "name": "implementationDate",
+                "type": "date",
+                "required": false,
+                "presentable": false,
+                "unique": false,
+                "options": {
+                    "min": "",
+                    "max": ""
+                }
+            },
+            {
+                "system": false,
+                "id": "field9",
+                "name": "priority",
+                "type": "select",
+                "required": false,
+                "presentable": false,
+                "unique": false,
+                "options": {
+                    "maxSelect": 1,
+                    "values": [
+                        "High",
+                        "Medium",
+                        "Low"
+                    ]
+                }
+            }
+        ],
+        "indexes": [],
+        "listRule": "@request.auth.id != \"\"",
+        "viewRule": "@request.auth.id != \"\"",
+        "createRule": "@request.auth.id != \"\"",
+        "updateRule": "@request.auth.id != \"\"",
+        "deleteRule": "@request.auth.id != \"\""
+    },
+    {
+        "id": "pbc_3394541438",
+        "name": "digital_marketing_strategies",
+        "type": "base",
+        "system": false,
+        "schema": [
+            {
+                "system": false,
+                "id": "field1",
+                "name": "strategyName",
+                "type": "text",
+                "required": true,
+                "presentable": false,
+                "unique": false,
+                "options": {
+                    "min": 1,
+                    "max": 255,
+                    "pattern": ""
+                }
+            },
+            {
+                "system": false,
+                "id": "field2",
+                "name": "description",
+                "type": "editor",
+                "required": false,
+                "presentable": false,
+                "unique": false,
+                "options": {
+                    "convertURLs": false
+                }
+            },
+            {
+                "system": false,
+                "id": "field3",
+                "name": "channel",
+                "type": "select",
+                "required": true,
+                "presentable": false,
+                "unique": false,
+                "options": {
+                    "maxSelect": 1,
+                    "values": [
+                        "Social Media",
+                        "Email Marketing",
+                        "Content Marketing",
+                        "SEO",
+                        "PPC",
+                        "Influencer Marketing",
+                        "Video Marketing",
+                        "Affiliate Marketing"
+                    ]
+                }
+            },
+            {
+                "system": false,
+                "id": "field4",
+                "name": "targetAudience",
+                "type": "text",
+                "required": false,
+                "presentable": false,
+                "unique": false,
+                "options": {
+                    "min": null,
+                    "max": 500,
+                    "pattern": ""
+                }
+            },
+            {
+                "system": false,
+                "id": "field5",
+                "name": "objectives",
+                "type": "editor",
+                "required": false,
+                "presentable": false,
+                "unique": false,
+                "options": {
+                    "convertURLs": false
+                }
+            },
+            {
+                "system": false,
+                "id": "field6",
+                "name": "kpis",
+                "type": "editor",
+                "required": false,
+                "presentable": false,
+                "unique": false,
+                "options": {
+                    "convertURLs": false
+                }
+            },
+            {
+                "system": false,
+                "id": "field7",
+                "name": "budget",
+                "type": "number",
+                "required": false,
+                "presentable": false,
+                "unique": false,
+                "options": {
+                    "min": 0,
+                    "max": null,
+                    "noDecimal": false
+                }
+            },
+            {
+                "system": false,
+                "id": "field8",
+                "name": "status",
+                "type": "select",
+                "required": true,
+                "presentable": false,
+                "unique": false,
+                "options": {
+                    "maxSelect": 1,
+                    "values": [
+                        "Planning",
+                        "Active",
+                        "Paused",
+                        "Completed",
+                        "Archived"
+                    ]
+                }
+            },
+            {
+                "system": false,
+                "id": "field9",
+                "name": "startDate",
+                "type": "date",
+                "required": false,
+                "presentable": false,
+                "unique": false,
+                "options": {
+                    "min": "",
+                    "max": ""
+                }
+            },
+            {
+                "system": false,
+                "id": "field10",
+                "name": "endDate",
+                "type": "date",
+                "required": false,
+                "presentable": false,
+                "unique": false,
+                "options": {
+                    "min": "",
+                    "max": ""
+                }
+            }
+        ],
+        "indexes": [],
+        "listRule": "@request.auth.id != \"\"",
+        "viewRule": "@request.auth.id != \"\"",
+        "createRule": "@request.auth.id != \"\"",
+        "updateRule": "@request.auth.id != \"\"",
+        "deleteRule": "@request.auth.id != \"\""
+    },
+    {
+        "id": "pbc_3428453785",
+        "name": "marketing_goals",
+        "type": "base",
+        "system": false,
+        "schema": [
+            {
+                "system": false,
+                "id": "field1",
+                "name": "goalName",
+                "type": "text",
+                "required": true,
+                "presentable": false,
+                "unique": false,
+                "options": {
+                    "min": 1,
+                    "max": 255,
+                    "pattern": ""
+                }
+            },
+            {
+                "system": false,
+                "id": "field2",
+                "name": "description",
+                "type": "editor",
+                "required": false,
+                "presentable": false,
+                "unique": false,
+                "options": {
+                    "convertURLs": false
+                }
+            },
+            {
+                "system": false,
+                "id": "field3",
+                "name": "category",
+                "type": "select",
+                "required": true,
+                "presentable": false,
+                "unique": false,
+                "options": {
+                    "maxSelect": 1,
+                    "values": [
+                        "Brand Awareness",
+                        "Lead Generation",
+                        "Customer Acquisition",
+                        "Customer Retention",
+                        "Revenue Growth",
+                        "Market Share",
+                        "Engagement"
+                    ]
+                }
+            },
+            {
+                "system": false,
+                "id": "field4",
+                "name": "targetMetric",
+                "type": "text",
+                "required": false,
+                "presentable": false,
+                "unique": false,
+                "options": {
+                    "min": null,
+                    "max": 255,
+                    "pattern": ""
+                }
+            },
+            {
+                "system": false,
+                "id": "field5",
+                "name": "targetValue",
+                "type": "number",
+                "required": false,
+                "presentable": false,
+                "unique": false,
+                "options": {
+                    "min": null,
+                    "max": null,
+                    "noDecimal": false
+                }
+            },
+            {
+                "system": false,
+                "id": "field6",
+                "name": "currentValue",
+                "type": "number",
+                "required": false,
+                "presentable": false,
+                "unique": false,
+                "options": {
+                    "min": null,
+                    "max": null,
+                    "noDecimal": false
+                }
+            },
+            {
+                "system": false,
+                "id": "field7",
+                "name": "deadline",
+                "type": "date",
+                "required": false,
+                "presentable": false,
+                "unique": false,
+                "options": {
+                    "min": "",
+                    "max": ""
+                }
+            },
+            {
+                "system": false,
+                "id": "field8",
+                "name": "status",
+                "type": "select",
+                "required": true,
+                "presentable": false,
+                "unique": false,
+                "options": {
+                    "maxSelect": 1,
+                    "values": [
+                        "Not Started",
+                        "In Progress",
+                        "On Track",
+                        "At Risk",
+                        "Achieved",
+                        "Missed"
+                    ]
+                }
+            },
+            {
+                "system": false,
+                "id": "field9",
+                "name": "priority",
+                "type": "select",
+                "required": false,
+                "presentable": false,
+                "unique": false,
+                "options": {
+                    "maxSelect": 1,
+                    "values": [
+                        "High",
+                        "Medium",
+                        "Low"
+                    ]
+                }
+            }
+        ],
+        "indexes": [],
+        "listRule": "@request.auth.id != \"\"",
+        "viewRule": "@request.auth.id != \"\"",
+        "createRule": "@request.auth.id != \"\"",
+        "updateRule": "@request.auth.id != \"\"",
+        "deleteRule": "@request.auth.id != \"\""
+    },
+    {
+        "id": "pbc_1171837472",
+        "name": "swot_analysis",
+        "type": "base",
+        "system": false,
+        "schema": [
+            {
+                "system": false,
+                "id": "field1",
+                "name": "title",
+                "type": "text",
+                "required": true,
+                "presentable": false,
+                "unique": false,
+                "options": {
+                    "min": 1,
+                    "max": 255,
+                    "pattern": ""
+                }
+            },
+            {
+                "system": false,
+                "id": "field2",
+                "name": "type",
+                "type": "select",
+                "required": true,
+                "presentable": false,
+                "unique": false,
+                "options": {
+                    "maxSelect": 1,
+                    "values": [
+                        "Strength",
+                        "Weakness",
+                        "Opportunity",
+                        "Threat"
+                    ]
+                }
+            },
+            {
+                "system": false,
+                "id": "field3",
+                "name": "description",
+                "type": "editor",
+                "required": false,
+                "presentable": false,
+                "unique": false,
+                "options": {
+                    "convertURLs": false
+                }
+            },
+            {
+                "system": false,
+                "id": "field4",
+                "name": "category",
+                "type": "select",
+                "required": false,
+                "presentable": false,
+                "unique": false,
+                "options": {
+                    "maxSelect": 1,
+                    "values": [
+                        "Market",
+                        "Product",
+                        "Operations",
+                        "Financial",
+                        "Technology",
+                        "Human Resources",
+                        "Brand",
+                        "Competition"
+                    ]
+                }
+            },
+            {
+                "system": false,
+                "id": "field5",
+                "name": "impact",
+                "type": "select",
+                "required": false,
+                "presentable": false,
+                "unique": false,
+                "options": {
+                    "maxSelect": 1,
+                    "values": [
+                        "High",
+                        "Medium",
+                        "Low"
+                    ]
+                }
+            },
+            {
+                "system": false,
+                "id": "field6",
+                "name": "actionItems",
+                "type": "editor",
+                "required": false,
+                "presentable": false,
+                "unique": false,
+                "options": {
+                    "convertURLs": false
+                }
+            },
+            {
+                "system": false,
+                "id": "field7",
+                "name": "status",
+                "type": "select",
+                "required": true,
+                "presentable": false,
+                "unique": false,
+                "options": {
+                    "maxSelect": 1,
+                    "values": [
+                        "Identified",
+                        "Under Review",
+                        "Action Planned",
+                        "In Progress",
+                        "Addressed",
+                        "Monitoring"
+                    ]
+                }
+            }
+        ],
+        "indexes": [],
+        "listRule": "@request.auth.id != \"\"",
+        "viewRule": "@request.auth.id != \"\"",
+        "createRule": "@request.auth.id != \"\"",
+        "updateRule": "@request.auth.id != \"\"",
+        "deleteRule": "@request.auth.id != \"\""
+    }
+]
