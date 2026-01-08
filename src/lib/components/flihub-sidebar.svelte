@@ -7,7 +7,9 @@
 		FolderKanban,
 		Receipt,
 		Building2,
-		CheckSquare
+		CheckSquare,
+		Trophy,
+		Award
 	} from 'lucide-svelte';
 
 	const data = {
@@ -16,6 +18,16 @@
 				title: 'Dashboard',
 				url: '/dashboard',
 				icon: LayoutDashboard
+			},
+			{
+				title: 'League',
+				url: '/dashboard/league',
+				icon: Award
+			},
+			{
+				title: 'Franchises',
+				url: '/dashboard/franchises',
+				icon: Trophy
 			},
 			{
 				title: 'Departments',
