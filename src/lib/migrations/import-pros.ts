@@ -86,16 +86,25 @@ function cleanURL(url: string): string | undefined {
 }
 
 async function importPros() {
-	const pb = new PocketBase(
-		process.env.POCKETBASE_URL || 'https://pocketbase-production-6ab5.up.railway.app/'
-	);
+	let url = process.env.POCKETBASE_URL || 'https://pocketbase-production-6ab5.up.railway.app';
+	// Remove trailing slash if present
+	url = url.replace(/\/$/, '');
+	
+	const pb = new PocketBase(url);
 
 	try {
+		const email = process.env.POCKETBASE_ADMIN_EMAIL;
+		const password = process.env.POCKETBASE_ADMIN_PASSWORD;
+		
+		if (!email || !password) {
+			throw new Error('POCKETBASE_ADMIN_EMAIL and POCKETBASE_ADMIN_PASSWORD must be set in .env file');
+		}
+		
+		console.log(`🔐 Authenticating to ${url}...`);
+		console.log(`   Email: ${email}`);
+		
 		// Authenticate
-		await pb.admins.authWithPassword(
-			process.env.POCKETBASE_ADMIN_EMAIL || 'ddinsmore8@gmail.com',
-			process.env.POCKETBASE_ADMIN_PASSWORD || 'MADcap(123)'
-		);
+		await pb.admins.authWithPassword(email, password);
 		console.log('✅ Authenticated\n');
 
 		// Read CSV file
@@ -111,7 +120,13 @@ async function importPros() {
 
 		console.log(`📊 Found ${records.length} pros in CSV\n`);
 
+		// Get all existing users and profiles for matching
+		const allUsers = await pb.collection('users').getFullList();
+		const allProfiles = await pb.collection('user_profiles').getFullList();
+		console.log(`📋 Found ${allUsers.length} existing users and ${allProfiles.length} profiles\n`);
+
 		let created = 0;
+		let updated = 0;
 		let skipped = 0;
 		let errors = 0;
 		let currentGender: 'male' | 'female' | undefined = undefined;
@@ -130,27 +145,58 @@ async function importPros() {
 			}
 
 			try {
-				// Skip duplicate check for now - just try to create
+				// Check if pro already exists
+				const existingPros = await pb.collection('pros').getFullList({
+					filter: `name = "${row.Name.replace(/"/g, '\\"')}"`
+				});
+
+				if (existingPros.length > 0) {
+					console.log(`⏭️  Pro already exists: ${row.Name}`);
+					skipped++;
+					continue;
+				}
 
 				// Parse world ranking
 				const worldRanking = row['World Ranking']
 					? parseNumber(row['World Ranking'].replace('#', '').trim())
 					: undefined;
 
+				// Parse date of birth
+				const dateOfBirth = parseDate(row.DOB);
+
 				// Parse signed contract safely
 				let signedContract = undefined;
 				const contractStr = cleanText(row['Signed Contract']);
 				if (contractStr) {
 					try {
-						// Try to parse as JSON, but if it fails, store as string
 						signedContract = JSON.parse(contractStr);
 					} catch {
-						// If not valid JSON, just store the string
 						signedContract = contractStr;
 					}
 				}
 
-				// Create pro record with basic fields only
+				// Try to find matching user by name
+				const [firstName, ...lastNameParts] = row.Name.split(' ');
+				const lastName = lastNameParts.join(' ') || firstName;
+				
+				// Look for matching profile by name
+				const matchingProfile = allProfiles.find(p => {
+					const profileFirstName = (p.firstName || '').toLowerCase();
+					const profileLastName = (p.lastName || '').toLowerCase();
+					const csvFirstName = firstName.toLowerCase();
+					const csvLastName = lastName.toLowerCase();
+					
+					return profileFirstName === csvFirstName && profileLastName === csvLastName;
+				});
+
+				let userProfileId: string | undefined = undefined;
+				
+				if (matchingProfile) {
+					userProfileId = matchingProfile.id; // Use the profile record ID, not userId
+					console.log(`🔗 Found matching user profile for ${row.Name}`);
+				}
+
+				// Create pro record with all available fields
 				const proData: any = {
 					name: row.Name,
 					status: 'active'
@@ -162,77 +208,57 @@ async function importPros() {
 				if (cleanText(row.Country)) proData.country = cleanText(row.Country);
 				if (cleanText(row.Residence)) proData.residence = cleanText(row.Residence);
 				if (cleanText(row.Bio)) proData.bio = cleanText(row.Bio);
+				if (cleanURL(row.Photo)) proData.photo = cleanURL(row.Photo);
 				if (cleanText(row['Sponsored by'])) proData.sponsoredBy = cleanText(row['Sponsored by']);
+				if (dateOfBirth) proData.dateOfBirth = dateOfBirth;
 				if (cleanText(row.Height)) proData.height = cleanText(row.Height);
 				if (cleanText(row.Weight)) proData.weight = cleanText(row.Weight);
+				if (cleanText(row.TikTok)) proData.tiktok = cleanText(row.TikTok);
+				if (cleanText(row['Twitch:'])) proData.twitch = cleanText(row['Twitch:']);
+				if (cleanURL(row['Website/Blog (if applicable)'])) proData.website = cleanURL(row['Website/Blog (if applicable)']);
 				if (parseNumber(row['Year Turned Professional']))
 					proData.yearTurnedPro = parseNumber(row['Year Turned Professional']);
+				if (cleanText(row['Primary Sponsor(s)'])) proData.primarySponsor = cleanText(row['Primary Sponsor(s)']);
+				if (cleanText(row['Favorite Disc'])) proData.favoriteDisc = cleanText(row['Favorite Disc']);
+				if (cleanText(row['Signature Move or Shot'])) proData.signatureMove = cleanText(row['Signature Move or Shot']);
+				if (cleanText(row['Career Highlights'])) proData.careerHighlights = cleanText(row['Career Highlights']);
+				if (parseNumber(row['Number of Tournaments Played']))
+					proData.tournamentsPlayed = parseNumber(row['Number of Tournaments Played']);
+				if (cleanText(row['Notable Records or Milestones'])) proData.notableRecords = cleanText(row['Notable Records or Milestones']);
+				if (cleanText(row.Education)) proData.education = cleanText(row.Education);
+				if (cleanText(row['Other Sports Played'])) proData.otherSports = cleanText(row['Other Sports Played']);
+				if (cleanText(row['Hobbies Outside Disc Golf'])) proData.hobbies = cleanText(row['Hobbies Outside Disc Golf']);
+				if (cleanText(row['Favorite Destination Played'])) proData.favoriteDestination = cleanText(row['Favorite Destination Played']);
+				if (cleanText(row['Personal Motivation or Quote'])) proData.personalMotivation = cleanText(row['Personal Motivation or Quote']);
+				if (cleanText(row['Video Highlights Links'])) proData.videoHighlightsLinks = cleanText(row['Video Highlights Links']);
+				if (cleanText(row['Injury History (if any)'])) proData.injuryHistory = cleanText(row['Injury History (if any)']);
+				if (cleanText(row['Current Fitness Regimen'])) proData.fitnessRegimen = cleanText(row['Current Fitness Regimen']);
+				if (cleanText(row['Dietary Preferences or Restrictions'])) proData.dietaryPreferences = cleanText(row['Dietary Preferences or Restrictions']);
+				if (cleanText(row['Long-Term Goals'])) proData.longTermGoals = cleanText(row['Long-Term Goals']);
+				if (cleanText(row['Personal Mission Statement in Disc Golf'])) proData.missionStatement = cleanText(row['Personal Mission Statement in Disc Golf']);
+				if (cleanText(row['Primary Airport'])) proData.primaryAirport = cleanText(row['Primary Airport']);
+				if (cleanText(row['Secondary (Alternate) Airport'])) proData.secondaryAirport = cleanText(row['Secondary (Alternate) Airport']);
+				if (cleanText(row['Frequent Flyer Number(s)'])) proData.frequentFlyerNumbers = cleanText(row['Frequent Flyer Number(s)']);
+				if (signedContract) proData.signedContract = signedContract;
 				if (currentGender) proData.gender = currentGender;
+				if (userProfileId) proData.userId = userProfileId;
 
 				const pro = await pb.collection('pros').create(proData);
-				console.log(`✅ Created pro: ${row.Name}`);
+				console.log(`✅ Created pro: ${row.Name}${userProfileId ? ' (linked to user)' : ''}`);
 
-				// Create user account for the pro
-				const firstName = row.Name.split(' ')[0].toLowerCase().replace(/[^a-z0-9]/g, '');
-				const email = `${firstName}@fligolf.com`;
-				const password = 'MADcap(123)';
-
-				try {
-					// Check if user already exists
-					const existingUsers = await pb.collection('users').getFullList({
-						filter: `email = "${email}"`
-					});
-
-					let userId: string;
-
-					if (existingUsers.length > 0) {
-						userId = existingUsers[0].id;
-						console.log(`   ℹ️  User already exists: ${email}`);
-					} else {
-						// Create user
-						const user = await pb.collection('users').create({
-							email,
-							password,
-							passwordConfirm: password,
-							emailVisibility: true
-						});
-						userId = user.id;
-						console.log(`   ✅ Created user: ${email}`);
-					}
-
-					// Check if user profile exists
-					const existingProfiles = await pb.collection('user_profiles').getFullList({
-						filter: `userId = "${userId}"`
-					});
-
-					if (existingProfiles.length > 0) {
-						// Update existing profile with pro reference
-						await pb.collection('user_profiles').update(existingProfiles[0].id, {
+				// Update user profile with pro reference if we found a match
+				if (matchingProfile && userProfileId) {
+					try {
+						await pb.collection('user_profiles').update(matchingProfile.id, {
 							proReference: pro.id,
 							role: 'pro',
 							availableRoles: ['pro']
 						});
 						console.log(`   ✅ Updated user profile with pro reference`);
-					} else {
-						// Create user profile
-						const [firstName, ...lastNameParts] = row.Name.split(' ');
-						const lastName = lastNameParts.join(' ') || firstName;
-
-						await pb.collection('user_profiles').create({
-							userId: userId,
-							firstName: firstName,
-							lastName: lastName,
-							email: email,
-							role: 'pro',
-							availableRoles: ['pro'],
-							status: 'active',
-							proReference: pro.id
-						});
-						console.log(`   ✅ Created user profile with pro reference`);
+						updated++;
+					} catch (updateError: any) {
+						console.error(`   ⚠️  Error updating profile:`, updateError.message);
 					}
-				} catch (userError: any) {
-					console.error(`   ⚠️  Error creating user for ${row.Name}:`, userError.message);
-					// Continue even if user creation fails
 				}
 
 				created++;
@@ -247,6 +273,7 @@ async function importPros() {
 
 		console.log('\n📊 Import Summary:');
 		console.log(`   Created: ${created}`);
+		console.log(`   Updated profiles: ${updated}`);
 		console.log(`   Skipped: ${skipped}`);
 		console.log(`   Errors: ${errors}`);
 		console.log('\n✅ Import completed!');
