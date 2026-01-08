@@ -405,7 +405,7 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 					actual: totalActual,
 					remaining: totalBudget - totalActual
 				},
-				managers: {
+				people: {
 					total: userProfiles.totalItems
 				},
 				phases: phaseMetrics
@@ -432,7 +432,7 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 				departments: { total: 0, active: 0, inactive: 0 },
 				expenses: { total: 0, totalAmount: 0, approvedAmount: 0, draft: 0, submitted: 0, approved: 0, paid: 0 },
 				budget: { total: 0, forecasted: 0, actual: 0, remaining: 0 },
-				managers: { total: 0 }
+				people: { total: 0 }
 			},
 			recentProjects: []
 		};

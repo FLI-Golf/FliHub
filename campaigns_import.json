@@ -1,0 +1,173 @@
+[
+    {
+        "id": "pbc_2270728936",
+        "listRule": "@request.auth.id != \"\"",
+        "viewRule": "@request.auth.id != \"\"",
+        "createRule": "@request.auth.id != \"\"",
+        "updateRule": "@request.auth.id != \"\"",
+        "deleteRule": "@request.auth.id != \"\"",
+        "name": "campaigns",
+        "type": "base",
+        "fields": [
+            {
+                "autogeneratePattern": "[a-z0-9]{15}",
+                "hidden": false,
+                "id": "text3208210256",
+                "max": 15,
+                "min": 15,
+                "name": "id",
+                "pattern": "^[a-z0-9]+$",
+                "presentable": false,
+                "primaryKey": true,
+                "required": true,
+                "system": true,
+                "type": "text"
+            },
+            {
+                "autogeneratePattern": "",
+                "hidden": false,
+                "id": "name_field",
+                "max": 255,
+                "min": 1,
+                "name": "name",
+                "pattern": "",
+                "presentable": false,
+                "primaryKey": false,
+                "required": true,
+                "system": false,
+                "type": "text"
+            },
+            {
+                "convertURLs": false,
+                "hidden": false,
+                "id": "description_field",
+                "maxSize": 0,
+                "name": "description",
+                "presentable": false,
+                "required": false,
+                "system": false,
+                "type": "editor"
+            },
+            {
+                "hidden": false,
+                "id": "type_field",
+                "maxSelect": 1,
+                "name": "type",
+                "presentable": false,
+                "required": true,
+                "system": false,
+                "type": "select",
+                "values": [
+                    "Marketing",
+                    "Sales",
+                    "Product Launch",
+                    "Brand Awareness",
+                    "Lead Generation",
+                    "Customer Retention",
+                    "Event"
+                ]
+            },
+            {
+                "hidden": false,
+                "id": "startDate_field",
+                "max": "",
+                "min": "",
+                "name": "startDate",
+                "presentable": false,
+                "required": false,
+                "system": false,
+                "type": "date"
+            },
+            {
+                "hidden": false,
+                "id": "endDate_field",
+                "max": "",
+                "min": "",
+                "name": "endDate",
+                "presentable": false,
+                "required": false,
+                "system": false,
+                "type": "date"
+            },
+            {
+                "hidden": false,
+                "id": "budget_field",
+                "max": null,
+                "min": 0,
+                "name": "budget",
+                "noDecimal": false,
+                "presentable": false,
+                "required": false,
+                "system": false,
+                "type": "number"
+            },
+            {
+                "hidden": false,
+                "id": "actualSpend_field",
+                "max": null,
+                "min": 0,
+                "name": "actualSpend",
+                "noDecimal": false,
+                "presentable": false,
+                "required": false,
+                "system": false,
+                "type": "number"
+            },
+            {
+                "hidden": false,
+                "id": "status_field",
+                "maxSelect": 1,
+                "name": "status",
+                "presentable": false,
+                "required": true,
+                "system": false,
+                "type": "select",
+                "values": [
+                    "Planning",
+                    "Active",
+                    "Paused",
+                    "Completed",
+                    "Cancelled"
+                ]
+            },
+            {
+                "autogeneratePattern": "",
+                "hidden": false,
+                "id": "targetAudience_field",
+                "max": 500,
+                "min": null,
+                "name": "targetAudience",
+                "pattern": "",
+                "presentable": false,
+                "primaryKey": false,
+                "required": false,
+                "system": false,
+                "type": "text"
+            },
+            {
+                "convertURLs": false,
+                "hidden": false,
+                "id": "goals_field",
+                "maxSize": 0,
+                "name": "goals",
+                "presentable": false,
+                "required": false,
+                "system": false,
+                "type": "editor"
+            },
+            {
+                "convertURLs": false,
+                "hidden": false,
+                "id": "metrics_field",
+                "maxSize": 0,
+                "name": "metrics",
+                "presentable": false,
+                "required": false,
+                "system": false,
+                "type": "editor"
+            }
+        ],
+        "indexes": [],
+        "system": false
+    }
+]

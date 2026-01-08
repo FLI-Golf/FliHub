@@ -1,0 +1,135 @@
+[
+    {
+        "id": "pbc_1171837472",
+        "listRule": "@request.auth.id != \"\"",
+        "viewRule": "@request.auth.id != \"\"",
+        "createRule": "@request.auth.id != \"\"",
+        "updateRule": "@request.auth.id != \"\"",
+        "deleteRule": "@request.auth.id != \"\"",
+        "name": "swot_analysis",
+        "type": "base",
+        "fields": [
+            {
+                "autogeneratePattern": "[a-z0-9]{15}",
+                "hidden": false,
+                "id": "text3208210256",
+                "max": 15,
+                "min": 15,
+                "name": "id",
+                "pattern": "^[a-z0-9]+$",
+                "presentable": false,
+                "primaryKey": true,
+                "required": true,
+                "system": true,
+                "type": "text"
+            },
+            {
+                "autogeneratePattern": "",
+                "hidden": false,
+                "id": "title_field",
+                "max": 255,
+                "min": 1,
+                "name": "title",
+                "pattern": "",
+                "presentable": false,
+                "primaryKey": false,
+                "required": true,
+                "system": false,
+                "type": "text"
+            },
+            {
+                "hidden": false,
+                "id": "type_field",
+                "maxSelect": 1,
+                "name": "type",
+                "presentable": false,
+                "required": true,
+                "system": false,
+                "type": "select",
+                "values": [
+                    "Strength",
+                    "Weakness",
+                    "Opportunity",
+                    "Threat"
+                ]
+            },
+            {
+                "convertURLs": false,
+                "hidden": false,
+                "id": "description_field",
+                "maxSize": 0,
+                "name": "description",
+                "presentable": false,
+                "required": false,
+                "system": false,
+                "type": "editor"
+            },
+            {
+                "hidden": false,
+                "id": "category_field",
+                "maxSelect": 1,
+                "name": "category",
+                "presentable": false,
+                "required": false,
+                "system": false,
+                "type": "select",
+                "values": [
+                    "Market",
+                    "Product",
+                    "Operations",
+                    "Financial",
+                    "Technology",
+                    "Human Resources",
+                    "Brand",
+                    "Competition"
+                ]
+            },
+            {
+                "hidden": false,
+                "id": "impact_field",
+                "maxSelect": 1,
+                "name": "impact",
+                "presentable": false,
+                "required": false,
+                "system": false,
+                "type": "select",
+                "values": [
+                    "High",
+                    "Medium",
+                    "Low"
+                ]
+            },
+            {
+                "convertURLs": false,
+                "hidden": false,
+                "id": "actionItems_field",
+                "maxSize": 0,
+                "name": "actionItems",
+                "presentable": false,
+                "required": false,
+                "system": false,
+                "type": "editor"
+            },
+            {
+                "hidden": false,
+                "id": "status_field",
+                "maxSelect": 1,
+                "name": "status",
+                "presentable": false,
+                "required": true,
+                "system": false,
+                "type": "select",
+                "values": [
+                    "Identified",
+                    "Under Review",
+                    "Action Planned",
+                    "In Progress",
+                    "Addressed",
+                    "Monitoring"
+                ]
+            }
+        ],
+        "indexes": [],
+        "system": false
+    }
+]

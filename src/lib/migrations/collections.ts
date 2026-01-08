@@ -6,62 +6,8 @@
  */
 
 export const collections = [
-	{
-		name: 'managers',
-		type: 'base',
-		schema: [
-			{
-				name: 'name',
-				type: 'text',
-				required: true,
-				options: { min: 1, max: 255 }
-			},
-			{
-				name: 'department',
-				type: 'select',
-				required: true,
-				options: {
-					maxSelect: 1,
-					values: [
-						'Publicist',
-						'Sales',
-						'Product Development',
-						'Finance',
-						'Marketing and PR',
-						'Technical',
-						'Production',
-						'Consultant',
-						'Operations',
-						'Apparel'
-					]
-				}
-			},
-			{
-				name: 'email',
-				type: 'email',
-				required: false
-			},
-			{
-				name: 'phone',
-				type: 'text',
-				required: false
-			},
-			{
-				name: 'goals',
-				type: 'editor',
-				required: false
-			}
-		],
-		indexes: [
-			'CREATE INDEX idx_managers_department ON managers (department)',
-			'CREATE INDEX idx_managers_email ON managers (email)'
-		],
-		listRule: '@request.auth.id != ""',
-		viewRule: '@request.auth.id != ""',
-		createRule: '@request.auth.id != ""',
-		updateRule: '@request.auth.id != ""',
-		deleteRule: '@request.auth.id != ""'
-	},
+	// Note: 'managers' collection has been deprecated
+	// We now use user_profiles with role='leader' for leadership roles
 	{
 		name: 'tasks',
 		type: 'base',
@@ -702,6 +648,238 @@ export const collections = [
 			}
 		],
 		indexes: ['CREATE INDEX idx_kpis_frequency ON kpis (analysisFrequency)'],
+		listRule: '@request.auth.id != ""',
+		viewRule: '@request.auth.id != ""',
+		createRule: '@request.auth.id != ""',
+		updateRule: '@request.auth.id != ""',
+		deleteRule: '@request.auth.id != ""'
+	},
+	{
+		name: 'pros',
+		type: 'base',
+		schema: [
+			{
+				name: 'name',
+				type: 'text',
+				required: true,
+				options: { min: 1, max: 255 }
+			},
+			{
+				name: 'nickname',
+				type: 'text',
+				required: false,
+				options: { max: 100 }
+			},
+			{
+				name: 'worldRanking',
+				type: 'number',
+				required: false,
+				options: { min: 0 }
+			},
+			{
+				name: 'country',
+				type: 'text',
+				required: false,
+				options: { max: 100 }
+			},
+			{
+				name: 'residence',
+				type: 'text',
+				required: false,
+				options: { max: 255 }
+			},
+			{
+				name: 'bio',
+				type: 'editor',
+				required: false
+			},
+			{
+				name: 'photo',
+				type: 'url',
+				required: false
+			},
+			{
+				name: 'sponsoredBy',
+				type: 'text',
+				required: false,
+				options: { max: 255 }
+			},
+			{
+				name: 'dateOfBirth',
+				type: 'date',
+				required: false
+			},
+			{
+				name: 'height',
+				type: 'text',
+				required: false,
+				options: { max: 50 }
+			},
+			{
+				name: 'weight',
+				type: 'text',
+				required: false,
+				options: { max: 50 }
+			},
+			{
+				name: 'yearTurnedPro',
+				type: 'number',
+				required: false,
+				options: { min: 1900, max: 2100 }
+			},
+			{
+				name: 'primarySponsor',
+				type: 'text',
+				required: false,
+				options: { max: 255 }
+			},
+			{
+				name: 'favoriteDisc',
+				type: 'text',
+				required: false,
+				options: { max: 255 }
+			},
+			{
+				name: 'signatureMove',
+				type: 'text',
+				required: false,
+				options: { max: 500 }
+			},
+			{
+				name: 'careerHighlights',
+				type: 'editor',
+				required: false
+			},
+			{
+				name: 'tournamentsPlayed',
+				type: 'number',
+				required: false,
+				options: { min: 0 }
+			},
+			{
+				name: 'notableRecords',
+				type: 'editor',
+				required: false
+			},
+			{
+				name: 'education',
+				type: 'text',
+				required: false,
+				options: { max: 500 }
+			},
+			{
+				name: 'otherSports',
+				type: 'text',
+				required: false,
+				options: { max: 500 }
+			},
+			{
+				name: 'hobbies',
+				type: 'text',
+				required: false,
+				options: { max: 500 }
+			},
+			{
+				name: 'favoriteDestination',
+				type: 'text',
+				required: false,
+				options: { max: 255 }
+			},
+			{
+				name: 'personalMotivation',
+				type: 'editor',
+				required: false
+			},
+			{
+				name: 'website',
+				type: 'url',
+				required: false
+			},
+			{
+				name: 'tiktok',
+				type: 'text',
+				required: false,
+				options: { max: 255 }
+			},
+			{
+				name: 'twitch',
+				type: 'text',
+				required: false,
+				options: { max: 255 }
+			},
+			{
+				name: 'videoHighlightsLinks',
+				type: 'editor',
+				required: false
+			},
+			{
+				name: 'injuryHistory',
+				type: 'editor',
+				required: false
+			},
+			{
+				name: 'fitnessRegimen',
+				type: 'editor',
+				required: false
+			},
+			{
+				name: 'dietaryPreferences',
+				type: 'text',
+				required: false,
+				options: { max: 500 }
+			},
+			{
+				name: 'longTermGoals',
+				type: 'editor',
+				required: false
+			},
+			{
+				name: 'missionStatement',
+				type: 'editor',
+				required: false
+			},
+			{
+				name: 'primaryAirport',
+				type: 'text',
+				required: false,
+				options: { max: 100 }
+			},
+			{
+				name: 'secondaryAirport',
+				type: 'text',
+				required: false,
+				options: { max: 100 }
+			},
+			{
+				name: 'frequentFlyerNumbers',
+				type: 'text',
+				required: false,
+				options: { max: 500 }
+			},
+			{
+				name: 'signedContract',
+				type: 'json',
+				required: false
+			},
+			{
+				name: 'status',
+				type: 'select',
+				required: true,
+				options: {
+					maxSelect: 1,
+					values: ['active', 'inactive', 'retired']
+				}
+			},
+			{
+				name: 'gender',
+				type: 'select',
+				required: false,
+				options: {
+					maxSelect: 1,
+					values: ['male', 'female', 'other']
+				}
+			}
+		],
 		listRule: '@request.auth.id != ""',
 		viewRule: '@request.auth.id != ""',
 		createRule: '@request.auth.id != ""',

@@ -12,12 +12,12 @@ export const load: PageServerLoad = async ({ locals }) => {
 		// User profile not found or error
 	}
 
-	// Fetch user profiles - all users if admin, only leaders otherwise
-	const filter = isAdmin ? '' : `role = "leader"`;
-	const managers = await locals.pb.collection('user_profiles').getFullList({
+	// Fetch user profiles - all users if admin, only current user's role otherwise
+	const filter = isAdmin ? '' : `userId = "${locals.pb.authStore.model?.id}"`;
+	const people = await locals.pb.collection('user_profiles').getFullList({
 		filter,
 		sort: 'firstName,lastName',
-		expand: 'vendorId'
+		expand: 'vendorId,proReference'
 	});
 
 	// Fetch all vendors for the dropdown
@@ -44,7 +44,7 @@ export const load: PageServerLoad = async ({ locals }) => {
 	}
 
 	return {
-		managers,
+		people,
 		vendors,
 		departments,
 		isAdmin
