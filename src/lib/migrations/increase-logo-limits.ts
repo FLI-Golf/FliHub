@@ -43,12 +43,12 @@ async function increaseLogoLimits() {
 				};
 			}
 			
-			// Increase spec sheet size from 20MB to 30MB
+			// Increase spec sheet size from 20MB to 100MB
 			if (field.name === 'brandSpecSheet') {
-				console.log(`   ${field.name}: 20MB → 30MB per file`);
+				console.log(`   ${field.name}: 30MB → 100MB per file`);
 				return {
 					...field,
-					maxSize: 31457280 // 30MB
+					maxSize: 104857600 // 100MB
 				};
 			}
 			
