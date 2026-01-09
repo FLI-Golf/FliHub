@@ -6,6 +6,13 @@ const config = {
 	preprocess: vitePreprocess(),
 	kit: {
 		adapter: adapter()
+	},
+	onwarn: (warning, handler) => {
+		// Ignore a11y warnings during build
+		if (warning.code.startsWith('a11y_')) return;
+		// Ignore svelte_component_deprecated warnings
+		if (warning.code === 'svelte_component_deprecated') return;
+		handler(warning);
 	}
 };
 

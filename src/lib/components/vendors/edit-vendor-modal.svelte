@@ -10,15 +10,32 @@
 
 	// Form state - initialize with vendor data
 	let formData = $state({
-		name: vendor.name || '',
-		contact_name: vendor.contact_name || '',
-		contact_email: vendor.contact_email || '',
-		contact_phone: vendor.contact_phone || '',
-		address: vendor.address || '',
-		website: vendor.website || '',
-		about: vendor.about || '',
-		type: vendor.type || '',
-		active: vendor.active !== undefined ? vendor.active : true
+		name: '',
+		contact_name: '',
+		contact_email: '',
+		contact_phone: '',
+		address: '',
+		website: '',
+		about: '',
+		type: '',
+		active: true
+	});
+
+	// Update formData when modal opens or vendor changes
+	$effect(() => {
+		if (open) {
+			formData = {
+				name: vendor.name || '',
+				contact_name: vendor.contact_name || '',
+				contact_email: vendor.contact_email || '',
+				contact_phone: vendor.contact_phone || '',
+				address: vendor.address || '',
+				website: vendor.website || '',
+				about: vendor.about || '',
+				type: vendor.type || '',
+				active: vendor.active !== undefined ? vendor.active : true
+			};
+		}
 	});
 
 	let isSubmitting = $state(false);
