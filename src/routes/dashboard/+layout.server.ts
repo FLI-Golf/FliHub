@@ -15,6 +15,11 @@ export const load: LayoutServerLoad = async ({ locals }) => {
 		});
 		userProfile = profiles[0] || null;
 
+		// Redirect sales users to their dashboard if they're on the main dashboard
+		if (userProfile?.role === 'sales' && locals.url?.pathname === '/dashboard') {
+			throw redirect(303, '/dashboard/sales');
+		}
+
 		// If user is a leader, check for their department
 		if (userProfile?.role === 'leader' && userProfile?.id) {
 			const departments = await locals.pb.collection('departments_collection').getFullList({
@@ -23,6 +28,10 @@ export const load: LayoutServerLoad = async ({ locals }) => {
 			userDepartment = departments[0] || null;
 		}
 	} catch (error) {
+		// If it's a redirect, re-throw it
+		if (error instanceof Response && error.status === 303) {
+			throw error;
+		}
 		console.error('Failed to fetch user profile:', error);
 	}
 

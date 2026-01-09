@@ -9,7 +9,9 @@
 		Building2,
 		CheckSquare,
 		Trophy,
-		Award
+		Award,
+		TrendingUp,
+		Star
 	} from 'lucide-svelte';
 
 	const data = {
@@ -18,6 +20,18 @@
 				title: 'Dashboard',
 				url: '/dashboard',
 				icon: LayoutDashboard
+			},
+			{
+				title: 'Sponsors',
+				url: '/dashboard/sponsors',
+				icon: Star,
+				roles: ['sales', 'admin']
+			},
+			{
+				title: 'Franchise Sales',
+				url: '/dashboard/sales',
+				icon: TrendingUp,
+				roles: ['sales', 'admin']
 			},
 			{
 				title: 'League',
@@ -82,6 +96,20 @@
 	
 	// Filter navigation based on role
 	const filteredNav = $derived(data.navMain.filter(item => {
+		// Admin sees everything - skip all filters
+		if (userRole === 'admin') {
+			return true;
+		}
+
+		// If item has specific roles, check if user has one of them
+		if (item.roles && !item.roles.includes(userRole)) {
+			return false;
+		}
+
+		if (userRole === 'sales') {
+			// Sales reps see: Sponsors, Franchise Sales, Dashboard, Projects, Tasks
+			return ['Dashboard', 'Sponsors', 'Franchise Sales', 'Projects', 'Tasks'].includes(item.title);
+		}
 		if (userRole === 'vendor') {
 			// Vendors only see: Dashboard, Projects (their projects), Expenses (their invoices)
 			return ['Dashboard', 'Projects', 'Expenses'].includes(item.title);
@@ -92,9 +120,9 @@
 		}
 		if (userRole === 'pro' || userRole === 'franchise_owner') {
 			// Pros and franchise owners see limited views
-			return !['People', 'Vendors', 'Approvals'].includes(item.title);
+			return !['People', 'Vendors', 'Approvals', 'Franchise Sales'].includes(item.title);
 		}
-		// Admin sees everything
+		// Default: show item
 		return true;
 	}));
 </script>
