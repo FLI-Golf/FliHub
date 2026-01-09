@@ -30,9 +30,11 @@
 		danger: 'bg-red-100 dark:bg-red-900/30 text-red-900 dark:text-red-100'
 	};
 	
-	const trendColor = trend && trend.value > 0 ? 'text-green-600 dark:text-green-400' : 
-	                   trend && trend.value < 0 ? 'text-red-600 dark:text-red-400' : 
-	                   'text-slate-600 dark:text-slate-400';
+	let trendColor = $derived(
+		trend && trend.value > 0 ? 'text-green-600 dark:text-green-400' : 
+		trend && trend.value < 0 ? 'text-red-600 dark:text-red-400' : 
+		'text-slate-600 dark:text-slate-400'
+	);
 </script>
 
 <Card class="p-6 hover:shadow-lg transition-shadow">

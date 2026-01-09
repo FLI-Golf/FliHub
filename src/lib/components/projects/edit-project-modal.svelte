@@ -10,20 +10,42 @@
 
 	// Form state - initialize with project data
 	let formData = $state({
-		name: project.name || '',
-		description: project.description || '',
-		type: project.type || 'tournament',
-		status: project.status || 'draft',
-		startDate: project.startDate ? project.startDate.split('T')[0] : '',
-		endDate: project.endDate ? project.endDate.split('T')[0] : '',
-		project_budget_mode: project.project_budget_mode || 'auto',
-		project_budget: project.project_budget?.toString() || '',
-		project_forecasted_expenses: project.project_forecasted_expenses?.toString() || '',
-		project_budget_buffer: project.project_budget_buffer?.toString() || '',
-		project_budget_cap: project.project_budget_cap?.toString() || '',
-		project_manual_budget_override: project.project_manual_budget_override?.toString() || '',
-		fiscalYear: project.fiscalYear || '',
-		notes: project.notes || ''
+		name: '',
+		description: '',
+		type: 'tournament',
+		status: 'draft',
+		startDate: '',
+		endDate: '',
+		project_budget_mode: 'auto',
+		project_budget: '',
+		project_forecasted_expenses: '',
+		project_budget_buffer: '',
+		project_budget_cap: '',
+		project_manual_budget_override: '',
+		fiscalYear: '',
+		notes: ''
+	});
+
+	// Update formData when modal opens or project changes
+	$effect(() => {
+		if (open) {
+			formData = {
+				name: project.name || '',
+				description: project.description || '',
+				type: project.type || 'tournament',
+				status: project.status || 'draft',
+				startDate: project.startDate ? project.startDate.split('T')[0] : '',
+				endDate: project.endDate ? project.endDate.split('T')[0] : '',
+				project_budget_mode: project.project_budget_mode || 'auto',
+				project_budget: project.project_budget?.toString() || '',
+				project_forecasted_expenses: project.project_forecasted_expenses?.toString() || '',
+				project_budget_buffer: project.project_budget_buffer?.toString() || '',
+				project_budget_cap: project.project_budget_cap?.toString() || '',
+				project_manual_budget_override: project.project_manual_budget_override?.toString() || '',
+				fiscalYear: project.fiscalYear || '',
+				notes: project.notes || ''
+			};
+		}
 	});
 
 	let isSubmitting = $state(false);
