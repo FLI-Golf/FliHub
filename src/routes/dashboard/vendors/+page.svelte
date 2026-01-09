@@ -36,12 +36,14 @@
 	let vendors = $derived(data.vendors || []);
 	let stats = $derived(data.stats);
 	
-	// Console log for debugging
-	console.log('Vendors page data:', {
-		vendorsCount: vendors.length,
-		stats,
-		firstVendor: vendors[0],
-		error: data.error
+	// Console log for debugging - wrapped in $effect to avoid state_referenced_locally error
+	$effect(() => {
+		console.log('Vendors page data:', {
+			vendorsCount: vendors.length,
+			stats,
+			firstVendor: vendors[0],
+			error: data.error
+		});
 	});
 	
 	let searchQuery = $state('');
