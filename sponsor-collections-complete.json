@@ -1,0 +1,449 @@
+[
+    {
+        "id": "pbc_3665759510",
+        "listRule": "@request.auth.id != \"\"",
+        "viewRule": "@request.auth.id != \"\"",
+        "createRule": "@request.auth.id != \"\"",
+        "updateRule": "@request.auth.id != \"\"",
+        "deleteRule": "@request.auth.id != \"\"",
+        "name": "sponsors",
+        "type": "base",
+        "fields": [
+            {
+                "autogeneratePattern": "[a-z0-9]{15}",
+                "hidden": false,
+                "id": "text3208210256",
+                "max": 15,
+                "min": 15,
+                "name": "id",
+                "pattern": "^[a-z0-9]+$",
+                "presentable": false,
+                "primaryKey": true,
+                "required": true,
+                "system": true,
+                "type": "text"
+            },
+            {
+                "hidden": false,
+                "id": "companyName",
+                "max": 255,
+                "min": 1,
+                "name": "companyName",
+                "presentable": true,
+                "required": true,
+                "system": false,
+                "type": "text"
+            },
+            {
+                "hidden": false,
+                "id": "type",
+                "name": "type",
+                "presentable": false,
+                "required": true,
+                "system": false,
+                "type": "select",
+                "values": ["casino", "resort", "hospitality", "entertainment", "corporate", "other"],
+                "maxSelect": 1
+            },
+            {
+                "hidden": false,
+                "id": "tier",
+                "name": "tier",
+                "presentable": false,
+                "required": true,
+                "system": false,
+                "type": "select",
+                "values": ["tier_1", "tier_2", "tier_3", "tier_4"],
+                "maxSelect": 1
+            },
+            {
+                "hidden": false,
+                "id": "status",
+                "name": "status",
+                "presentable": false,
+                "required": true,
+                "system": false,
+                "type": "select",
+                "values": ["prospect", "negotiating", "active", "renewed", "expired", "converted_to_franchise", "inactive"],
+                "maxSelect": 1
+            },
+            {
+                "hidden": false,
+                "id": "primaryContactName",
+                "max": 255,
+                "name": "primaryContactName",
+                "presentable": false,
+                "required": false,
+                "system": false,
+                "type": "text"
+            },
+            {
+                "hidden": false,
+                "id": "primaryContactEmail",
+                "name": "primaryContactEmail",
+                "presentable": false,
+                "required": false,
+                "system": false,
+                "type": "email"
+            },
+            {
+                "hidden": false,
+                "id": "primaryContactPhone",
+                "max": 50,
+                "name": "primaryContactPhone",
+                "presentable": false,
+                "required": false,
+                "system": false,
+                "type": "text"
+            },
+            {
+                "hidden": false,
+                "id": "location",
+                "max": 255,
+                "name": "location",
+                "presentable": false,
+                "required": false,
+                "system": false,
+                "type": "text"
+            },
+            {
+                "hidden": false,
+                "id": "territory",
+                "max": 255,
+                "name": "territory",
+                "presentable": false,
+                "required": false,
+                "system": false,
+                "type": "text"
+            },
+            {
+                "hidden": false,
+                "id": "contractStartDate",
+                "name": "contractStartDate",
+                "presentable": false,
+                "required": false,
+                "system": false,
+                "type": "date"
+            },
+            {
+                "hidden": false,
+                "id": "contractEndDate",
+                "name": "contractEndDate",
+                "presentable": false,
+                "required": false,
+                "system": false,
+                "type": "date"
+            },
+            {
+                "hidden": false,
+                "id": "currentYear",
+                "min": 2025,
+                "max": 2027,
+                "name": "currentYear",
+                "presentable": false,
+                "required": false,
+                "system": false,
+                "type": "number"
+            },
+            {
+                "hidden": false,
+                "id": "annualCommitment",
+                "min": 0,
+                "name": "annualCommitment",
+                "presentable": false,
+                "required": false,
+                "system": false,
+                "type": "number"
+            },
+            {
+                "hidden": false,
+                "id": "totalPaid",
+                "min": 0,
+                "name": "totalPaid",
+                "presentable": false,
+                "required": false,
+                "system": false,
+                "type": "number"
+            },
+            {
+                "hidden": false,
+                "id": "franchiseInterest",
+                "name": "franchiseInterest",
+                "presentable": false,
+                "required": false,
+                "system": false,
+                "type": "bool"
+            },
+            {
+                "hidden": false,
+                "id": "franchiseConversionDate",
+                "name": "franchiseConversionDate",
+                "presentable": false,
+                "required": false,
+                "system": false,
+                "type": "date"
+            },
+            {
+                "cascadeDelete": false,
+                "collectionId": "franchise_deals",
+                "hidden": false,
+                "id": "franchiseDealId",
+                "maxSelect": 1,
+                "name": "franchiseDealId",
+                "presentable": false,
+                "required": false,
+                "system": false,
+                "type": "relation"
+            },
+            {
+                "cascadeDelete": false,
+                "collectionId": "user_profiles",
+                "hidden": false,
+                "id": "assignedTo",
+                "maxSelect": 1,
+                "name": "assignedTo",
+                "presentable": false,
+                "required": false,
+                "system": false,
+                "type": "relation"
+            },
+            {
+                "convertURLs": false,
+                "hidden": false,
+                "id": "notes",
+                "name": "notes",
+                "presentable": false,
+                "required": false,
+                "system": false,
+                "type": "editor"
+            },
+            {
+                "hidden": false,
+                "id": "autodate2990389176",
+                "name": "created",
+                "onCreate": true,
+                "onUpdate": false,
+                "presentable": false,
+                "system": false,
+                "type": "autodate"
+            },
+            {
+                "hidden": false,
+                "id": "autodate3332085495",
+                "name": "updated",
+                "onCreate": true,
+                "onUpdate": true,
+                "presentable": false,
+                "system": false,
+                "type": "autodate"
+            }
+        ],
+        "indexes": [],
+        "system": false
+    },
+    {
+        "id": "pbc_3558535174",
+        "listRule": "@request.auth.id != \"\"",
+        "viewRule": "@request.auth.id != \"\"",
+        "createRule": "@request.auth.id != \"\"",
+        "updateRule": "@request.auth.id != \"\"",
+        "deleteRule": "@request.auth.id != \"\"",
+        "name": "sponsor_franchise_bridge",
+        "type": "base",
+        "fields": [
+            {
+                "autogeneratePattern": "[a-z0-9]{15}",
+                "hidden": false,
+                "id": "text3208210256",
+                "max": 15,
+                "min": 15,
+                "name": "id",
+                "pattern": "^[a-z0-9]+$",
+                "presentable": false,
+                "primaryKey": true,
+                "required": true,
+                "system": true,
+                "type": "text"
+            },
+            {
+                "cascadeDelete": false,
+                "collectionId": "pbc_3665759510",
+                "hidden": false,
+                "id": "sponsorId",
+                "maxSelect": 1,
+                "name": "sponsorId",
+                "presentable": false,
+                "required": true,
+                "system": false,
+                "type": "relation"
+            },
+            {
+                "hidden": false,
+                "id": "status",
+                "name": "status",
+                "presentable": false,
+                "required": true,
+                "system": false,
+                "type": "select",
+                "values": ["sponsor_active", "interest_expressed", "evaluation", "negotiation", "franchise_deal_pending", "converted", "declined"],
+                "maxSelect": 1
+            },
+            {
+                "hidden": false,
+                "id": "interestExpressedDate",
+                "name": "interestExpressedDate",
+                "presentable": false,
+                "required": false,
+                "system": false,
+                "type": "date"
+            },
+            {
+                "hidden": false,
+                "id": "evaluationStartDate",
+                "name": "evaluationStartDate",
+                "presentable": false,
+                "required": false,
+                "system": false,
+                "type": "date"
+            },
+            {
+                "hidden": false,
+                "id": "sponsorshipValueToDate",
+                "min": 0,
+                "name": "sponsorshipValueToDate",
+                "presentable": false,
+                "required": false,
+                "system": false,
+                "type": "number"
+            },
+            {
+                "hidden": false,
+                "id": "franchiseFeeDiscount",
+                "min": 0,
+                "name": "franchiseFeeDiscount",
+                "presentable": false,
+                "required": false,
+                "system": false,
+                "type": "number"
+            },
+            {
+                "hidden": false,
+                "id": "netFranchiseFee",
+                "min": 0,
+                "name": "netFranchiseFee",
+                "presentable": false,
+                "required": false,
+                "system": false,
+                "type": "number"
+            },
+            {
+                "cascadeDelete": false,
+                "collectionId": "franchise_leads",
+                "hidden": false,
+                "id": "franchiseLeadId",
+                "maxSelect": 1,
+                "name": "franchiseLeadId",
+                "presentable": false,
+                "required": false,
+                "system": false,
+                "type": "relation"
+            },
+            {
+                "cascadeDelete": false,
+                "collectionId": "franchise_opportunities",
+                "hidden": false,
+                "id": "franchiseOpportunityId",
+                "maxSelect": 1,
+                "name": "franchiseOpportunityId",
+                "presentable": false,
+                "required": false,
+                "system": false,
+                "type": "relation"
+            },
+            {
+                "cascadeDelete": false,
+                "collectionId": "franchise_deals",
+                "hidden": false,
+                "id": "franchiseDealId",
+                "maxSelect": 1,
+                "name": "franchiseDealId",
+                "presentable": false,
+                "required": false,
+                "system": false,
+                "type": "relation"
+            },
+            {
+                "hidden": false,
+                "id": "proposedTerritory",
+                "max": 255,
+                "name": "proposedTerritory",
+                "presentable": false,
+                "required": false,
+                "system": false,
+                "type": "text"
+            },
+            {
+                "hidden": false,
+                "id": "targetConversionDate",
+                "name": "targetConversionDate",
+                "presentable": false,
+                "required": false,
+                "system": false,
+                "type": "date"
+            },
+            {
+                "hidden": false,
+                "id": "actualConversionDate",
+                "name": "actualConversionDate",
+                "presentable": false,
+                "required": false,
+                "system": false,
+                "type": "date"
+            },
+            {
+                "cascadeDelete": false,
+                "collectionId": "user_profiles",
+                "hidden": false,
+                "id": "assignedSalesRep",
+                "maxSelect": 1,
+                "name": "assignedSalesRep",
+                "presentable": false,
+                "required": false,
+                "system": false,
+                "type": "relation"
+            },
+            {
+                "convertURLs": false,
+                "hidden": false,
+                "id": "notes",
+                "name": "notes",
+                "presentable": false,
+                "required": false,
+                "system": false,
+                "type": "editor"
+            },
+            {
+                "hidden": false,
+                "id": "autodate2990389176",
+                "name": "created",
+                "onCreate": true,
+                "onUpdate": false,
+                "presentable": false,
+                "system": false,
+                "type": "autodate"
+            },
+            {
+                "hidden": false,
+                "id": "autodate3332085495",
+                "name": "updated",
+                "onCreate": true,
+                "onUpdate": true,
+                "presentable": false,
+                "system": false,
+                "type": "autodate"
+            }
+        ],
+        "indexes": [],
+        "system": false
+    }
+]

@@ -58,7 +58,18 @@ export const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
 		'approvals:*',
 		'invoices:read',
 		'contracts:read',
-		'reports:read'
+		'reports:read',
+		'franchise_sales:*'
+	],
+
+	sales: [
+		'franchise_leads:*',
+		'franchise_opportunities:*',
+		'franchise_deals:*',
+		'franchise_territories:read',
+		'projects:read',
+		'tasks:*:own',
+		'profile:*:own'
 	],
 
 	vendor: [
@@ -89,6 +100,7 @@ export const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
 export const DEFAULT_ROUTES: Record<UserRole, string> = {
 	leader: '/dashboard',
 	admin: '/dashboard',
+	sales: '/dashboard/sales',
 	vendor: '/dashboard/vendors',
 	pro: '/dashboard/pros',
 	franchise_owner: '/dashboard/franchise'

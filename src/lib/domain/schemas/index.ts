@@ -11,6 +11,16 @@ export * from './approval.schema';
 export * from './vendor.schema';
 export * from './pro.schema';
 
+// Franchise Sales schemas
+export * from './franchise-lead.schema';
+export * from './franchise-opportunity.schema';
+export * from './franchise-deal.schema';
+export * from './franchise-territory.schema';
+
+// Sponsor schemas
+export * from './sponsor.schema';
+export * from './sponsor-franchise-bridge.schema';
+
 // Business & Marketing schemas
 export * from './brand-positioning.schema';
 export * from './budget.schema';

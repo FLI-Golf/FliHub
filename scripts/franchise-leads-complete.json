@@ -1,0 +1,238 @@
+[
+    {
+        "id": "pbc_3970026079",
+        "listRule": "@request.auth.id != \"\"",
+        "viewRule": "@request.auth.id != \"\"",
+        "createRule": "@request.auth.id != \"\"",
+        "updateRule": "@request.auth.id != \"\"",
+        "deleteRule": "@request.auth.id != \"\"",
+        "name": "franchise_leads",
+        "type": "base",
+        "fields": [
+            {
+                "autogeneratePattern": "[a-z0-9]{15}",
+                "hidden": false,
+                "id": "text3208210256",
+                "max": 15,
+                "min": 15,
+                "name": "id",
+                "pattern": "^[a-z0-9]+$",
+                "presentable": false,
+                "primaryKey": true,
+                "required": true,
+                "system": true,
+                "type": "text"
+            },
+            {
+                "hidden": false,
+                "id": "firstName",
+                "max": 255,
+                "min": 1,
+                "name": "firstName",
+                "presentable": false,
+                "required": true,
+                "system": false,
+                "type": "text"
+            },
+            {
+                "hidden": false,
+                "id": "lastName",
+                "max": 255,
+                "min": 1,
+                "name": "lastName",
+                "presentable": true,
+                "required": true,
+                "system": false,
+                "type": "text"
+            },
+            {
+                "hidden": false,
+                "id": "email",
+                "name": "email",
+                "presentable": false,
+                "required": true,
+                "system": false,
+                "type": "email"
+            },
+            {
+                "hidden": false,
+                "id": "phone",
+                "max": 50,
+                "name": "phone",
+                "presentable": false,
+                "required": false,
+                "system": false,
+                "type": "text"
+            },
+            {
+                "hidden": false,
+                "id": "company",
+                "max": 255,
+                "name": "company",
+                "presentable": false,
+                "required": false,
+                "system": false,
+                "type": "text"
+            },
+            {
+                "hidden": false,
+                "id": "location",
+                "max": 255,
+                "name": "location",
+                "presentable": false,
+                "required": false,
+                "system": false,
+                "type": "text"
+            },
+            {
+                "hidden": false,
+                "id": "territory",
+                "max": 255,
+                "name": "territory",
+                "presentable": false,
+                "required": false,
+                "system": false,
+                "type": "text"
+            },
+            {
+                "hidden": false,
+                "id": "source",
+                "name": "source",
+                "presentable": false,
+                "required": true,
+                "system": false,
+                "type": "select",
+                "values": ["website", "referral", "event", "cold_outreach", "partner", "social_media", "other"],
+                "maxSelect": 1
+            },
+            {
+                "hidden": false,
+                "id": "status",
+                "name": "status",
+                "presentable": false,
+                "required": true,
+                "system": false,
+                "type": "select",
+                "values": ["new", "contacted", "qualified", "unqualified", "converted", "lost"],
+                "maxSelect": 1
+            },
+            {
+                "hidden": false,
+                "id": "netWorth",
+                "min": 0,
+                "name": "netWorth",
+                "presentable": false,
+                "required": false,
+                "system": false,
+                "type": "number"
+            },
+            {
+                "hidden": false,
+                "id": "liquidCapital",
+                "min": 0,
+                "name": "liquidCapital",
+                "presentable": false,
+                "required": false,
+                "system": false,
+                "type": "number"
+            },
+            {
+                "hidden": false,
+                "id": "experienceLevel",
+                "name": "experienceLevel",
+                "presentable": false,
+                "required": false,
+                "system": false,
+                "type": "select",
+                "values": ["none", "some", "extensive"],
+                "maxSelect": 1
+            },
+            {
+                "hidden": false,
+                "id": "isExistingSponsor",
+                "name": "isExistingSponsor",
+                "presentable": false,
+                "required": false,
+                "system": false,
+                "type": "bool"
+            },
+            {
+                "convertURLs": false,
+                "hidden": false,
+                "id": "notes",
+                "name": "notes",
+                "presentable": false,
+                "required": false,
+                "system": false,
+                "type": "editor"
+            },
+            {
+                "hidden": false,
+                "id": "qualifiedDate",
+                "name": "qualifiedDate",
+                "presentable": false,
+                "required": false,
+                "system": false,
+                "type": "date"
+            },
+            {
+                "cascadeDelete": false,
+                "collectionId": "user_profiles_collection",
+                "hidden": false,
+                "id": "assignedTo",
+                "maxSelect": 1,
+                "name": "assignedTo",
+                "presentable": false,
+                "required": false,
+                "system": false,
+                "type": "relation"
+            },
+            {
+                "cascadeDelete": false,
+                "collectionId": "pbc_3665759510",
+                "hidden": false,
+                "id": "sponsorId",
+                "maxSelect": 1,
+                "name": "sponsorId",
+                "presentable": false,
+                "required": false,
+                "system": false,
+                "type": "relation"
+            },
+            {
+                "cascadeDelete": false,
+                "collectionId": "pbc_3558535174",
+                "hidden": false,
+                "id": "sponsorBridgeId",
+                "maxSelect": 1,
+                "name": "sponsorBridgeId",
+                "presentable": false,
+                "required": false,
+                "system": false,
+                "type": "relation"
+            },
+            {
+                "hidden": false,
+                "id": "autodate2990389176",
+                "name": "created",
+                "onCreate": true,
+                "onUpdate": false,
+                "presentable": false,
+                "system": false,
+                "type": "autodate"
+            },
+            {
+                "hidden": false,
+                "id": "autodate3332085495",
+                "name": "updated",
+                "onCreate": true,
+                "onUpdate": true,
+                "presentable": false,
+                "system": false,
+                "type": "autodate"
+            }
+        ],
+        "indexes": [],
+        "system": false
+    }
+]

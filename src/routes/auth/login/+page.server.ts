@@ -11,12 +11,15 @@ export const load: PageServerLoad = async ({ locals }) => {
 			});
 			const userProfile = profiles[0];
 
-			// Redirect vendor users to their dashboard
+			// Redirect based on role
+			if (userProfile?.role === 'sales') {
+				throw redirect(303, '/dashboard/sales');
+			}
+
 			if (userProfile?.role === 'vendor') {
 				throw redirect(303, '/dashboard/vendors');
 			}
 
-			// Redirect leader users to their department
 			if (userProfile?.role === 'leader') {
 				if (!userProfile.departmentId) {
 					throw redirect(303, '/dashboard/departments');
@@ -57,6 +60,11 @@ export const actions: Actions = {
 			const userProfile = profiles[0];
 
 			if (userProfile) {
+				// Sales users - redirect to franchise sales dashboard
+				if (userProfile.role === 'sales') {
+					throw redirect(303, '/dashboard/sales');
+				}
+
 				// Vendor users - redirect to vendor dashboard or setup
 				if (userProfile.role === 'vendor') {
 					if (!userProfile.vendorId) {
