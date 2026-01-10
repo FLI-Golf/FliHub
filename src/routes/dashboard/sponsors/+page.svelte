@@ -160,7 +160,7 @@
 							<td class="text-right py-3 px-4">{formatCurrency(pricing[2027])}</td>
 							<td class="text-right py-3 px-4 font-semibold">{formatCurrency(total)}</td>
 							<td class="text-center py-3 px-4">
-								<span class="px-2 py-1 text-xs font-medium rounded-full bg-slate-100 dark:bg-slate-800">
+								<span class="px-2 py-1 text-xs font-medium rounded-full bg-slate-100 dark:bg-slate-800 text-black dark:text-black">
 									{count}
 								</span>
 							</td>
@@ -259,10 +259,10 @@
 												<span>{formatCurrency(bridge.sponsorshipValueToDate)} invested</span>
 											</div>
 										{/if}
-										{#if bridge.netFranchiseFee}
+										{#if bridge.netFranchiseValue || bridge.netFranchiseFee}
 											<div class="flex items-center gap-1">
 												<ArrowRight class="size-3" />
-												<span>{formatCurrency(bridge.netFranchiseFee)} franchise fee</span>
+												<span>{formatCurrency(bridge.netFranchiseValue || bridge.netFranchiseFee)} franchise value</span>
 											</div>
 										{/if}
 									</div>

@@ -43,17 +43,19 @@ export const load: PageServerLoad = async ({ locals }) => {
 			expand: 'dealId'
 		});
 
-		// Calculate metrics
+		// Calculate metrics using new financial fields
 		const totalLeads = leads.length;
 		const qualifiedLeads = leads.filter((l: any) => l.status === 'qualified').length;
 		const totalOpportunities = opportunities.length;
 		const totalDeals = deals.filter((d: any) => d.status === 'signed' || d.status === 'active').length;
 		const totalRevenue = deals
-			.filter((d: any) => d.status === 'payment_received' || d.status === 'active')
-			.reduce((sum: number, d: any) => sum + (d.paymentReceived || 0), 0);
+			.filter((d: any) => d.status === 'payment_received' || d.status === 'payment_completed' || d.status === 'active')
+			.reduce((sum: number, d: any) => sum + (d.totalPaidToDate || d.paymentReceived || 0), 0);
 		const pipelineValue = opportunities
 			.filter((o: any) => o.stage !== 'closed_lost' && o.stage !== 'closed_won')
 			.reduce((sum: number, o: any) => sum + (o.dealValue || 0), 0);
+		const outstandingBalance = deals
+			.reduce((sum: number, d: any) => sum + (d.outstandingBalance || ((d.netFranchiseValue || d.dealValue || 0) - (d.totalPaidToDate || d.paymentReceived || 0))), 0);
 
 		return {
 			userProfile,
@@ -67,7 +69,8 @@ export const load: PageServerLoad = async ({ locals }) => {
 				totalOpportunities,
 				totalDeals,
 				totalRevenue,
-				pipelineValue
+				pipelineValue,
+				outstandingBalance
 			}
 		};
 	} catch (error) {
@@ -84,7 +87,8 @@ export const load: PageServerLoad = async ({ locals }) => {
 				totalOpportunities: 0,
 				totalDeals: 0,
 				totalRevenue: 0,
-				pipelineValue: 0
+				pipelineValue: 0,
+				outstandingBalance: 0
 			}
 		};
 	}

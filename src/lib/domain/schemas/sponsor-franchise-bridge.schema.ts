@@ -21,8 +21,13 @@ export const SponsorFranchiseBridgeSchema = z.object({
 	
 	// Financial bridge
 	sponsorshipValueToDate: z.number().min(0).optional(), // Total paid as sponsor
-	franchiseFeeDiscount: z.number().min(0).optional(), // Discount offered based on sponsorship
-	netFranchiseFee: z.number().min(0).optional(), // $10M - discount
+	franchiseDiscount: z.number().min(0).optional(), // Discount offered based on sponsorship
+	totalFranchiseValue: z.number().min(0).default(10000000), // Base franchise value
+	netFranchiseValue: z.number().min(0).optional(), // After discount
+	
+	// Legacy field (deprecated)
+	franchiseFeeDiscount: z.number().min(0).optional(), // OLD: use franchiseDiscount
+	netFranchiseFee: z.number().min(0).optional(), // OLD: use netFranchiseValue
 	
 	// Franchise details
 	franchiseLeadId: z.string().optional(), // Link to franchise_leads
@@ -57,18 +62,18 @@ export const BRIDGE_STATUS_LABELS: Record<BridgeStatus, string> = {
 	declined: 'Declined'
 };
 
-// Helper to calculate franchise fee discount based on sponsorship value
-export function calculateFranchiseDiscount(sponsorshipValue: number): number {
-	// Example discount structure:
-	// - 10% discount for every $1M in sponsorship (up to 30% max)
+// Helper to calculate franchise discount based on sponsorship value
+export function calculateFranchiseDiscount(sponsorshipValue: number, baseValue: number = 10000000): number {
+	// Discount structure: 10% discount for every $1M in sponsorship (up to 30% max)
 	const discountPercentage = Math.min((sponsorshipValue / 1000000) * 10, 30);
-	const franchiseFee = 10000000;
-	return Math.round((franchiseFee * discountPercentage) / 100);
+	return Math.round((baseValue * discountPercentage) / 100);
 }
 
-// Helper to calculate net franchise fee after discount
-export function calculateNetFranchiseFee(sponsorshipValue: number): number {
-	const franchiseFee = 10000000;
-	const discount = calculateFranchiseDiscount(sponsorshipValue);
-	return franchiseFee - discount;
+// Helper to calculate net franchise value after discount
+export function calculateNetFranchiseValue(sponsorshipValue: number, baseValue: number = 10000000): number {
+	const discount = calculateFranchiseDiscount(sponsorshipValue, baseValue);
+	return baseValue - discount;
 }
+
+// Legacy function names (deprecated - use new names above)
+export const calculateNetFranchiseFee = calculateNetFranchiseValue;

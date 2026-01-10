@@ -48,8 +48,19 @@
 	
 	let searchQuery = $state('');
 	let statusFilter = $state<string>('all');
+	let typeFilter = $state<string>('all');
 	
-	// Filter vendors based on search and status
+	const vendorTypes = [
+		{ value: 'all', label: 'All Types' },
+		{ value: 'venue', label: 'Venue' },
+		{ value: 'product_supplier', label: 'Product Supplier' },
+		{ value: 'beverage', label: 'Beverage' },
+		{ value: 'technology', label: 'Technology' },
+		{ value: 'gaming', label: 'Gaming' },
+		{ value: 'service_provider', label: 'Service Provider' }
+	];
+	
+	// Filter vendors based on search, status, and type
 	let filteredVendors = $derived(vendors.filter(vendor => {
 		// Search filter
 		if (searchQuery) {
@@ -68,6 +79,9 @@
 		// Status filter
 		if (statusFilter === 'active' && !vendor.active) return false;
 		if (statusFilter === 'inactive' && vendor.active) return false;
+		
+		// Type filter
+		if (typeFilter !== 'all' && vendor.type !== typeFilter) return false;
 		
 		return true;
 	}));
@@ -195,6 +209,16 @@
 				/>
 			</div>
 			
+			<!-- Type Filter -->
+			<select
+				bind:value={typeFilter}
+				class="flex h-10 rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+			>
+				{#each vendorTypes as type}
+					<option value={type.value}>{type.label}</option>
+				{/each}
+			</select>
+			
 			<!-- View Mode Toggle -->
 			<div class="flex gap-2">
 				<Button 
@@ -251,6 +275,13 @@
 					<div class="flex items-start justify-between mb-4">
 						<div class="flex-1">
 							<h3 class="text-xl font-bold mb-1">{vendor.name || 'Unnamed Vendor'}</h3>
+							<div class="flex items-center gap-2 mb-2">
+								{#if vendor.type}
+									<span class="px-2 py-1 text-xs font-medium rounded-full bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">
+										{vendorTypes.find(t => t.value === vendor.type)?.label || vendor.type}
+									</span>
+								{/if}
+							</div>
 							{#if vendor.about}
 								<p class="text-sm text-muted-foreground line-clamp-2">{vendor.about}</p>
 							{/if}
@@ -389,8 +420,8 @@
 								</td>
 								<td class="px-6 py-4 text-sm">
 									{#if vendor.type}
-										<span class="px-2 py-1 rounded-full bg-slate-100 dark:bg-slate-800 text-xs text-black dark:text-white">
-											{vendor.type}
+										<span class="px-2 py-1 rounded-full bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 text-xs font-medium">
+											{vendorTypes.find(t => t.value === vendor.type)?.label || vendor.type}
 										</span>
 									{:else}
 										<span class="text-muted-foreground">-</span>

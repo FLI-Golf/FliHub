@@ -42,23 +42,12 @@
 	let error = $state('');
 
 	const vendorTypes = [
-		'Software',
-		'Sales',
-		'Publisist',
-		'Digital Marketing',
-		'Product',
-		'Venue Parner',
-		'Production Film',
-		'Production Media',
-		'On Course Prop',
-		'Course Materials',
-		'Office Supplies',
-		'Consultant',
-		'Marketing',
-		'Legal',
-		'Public Relations',
-		'Advertising',
-		'Tech/App Development'
+		{ value: 'venue', label: 'Venue' },
+		{ value: 'product_supplier', label: 'Product Supplier' },
+		{ value: 'beverage', label: 'Beverage' },
+		{ value: 'technology', label: 'Technology' },
+		{ value: 'gaming', label: 'Gaming' },
+		{ value: 'service_provider', label: 'Service Provider' }
 	];
 
 	async function handleSubmit(e: Event) {
@@ -212,7 +201,7 @@
 				>
 					<option value="">Select a type...</option>
 					{#each vendorTypes as type}
-						<option value={type}>{type}</option>
+						<option value={type.value}>{type.label}</option>
 					{/each}
 				</select>
 			</div>
