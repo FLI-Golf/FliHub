@@ -15,6 +15,19 @@
 	import FinancialHealthCard from '$lib/components/charts/FinancialHealthCard.svelte';
 	import PhaseFilter from '$lib/components/filters/PhaseFilter.svelte';
 	import DepartmentBreakdownTable from '$lib/components/charts/DepartmentBreakdownTable.svelte';
+	import RevenueOverviewCard from '$lib/components/charts/revenue/RevenueOverviewCard.svelte';
+	import SponsorTierChart from '$lib/components/charts/revenue/SponsorTierChart.svelte';
+	import FranchisePipelineChart from '$lib/components/charts/revenue/FranchisePipelineChart.svelte';
+	import TerritoryStatusCard from '$lib/components/charts/revenue/TerritoryStatusCard.svelte';
+	import PlayerRosterCard from '$lib/components/charts/players/PlayerRosterCard.svelte';
+	import PlayerStatusChart from '$lib/components/charts/players/PlayerStatusChart.svelte';
+	import PlayerGeographicChart from '$lib/components/charts/players/PlayerGeographicChart.svelte';
+	import CampaignPerformanceCard from '$lib/components/charts/marketing/CampaignPerformanceCard.svelte';
+	import MarketingGoalsChart from '$lib/components/charts/marketing/MarketingGoalsChart.svelte';
+	import CampaignTypeChart from '$lib/components/charts/marketing/CampaignTypeChart.svelte';
+	import VendorSpendingCard from '$lib/components/charts/vendors/VendorSpendingCard.svelte';
+	import TopVendorsChart from '$lib/components/charts/vendors/TopVendorsChart.svelte';
+	import VendorCategoryChart from '$lib/components/charts/vendors/VendorCategoryChart.svelte';
 	import { 
 		Users, 
 		ListTodo, 
@@ -37,7 +50,10 @@
 		UserCircle,
 		Database,
 		RotateCcw,
-		CheckSquare
+		CheckSquare,
+		UserCheck,
+		Target,
+		Package
 	} from 'lucide-svelte';
 	
 	let { data }: { data: PageData } = $props();
@@ -48,6 +64,9 @@
 	
 	let projectStatusTab = $state<string>('in_progress');
 	let departmentStatusTab = $state<string>('active');
+	
+	// Main dashboard tab state
+	let activeTab = $state<string>('overview');
 	
 	let metrics = $derived(data.metrics || {
 		projects: { total: 0, draft: 0, planned: 0, active: 0, completed: 0, cancelled: 0 },
@@ -388,269 +407,433 @@
 		</div>
 	</div>
 
-	<!-- Expenses & Approvals Breakdown -->
-	<div>
-		<h2 class="text-2xl font-bold mb-4">Expenses & Approvals</h2>
-		<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-			<!-- Expense Status Breakdown -->
-			<Card class="p-6 bg-gradient-to-br from-blue-950 to-blue-900 border-blue-800">
-				<div class="flex items-center justify-between mb-4">
-					<h3 class="text-lg font-semibold">Expense Pipeline</h3>
-					<Receipt class="size-5 text-blue-400" />
-				</div>
-				<div class="space-y-3">
-					<div class="flex items-center justify-between p-3 bg-black/20 rounded-lg border border-gray-800">
-						<div class="flex items-center gap-2">
-							<div class="size-3 rounded-full bg-gray-400"></div>
-							<span class="text-sm font-medium">Draft</span>
-						</div>
-						<span class="text-sm font-bold">{metrics.expenses.draft}</span>
-					</div>
-					<div class="flex items-center justify-between p-3 bg-black/20 rounded-lg border border-gray-800">
-						<div class="flex items-center gap-2">
-							<div class="size-3 rounded-full bg-blue-500"></div>
-							<span class="text-sm font-medium">Submitted</span>
-						</div>
-						<span class="text-sm font-bold">{metrics.expenses.submitted}</span>
-					</div>
-					<div class="flex items-center justify-between p-3 bg-black/20 rounded-lg border border-gray-800">
-						<div class="flex items-center gap-2">
-							<div class="size-3 rounded-full bg-green-500"></div>
-							<span class="text-sm font-medium">Approved</span>
-						</div>
-						<span class="text-sm font-bold">{metrics.expenses.approved}</span>
-					</div>
-					<div class="flex items-center justify-between p-3 bg-black/20 rounded-lg border border-gray-800">
-						<div class="flex items-center gap-2">
-							<div class="size-3 rounded-full bg-emerald-600"></div>
-							<span class="text-sm font-medium">Paid</span>
-						</div>
-						<span class="text-sm font-bold">{metrics.expenses.paid}</span>
-					</div>
-				</div>
-				<div class="mt-4 pt-4 border-t border-blue-800">
-					<Button href="/dashboard/expenses" class="w-full" variant="outline">
-						View All Expenses
-						<ArrowRight class="size-4 ml-2" />
-					</Button>
-				</div>
-			</Card>
-
-			<!-- Approval Status Breakdown -->
-			<Card class="p-6 bg-gradient-to-br from-indigo-950 to-purple-950 border-indigo-800">
-				<div class="flex items-center justify-between mb-4">
-					<h3 class="text-lg font-semibold">Approval Workflow</h3>
-					<CheckSquare class="size-5 text-indigo-400" />
-				</div>
-				<div class="space-y-3">
-					<div class="flex items-center justify-between p-3 bg-black/20 rounded-lg border border-gray-800">
-						<div class="flex items-center gap-2">
-							<div class="size-3 rounded-full bg-yellow-500"></div>
-							<span class="text-sm font-medium">Pending</span>
-						</div>
-						<span class="text-sm font-bold">{metrics.approvals.pending}</span>
-					</div>
-					<div class="flex items-center justify-between p-3 bg-black/20 rounded-lg border border-gray-800">
-						<div class="flex items-center gap-2">
-							<div class="size-3 rounded-full bg-green-500"></div>
-							<span class="text-sm font-medium">Approved</span>
-						</div>
-						<span class="text-sm font-bold">{metrics.approvals.approved}</span>
-					</div>
-					<div class="flex items-center justify-between p-3 bg-black/20 rounded-lg border border-gray-800">
-						<div class="flex items-center gap-2">
-							<div class="size-3 rounded-full bg-red-500"></div>
-							<span class="text-sm font-medium">Rejected</span>
-						</div>
-						<span class="text-sm font-bold">{metrics.approvals.rejected}</span>
-					</div>
-					<div class="flex items-center justify-between p-3 bg-black/20 rounded-lg border border-gray-800">
-						<div class="flex items-center gap-2">
-							<div class="size-3 rounded-full bg-orange-500"></div>
-							<span class="text-sm font-medium">Revision Requested</span>
-						</div>
-						<span class="text-sm font-bold">{metrics.approvals.revision_requested}</span>
-					</div>
-				</div>
-				<div class="mt-4 pt-4 border-t border-indigo-800">
-					<Button href="/dashboard/approvals" class="w-full" variant="outline">
-						View All Approvals
-						<ArrowRight class="size-4 ml-2" />
-					</Button>
-				</div>
-			</Card>
+	<!-- Dashboard Tabs -->
+	<div class="flex flex-col gap-2 mb-6">
+		<div class="flex items-center gap-2 text-sm text-muted-foreground">
+			<FolderKanban class="size-4" />
+			<span>Dashboard View</span>
+		</div>
+		<div class="flex flex-wrap gap-1 border-b border-border">
+			<button
+				onclick={() => activeTab = 'overview'}
+				class="relative px-6 py-3 text-sm font-medium transition-all duration-200 {
+					activeTab === 'overview'
+						? 'bg-card text-foreground border-t-2 border-x border-primary rounded-t-lg -mb-px z-10'
+						: 'bg-muted/50 text-muted-foreground hover:bg-muted hover:text-foreground rounded-t-lg'
+				}"
+				style={activeTab === 'overview' ? 'border-bottom: 2px solid hsl(var(--card))' : ''}
+			>
+				<span class="font-semibold">Overview</span>
+				{#if activeTab === 'overview'}
+					<div class="absolute inset-x-0 -bottom-px h-0.5 bg-card"></div>
+				{/if}
+			</button>
+			{#if isAdmin && metrics.sponsors && metrics.franchises}
+				<button
+					onclick={() => activeTab = 'revenue'}
+					class="relative px-6 py-3 text-sm font-medium transition-all duration-200 {
+						activeTab === 'revenue'
+							? 'bg-card text-foreground border-t-2 border-x border-primary rounded-t-lg -mb-px z-10'
+							: 'bg-muted/50 text-muted-foreground hover:bg-muted hover:text-foreground rounded-t-lg'
+					}"
+					style={activeTab === 'revenue' ? 'border-bottom: 2px solid hsl(var(--card))' : ''}
+				>
+					<span class="font-semibold">Revenue & Sales</span>
+					{#if activeTab === 'revenue'}
+						<div class="absolute inset-x-0 -bottom-px h-0.5 bg-card"></div>
+					{/if}
+				</button>
+			{/if}
+			<button
+				onclick={() => activeTab = 'projects'}
+				class="relative px-6 py-3 text-sm font-medium transition-all duration-200 {
+					activeTab === 'projects'
+						? 'bg-card text-foreground border-t-2 border-x border-primary rounded-t-lg -mb-px z-10'
+						: 'bg-muted/50 text-muted-foreground hover:bg-muted hover:text-foreground rounded-t-lg'
+				}"
+				style={activeTab === 'projects' ? 'border-bottom: 2px solid hsl(var(--card))' : ''}
+			>
+				<span class="font-semibold">Projects</span>
+				{#if activeTab === 'projects'}
+					<div class="absolute inset-x-0 -bottom-px h-0.5 bg-card"></div>
+				{/if}
+			</button>
+			<button
+				onclick={() => activeTab = 'financial'}
+				class="relative px-6 py-3 text-sm font-medium transition-all duration-200 {
+					activeTab === 'financial'
+						? 'bg-card text-foreground border-t-2 border-x border-primary rounded-t-lg -mb-px z-10'
+						: 'bg-muted/50 text-muted-foreground hover:bg-muted hover:text-foreground rounded-t-lg'
+				}"
+				style={activeTab === 'financial' ? 'border-bottom: 2px solid hsl(var(--card))' : ''}
+			>
+				<span class="font-semibold">Financial</span>
+				{#if activeTab === 'financial'}
+					<div class="absolute inset-x-0 -bottom-px h-0.5 bg-card"></div>
+				{/if}
+			</button>
+			<button
+				onclick={() => activeTab = 'expenses'}
+				class="relative px-6 py-3 text-sm font-medium transition-all duration-200 {
+					activeTab === 'expenses'
+						? 'bg-card text-foreground border-t-2 border-x border-primary rounded-t-lg -mb-px z-10'
+						: 'bg-muted/50 text-muted-foreground hover:bg-muted hover:text-foreground rounded-t-lg'
+				}"
+				style={activeTab === 'expenses' ? 'border-bottom: 2px solid hsl(var(--card))' : ''}
+			>
+				<span class="font-semibold">Expenses & Approvals</span>
+				{#if activeTab === 'expenses'}
+					<div class="absolute inset-x-0 -bottom-px h-0.5 bg-card"></div>
+				{/if}
+			</button>
+			{#if metrics.pros && metrics.pros.total > 0}
+				<button
+					onclick={() => activeTab = 'pros'}
+					class="relative px-6 py-3 text-sm font-medium transition-all duration-200 {
+						activeTab === 'pros'
+							? 'bg-card text-foreground border-t-2 border-x border-primary rounded-t-lg -mb-px z-10'
+							: 'bg-muted/50 text-muted-foreground hover:bg-muted hover:text-foreground rounded-t-lg'
+					}"
+					style={activeTab === 'pros' ? 'border-bottom: 2px solid hsl(var(--card))' : ''}
+				>
+					<span class="font-semibold">Pros</span>
+					{#if activeTab === 'pros'}
+						<div class="absolute inset-x-0 -bottom-px h-0.5 bg-card"></div>
+					{/if}
+				</button>
+			{/if}
+			{#if metrics.marketing && metrics.marketing.campaigns.total > 0}
+				<button
+					onclick={() => activeTab = 'marketing'}
+					class="relative px-6 py-3 text-sm font-medium transition-all duration-200 {
+						activeTab === 'marketing'
+							? 'bg-card text-foreground border-t-2 border-x border-primary rounded-t-lg -mb-px z-10'
+							: 'bg-muted/50 text-muted-foreground hover:bg-muted hover:text-foreground rounded-t-lg'
+					}"
+					style={activeTab === 'marketing' ? 'border-bottom: 2px solid hsl(var(--card))' : ''}
+				>
+					<span class="font-semibold">Marketing</span>
+					{#if activeTab === 'marketing'}
+						<div class="absolute inset-x-0 -bottom-px h-0.5 bg-card"></div>
+					{/if}
+				</button>
+			{/if}
+			{#if metrics.vendors && metrics.vendors.total > 0}
+				<button
+					onclick={() => activeTab = 'vendors'}
+					class="relative px-6 py-3 text-sm font-medium transition-all duration-200 {
+						activeTab === 'vendors'
+							? 'bg-card text-foreground border-t-2 border-x border-primary rounded-t-lg -mb-px z-10'
+							: 'bg-muted/50 text-muted-foreground hover:bg-muted hover:text-foreground rounded-t-lg'
+					}"
+					style={activeTab === 'vendors' ? 'border-bottom: 2px solid hsl(var(--card))' : ''}
+				>
+					<span class="font-semibold">Vendors</span>
+					{#if activeTab === 'vendors'}
+						<div class="absolute inset-x-0 -bottom-px h-0.5 bg-card"></div>
+					{/if}
+				</button>
+			{/if}
 		</div>
 	</div>
 
-	<!-- Phase Filter -->
-	<div>
-		<PhaseFilter 
-			activePhase={selectedPhase}
-			onPhaseChange={(phase) => selectedPhase = phase}
-		/>
-	</div>
+	<!-- Tab Content -->
+	{#if activeTab === 'overview'}
+		<!-- Overview Tab Content -->
+		<div class="space-y-6">
+			<!-- Phase Filter -->
+			<div>
+				<PhaseFilter 
+					activePhase={selectedPhase}
+					onPhaseChange={(phase) => selectedPhase = phase}
+				/>
+			</div>
 
-	<!-- Investor Overview -->
-	<div>
-		<h2 class="text-2xl font-bold mb-4">
-			Financial Overview
-			{#if selectedPhase !== 'all'}
-				<span class="text-lg font-normal text-muted-foreground">
-					- {selectedPhase === 'phase1' ? 'Phase 1' : selectedPhase === 'phase2' ? 'Phase 2' : 'Phase 3'}
-				</span>
-			{/if}
-		</h2>
-		<div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
-			<!-- Financial Health Card -->
-			<FinancialHealthCard 
-				totalBudget={phaseFilteredBudget.total}
-				actualSpent={phaseFilteredBudget.actual}
-				forecasted={phaseFilteredBudget.forecasted}
-				approvedExpenses={metrics.expenses.approvedAmount}
-				pendingExpenses={pendingExpenses}
-			/>
-
-			<!-- Burn Rate Analysis -->
-			<Card class="p-6">
-				<div class="flex items-center justify-between mb-4">
-					<h3 class="text-lg font-semibold">Budget vs Spending</h3>
-					<TrendingUp class="size-5 text-muted-foreground" />
-				</div>
-				<BurnRateChart 
+			<!-- Investor Overview -->
+			<div>
+				<h2 class="text-2xl font-bold mb-4">
+					Financial Overview
+					{#if selectedPhase !== 'all'}
+						<span class="text-lg font-normal text-muted-foreground">
+							- {selectedPhase === 'phase1' ? 'Phase 1' : selectedPhase === 'phase2' ? 'Phase 2' : 'Phase 3'}
+						</span>
+					{/if}
+				</h2>
+				<FinancialHealthCard 
 					totalBudget={phaseFilteredBudget.total}
 					actualSpent={phaseFilteredBudget.actual}
 					forecasted={phaseFilteredBudget.forecasted}
 				/>
-			</Card>
-		</div>
-	</div>
+			</div>
 
-	<!-- Department Budget Allocation Chart -->
-	{#if phaseFilteredDepartments.length > 0}
-		<div>
-			<h2 class="text-2xl font-bold mb-4">
-				Budget Allocation by Department
-				{#if selectedPhase !== 'all'}
-					<span class="text-lg font-normal text-muted-foreground">
-						- {selectedPhase === 'phase1' ? 'Phase 1' : selectedPhase === 'phase2' ? 'Phase 2' : 'Phase 3'}
-					</span>
-				{/if}
-			</h2>
-			<Card class="p-6">
-				<div class="flex items-center justify-between mb-6">
-					<div>
-						<h3 class="text-lg font-semibold">Where Your Investment Goes</h3>
-						<p class="text-sm text-muted-foreground mt-1">
-							{selectedPhase === 'all' 
-								? 'Budget allocation and spending across all departments' 
-								: `Spending breakdown for ${selectedPhase === 'phase1' ? 'Phase 1 (Jan-Sep 2026)' : selectedPhase === 'phase2' ? 'Phase 2 (Oct 2026-Mar 2027)' : 'Phase 3 (Apr-Dec 2027)'}`
-							}
-						</p>
-					</div>
-					<Building2 class="size-5 text-muted-foreground" />
+			<!-- Department Budget Allocation Chart -->
+			{#if phaseFilteredDepartments.length > 0}
+				<div>
+					<h2 class="text-2xl font-bold mb-4">
+						Budget Allocation by Department
+						{#if selectedPhase !== 'all'}
+							<span class="text-lg font-normal text-muted-foreground">
+								- {selectedPhase === 'phase1' ? 'Phase 1' : selectedPhase === 'phase2' ? 'Phase 2' : 'Phase 3'}
+							</span>
+						{/if}
+					</h2>
+					<Card class="p-6">
+						<div class="flex items-center justify-between mb-6">
+							<div>
+								<h3 class="text-lg font-semibold">Where Your Investment Goes</h3>
+								<p class="text-sm text-muted-foreground mt-1">
+									{selectedPhase === 'all' 
+										? 'Budget allocation and spending across all departments' 
+										: `Spending breakdown for ${selectedPhase === 'phase1' ? 'Phase 1 (Jan-Sep 2026)' : selectedPhase === 'phase2' ? 'Phase 2 (Oct 2026-Mar 2027)' : 'Phase 3 (Apr-Dec 2027)'}`
+									}
+								</p>
+							</div>
+							<Building2 class="size-5 text-muted-foreground" />
+						</div>
+						<DepartmentBudgetChart departments={phaseFilteredDepartments} />
+					</Card>
 				</div>
-				<DepartmentBudgetChart departments={phaseFilteredDepartments} />
-			</Card>
+			{/if}
+
+			<!-- Department Breakdown Table -->
+			<div>
+				<h2 class="text-2xl font-bold mb-4">
+					Department Performance
+					{#if selectedPhase !== 'all'}
+						<span class="text-lg font-normal text-muted-foreground">
+							- {selectedPhase === 'phase1' ? 'Phase 1' : selectedPhase === 'phase2' ? 'Phase 2' : 'Phase 3'}
+						</span>
+					{/if}
+				</h2>
+				<DepartmentBreakdownTable departments={phaseFilteredDepartments} />
+			</div>
 		</div>
 	{/if}
 
-	<!-- Department Breakdown Table -->
-	<div>
-		<h2 class="text-2xl font-bold mb-4">
-			Department Financial Breakdown
-			{#if selectedPhase !== 'all'}
-				<span class="text-lg font-normal text-muted-foreground">
-					- {selectedPhase === 'phase1' ? 'Phase 1' : selectedPhase === 'phase2' ? 'Phase 2' : 'Phase 3'}
-				</span>
-			{/if}
-		</h2>
-		<DepartmentBreakdownTable 
-			departments={phaseFilteredDepartments}
-			phase={selectedPhase}
-		/>
-	</div>
-
-	<!-- Project & Expense Analytics -->
-	<div>
-		<h2 class="text-2xl font-bold mb-4">Project & Expense Analytics</h2>
-		<div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
-			<Card class="p-6">
-				<div class="flex items-center justify-between mb-4">
-					<h3 class="text-lg font-semibold">Project Status</h3>
-					<FolderKanban class="size-5 text-muted-foreground" />
-				</div>
-				<ProjectStatusChart 
-					draft={metrics.projects.draft}
-					planned={metrics.projects.planned}
-					active={metrics.projects.active}
-					completed={metrics.projects.completed}
-					cancelled={metrics.projects.cancelled}
+	{#if activeTab === 'revenue'}
+		<!-- Revenue Tab Content -->
+		<div class="space-y-6">
+			<!-- Revenue Dashboard -->
+	{#if isAdmin && metrics.sponsors && metrics.franchises}
+		<div>
+			<div class="flex items-center justify-between mb-4">
+				<h2 class="text-2xl font-bold">Revenue & Sales</h2>
+				<Button href="/dashboard/franchise-sales" variant="outline">
+					View Detailed Franchise Dashboard
+					<ArrowRight class="size-4 ml-2" />
+				</Button>
+			</div>
+			
+			<!-- Top Row: Revenue Overview, Sponsor Pipeline, Franchise Pipeline -->
+			<div class="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-4">
+				<!-- Revenue Overview Card -->
+				<RevenueOverviewCard 
+					sponsorCommitted={metrics.sponsors.totalCommitted}
+					sponsorPaid={metrics.sponsors.totalPaid}
+					dealValue={metrics.franchises.deals.totalValue}
+					dealReceived={metrics.franchises.deals.totalReceived}
 				/>
-			</Card>
-
-			<Card class="p-6">
-				<div class="flex items-center justify-between mb-4">
-					<h3 class="text-lg font-semibold">Budget Utilization</h3>
-					<div class="flex items-center gap-2">
-						<Button 
-							size="sm" 
-							variant={budgetChartType === 'donut' ? 'default' : 'outline'}
-							onclick={() => budgetChartType = 'donut'}
-							class="h-8 px-2"
-						>
-							Donut
+				
+				<!-- Sponsor Status Card -->
+				<Card class="p-6 bg-gradient-to-br from-blue-950 to-blue-900 border-blue-800">
+					<div class="flex items-center justify-between mb-4">
+						<h3 class="text-lg font-semibold text-white">Sponsor Pipeline</h3>
+						<Store class="size-5 text-blue-400" />
+					</div>
+					<div class="space-y-3">
+						<div class="flex items-center justify-between p-3 bg-black/20 rounded-lg border border-blue-800">
+							<span class="text-sm font-medium text-white">Prospects</span>
+							<span class="text-lg font-bold text-white">{metrics.sponsors.byStatus.prospect}</span>
+						</div>
+						<div class="flex items-center justify-between p-3 bg-black/20 rounded-lg border border-blue-800">
+							<span class="text-sm font-medium text-white">Negotiating</span>
+							<span class="text-lg font-bold text-yellow-300">{metrics.sponsors.byStatus.negotiating}</span>
+						</div>
+						<div class="flex items-center justify-between p-3 bg-black/20 rounded-lg border border-blue-800">
+							<span class="text-sm font-medium text-white">Active</span>
+							<span class="text-lg font-bold text-green-400">{metrics.sponsors.byStatus.active}</span>
+						</div>
+						<div class="flex items-center justify-between p-3 bg-black/20 rounded-lg border border-blue-800">
+							<span class="text-sm font-medium text-white">Renewed</span>
+							<span class="text-lg font-bold text-emerald-400">{metrics.sponsors.byStatus.renewed}</span>
+						</div>
+					</div>
+					<div class="mt-4 pt-4 border-t border-blue-800">
+						<Button href="/dashboard/sponsors" class="w-full" variant="outline">
+							View All Sponsors
+							<ArrowRight class="size-4 ml-2" />
 						</Button>
-						<Button 
-							size="sm" 
-							variant={budgetChartType === 'bar' ? 'default' : 'outline'}
-							onclick={() => budgetChartType = 'bar'}
-							class="h-8 px-2"
-						>
-							Bar
-						</Button>
 					</div>
-				</div>
-				{#if budgetChartType === 'donut'}
-					<BudgetDonutChart 
-						actual={metrics.budget.actual}
-						remaining={metrics.budget.remaining}
-						total={metrics.budget.total}
+				</Card>
+				
+				<!-- Franchise Pipeline Card -->
+				<Card class="p-6">
+					<h3 class="text-lg font-semibold mb-4">Franchise Sales Pipeline</h3>
+					<FranchisePipelineChart 
+						leads={metrics.franchises.pipeline.leads}
+						opportunities={metrics.franchises.pipeline.opportunities}
+						deals={metrics.franchises.pipeline.deals}
 					/>
-				{:else}
-					<BurnRateChart 
-						totalBudget={metrics.budget.total}
-						actualSpent={metrics.budget.actual}
-						forecasted={metrics.budget.forecasted}
+					<div class="mt-4 pt-4 border-t">
+						<div class="grid grid-cols-3 gap-2 text-center text-xs">
+							<div>
+								<p class="text-muted-foreground">Leads</p>
+								<p class="font-bold text-lg">{metrics.franchises.pipeline.leads}</p>
+							</div>
+							<div>
+								<p class="text-muted-foreground">Opportunities</p>
+								<p class="font-bold text-lg">{metrics.franchises.pipeline.opportunities}</p>
+							</div>
+							<div>
+								<p class="text-muted-foreground">Deals</p>
+								<p class="font-bold text-lg">{metrics.franchises.pipeline.deals}</p>
+							</div>
+						</div>
+					</div>
+				</Card>
+			</div>
+			
+			<!-- Bottom Row: Sponsor Tiers, Deal Status, Territory Coverage -->
+			<div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+				<!-- Sponsor Tier Distribution -->
+				<Card class="p-6">
+					<h3 class="text-lg font-semibold mb-4">Sponsors by Tier</h3>
+					<SponsorTierChart 
+						tier_1={metrics.sponsors.byTier.tier_1}
+						tier_2={metrics.sponsors.byTier.tier_2}
+						tier_3={metrics.sponsors.byTier.tier_3}
+						tier_4={metrics.sponsors.byTier.tier_4}
 					/>
-				{/if}
-				<div class="mt-6 pt-4 border-t space-y-2">
-					<div class="flex justify-between text-sm">
-						<span class="text-muted-foreground">Total Budget</span>
-						<span class="font-semibold">{formatCurrency(metrics.budget.total)}</span>
+				</Card>
+				
+				<!-- Franchise Deal Status -->
+				<Card class="p-6">
+					<h3 class="text-lg font-semibold mb-4">Franchise Deal Status</h3>
+					<div class="space-y-3">
+						<div class="flex justify-between items-center">
+							<span class="text-sm">Pending Signature</span>
+							<span class="text-lg font-bold text-yellow-600">{metrics.franchises.deals.byStatus.pending_signature}</span>
+						</div>
+						<div class="flex justify-between items-center">
+							<span class="text-sm">Signed</span>
+							<span class="text-lg font-bold text-blue-600">{metrics.franchises.deals.byStatus.signed}</span>
+						</div>
+						<div class="flex justify-between items-center">
+							<span class="text-sm">Payment Received</span>
+							<span class="text-lg font-bold text-green-600">{metrics.franchises.deals.byStatus.payment_received}</span>
+						</div>
+						<div class="flex justify-between items-center">
+							<span class="text-sm">Active</span>
+							<span class="text-lg font-bold text-emerald-600">{metrics.franchises.deals.byStatus.active}</span>
+						</div>
 					</div>
-					<div class="flex justify-between text-sm">
-						<span class="text-muted-foreground">Forecasted</span>
-						<span class="font-semibold">{formatCurrency(metrics.budget.forecasted)}</span>
+					<div class="mt-6 pt-4 border-t">
+						<div class="flex justify-between items-center">
+							<span class="text-sm font-semibold">Average Deal Value</span>
+							<span class="text-xl font-bold">{formatCurrency(metrics.franchises.deals.averageDealValue)}</span>
+						</div>
 					</div>
-				</div>
-			</Card>
-
-			<Card class="p-6">
-				<div class="flex items-center justify-between mb-4">
-					<h3 class="text-lg font-semibold">Expense Status</h3>
-					<Receipt class="size-5 text-muted-foreground" />
-				</div>
-				<ExpenseBarChart 
-					draft={metrics.expenses.draft}
-					submitted={metrics.expenses.submitted}
-					approved={metrics.expenses.approved}
-					paid={metrics.expenses.paid}
+				</Card>
+				
+				<!-- Territory Coverage -->
+				<TerritoryStatusCard 
+					total={metrics.franchises.territories.total}
+					available={metrics.franchises.territories.available}
+					reserved={metrics.franchises.territories.reserved}
+					sold={metrics.franchises.territories.sold}
 				/>
-			</Card>
+			</div>
 		</div>
-	</div>
+	{/if}
+		</div>
+	{/if}
 
-	<!-- Recent Projects -->
+	{#if activeTab === 'projects'}
+		<!-- Projects Tab Content -->
+		<div class="space-y-6">
+			<!-- Project & Expense Analytics -->
+			<div>
+				<h2 class="text-2xl font-bold mb-4">Project & Expense Analytics</h2>
+				<div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+					<Card class="p-6">
+						<div class="flex items-center justify-between mb-4">
+							<h3 class="text-lg font-semibold">Project Status</h3>
+							<FolderKanban class="size-5 text-muted-foreground" />
+						</div>
+						<ProjectStatusChart 
+							draft={metrics.projects.draft}
+							planned={metrics.projects.planned}
+							active={metrics.projects.active}
+							completed={metrics.projects.completed}
+							cancelled={metrics.projects.cancelled}
+						/>
+					</Card>
+
+					<Card class="p-6">
+						<div class="flex items-center justify-between mb-4">
+							<h3 class="text-lg font-semibold">Budget Utilization</h3>
+							<div class="flex items-center gap-2">
+								<Button 
+									size="sm" 
+									variant={budgetChartType === 'donut' ? 'default' : 'outline'}
+									onclick={() => budgetChartType = 'donut'}
+									class="h-8 px-2"
+								>
+									Donut
+								</Button>
+								<Button 
+									size="sm" 
+									variant={budgetChartType === 'bar' ? 'default' : 'outline'}
+									onclick={() => budgetChartType = 'bar'}
+									class="h-8 px-2"
+								>
+									Bar
+								</Button>
+							</div>
+						</div>
+						{#if budgetChartType === 'donut'}
+							<BudgetDonutChart 
+								actual={metrics.budget.actual}
+								remaining={metrics.budget.remaining}
+								total={metrics.budget.total}
+							/>
+						{:else}
+							<BurnRateChart 
+								totalBudget={metrics.budget.total}
+								actualSpent={metrics.budget.actual}
+								forecasted={metrics.budget.forecasted}
+							/>
+						{/if}
+						<div class="mt-6 pt-4 border-t space-y-2">
+							<div class="flex justify-between text-sm">
+								<span class="text-muted-foreground">Total Budget</span>
+								<span class="font-semibold">{formatCurrency(metrics.budget.total)}</span>
+							</div>
+							<div class="flex justify-between text-sm">
+								<span class="text-muted-foreground">Forecasted</span>
+								<span class="font-semibold">{formatCurrency(metrics.budget.forecasted)}</span>
+							</div>
+						</div>
+					</Card>
+
+					<Card class="p-6">
+						<div class="flex items-center justify-between mb-4">
+							<h3 class="text-lg font-semibold">Expense Status</h3>
+							<Receipt class="size-5 text-muted-foreground" />
+						</div>
+						<ExpenseBarChart 
+							draft={metrics.expenses.draft}
+							submitted={metrics.expenses.submitted}
+							approved={metrics.expenses.approved}
+							paid={metrics.expenses.paid}
+						/>
+					</Card>
+				</div>
+			</div>
+		</div>
+	{/if}
+
+	<!-- Recent Projects (Always Visible) -->
 	{#if recentProjects.length > 0}
 		<div>
 			<div class="flex items-center justify-between mb-4">
@@ -730,7 +913,492 @@
 		</div>
 	{/if}
 
-	<!-- Quick Actions -->
+	{#if activeTab === 'financial'}
+		<!-- Financial Tab Content -->
+		<div class="space-y-6">
+			<!-- Phase Filter -->
+			<div>
+				<PhaseFilter 
+					activePhase={selectedPhase}
+					onPhaseChange={(phase) => selectedPhase = phase}
+				/>
+			</div>
+
+			<!-- Financial Overview -->
+			<div>
+				<h2 class="text-2xl font-bold mb-4">
+					Financial Overview
+					{#if selectedPhase !== 'all'}
+						<span class="text-lg font-normal text-muted-foreground">
+							- {selectedPhase === 'phase1' ? 'Phase 1' : selectedPhase === 'phase2' ? 'Phase 2' : 'Phase 3'}
+						</span>
+					{/if}
+				</h2>
+				<FinancialHealthCard 
+					totalBudget={phaseFilteredBudget.total}
+					actualSpent={phaseFilteredBudget.actual}
+					forecasted={phaseFilteredBudget.forecasted}
+				/>
+			</div>
+
+			<!-- Department Budget Allocation Chart -->
+			{#if phaseFilteredDepartments.length > 0}
+				<div>
+					<h2 class="text-2xl font-bold mb-4">
+						Budget Allocation by Department
+						{#if selectedPhase !== 'all'}
+							<span class="text-lg font-normal text-muted-foreground">
+								- {selectedPhase === 'phase1' ? 'Phase 1' : selectedPhase === 'phase2' ? 'Phase 2' : 'Phase 3'}
+							</span>
+						{/if}
+					</h2>
+					<Card class="p-6">
+						<div class="flex items-center justify-between mb-6">
+							<div>
+								<h3 class="text-lg font-semibold">Where Your Investment Goes</h3>
+								<p class="text-sm text-muted-foreground mt-1">
+									{selectedPhase === 'all' 
+										? 'Budget allocation and spending across all departments' 
+										: `Spending breakdown for ${selectedPhase === 'phase1' ? 'Phase 1 (Jan-Sep 2026)' : selectedPhase === 'phase2' ? 'Phase 2 (Oct 2026-Mar 2027)' : 'Phase 3 (Apr-Dec 2027)'}`
+									}
+								</p>
+							</div>
+							<Building2 class="size-5 text-muted-foreground" />
+						</div>
+						<DepartmentBudgetChart departments={phaseFilteredDepartments} />
+					</Card>
+				</div>
+			{/if}
+
+			<!-- Department Breakdown Table -->
+			<div>
+				<h2 class="text-2xl font-bold mb-4">
+					Department Performance
+					{#if selectedPhase !== 'all'}
+						<span class="text-lg font-normal text-muted-foreground">
+							- {selectedPhase === 'phase1' ? 'Phase 1' : selectedPhase === 'phase2' ? 'Phase 2' : 'Phase 3'}
+						</span>
+					{/if}
+				</h2>
+				<DepartmentBreakdownTable departments={phaseFilteredDepartments} />
+			</div>
+		</div>
+	{/if}
+
+	{#if activeTab === 'expenses'}
+		<!-- Expenses Tab Content -->
+		<div class="space-y-6">
+			<!-- Expenses & Approvals Breakdown -->
+			<div>
+				<h2 class="text-2xl font-bold mb-4">Expenses & Approvals</h2>
+				<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+					<!-- Expense Status Breakdown -->
+					<Card class="p-6 bg-gradient-to-br from-blue-950 to-blue-900 border-blue-800">
+						<div class="flex items-center justify-between mb-4">
+							<h3 class="text-lg font-semibold">Expense Pipeline</h3>
+							<Receipt class="size-5 text-blue-400" />
+						</div>
+						<div class="space-y-3">
+							<div class="flex items-center justify-between p-3 bg-black/20 rounded-lg border border-gray-800">
+								<div class="flex items-center gap-2">
+									<div class="size-3 rounded-full bg-gray-400"></div>
+									<span class="text-sm font-medium">Draft</span>
+								</div>
+								<span class="text-sm font-bold">{metrics.expenses.draft}</span>
+							</div>
+							<div class="flex items-center justify-between p-3 bg-black/20 rounded-lg border border-gray-800">
+								<div class="flex items-center gap-2">
+									<div class="size-3 rounded-full bg-blue-500"></div>
+									<span class="text-sm font-medium">Submitted</span>
+								</div>
+								<span class="text-sm font-bold">{metrics.expenses.submitted}</span>
+							</div>
+							<div class="flex items-center justify-between p-3 bg-black/20 rounded-lg border border-gray-800">
+								<div class="flex items-center gap-2">
+									<div class="size-3 rounded-full bg-green-500"></div>
+									<span class="text-sm font-medium">Approved</span>
+								</div>
+								<span class="text-sm font-bold">{metrics.expenses.approved}</span>
+							</div>
+							<div class="flex items-center justify-between p-3 bg-black/20 rounded-lg border border-gray-800">
+								<div class="flex items-center gap-2">
+									<div class="size-3 rounded-full bg-emerald-600"></div>
+									<span class="text-sm font-medium">Paid</span>
+								</div>
+								<span class="text-sm font-bold">{metrics.expenses.paid}</span>
+							</div>
+						</div>
+						<div class="mt-4 pt-4 border-t border-blue-800">
+							<Button href="/dashboard/expenses" class="w-full" variant="outline">
+								View All Expenses
+								<ArrowRight class="size-4 ml-2" />
+							</Button>
+						</div>
+					</Card>
+
+					<!-- Approval Status Breakdown -->
+					<Card class="p-6 bg-gradient-to-br from-indigo-950 to-purple-950 border-indigo-800">
+						<div class="flex items-center justify-between mb-4">
+							<h3 class="text-lg font-semibold">Approval Workflow</h3>
+							<CheckSquare class="size-5 text-indigo-400" />
+						</div>
+						<div class="space-y-3">
+							<div class="flex items-center justify-between p-3 bg-black/20 rounded-lg border border-gray-800">
+								<div class="flex items-center gap-2">
+									<div class="size-3 rounded-full bg-yellow-500"></div>
+									<span class="text-sm font-medium">Pending</span>
+								</div>
+								<span class="text-sm font-bold">{metrics.approvals.pending}</span>
+							</div>
+							<div class="flex items-center justify-between p-3 bg-black/20 rounded-lg border border-gray-800">
+								<div class="flex items-center gap-2">
+									<div class="size-3 rounded-full bg-green-500"></div>
+									<span class="text-sm font-medium">Approved</span>
+								</div>
+								<span class="text-sm font-bold">{metrics.approvals.approved}</span>
+							</div>
+							<div class="flex items-center justify-between p-3 bg-black/20 rounded-lg border border-gray-800">
+								<div class="flex items-center gap-2">
+									<div class="size-3 rounded-full bg-red-500"></div>
+									<span class="text-sm font-medium">Rejected</span>
+								</div>
+								<span class="text-sm font-bold">{metrics.approvals.rejected}</span>
+							</div>
+							<div class="flex items-center justify-between p-3 bg-black/20 rounded-lg border border-gray-800">
+								<div class="flex items-center gap-2">
+									<div class="size-3 rounded-full bg-orange-500"></div>
+									<span class="text-sm font-medium">Revision Requested</span>
+								</div>
+								<span class="text-sm font-bold">{metrics.approvals.revision_requested}</span>
+							</div>
+						</div>
+						<div class="mt-4 pt-4 border-t border-indigo-800">
+							<Button href="/dashboard/approvals" class="w-full" variant="outline">
+								View All Approvals
+								<ArrowRight class="size-4 ml-2" />
+							</Button>
+						</div>
+					</Card>
+				</div>
+			</div>
+		</div>
+	{/if}
+
+	{#if activeTab === 'pros'}
+		<!-- Pros Tab Content -->
+		<div class="space-y-6">
+			<!-- Pro Management -->
+			<div>
+				<h2 class="text-2xl font-bold mb-4">Pro Roster Management</h2>
+				
+				<div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+					<!-- Pro Roster Card -->
+					<PlayerRosterCard 
+						total={metrics.pros.total}
+						active={metrics.pros.active}
+						inactive={metrics.pros.inactive}
+						retired={metrics.pros.retired}
+					/>
+					
+					<!-- Pro Status Chart -->
+					<Card class="p-6">
+						<h3 class="text-lg font-semibold mb-4">Status Breakdown</h3>
+						<PlayerStatusChart 
+							active={metrics.pros.active}
+							inactive={metrics.pros.inactive}
+							retired={metrics.pros.retired}
+							male={metrics.pros.byGender.male}
+							female={metrics.pros.byGender.female}
+						/>
+					</Card>
+					
+					<!-- Geographic Distribution -->
+					<PlayerGeographicChart 
+						byCountry={metrics.pros.byCountry}
+						topRanked={metrics.pros.topRanked}
+						withContracts={metrics.pros.withContracts}
+					/>
+				</div>
+			</div>
+
+			<!-- Pro Metrics Summary -->
+			<div>
+				<h2 class="text-2xl font-bold mb-4">Key Metrics</h2>
+				<div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+					<Card class="p-6">
+						<div class="flex items-center justify-between mb-2">
+							<span class="text-sm text-muted-foreground">Total Pros</span>
+							<Users class="size-4 text-muted-foreground" />
+						</div>
+						<p class="text-3xl font-bold">{metrics.pros.total}</p>
+					</Card>
+					
+					<Card class="p-6">
+						<div class="flex items-center justify-between mb-2">
+							<span class="text-sm text-muted-foreground">Active Pros</span>
+							<UserCheck class="size-4 text-green-600" />
+						</div>
+						<p class="text-3xl font-bold text-green-600">{metrics.pros.active}</p>
+						<p class="text-xs text-muted-foreground mt-1">
+							{metrics.pros.total > 0 ? ((metrics.pros.active / metrics.pros.total) * 100).toFixed(0) : 0}% of roster
+						</p>
+					</Card>
+					
+					<Card class="p-6">
+						<div class="flex items-center justify-between mb-2">
+							<span class="text-sm text-muted-foreground">Top 100 Ranked</span>
+							<TrendingUp class="size-4 text-primary" />
+						</div>
+						<p class="text-3xl font-bold text-primary">{metrics.pros.topRanked}</p>
+						<p class="text-xs text-muted-foreground mt-1">World rankings</p>
+					</Card>
+					
+					<Card class="p-6">
+						<div class="flex items-center justify-between mb-2">
+							<span class="text-sm text-muted-foreground">With Contracts</span>
+							<FileText class="size-4 text-blue-600" />
+						</div>
+						<p class="text-3xl font-bold text-blue-600">{metrics.pros.withContracts}</p>
+						<p class="text-xs text-muted-foreground mt-1">Signed contracts</p>
+					</Card>
+				</div>
+			</div>
+		</div>
+	{/if}
+
+	{#if activeTab === 'marketing'}
+		<!-- Marketing Tab Content -->
+		<div class="space-y-6">
+			<!-- Marketing Overview -->
+			<div>
+				<h2 class="text-2xl font-bold mb-4">Marketing Performance</h2>
+				
+				<div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+					<!-- Campaign Performance Card -->
+					<CampaignPerformanceCard 
+						total={metrics.marketing.campaigns.total}
+						active={metrics.marketing.campaigns.active}
+						totalBudget={metrics.marketing.campaigns.totalBudget}
+						totalSpend={metrics.marketing.campaigns.totalSpend}
+					/>
+					
+					<!-- Marketing Goals Chart -->
+					<MarketingGoalsChart 
+						total={metrics.marketing.goals.total}
+						completed={metrics.marketing.goals.completed}
+						inProgress={metrics.marketing.goals.inProgress}
+						notStarted={metrics.marketing.goals.notStarted}
+						completionRate={metrics.marketing.goals.completionRate}
+					/>
+					
+					<!-- Campaign Type Distribution -->
+					<Card class="p-6">
+						<h3 class="text-lg font-semibold mb-4">Campaigns by Type</h3>
+						<CampaignTypeChart byType={metrics.marketing.campaigns.byType} />
+					</Card>
+				</div>
+			</div>
+
+			<!-- Campaign Status Breakdown -->
+			<div>
+				<h2 class="text-2xl font-bold mb-4">Campaign Status</h2>
+				<div class="grid grid-cols-1 md:grid-cols-5 gap-4">
+					<Card class="p-6">
+						<div class="flex items-center justify-between mb-2">
+							<span class="text-sm text-muted-foreground">Planning</span>
+							<Clock class="size-4 text-gray-600" />
+						</div>
+						<p class="text-3xl font-bold text-gray-600">{metrics.marketing.campaigns.byStatus.planning}</p>
+					</Card>
+					
+					<Card class="p-6">
+						<div class="flex items-center justify-between mb-2">
+							<span class="text-sm text-muted-foreground">Active</span>
+							<PlayCircle class="size-4 text-green-600" />
+						</div>
+						<p class="text-3xl font-bold text-green-600">{metrics.marketing.campaigns.byStatus.active}</p>
+					</Card>
+					
+					<Card class="p-6">
+						<div class="flex items-center justify-between mb-2">
+							<span class="text-sm text-muted-foreground">Paused</span>
+							<Clock class="size-4 text-yellow-600" />
+						</div>
+						<p class="text-3xl font-bold text-yellow-600">{metrics.marketing.campaigns.byStatus.paused}</p>
+					</Card>
+					
+					<Card class="p-6">
+						<div class="flex items-center justify-between mb-2">
+							<span class="text-sm text-muted-foreground">Completed</span>
+							<CheckCircle2 class="size-4 text-blue-600" />
+						</div>
+						<p class="text-3xl font-bold text-blue-600">{metrics.marketing.campaigns.byStatus.completed}</p>
+					</Card>
+					
+					<Card class="p-6">
+						<div class="flex items-center justify-between mb-2">
+							<span class="text-sm text-muted-foreground">Cancelled</span>
+							<XCircle class="size-4 text-red-600" />
+						</div>
+						<p class="text-3xl font-bold text-red-600">{metrics.marketing.campaigns.byStatus.cancelled}</p>
+					</Card>
+				</div>
+			</div>
+
+			<!-- Key Marketing Metrics -->
+			<div>
+				<h2 class="text-2xl font-bold mb-4">Key Metrics</h2>
+				<div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+					<Card class="p-6">
+						<div class="flex items-center justify-between mb-2">
+							<span class="text-sm text-muted-foreground">Total Budget</span>
+							<DollarSign class="size-4 text-muted-foreground" />
+						</div>
+						<p class="text-2xl font-bold">{formatCurrency(metrics.marketing.campaigns.totalBudget)}</p>
+					</Card>
+					
+					<Card class="p-6">
+						<div class="flex items-center justify-between mb-2">
+							<span class="text-sm text-muted-foreground">Total Spend</span>
+							<TrendingUp class="size-4 text-orange-600" />
+						</div>
+						<p class="text-2xl font-bold text-orange-600">{formatCurrency(metrics.marketing.campaigns.totalSpend)}</p>
+						<p class="text-xs text-muted-foreground mt-1">
+							{metrics.marketing.campaigns.totalBudget > 0 ? ((metrics.marketing.campaigns.totalSpend / metrics.marketing.campaigns.totalBudget) * 100).toFixed(0) : 0}% of budget
+						</p>
+					</Card>
+					
+					<Card class="p-6">
+						<div class="flex items-center justify-between mb-2">
+							<span class="text-sm text-muted-foreground">Avg Campaign Budget</span>
+							<DollarSign class="size-4 text-blue-600" />
+						</div>
+						<p class="text-2xl font-bold text-blue-600">{formatCurrency(metrics.marketing.campaigns.averageBudget)}</p>
+					</Card>
+					
+					<Card class="p-6">
+						<div class="flex items-center justify-between mb-2">
+							<span class="text-sm text-muted-foreground">Goal Completion</span>
+							<Target class="size-4 text-green-600" />
+						</div>
+						<p class="text-2xl font-bold text-green-600">{metrics.marketing.goals.completionRate.toFixed(0)}%</p>
+						<p class="text-xs text-muted-foreground mt-1">
+							{metrics.marketing.goals.completed} of {metrics.marketing.goals.total} goals
+						</p>
+					</Card>
+				</div>
+			</div>
+		</div>
+	{/if}
+
+	{#if activeTab === 'vendors'}
+		<!-- Vendors Tab Content -->
+		<div class="space-y-6">
+			<!-- Vendor Overview -->
+			<div>
+				<h2 class="text-2xl font-bold mb-4">Vendor Management</h2>
+				
+				<div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+					<!-- Vendor Spending Card -->
+					<VendorSpendingCard 
+						total={metrics.vendors.total}
+						active={metrics.vendors.active}
+						totalSpend={metrics.vendors.totalSpend}
+						averageSpend={metrics.vendors.averageSpend}
+					/>
+					
+					<!-- Top Vendors Chart -->
+					<Card class="p-6 lg:col-span-2">
+						<h3 class="text-lg font-semibold mb-4">Top Vendors by Spending</h3>
+						<TopVendorsChart topVendors={metrics.vendors.topVendors} />
+					</Card>
+				</div>
+			</div>
+
+			<!-- Vendor Categories -->
+			<div>
+				<h2 class="text-2xl font-bold mb-4">Vendor Distribution</h2>
+				<div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+					<!-- Category Distribution -->
+					<VendorCategoryChart byCategory={metrics.vendors.byCategory} />
+					
+					<!-- Vendor Status -->
+					<Card class="p-6">
+						<h3 class="text-lg font-semibold mb-4">Vendor Status</h3>
+						<div class="space-y-4">
+							<div class="flex items-center justify-between p-4 bg-green-50 dark:bg-green-900/20 rounded-lg border border-green-200 dark:border-green-800">
+								<div class="flex items-center gap-3">
+									<div class="w-3 h-3 rounded-full bg-green-500"></div>
+									<span class="font-medium text-foreground">Active Vendors</span>
+								</div>
+								<span class="text-2xl font-bold text-green-600 dark:text-green-500">{metrics.vendors.active}</span>
+							</div>
+							
+							<div class="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-900/20 rounded-lg border border-gray-200 dark:border-gray-800">
+								<div class="flex items-center gap-3">
+									<div class="w-3 h-3 rounded-full bg-gray-500"></div>
+									<span class="font-medium text-foreground">Inactive Vendors</span>
+								</div>
+								<span class="text-2xl font-bold text-gray-600 dark:text-gray-400">{metrics.vendors.inactive}</span>
+							</div>
+							
+							<div class="pt-4 border-t">
+								<div class="flex justify-between items-center">
+									<span class="text-sm text-muted-foreground">Active Rate</span>
+									<span class="text-xl font-bold text-foreground">
+										{metrics.vendors.total > 0 ? ((metrics.vendors.active / metrics.vendors.total) * 100).toFixed(0) : 0}%
+									</span>
+								</div>
+							</div>
+						</div>
+					</Card>
+				</div>
+			</div>
+
+			<!-- Key Vendor Metrics -->
+			<div>
+				<h2 class="text-2xl font-bold mb-4">Key Metrics</h2>
+				<div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+					<Card class="p-6">
+						<div class="flex items-center justify-between mb-2">
+							<span class="text-sm text-muted-foreground">Total Vendors</span>
+							<Package class="size-4 text-muted-foreground" />
+						</div>
+						<p class="text-3xl font-bold">{metrics.vendors.total}</p>
+					</Card>
+					
+					<Card class="p-6">
+						<div class="flex items-center justify-between mb-2">
+							<span class="text-sm text-muted-foreground">Active Vendors</span>
+							<CheckCircle2 class="size-4 text-green-600" />
+						</div>
+						<p class="text-3xl font-bold text-green-600">{metrics.vendors.active}</p>
+						<p class="text-xs text-muted-foreground mt-1">
+							{metrics.vendors.total > 0 ? ((metrics.vendors.active / metrics.vendors.total) * 100).toFixed(0) : 0}% of total
+						</p>
+					</Card>
+					
+					<Card class="p-6">
+						<div class="flex items-center justify-between mb-2">
+							<span class="text-sm text-muted-foreground">Total Spending</span>
+							<DollarSign class="size-4 text-cyan-600" />
+						</div>
+						<p class="text-2xl font-bold text-cyan-600">{formatCurrency(metrics.vendors.totalSpend)}</p>
+					</Card>
+					
+					<Card class="p-6">
+						<div class="flex items-center justify-between mb-2">
+							<span class="text-sm text-muted-foreground">Avg per Vendor</span>
+							<TrendingUp class="size-4 text-blue-600" />
+						</div>
+						<p class="text-2xl font-bold text-blue-600">{formatCurrency(metrics.vendors.averageSpend)}</p>
+					</Card>
+				</div>
+			</div>
+		</div>
+	{/if}
+
+	<!-- Quick Actions (Always Visible) -->
 	<div>
 		<h2 class="text-2xl font-bold mb-4">Quick Actions</h2>
 		
@@ -741,80 +1409,6 @@
 		{/if}
 
 		<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-			{#if isAdmin}
-				<Card class="p-6 hover:shadow-lg transition-shadow border-2 border-blue-200 dark:border-blue-800">
-					<div class="flex items-center gap-4 mb-4">
-						<div class="flex size-12 items-center justify-center rounded-xl bg-blue-600 text-white">
-							<Database class="size-6 stroke-[2]" />
-						</div>
-						<h3 class="text-lg font-bold">Seed Expenses</h3>
-					</div>
-					<p class="text-muted-foreground mb-6 text-sm">Add test vendors and expenses</p>
-					<button 
-						type="button"
-						onclick={seedTestData} 
-						disabled={seedingData || restoringData || seedingApprovals || removingApprovals}
-						class="w-full px-4 py-3 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 active:bg-blue-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors cursor-pointer"
-					>
-						{seedingData ? 'Seeding...' : 'Seed Expenses Data'}
-					</button>
-				</Card>
-
-				<Card class="p-6 hover:shadow-lg transition-shadow border-2 border-red-200 dark:border-red-800">
-					<div class="flex items-center gap-4 mb-4">
-						<div class="flex size-12 items-center justify-center rounded-xl bg-red-600 text-white">
-							<XCircle class="size-6 stroke-[2]" />
-						</div>
-						<h3 class="text-lg font-bold">Remove Expenses</h3>
-					</div>
-					<p class="text-muted-foreground mb-6 text-sm">Delete test vendors and expenses</p>
-					<button 
-						type="button"
-						onclick={restoreTestData} 
-						disabled={seedingData || restoringData || seedingApprovals || removingApprovals}
-						class="w-full px-4 py-3 bg-red-600 text-white rounded-lg font-semibold hover:bg-red-700 active:bg-red-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors cursor-pointer"
-					>
-						{restoringData ? 'Removing...' : 'Remove Expenses Data'}
-					</button>
-				</Card>
-
-				<Card class="p-6 hover:shadow-lg transition-shadow border-2 border-green-200 dark:border-green-800">
-					<div class="flex items-center gap-4 mb-4">
-						<div class="flex size-12 items-center justify-center rounded-xl bg-green-600 text-white">
-							<CheckSquare class="size-6 stroke-[2]" />
-						</div>
-						<h3 class="text-lg font-bold">Seed Approvals</h3>
-					</div>
-					<p class="text-muted-foreground mb-6 text-sm">Add approval workflow test data</p>
-					<button 
-						type="button"
-						onclick={seedApprovals} 
-						disabled={seedingData || restoringData || seedingApprovals || removingApprovals}
-						class="w-full px-4 py-3 bg-green-600 text-white rounded-lg font-semibold hover:bg-green-700 active:bg-green-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors cursor-pointer"
-					>
-						{seedingApprovals ? 'Seeding...' : 'Seed Approval Data'}
-					</button>
-				</Card>
-
-				<Card class="p-6 hover:shadow-lg transition-shadow border-2 border-orange-200 dark:border-orange-800">
-					<div class="flex items-center gap-4 mb-4">
-						<div class="flex size-12 items-center justify-center rounded-xl bg-orange-600 text-white">
-							<RotateCcw class="size-6 stroke-[2]" />
-						</div>
-						<h3 class="text-lg font-bold">Remove Approvals</h3>
-					</div>
-					<p class="text-muted-foreground mb-6 text-sm">Delete approval test data</p>
-					<button 
-						type="button"
-						onclick={removeApprovals} 
-						disabled={seedingData || restoringData || seedingApprovals || removingApprovals}
-						class="w-full px-4 py-3 bg-orange-600 text-white rounded-lg font-semibold hover:bg-orange-700 active:bg-orange-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors cursor-pointer"
-					>
-						{removingApprovals ? 'Removing...' : 'Remove Approval Data'}
-					</button>
-				</Card>
-			{/if}
-			
 			{#if !isAdmin}
 				<Card class="p-6 hover:shadow-lg transition-shadow border-2">
 					<div class="flex items-center gap-4 mb-4">

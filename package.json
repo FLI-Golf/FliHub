@@ -16,6 +16,10 @@
     "test:seed:quick": "tsx scripts/seed-test-data.ts quick",
     "test:seed:full": "tsx scripts/seed-test-data.ts full",
     "test:seed:approvals": "tsx scripts/seed-approval-workflow.ts",
+    "test:seed:revenue": "tsx scripts/seed-revenue-data.ts",
+    "test:seed:players": "tsx scripts/seed-player-data.ts",
+    "test:seed:marketing": "tsx scripts/seed-marketing-data.ts",
+    "test:seed:vendors": "tsx scripts/seed-vendor-data.ts",
     "test:restore": "tsx scripts/restore-from-seed-backup.ts latest",
     "test:flow": "npm run test:backup && npm run test:seed:quick"
   },

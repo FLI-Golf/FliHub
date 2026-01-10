@@ -28,8 +28,14 @@
 				roles: ['sales', 'admin']
 			},
 			{
-				title: 'Franchise Sales',
+				title: 'Franchise Sales Overview',
 				url: '/dashboard/sales',
+				icon: TrendingUp,
+				roles: ['sales', 'admin']
+			},
+			{
+				title: 'Franchise Forecast',
+				url: '/dashboard/franchise-sales',
 				icon: TrendingUp,
 				roles: ['sales', 'admin']
 			},

@@ -31,14 +31,23 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 	try {
 		// Fetch counts and metrics with error handling for each collection
 		console.log('Fetching collection counts...');
-		const [projects, departments, expenses, userProfiles, approvals] = await Promise.allSettled([
+		const [projects, departments, expenses, userProfiles, approvals, sponsors, franchiseDeals, franchiseOpportunities, franchiseLeads, franchiseTerritories, pros, campaigns, marketingGoals, vendors] = await Promise.allSettled([
 			pb.collection('projects').getList(1, 1, { fields: 'id' }),
 			pb.collection('departments').getList(1, 1, { fields: 'id' }),
 			pb.collection('expenses').getList(1, 1, { fields: 'id' }),
 			pb.collection('user_profiles').getList(1, 1, { fields: 'id' }),
-			pb.collection('approvals').getList(1, 1, { fields: 'id' })
+			pb.collection('approvals').getList(1, 1, { fields: 'id' }),
+			pb.collection('sponsors').getList(1, 1, { fields: 'id' }),
+			pb.collection('franchise_deals').getList(1, 1, { fields: 'id' }),
+			pb.collection('franchise_opportunities').getList(1, 1, { fields: 'id' }),
+			pb.collection('franchise_leads').getList(1, 1, { fields: 'id' }),
+			pb.collection('franchise_territories').getList(1, 1, { fields: 'id' }),
+			pb.collection('pros').getList(1, 1, { fields: 'id' }),
+			pb.collection('campaigns').getList(1, 1, { fields: 'id' }),
+			pb.collection('marketing_goals').getList(1, 1, { fields: 'id' }),
+			pb.collection('vendors').getList(1, 1, { fields: 'id' })
 		]).then(results => results.map((r, i) => {
-			const collectionName = ['projects', 'departments', 'expenses', 'user_profiles', 'approvals'][i];
+			const collectionName = ['projects', 'departments', 'expenses', 'user_profiles', 'approvals', 'sponsors', 'franchise_deals', 'franchise_opportunities', 'franchise_leads', 'franchise_territories', 'pros', 'campaigns', 'marketing_goals', 'vendors'][i];
 			if (r.status === 'fulfilled') {
 				console.log(`✓ ${collectionName}: ${r.value.totalItems} items`);
 				return r.value;
@@ -148,6 +157,68 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 			console.error(`✗ Failed to fetch approvals ${status}:`, r.reason?.message);
 			return { totalItems: 0 };
 		}));
+
+		// Fetch sponsors data
+		console.log('Fetching sponsors data...');
+		let allSponsors = [];
+		try {
+			allSponsors = await pb.collection('sponsors').getFullList();
+			console.log(`✓ Fetched ${allSponsors.length} sponsors`);
+		} catch (err: any) {
+			console.error('✗ Failed to fetch sponsors:', err.message);
+		}
+
+		// Fetch franchise data
+		console.log('Fetching franchise data...');
+		let allFranchiseLeads = [];
+		let allFranchiseOpportunities = [];
+		let allFranchiseDeals = [];
+		let allFranchiseTerritories = [];
+		try {
+			[allFranchiseLeads, allFranchiseOpportunities, allFranchiseDeals, allFranchiseTerritories] = await Promise.all([
+				pb.collection('franchise_leads').getFullList().catch(() => []),
+				pb.collection('franchise_opportunities').getFullList().catch(() => []),
+				pb.collection('franchise_deals').getFullList().catch(() => []),
+				pb.collection('franchise_territories').getFullList().catch(() => [])
+			]);
+			console.log(`✓ Fetched franchise data: ${allFranchiseLeads.length} leads, ${allFranchiseOpportunities.length} opportunities, ${allFranchiseDeals.length} deals, ${allFranchiseTerritories.length} territories`);
+		} catch (err: any) {
+			console.error('✗ Failed to fetch franchise data:', err.message);
+		}
+
+		// Fetch pro players data
+		console.log('Fetching pro players data...');
+		let allPros = [];
+		try {
+			allPros = await pb.collection('pros').getFullList();
+			console.log(`✓ Fetched ${allPros.length} pro players`);
+		} catch (err: any) {
+			console.error('✗ Failed to fetch pros:', err.message);
+		}
+
+		// Fetch campaigns and marketing data
+		console.log('Fetching campaigns and marketing data...');
+		let allCampaigns = [];
+		let allMarketingGoals = [];
+		try {
+			[allCampaigns, allMarketingGoals] = await Promise.all([
+				pb.collection('campaigns').getFullList().catch(() => []),
+				pb.collection('marketing_goals').getFullList().catch(() => [])
+			]);
+			console.log(`✓ Fetched marketing data: ${allCampaigns.length} campaigns, ${allMarketingGoals.length} goals`);
+		} catch (err: any) {
+			console.error('✗ Failed to fetch marketing data:', err.message);
+		}
+
+		// Fetch vendors data
+		console.log('Fetching vendors data...');
+		let allVendors = [];
+		try {
+			allVendors = await pb.collection('vendors').getFullList();
+			console.log(`✓ Fetched ${allVendors.length} vendors`);
+		} catch (err: any) {
+			console.error('✗ Failed to fetch vendors:', err.message);
+		}
 
 		// Fetch ALL project details using the SAME method as the count query
 		let projectsWithBudget = [];
@@ -356,8 +427,172 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 			}
 		};
 
+		// Calculate sponsor metrics
+		const sponsorMetrics = {
+			total: allSponsors.length,
+			byTier: {
+				tier_1: allSponsors.filter(s => s.tier === 'tier_1').length,
+				tier_2: allSponsors.filter(s => s.tier === 'tier_2').length,
+				tier_3: allSponsors.filter(s => s.tier === 'tier_3').length,
+				tier_4: allSponsors.filter(s => s.tier === 'tier_4').length
+			},
+			byStatus: {
+				prospect: allSponsors.filter(s => s.status === 'prospect').length,
+				negotiating: allSponsors.filter(s => s.status === 'negotiating').length,
+				active: allSponsors.filter(s => s.status === 'active').length,
+				renewed: allSponsors.filter(s => s.status === 'renewed').length,
+				expired: allSponsors.filter(s => s.status === 'expired').length,
+				converted_to_franchise: allSponsors.filter(s => s.status === 'converted_to_franchise').length,
+				inactive: allSponsors.filter(s => s.status === 'inactive').length
+			},
+			byType: {
+				casino: allSponsors.filter(s => s.type === 'casino').length,
+				resort: allSponsors.filter(s => s.type === 'resort').length,
+				hospitality: allSponsors.filter(s => s.type === 'hospitality').length,
+				entertainment: allSponsors.filter(s => s.type === 'entertainment').length,
+				corporate: allSponsors.filter(s => s.type === 'corporate').length,
+				other: allSponsors.filter(s => s.type === 'other').length
+			},
+			totalCommitted: allSponsors.reduce((sum, s) => sum + (s.annualCommitment || 0), 0),
+			totalPaid: allSponsors.reduce((sum, s) => sum + (s.totalPaid || 0), 0)
+		};
+
+		// Calculate franchise metrics
+		const franchiseMetrics = {
+			pipeline: {
+				leads: allFranchiseLeads.length,
+				opportunities: allFranchiseOpportunities.length,
+				deals: allFranchiseDeals.length
+			},
+			deals: {
+				total: allFranchiseDeals.length,
+				byStatus: {
+					pending_signature: allFranchiseDeals.filter(d => d.status === 'pending_signature').length,
+					signed: allFranchiseDeals.filter(d => d.status === 'signed').length,
+					payment_pending: allFranchiseDeals.filter(d => d.status === 'payment_pending').length,
+					payment_received: allFranchiseDeals.filter(d => d.status === 'payment_received').length,
+					onboarding: allFranchiseDeals.filter(d => d.status === 'onboarding').length,
+					active: allFranchiseDeals.filter(d => d.status === 'active').length,
+					cancelled: allFranchiseDeals.filter(d => d.status === 'cancelled').length
+				},
+				totalValue: allFranchiseDeals.reduce((sum, d) => sum + (d.dealValue || 0), 0),
+				totalReceived: allFranchiseDeals.reduce((sum, d) => sum + (d.paymentReceived || 0), 0),
+				averageDealValue: allFranchiseDeals.length > 0 
+					? allFranchiseDeals.reduce((sum, d) => sum + (d.dealValue || 0), 0) / allFranchiseDeals.length 
+					: 0
+			},
+			territories: {
+				total: allFranchiseTerritories.length,
+				available: allFranchiseTerritories.filter(t => t.status === 'available').length,
+				reserved: allFranchiseTerritories.filter(t => t.status === 'reserved').length,
+				sold: allFranchiseTerritories.filter(t => t.status === 'sold').length
+			},
+			conversionRates: {
+				leadToOpportunity: allFranchiseLeads.length > 0 ? allFranchiseOpportunities.length / allFranchiseLeads.length : 0,
+				opportunityToDeal: allFranchiseOpportunities.length > 0 ? allFranchiseDeals.length / allFranchiseOpportunities.length : 0,
+				leadToDeal: allFranchiseLeads.length > 0 ? allFranchiseDeals.length / allFranchiseLeads.length : 0
+			}
+		};
+
+		// Calculate pro player metrics
+		const proMetrics = {
+			total: allPros.length,
+			active: allPros.filter(p => p.status === 'active').length,
+			inactive: allPros.filter(p => p.status === 'inactive').length,
+			retired: allPros.filter(p => p.status === 'retired').length,
+			byGender: {
+				male: allPros.filter(p => p.gender === 'male').length,
+				female: allPros.filter(p => p.gender === 'female').length,
+				other: allPros.filter(p => p.gender === 'other').length
+			},
+			withContracts: allPros.filter(p => p.signedContract).length,
+			topRanked: allPros.filter(p => p.worldRanking && p.worldRanking <= 100).length,
+			byCountry: allPros.reduce((acc, p) => {
+				if (p.country) {
+					acc[p.country] = (acc[p.country] || 0) + 1;
+				}
+				return acc;
+			}, {} as Record<string, number>)
+		};
+
+		// Calculate marketing metrics
+		const marketingMetrics = {
+			campaigns: {
+				total: allCampaigns.length,
+				active: allCampaigns.filter(c => c.status === 'Active').length,
+				byStatus: {
+					planning: allCampaigns.filter(c => c.status === 'Planning').length,
+					active: allCampaigns.filter(c => c.status === 'Active').length,
+					paused: allCampaigns.filter(c => c.status === 'Paused').length,
+					completed: allCampaigns.filter(c => c.status === 'Completed').length,
+					cancelled: allCampaigns.filter(c => c.status === 'Cancelled').length
+				},
+				byType: allCampaigns.reduce((acc, c) => {
+					if (c.type) {
+						acc[c.type] = (acc[c.type] || 0) + 1;
+					}
+					return acc;
+				}, {} as Record<string, number>),
+				totalBudget: allCampaigns.reduce((sum, c) => sum + (c.budget || 0), 0),
+				totalSpend: allCampaigns.reduce((sum, c) => sum + (c.actualSpend || 0), 0),
+				averageBudget: allCampaigns.length > 0 
+					? allCampaigns.reduce((sum, c) => sum + (c.budget || 0), 0) / allCampaigns.length 
+					: 0
+			},
+			goals: {
+				total: allMarketingGoals.length,
+				completed: allMarketingGoals.filter(g => g.status === 'Completed').length,
+				inProgress: allMarketingGoals.filter(g => g.status === 'In Progress').length,
+				notStarted: allMarketingGoals.filter(g => g.status === 'Not Started').length,
+				completionRate: allMarketingGoals.length > 0 
+					? (allMarketingGoals.filter(g => g.status === 'Completed').length / allMarketingGoals.length) * 100 
+					: 0
+			}
+		};
+
+		// Calculate vendor metrics
+		const vendorSpending = allVendors.map(vendor => {
+			const vendorExpenses = allExpenses.filter(e => e.vendorId === vendor.id);
+			return {
+				id: vendor.id,
+				name: vendor.name,
+				totalSpend: vendorExpenses.reduce((sum, e) => sum + (e.amount || 0), 0),
+				expenseCount: vendorExpenses.length,
+				status: vendor.status,
+				category: vendor.category
+			};
+		}).sort((a, b) => b.totalSpend - a.totalSpend);
+
+		const vendorMetrics = {
+			total: allVendors.length,
+			active: allVendors.filter(v => v.status === 'active').length,
+			inactive: allVendors.filter(v => v.status === 'inactive').length,
+			totalSpend: vendorSpending.reduce((sum, v) => sum + v.totalSpend, 0),
+			topVendors: vendorSpending.slice(0, 10),
+			byCategory: allVendors.reduce((acc, v) => {
+				if (v.category) {
+					acc[v.category] = (acc[v.category] || 0) + 1;
+				}
+				return acc;
+			}, {} as Record<string, number>),
+			averageSpend: vendorSpending.length > 0 
+				? vendorSpending.reduce((sum, v) => sum + v.totalSpend, 0) / vendorSpending.length 
+				: 0
+		};
+
+		console.log('✓ Sponsor metrics calculated:', sponsorMetrics);
+		console.log('✓ Franchise metrics calculated:', franchiseMetrics);
+		console.log('✓ Pro player metrics calculated:', proMetrics);
+		console.log('✓ Marketing metrics calculated:', marketingMetrics);
+		console.log('✓ Vendor metrics calculated:', vendorMetrics);
+
 		const result = {
 			metrics: {
+				sponsors: sponsorMetrics,
+				franchises: franchiseMetrics,
+				pros: proMetrics,
+				marketing: marketingMetrics,
+				vendors: vendorMetrics,
 				projects: {
 					total: projects.totalItems,
 					draft: projectsWithBudget.filter(p => p.status === 'draft').length,
