@@ -37,17 +37,21 @@
 		// Sort by budget descending
 		const sortedData = [...departments].sort((a, b) => b.budget - a.budget);
 
-		const width = 500;
-		const height = Math.max(300, sortedData.length * 50);
-		const margin = { top: 20, right: 120, bottom: 40, left: 150 };
+		// Use container width for responsive sizing
+		const containerWidth = chartContainer.clientWidth || 800;
+		const width = Math.max(containerWidth, 600);
+		const height = Math.max(400, sortedData.length * 60);
+		const margin = { top: 20, right: 140, bottom: 50, left: 180 };
 		const innerWidth = width - margin.left - margin.right;
 		const innerHeight = height - margin.top - margin.bottom;
 
 		const svg = d3
 			.select(chartContainer)
 			.append('svg')
-			.attr('width', width)
+			.attr('width', '100%')
 			.attr('height', height)
+			.attr('viewBox', `0 0 ${width} ${height}`)
+			.attr('preserveAspectRatio', 'xMinYMin meet')
 			.append('g')
 			.attr('transform', `translate(${margin.left},${margin.top})`);
 
@@ -56,7 +60,7 @@
 			.scaleBand()
 			.domain(sortedData.map((d) => d.name))
 			.range([0, innerHeight])
-			.padding(0.3);
+			.padding(0.4);
 
 		const maxValue = d3.max(sortedData, (d) => Math.max(d.budget, d.actual)) || 100;
 		const x = d3
@@ -71,17 +75,18 @@
 			.call(d3.axisLeft(y))
 			.selectAll('text')
 			.style('fill', 'currentColor')
-			.style('font-size', '12px');
+			.style('font-size', '13px')
+			.style('font-weight', '500');
 
 		// X axis (budget amounts)
 		svg
 			.append('g')
 			.attr('transform', `translate(0,${innerHeight})`)
-			.call(d3.axisBottom(x).ticks(5).tickFormat(d => formatCurrency(d as number)))
+			.call(d3.axisBottom(x).ticks(6).tickFormat(d => formatCurrency(d as number)))
 			.selectAll('text')
 			.style('fill', 'currentColor')
-			.style('font-size', '11px')
-			.attr('transform', 'rotate(-15)')
+			.style('font-size', '12px')
+			.attr('transform', 'rotate(-20)')
 			.style('text-anchor', 'end');
 
 		// Style axis lines
@@ -159,17 +164,33 @@
 			.enter()
 			.append('text')
 			.attr('class', 'value-label')
-			.attr('x', (d) => x(d.actual) + 5)
+			.attr('x', (d) => x(d.actual) + 8)
 			.attr('y', (d) => y(d.name)! + y.bandwidth() / 2)
 			.attr('dy', '0.35em')
-			.style('font-size', '11px')
-			.style('font-weight', 'bold')
+			.style('font-size', '12px')
+			.style('font-weight', '600')
 			.style('fill', 'currentColor')
 			.text((d) => formatCurrency(d.actual));
 	}
-
+	
+	// Add resize observer to handle window resizing
+	let resizeObserver: ResizeObserver;
+	
 	onMount(() => {
 		createChart();
+		
+		if (chartContainer) {
+			resizeObserver = new ResizeObserver(() => {
+				createChart();
+			});
+			resizeObserver.observe(chartContainer);
+		}
+		
+		return () => {
+			if (resizeObserver) {
+				resizeObserver.disconnect();
+			}
+		};
 	});
 
 	$effect(() => {
@@ -202,6 +223,13 @@
 <style>
 	.chart-container {
 		width: 100%;
+		min-height: 400px;
 		overflow-x: auto;
+	}
+	
+	.chart-container :global(svg) {
+		display: block;
+		max-width: 100%;
+		height: auto;
 	}
 </style>
