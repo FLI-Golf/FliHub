@@ -116,12 +116,25 @@
 							</div>
 						</div>
 						
-						<!-- Franchise Fee -->
-						<div class="pt-2 border-t">
-							<div class="text-xs text-muted-foreground">Franchise Fee</div>
+						<!-- Franchise Value -->
+						<div class="pt-2 border-t space-y-1">
+							<div class="text-xs text-muted-foreground">Franchise Value</div>
 							<div class="text-xl font-bold" style="color: {franchise.primaryColor || '#3B82F6'}">
-								{formatCurrency(franchise.franchiseFee || 0)}
+								{formatCurrency(franchise.netFranchiseValue || franchise.franchiseFee || 0)}
 							</div>
+							{#if franchise.sponsorshipDiscount && franchise.sponsorshipDiscount > 0}
+								<div class="text-xs text-green-600 dark:text-green-400">
+									💰 {formatCurrency(franchise.sponsorshipDiscount)} sponsor discount
+								</div>
+							{/if}
+							{#if franchise.totalPaidToDate && franchise.totalPaidToDate > 0}
+								<div class="text-xs text-muted-foreground">
+									✅ {formatCurrency(franchise.totalPaidToDate)} paid
+									{#if franchise.outstandingBalance && franchise.outstandingBalance > 0}
+										<br/>⏳ {formatCurrency(franchise.outstandingBalance)} outstanding
+									{/if}
+								</div>
+							{/if}
 						</div>
 					</div>
 				</Card>

@@ -3,10 +3,11 @@
 	import Badge from '$lib/components/ui/badge.svelte';
 	import { Button } from '$lib/components/ui/button';
 	import { ArrowLeft } from 'lucide-svelte';
+	import LeagueDashboard from '$lib/components/league/LeagueDashboard.svelte';
 	import type { PageData } from './$types';
 
 	export let data: PageData;
-	const { league } = data;
+	const { league, franchises, deals, opportunities } = data;
 
 	const pbUrl = 'https://pocketbase-production-6ab5.up.railway.app';
 
@@ -137,25 +138,11 @@
 			</div>
 		</Card>
 
-		<!-- Financial Information -->
-		<Card class="p-6">
-			<h3 class="text-lg font-semibold mb-4">Financial Overview</h3>
-			<div class="space-y-4">
-				{#if league.projectedRevenue}
-					<div class="flex justify-between">
-						<span class="text-sm text-muted-foreground">Projected Revenue</span>
-						<span class="text-sm font-medium">{formatCurrency(league.projectedRevenue)}</span>
-					</div>
-				{/if}
-
-				{#if league.valuationCurrent}
-					<div class="flex justify-between">
-						<span class="text-sm text-muted-foreground">Current Valuation</span>
-						<span class="text-sm font-medium">{formatCurrency(league.valuationCurrent)}</span>
-					</div>
-				{/if}
-			</div>
-		</Card>
+		<!-- Financial Dashboard -->
+		<div class="lg:col-span-2">
+			<h2 class="text-2xl font-bold mb-6">Financial Overview</h2>
+			<LeagueDashboard {league} {franchises} {deals} {opportunities} />
+		</div>
 
 		<!-- Brand Spec Sheet -->
 		{#if specSheets.length > 0}

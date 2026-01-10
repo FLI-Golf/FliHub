@@ -64,19 +64,21 @@ export const load: PageServerLoad = async ({ locals }) => {
 				negotiation: opportunities.filter(o => o.status === 'negotiation').length,
 				closedWon: opportunities.filter(o => o.status === 'closed_won').length,
 				closedLost: opportunities.filter(o => o.status === 'closed_lost').length,
-				totalValue: opportunities.reduce((sum, o) => sum + (o.estimatedValue || 0), 0)
+				totalValue: opportunities.reduce((sum, o) => sum + (o.dealValue || o.estimatedValue || 0), 0)
 			},
 			deals: {
 				total: deals.length,
 				pendingSignature: deals.filter(d => d.status === 'pending_signature').length,
 				signed: deals.filter(d => d.status === 'signed').length,
 				paymentPending: deals.filter(d => d.status === 'payment_pending').length,
-				paymentReceived: deals.filter(d => d.status === 'payment_received').length,
+				paymentInProgress: deals.filter(d => d.status === 'payment_in_progress').length,
+				paymentReceived: deals.filter(d => d.status === 'payment_received' || d.status === 'payment_completed').length,
 				onboarding: deals.filter(d => d.status === 'onboarding').length,
 				active: deals.filter(d => d.status === 'active').length,
 				cancelled: deals.filter(d => d.status === 'cancelled').length,
-				totalValue: deals.reduce((sum, d) => sum + (d.dealValue || 0), 0),
-				totalReceived: deals.reduce((sum, d) => sum + (d.paymentReceived || 0), 0)
+				defaulted: deals.filter(d => d.status === 'defaulted').length,
+				totalValue: deals.reduce((sum, d) => sum + (d.netFranchiseValue || d.dealValue || 0), 0),
+				totalReceived: deals.reduce((sum, d) => sum + (d.totalPaidToDate || d.paymentReceived || 0), 0)
 			},
 			territories: {
 				total: territories.length,
@@ -91,15 +93,17 @@ export const load: PageServerLoad = async ({ locals }) => {
 			}
 		};
 
-		// Calculate revenue metrics
+		// Calculate revenue metrics using new financial fields
 		const revenueMetrics = {
-			committed: deals.reduce((sum, d) => sum + (d.dealValue || 0), 0),
-			received: deals.reduce((sum, d) => sum + (d.paymentReceived || 0), 0),
-			outstanding: deals.reduce((sum, d) => sum + ((d.dealValue || 0) - (d.paymentReceived || 0)), 0),
-			averageDealSize: deals.length > 0 ? deals.reduce((sum, d) => sum + (d.dealValue || 0), 0) / deals.length : 0,
-			collectionRate: deals.reduce((sum, d) => sum + (d.dealValue || 0), 0) > 0 
-				? (deals.reduce((sum, d) => sum + (d.paymentReceived || 0), 0) / deals.reduce((sum, d) => sum + (d.dealValue || 0), 0)) * 100 
-				: 0
+			committed: deals.reduce((sum, d) => sum + (d.netFranchiseValue || d.dealValue || 0), 0),
+			received: deals.reduce((sum, d) => sum + (d.totalPaidToDate || d.paymentReceived || 0), 0),
+			outstanding: deals.reduce((sum, d) => sum + (d.outstandingBalance || ((d.netFranchiseValue || d.dealValue || 0) - (d.totalPaidToDate || d.paymentReceived || 0))), 0),
+			averageDealSize: deals.length > 0 ? deals.reduce((sum, d) => sum + (d.netFranchiseValue || d.dealValue || 0), 0) / deals.length : 0,
+			collectionRate: deals.reduce((sum, d) => sum + (d.netFranchiseValue || d.dealValue || 0), 0) > 0 
+				? (deals.reduce((sum, d) => sum + (d.totalPaidToDate || d.paymentReceived || 0), 0) / deals.reduce((sum, d) => sum + (d.netFranchiseValue || d.dealValue || 0), 0)) * 100 
+				: 0,
+			totalDiscounts: deals.reduce((sum, d) => sum + (d.sponsorshipDiscount || 0), 0),
+			sponsorConversions: deals.filter(d => d.sponsorBridgeId).length
 		};
 
 		// Group deals by month for trend analysis
@@ -108,13 +112,14 @@ export const load: PageServerLoad = async ({ locals }) => {
 				const date = new Date(deal.contractSignedDate);
 				const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
 				if (!acc[monthKey]) {
-					acc[monthKey] = { count: 0, value: 0 };
+					acc[monthKey] = { count: 0, value: 0, paid: 0 };
 				}
 				acc[monthKey].count++;
-				acc[monthKey].value += deal.dealValue || 0;
+				acc[monthKey].value += deal.netFranchiseValue || deal.dealValue || 0;
+				acc[monthKey].paid += deal.totalPaidToDate || deal.paymentReceived || 0;
 			}
 			return acc;
-		}, {} as Record<string, { count: number; value: number }>);
+		}, {} as Record<string, { count: number; value: number; paid: number }>);
 
 		return {
 			userProfile,

@@ -10,12 +10,22 @@
 	// Form state
 	let formData = $state({
 		name: '',
+		type: '',
 		contact_email: '',
 		contact_phone: '',
 		website: '',
 		about: '',
 		active: true
 	});
+
+	const vendorTypes = [
+		{ value: 'venue', label: 'Venue' },
+		{ value: 'product_supplier', label: 'Product Supplier' },
+		{ value: 'beverage', label: 'Beverage' },
+		{ value: 'technology', label: 'Technology' },
+		{ value: 'gaming', label: 'Gaming' },
+		{ value: 'service_provider', label: 'Service Provider' }
+	];
 
 	let isSubmitting = $state(false);
 	let error = $state('');
@@ -55,6 +65,7 @@
 	function resetForm() {
 		formData = {
 			name: '',
+			type: '',
 			contact_email: '',
 			contact_phone: '',
 			website: '',
@@ -101,6 +112,21 @@
 					required
 					class="bg-slate-800 border-slate-700 text-white placeholder:text-slate-400"
 				/>
+			</div>
+
+			<!-- Vendor Type -->
+			<div class="space-y-2">
+				<Label for="type" class="text-slate-200">Vendor Type</Label>
+				<select
+					id="type"
+					bind:value={formData.type}
+					class="flex h-10 w-full rounded-md border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-500 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-900"
+				>
+					<option value="">Select a type...</option>
+					{#each vendorTypes as type}
+						<option value={type.value}>{type.label}</option>
+					{/each}
+				</select>
 			</div>
 
 			<!-- Contact Email -->

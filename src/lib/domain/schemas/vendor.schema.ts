@@ -1,9 +1,19 @@
 import { z } from 'zod';
 
+export const VendorTypeEnum = z.enum([
+	'venue',
+	'product_supplier',
+	'beverage',
+	'technology',
+	'gaming',
+	'service_provider'
+]);
+
 export const VendorSchema = z.object({
 	id: z.string().optional(),
 	active: z.boolean().default(true),
 	name: z.string().optional(),
+	type: VendorTypeEnum.optional(),
 	contact_email: z.string().email().optional().or(z.literal('')),
 	contact_phone: z.string().optional(),
 	website: z.string().url().optional().or(z.literal('')),
@@ -16,3 +26,4 @@ export const VendorSchema = z.object({
 });
 
 export type VendorInput = z.infer<typeof VendorSchema>;
+export type VendorType = z.infer<typeof VendorTypeEnum>;
