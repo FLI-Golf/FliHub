@@ -1,6 +1,6 @@
 <script lang="ts">
 	import Card from '$lib/components/ui/card.svelte';
-	import Badge from '$lib/components/ui/badge.svelte';
+	import { Badge } from '$lib/components/ui/badge';
 	import type { PageData } from './$types';
 
 	export let data: PageData;

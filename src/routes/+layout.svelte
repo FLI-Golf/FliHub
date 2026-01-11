@@ -3,5 +3,5 @@
 	import { ModeWatcher } from 'mode-watcher';
 </script>
 
-<ModeWatcher defaultMode="dark" track={false} />
+<ModeWatcher defaultMode="dark" />
 <slot />

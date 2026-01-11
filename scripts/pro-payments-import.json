@@ -1,0 +1,220 @@
+[
+  {
+    "id": "pbc_599686574",
+    "name": "pro_payments",
+    "type": "base",
+    "system": false,
+    "schema": [
+      {
+        "system": true,
+        "id": "text3208210256",
+        "name": "id",
+        "type": "text",
+        "required": true,
+        "presentable": false,
+        "unique": false,
+        "options": {
+          "min": 15,
+          "max": 15,
+          "pattern": "^[a-z0-9]+$"
+        }
+      },
+      {
+        "system": false,
+        "id": "relation_pro",
+        "name": "pro",
+        "type": "relation",
+        "required": true,
+        "presentable": false,
+        "unique": false,
+        "options": {
+          "collectionId": "pbc_292221920",
+          "cascadeDelete": false,
+          "minSelect": null,
+          "maxSelect": 1,
+          "displayFields": [
+            "name"
+          ]
+        }
+      },
+      {
+        "system": false,
+        "id": "select_paymentType",
+        "name": "paymentType",
+        "type": "select",
+        "required": true,
+        "presentable": false,
+        "unique": false,
+        "options": {
+          "maxSelect": 1,
+          "values": [
+            "tournament",
+            "special_event",
+            "bonus",
+            "other"
+          ]
+        }
+      },
+      {
+        "system": false,
+        "id": "relation_tournament",
+        "name": "tournament",
+        "type": "relation",
+        "required": false,
+        "presentable": false,
+        "unique": false,
+        "options": {
+          "collectionId": "pbc_340646327",
+          "cascadeDelete": false,
+          "minSelect": null,
+          "maxSelect": 1,
+          "displayFields": [
+            "name"
+          ]
+        }
+      },
+      {
+        "system": false,
+        "id": "relation_specialEvent",
+        "name": "specialEvent",
+        "type": "relation",
+        "required": false,
+        "presentable": false,
+        "unique": false,
+        "options": {
+          "collectionId": "pbc_1964731765",
+          "cascadeDelete": false,
+          "minSelect": null,
+          "maxSelect": 1,
+          "displayFields": [
+            "name"
+          ]
+        }
+      },
+      {
+        "system": false,
+        "id": "number_amount",
+        "name": "amount",
+        "type": "number",
+        "required": true,
+        "presentable": false,
+        "unique": false,
+        "options": {
+          "min": 0,
+          "max": null,
+          "noDecimal": false
+        }
+      },
+      {
+        "system": false,
+        "id": "date_paymentDate",
+        "name": "paymentDate",
+        "type": "date",
+        "required": false,
+        "presentable": false,
+        "unique": false,
+        "options": {
+          "min": "",
+          "max": ""
+        }
+      },
+      {
+        "system": false,
+        "id": "date_dueDate",
+        "name": "dueDate",
+        "type": "date",
+        "required": false,
+        "presentable": false,
+        "unique": false,
+        "options": {
+          "min": "",
+          "max": ""
+        }
+      },
+      {
+        "system": false,
+        "id": "select_status",
+        "name": "status",
+        "type": "select",
+        "required": true,
+        "presentable": false,
+        "unique": false,
+        "options": {
+          "maxSelect": 1,
+          "values": [
+            "pending",
+            "processing",
+            "paid",
+            "cancelled"
+          ]
+        }
+      },
+      {
+        "system": false,
+        "id": "select_paymentMethod",
+        "name": "paymentMethod",
+        "type": "select",
+        "required": false,
+        "presentable": false,
+        "unique": false,
+        "options": {
+          "maxSelect": 1,
+          "values": [
+            "bank_transfer",
+            "check",
+            "paypal",
+            "venmo",
+            "zelle",
+            "other"
+          ]
+        }
+      },
+      {
+        "system": false,
+        "id": "text_transactionId",
+        "name": "transactionId",
+        "type": "text",
+        "required": false,
+        "presentable": false,
+        "unique": false,
+        "options": {
+          "min": null,
+          "max": 255,
+          "pattern": ""
+        }
+      },
+      {
+        "system": false,
+        "id": "text_description",
+        "name": "description",
+        "type": "text",
+        "required": false,
+        "presentable": false,
+        "unique": false,
+        "options": {
+          "min": null,
+          "max": 1000,
+          "pattern": ""
+        }
+      },
+      {
+        "system": false,
+        "id": "editor_notes",
+        "name": "notes",
+        "type": "editor",
+        "required": false,
+        "presentable": false,
+        "unique": false,
+        "options": {
+          "convertUrls": false
+        }
+      }
+    ],
+    "indexes": [],
+    "listRule": "@request.auth.id != \"\"",
+    "viewRule": "@request.auth.id != \"\"",
+    "createRule": "@request.auth.id != \"\"",
+    "updateRule": "@request.auth.id != \"\"",
+    "deleteRule": "@request.auth.id != \"\""
+  }
+]

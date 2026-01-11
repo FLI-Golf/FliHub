@@ -1,0 +1,192 @@
+[
+  {
+    "id": "pbc_599686574",
+    "listRule": "@request.auth.id != \"\"",
+    "viewRule": "@request.auth.id != \"\"",
+    "createRule": "@request.auth.id != \"\"",
+    "updateRule": "@request.auth.id != \"\"",
+    "deleteRule": "@request.auth.id != \"\"",
+    "name": "pro_payments",
+    "type": "base",
+    "fields": [
+      {
+        "autogeneratePattern": "[a-z0-9]{15}",
+        "hidden": false,
+        "id": "text3208210256",
+        "max": 15,
+        "min": 15,
+        "name": "id",
+        "pattern": "^[a-z0-9]+$",
+        "presentable": false,
+        "primaryKey": true,
+        "required": true,
+        "system": true,
+        "type": "text"
+      },
+      {
+        "cascadeDelete": false,
+        "collectionId": "pbc_292221920",
+        "hidden": false,
+        "id": "relation_pro",
+        "maxSelect": 1,
+        "minSelect": 0,
+        "name": "pro",
+        "presentable": false,
+        "required": true,
+        "system": false,
+        "type": "relation"
+      },
+      {
+        "hidden": false,
+        "id": "select_paymentType",
+        "maxSelect": 1,
+        "name": "paymentType",
+        "presentable": false,
+        "required": true,
+        "system": false,
+        "type": "select",
+        "values": [
+          "tournament",
+          "special_event",
+          "bonus",
+          "other"
+        ]
+      },
+      {
+        "cascadeDelete": false,
+        "collectionId": "pbc_340646327",
+        "hidden": false,
+        "id": "relation_tournament",
+        "maxSelect": 1,
+        "minSelect": 0,
+        "name": "tournament",
+        "presentable": false,
+        "required": false,
+        "system": false,
+        "type": "relation"
+      },
+      {
+        "cascadeDelete": false,
+        "collectionId": "pbc_1964731765",
+        "hidden": false,
+        "id": "relation_specialEvent",
+        "maxSelect": 1,
+        "minSelect": 0,
+        "name": "specialEvent",
+        "presentable": false,
+        "required": false,
+        "system": false,
+        "type": "relation"
+      },
+      {
+        "hidden": false,
+        "id": "number_amount",
+        "max": null,
+        "min": 0,
+        "name": "amount",
+        "onlyInt": false,
+        "presentable": false,
+        "required": true,
+        "system": false,
+        "type": "number"
+      },
+      {
+        "hidden": false,
+        "id": "date_paymentDate",
+        "max": "",
+        "min": "",
+        "name": "paymentDate",
+        "presentable": false,
+        "required": false,
+        "system": false,
+        "type": "date"
+      },
+      {
+        "hidden": false,
+        "id": "date_dueDate",
+        "max": "",
+        "min": "",
+        "name": "dueDate",
+        "presentable": false,
+        "required": false,
+        "system": false,
+        "type": "date"
+      },
+      {
+        "hidden": false,
+        "id": "select_status",
+        "maxSelect": 1,
+        "name": "status",
+        "presentable": false,
+        "required": true,
+        "system": false,
+        "type": "select",
+        "values": [
+          "pending",
+          "processing",
+          "paid",
+          "cancelled"
+        ]
+      },
+      {
+        "hidden": false,
+        "id": "select_paymentMethod",
+        "maxSelect": 1,
+        "name": "paymentMethod",
+        "presentable": false,
+        "required": false,
+        "system": false,
+        "type": "select",
+        "values": [
+          "bank_transfer",
+          "check",
+          "paypal",
+          "venmo",
+          "zelle",
+          "other"
+        ]
+      },
+      {
+        "autogeneratePattern": "",
+        "hidden": false,
+        "id": "text_transactionId",
+        "max": 255,
+        "min": 0,
+        "name": "transactionId",
+        "pattern": "",
+        "presentable": false,
+        "primaryKey": false,
+        "required": false,
+        "system": false,
+        "type": "text"
+      },
+      {
+        "autogeneratePattern": "",
+        "hidden": false,
+        "id": "text_description",
+        "max": 1000,
+        "min": 0,
+        "name": "description",
+        "pattern": "",
+        "presentable": false,
+        "primaryKey": false,
+        "required": false,
+        "system": false,
+        "type": "text"
+      },
+      {
+        "convertURLs": false,
+        "hidden": false,
+        "id": "editor_notes",
+        "maxSize": 0,
+        "name": "notes",
+        "presentable": false,
+        "required": false,
+        "system": false,
+        "type": "editor"
+      }
+    ],
+    "indexes": [],
+    "system": false
+  }
+]

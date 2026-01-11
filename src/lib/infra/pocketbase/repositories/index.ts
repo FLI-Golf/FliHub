@@ -1,2 +1,10 @@
 export { BaseRepo } from './BaseRepo';
 export type { QueryOptions } from './BaseRepo';
+export { TournamentRepo } from './TournamentRepo';
+export type { TournamentRecord } from './TournamentRepo';
+export { TournamentResultRepo } from './TournamentResultRepo';
+export type { TournamentResultRecord } from './TournamentResultRepo';
+export { SpecialEventRepo } from './SpecialEventRepo';
+export type { SpecialEventRecord } from './SpecialEventRepo';
+export { ProPaymentRepo } from './ProPaymentRepo';
+export type { ProPaymentRecord } from './ProPaymentRepo';
