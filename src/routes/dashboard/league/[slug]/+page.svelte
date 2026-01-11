@@ -1,6 +1,6 @@
 <script lang="ts">
 	import Card from '$lib/components/ui/card.svelte';
-	import Badge from '$lib/components/ui/badge.svelte';
+	import { Badge } from '$lib/components/ui/badge';
 	import { Button } from '$lib/components/ui/button';
 	import { ArrowLeft } from 'lucide-svelte';
 	import LeagueDashboard from '$lib/components/league/LeagueDashboard.svelte';

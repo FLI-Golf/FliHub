@@ -11,7 +11,8 @@
 		Trophy,
 		Award,
 		TrendingUp,
-		Star
+		Star,
+		UserCircle
 	} from 'lucide-svelte';
 
 	const data = {
@@ -48,6 +49,11 @@
 				title: 'Franchises',
 				url: '/dashboard/franchises',
 				icon: Trophy
+			},
+			{
+				title: 'Manage Pros',
+				url: '/dashboard/pros',
+				icon: UserCircle
 			},
 			{
 				title: 'Departments',

@@ -1,7 +1,7 @@
 <script lang="ts">
 	import type { PageData } from './$types';
 	import Card from '$lib/components/ui/card.svelte';
-	import Badge from '$lib/components/ui/badge.svelte';
+	import { Badge } from '$lib/components/ui/badge';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import { Separator } from '$lib/components/ui/separator/index.js';
 	import { ArrowLeft, Download, ExternalLink } from 'lucide-svelte';
