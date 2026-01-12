@@ -12,7 +12,8 @@
 		Award,
 		TrendingUp,
 		Star,
-		UserCircle
+		UserCircle,
+		Network
 	} from 'lucide-svelte';
 
 	const data = {
@@ -89,6 +90,11 @@
 				title: 'Approvals',
 				url: '/dashboard/approvals',
 				icon: CheckSquare
+			},
+			{
+				title: 'Schema Guide',
+				url: '/dashboard/schema-guide',
+				icon: Network
 			}
 		]
 	};
@@ -127,8 +133,8 @@
 			return ['Dashboard', 'Projects', 'Expenses'].includes(item.title);
 		}
 		if (userRole === 'leader') {
-			// Leaders see: Dashboard (their department), Projects, Tasks, Expenses, Approvals
-			return ['Dashboard', 'Projects', 'Tasks', 'Expenses', 'Approvals'].includes(item.title);
+			// Leaders see: Dashboard (their department), Projects, Tasks, Expenses, Approvals, Schema Guide
+			return ['Dashboard', 'Projects', 'Tasks', 'Expenses', 'Approvals', 'Schema Guide'].includes(item.title);
 		}
 		if (userRole === 'pro' || userRole === 'franchise_owner') {
 			// Pros and franchise owners see limited views
