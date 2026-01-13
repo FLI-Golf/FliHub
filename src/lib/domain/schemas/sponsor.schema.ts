@@ -24,24 +24,24 @@ export const SponsorTypeEnum = z.enum([
 // Tier pricing structure by year
 export const SPONSOR_TIER_PRICING = {
 	tier_1: {
-		2025: 7000000,
-		2026: 5000000,
-		2027: 3000000
+		2026: 7000000,
+		2027: 5000000,
+		2028: 3000000
 	},
 	tier_2: {
-		2025: 5000000,
-		2026: 7000000,
-		2027: 9000000
+		2026: 5000000,
+		2027: 7000000,
+		2028: 9000000
 	},
 	tier_3: {
-		2025: 1000000,
 		2026: 1000000,
-		2027: 2000000
+		2027: 1000000,
+		2028: 2000000
 	},
 	tier_4: {
-		2025: 1000000,
-		2026: 1500000,
-		2027: 2000000
+		2026: 1000000,
+		2027: 1500000,
+		2028: 2000000
 	}
 } as const;
 
@@ -78,7 +78,7 @@ export const SponsorSchema = z.object({
 	// Contract details
 	contractStartDate: z.date().optional(),
 	contractEndDate: z.date().optional(),
-	currentYear: z.number().int().min(2025).max(2027).optional(),
+	currentYear: z.number().int().min(2026).max(2028).optional(),
 	
 	// Financial
 	annualCommitment: z.number().min(0).optional(),
@@ -103,15 +103,15 @@ export type SponsorStatus = z.infer<typeof SponsorStatusEnum>;
 export type SponsorType = z.infer<typeof SponsorTypeEnum>;
 
 // Helper function to get pricing for a tier and year
-export function getSponsorPricing(tier: SponsorTier, year: 2025 | 2026 | 2027): number {
+export function getSponsorPricing(tier: SponsorTier, year: 2026 | 2027 | 2028): number {
 	return SPONSOR_TIER_PRICING[tier][year];
 }
 
 // Helper function to calculate total 3-year commitment
 export function getTotalCommitment(tier: SponsorTier): number {
 	return (
-		SPONSOR_TIER_PRICING[tier][2025] +
 		SPONSOR_TIER_PRICING[tier][2026] +
-		SPONSOR_TIER_PRICING[tier][2027]
+		SPONSOR_TIER_PRICING[tier][2027] +
+		SPONSOR_TIER_PRICING[tier][2028]
 	);
 }

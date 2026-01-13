@@ -1,11 +1,11 @@
 <script lang="ts">
-	import * as Tabs from '$lib/components/ui/tabs/index.js';
 	import Card from '$lib/components/ui/card.svelte';
 	import { Badge } from '$lib/components/ui/badge/index.js';
 	import { Button } from '$lib/components/ui/button/index.js';
-	import { Table, Eye } from 'lucide-svelte';
+	import { Table, Eye, FolderKanban } from 'lucide-svelte';
 	
 	let viewMode = $state<'table' | 'visual'>('table');
+	let activeTab = $state<string>('financial');
 	
 	// Vendors system relationships
 	const vendorsRelationships = [
@@ -167,7 +167,7 @@
 				{ name: 'territory', type: 'text', description: 'Geographic territory' },
 				{ name: 'contractStartDate', type: 'date', description: 'Contract start date' },
 				{ name: 'contractEndDate', type: 'date', description: 'Contract end date' },
-				{ name: 'currentYear', type: 'number', description: 'Current contract year (2025-2027)' },
+				{ name: 'currentYear', type: 'number', description: 'Current contract year (2026-2028)' },
 				{ name: 'annualCommitment', type: 'number', description: 'Annual sponsorship value' },
 				{ name: 'totalPaid', type: 'number', description: 'Total paid to date' },
 				{ name: 'franchiseInterest', type: 'boolean', description: 'Interested in franchise conversion' },
@@ -581,20 +581,45 @@
 		</div>
 	</div>
 
-	<Tabs.Root value="financial" class="w-full">
-		<Tabs.List class="grid w-full grid-cols-9">
-			<Tabs.Trigger value="financial">Financial</Tabs.Trigger>
-			<Tabs.Trigger value="operations">Operations</Tabs.Trigger>
-			<Tabs.Trigger value="sales">Sales</Tabs.Trigger>
-			<Tabs.Trigger value="league">League</Tabs.Trigger>
-			<Tabs.Trigger value="sponsors">Sponsors</Tabs.Trigger>
-			<Tabs.Trigger value="franchises">Franchises</Tabs.Trigger>
-			<Tabs.Trigger value="pros">Pros</Tabs.Trigger>
-			<Tabs.Trigger value="vendors">Vendors</Tabs.Trigger>
-			<Tabs.Trigger value="overview">Overview</Tabs.Trigger>
-		</Tabs.List>
+	<!-- Folder-style Tabs -->
+	<div class="flex flex-col gap-2 mb-6">
+		<div class="flex items-center gap-2 text-sm text-muted-foreground">
+			<FolderKanban class="size-4" />
+			<span>Schema Categories</span>
+		</div>
+		<div class="flex flex-wrap gap-1 border-b border-border">
+			{#each [
+				{ id: 'financial', label: 'Financial' },
+				{ id: 'operations', label: 'Operations' },
+				{ id: 'sales', label: 'Sales' },
+				{ id: 'league', label: 'League' },
+				{ id: 'sponsors', label: 'Sponsors' },
+				{ id: 'franchises', label: 'Franchises' },
+				{ id: 'pros', label: 'Pros' },
+				{ id: 'vendors', label: 'Vendors' },
+				{ id: 'overview', label: 'Overview' }
+			] as tab}
+				<button
+					onclick={() => activeTab = tab.id}
+					class="relative px-6 py-3 text-sm font-medium transition-all duration-200 {
+						activeTab === tab.id
+							? 'bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 border-t-2 border-x border-blue-400 dark:border-blue-600 rounded-t-lg -mb-px z-10'
+							: 'bg-muted/50 text-muted-foreground hover:bg-muted hover:text-foreground rounded-t-lg'
+					}"
+					style={activeTab === tab.id ? 'border-bottom: 2px solid hsl(var(--card))' : ''}
+				>
+					<span class="font-semibold">{tab.label}</span>
+					{#if activeTab === tab.id}
+						<div class="absolute inset-x-0 -bottom-px h-0.5 bg-card"></div>
+					{/if}
+				</button>
+			{/each}
+		</div>
+	</div>
 
-		<Tabs.Content value="financial" class="space-y-6 mt-6">
+	<!-- Tab Content -->
+	{#if activeTab === 'financial'}
+		<div class="space-y-6">
 			{#if viewMode === 'table'}
 				<div class="grid gap-6">
 					{#each financialRelationships as collection}
@@ -756,9 +781,11 @@
 					</div>
 				</div>
 			</Card>
-		</Tabs.Content>
+		</div>
+	{/if}
 
-		<Tabs.Content value="operations" class="space-y-6 mt-6">
+	{#if activeTab === 'operations'}
+		<div class="space-y-6">
 			{#if viewMode === 'table'}
 				<div class="grid gap-6">
 					{#each operationsRelationships as collection}
@@ -916,9 +943,11 @@
 					</div>
 				</div>
 			</Card>
-		</Tabs.Content>
+		</div>
+	{/if}
 
-		<Tabs.Content value="sales" class="space-y-6 mt-6">
+	{#if activeTab === 'sales'}
+		<div class="space-y-6">
 			{#if viewMode === 'table'}
 				<div class="grid gap-6">
 					{#each salesRelationships as collection}
@@ -1081,9 +1110,11 @@
 					</div>
 				</div>
 			</Card>
-		</Tabs.Content>
+		</div>
+	{/if}
 
-		<Tabs.Content value="league" class="space-y-6 mt-6">
+	{#if activeTab === 'league'}
+		<div class="space-y-6">
 			{#if viewMode === 'table'}
 				<div class="grid gap-6">
 					{#each leagueRelationships as collection}
@@ -1253,9 +1284,11 @@
 					</div>
 				</div>
 			</Card>
-		</Tabs.Content>
+		</div>
+	{/if}
 
-		<Tabs.Content value="sponsors" class="space-y-6 mt-6">
+	{#if activeTab === 'sponsors'}
+		<div class="space-y-6">
 			{#if viewMode === 'table'}
 				<div class="grid gap-6">
 					{#each sponsorsRelationships as collection}
@@ -1391,15 +1424,15 @@
 							<div class="font-bold text-lg mb-2">Tier 1 - Premium</div>
 							<div class="space-y-1 text-sm">
 								<div class="flex justify-between">
-									<span>2025:</span>
+									<span>2026:</span>
 									<span class="font-mono">$7M</span>
 								</div>
 								<div class="flex justify-between">
-									<span>2026:</span>
+									<span>2027:</span>
 									<span class="font-mono">$5M</span>
 								</div>
 								<div class="flex justify-between">
-									<span>2027:</span>
+									<span>2028:</span>
 									<span class="font-mono">$3M</span>
 								</div>
 								<div class="border-t border-pink-400 pt-1 mt-2 flex justify-between font-bold">
@@ -1413,15 +1446,15 @@
 							<div class="font-bold text-lg mb-2">Tier 2 - Elite</div>
 							<div class="space-y-1 text-sm">
 								<div class="flex justify-between">
-									<span>2025:</span>
+									<span>2026:</span>
 									<span class="font-mono">$5M</span>
 								</div>
 								<div class="flex justify-between">
-									<span>2026:</span>
+									<span>2027:</span>
 									<span class="font-mono">$7M</span>
 								</div>
 								<div class="flex justify-between">
-									<span>2027:</span>
+									<span>2028:</span>
 									<span class="font-mono">$9M</span>
 								</div>
 								<div class="border-t border-pink-300 pt-1 mt-2 flex justify-between font-bold">
@@ -1435,15 +1468,15 @@
 							<div class="font-bold text-lg mb-2">Tier 3 - Standard</div>
 							<div class="space-y-1 text-sm">
 								<div class="flex justify-between">
-									<span>2025:</span>
-									<span class="font-mono">$1M</span>
-								</div>
-								<div class="flex justify-between">
 									<span>2026:</span>
 									<span class="font-mono">$1M</span>
 								</div>
 								<div class="flex justify-between">
 									<span>2027:</span>
+									<span class="font-mono">$1M</span>
+								</div>
+								<div class="flex justify-between">
+									<span>2028:</span>
 									<span class="font-mono">$2M</span>
 								</div>
 								<div class="border-t border-pink-200 pt-1 mt-2 flex justify-between font-bold">
@@ -1457,15 +1490,15 @@
 							<div class="font-bold text-lg mb-2">Tier 4 - Growth</div>
 							<div class="space-y-1 text-sm">
 								<div class="flex justify-between">
-									<span>2025:</span>
+									<span>2026:</span>
 									<span class="font-mono">$1M</span>
 								</div>
 								<div class="flex justify-between">
-									<span>2026:</span>
+									<span>2027:</span>
 									<span class="font-mono">$1.5M</span>
 								</div>
 								<div class="flex justify-between">
-									<span>2027:</span>
+									<span>2028:</span>
 									<span class="font-mono">$2M</span>
 								</div>
 								<div class="border-t border-pink-200 pt-1 mt-2 flex justify-between font-bold">
@@ -1517,9 +1550,11 @@
 					</div>
 				</div>
 			</Card>
-		</Tabs.Content>
+		</div>
+	{/if}
 
-		<Tabs.Content value="franchises" class="space-y-6 mt-6">
+	{#if activeTab === 'franchises'}
+		<div class="space-y-6">
 			{#if viewMode === 'table'}
 				<div class="grid gap-6">
 					{#each franchisesRelationships as collection}
@@ -1764,9 +1799,11 @@
 					</div>
 				</div>
 			</Card>
-		</Tabs.Content>
+		</div>
+	{/if}
 
-		<Tabs.Content value="pros" class="space-y-6 mt-6">
+	{#if activeTab === 'pros'}
+		<div class="space-y-6">
 			{#if viewMode === 'table'}
 				<div class="grid gap-6">
 					{#each prosRelationships as collection}
@@ -2042,9 +2079,11 @@
 					</div>
 				</div>
 			</Card>
-		</Tabs.Content>
+		</div>
+	{/if}
 
-		<Tabs.Content value="vendors" class="space-y-6 mt-6">
+	{#if activeTab === 'vendors'}
+		<div class="space-y-6">
 			{#if viewMode === 'table'}
 				<div class="grid gap-6">
 					{#each vendorsRelationships as collection}
@@ -2305,9 +2344,11 @@
 					</div>
 				</div>
 			</Card>
-		</Tabs.Content>
+		</div>
+	{/if}
 
-		<Tabs.Content value="overview" class="space-y-6 mt-6">
+	{#if activeTab === 'overview'}
+		<div class="space-y-6">
 			<Card class="p-6">
 				<div class="space-y-6">
 					<div>
@@ -2504,6 +2545,6 @@
 					</div>
 				</div>
 			</Card>
-		</Tabs.Content>
-	</Tabs.Root>
+		</div>
+	{/if}
 </div>

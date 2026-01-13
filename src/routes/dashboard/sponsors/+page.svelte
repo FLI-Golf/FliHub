@@ -76,10 +76,10 @@
 
 	// Tier pricing data
 	const tierPricing = {
-		tier_1: { 2025: 7000000, 2026: 5000000, 2027: 3000000 },
-		tier_2: { 2025: 5000000, 2026: 7000000, 2027: 9000000 },
-		tier_3: { 2025: 1000000, 2026: 1000000, 2027: 2000000 },
-		tier_4: { 2025: 1000000, 2026: 1500000, 2027: 2000000 }
+		tier_1: { 2026: 7000000, 2027: 5000000, 2028: 3000000 },
+		tier_2: { 2026: 5000000, 2027: 7000000, 2028: 9000000 },
+		tier_3: { 2026: 1000000, 2027: 1000000, 2028: 2000000 },
+		tier_4: { 2026: 1000000, 2027: 1500000, 2028: 2000000 }
 	};
 </script>
 
@@ -138,16 +138,16 @@
 				<thead>
 					<tr class="border-b">
 						<th class="text-left py-3 px-4 font-semibold">Tier</th>
-						<th class="text-right py-3 px-4 font-semibold">2025</th>
 						<th class="text-right py-3 px-4 font-semibold">2026</th>
 						<th class="text-right py-3 px-4 font-semibold">2027</th>
+						<th class="text-right py-3 px-4 font-semibold">2028</th>
 						<th class="text-right py-3 px-4 font-semibold">Total</th>
 						<th class="text-center py-3 px-4 font-semibold">Count</th>
 					</tr>
 				</thead>
 				<tbody>
 					{#each Object.entries(tierPricing) as [tier, pricing]}
-						{@const total = pricing[2025] + pricing[2026] + pricing[2027]}
+						{@const total = pricing[2026] + pricing[2027] + pricing[2028]}
 						{@const count = data.metrics.sponsorsByTier[tier as keyof typeof data.metrics.sponsorsByTier]}
 						<tr class="border-b hover:bg-accent/50">
 							<td class="py-3 px-4">
@@ -155,9 +155,9 @@
 									{getTierLabel(tier)}
 								</span>
 							</td>
-							<td class="text-right py-3 px-4">{formatCurrency(pricing[2025])}</td>
 							<td class="text-right py-3 px-4">{formatCurrency(pricing[2026])}</td>
 							<td class="text-right py-3 px-4">{formatCurrency(pricing[2027])}</td>
+							<td class="text-right py-3 px-4">{formatCurrency(pricing[2028])}</td>
 							<td class="text-right py-3 px-4 font-semibold">{formatCurrency(total)}</td>
 							<td class="text-center py-3 px-4">
 								<span class="px-2 py-1 text-xs font-medium rounded-full bg-slate-100 dark:bg-slate-800 text-black dark:text-black">
