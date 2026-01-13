@@ -28,13 +28,13 @@
 	const getStatusColor = (status: string) => {
 		switch (status) {
 			case 'active':
-				return 'bg-green-100 text-green-800';
+				return 'bg-green-600 text-white';
 			case 'inactive':
-				return 'bg-gray-100 text-gray-800';
+				return 'bg-gray-600 text-white';
 			case 'retired':
-				return 'bg-blue-100 text-blue-800';
+				return 'bg-blue-600 text-white';
 			default:
-				return 'bg-gray-100 text-gray-800';
+				return 'bg-gray-600 text-white';
 		}
 	};
 
@@ -65,8 +65,8 @@
 <div class="container mx-auto p-6 space-y-6">
 	<div class="flex items-center justify-between">
 		<div>
-			<h1 class="text-3xl font-bold">Pro Management</h1>
-			<p class="text-muted-foreground">Manage professional players, tournaments, and payments</p>
+			<h1 class="text-3xl font-bold text-white">Pro Management</h1>
+			<p class="text-gray-400">Manage professional players, tournaments, and payments</p>
 		</div>
 		<div class="flex gap-2">
 			<Button href="/dashboard/pros/tournaments">Tournaments</Button>
@@ -78,56 +78,56 @@
 
 	<!-- Stats Overview -->
 	<div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4">
-		<div class="bg-white dark:bg-gray-800 p-6 rounded-lg border dark:border-gray-700">
-			<div class="text-sm text-muted-foreground">Total Pros</div>
-			<div class="text-3xl font-bold">{data.overallStats.totalPros}</div>
+		<div class="bg-slate-800 p-6 rounded-lg border border-slate-600">
+			<div class="text-sm text-slate-400">Total Pros</div>
+			<div class="text-3xl font-bold text-white">{data.overallStats.totalPros}</div>
 		</div>
-		<div class="bg-white dark:bg-gray-800 p-6 rounded-lg border dark:border-gray-700">
-			<div class="text-sm text-muted-foreground">Active</div>
-			<div class="text-3xl font-bold text-green-600">{data.overallStats.activePros}</div>
+		<div class="bg-green-900/50 p-6 rounded-lg border border-green-700">
+			<div class="text-sm text-green-400">Active</div>
+			<div class="text-3xl font-bold text-green-400">{data.overallStats.activePros}</div>
 		</div>
-		<div class="bg-white dark:bg-gray-800 p-6 rounded-lg border dark:border-gray-700">
-			<div class="text-sm text-muted-foreground">Men</div>
-			<div class="text-3xl font-bold text-blue-600">{data.overallStats.mensPros}</div>
+		<div class="bg-blue-900/50 p-6 rounded-lg border border-blue-700">
+			<div class="text-sm text-blue-400">Men</div>
+			<div class="text-3xl font-bold text-blue-400">{data.overallStats.mensPros}</div>
 		</div>
-		<div class="bg-white dark:bg-gray-800 p-6 rounded-lg border dark:border-gray-700">
-			<div class="text-sm text-muted-foreground">Women</div>
-			<div class="text-3xl font-bold text-pink-600">{data.overallStats.womensPros}</div>
+		<div class="bg-pink-900/50 p-6 rounded-lg border border-pink-700">
+			<div class="text-sm text-pink-400">Women</div>
+			<div class="text-3xl font-bold text-pink-400">{data.overallStats.womensPros}</div>
 		</div>
-		<div class="bg-white dark:bg-gray-800 p-6 rounded-lg border dark:border-gray-700">
-			<div class="text-sm text-muted-foreground">Total Earnings</div>
-			<div class="text-2xl font-bold">{formatCurrency(data.overallStats.totalEarnings)}</div>
+		<div class="bg-emerald-900/50 p-6 rounded-lg border border-emerald-700">
+			<div class="text-sm text-emerald-400">Total Earnings</div>
+			<div class="text-2xl font-bold text-emerald-400">{formatCurrency(data.overallStats.totalEarnings)}</div>
 		</div>
-		<div class="bg-white dark:bg-gray-800 p-6 rounded-lg border dark:border-gray-700">
-			<div class="text-sm text-muted-foreground">Pending Payments</div>
-			<div class="text-3xl font-bold text-yellow-600">{data.pendingPayments.length}</div>
+		<div class="bg-amber-900/50 p-6 rounded-lg border border-amber-700">
+			<div class="text-sm text-amber-400">Pending Payments</div>
+			<div class="text-3xl font-bold text-amber-400">{data.pendingPayments.length}</div>
 		</div>
-		<div class="bg-white dark:bg-gray-800 p-6 rounded-lg border dark:border-gray-700">
-			<div class="text-sm text-muted-foreground">Overdue</div>
-			<div class="text-3xl font-bold text-red-600">{data.overduePayments.length}</div>
+		<div class="bg-red-900/50 p-6 rounded-lg border border-red-700">
+			<div class="text-sm text-red-400">Overdue</div>
+			<div class="text-3xl font-bold text-red-400">{data.overduePayments.length}</div>
 		</div>
 	</div>
 
 	<!-- Filters -->
-	<div class="bg-white dark:bg-gray-800 rounded-lg border p-4">
+	<div class="bg-gray-800 rounded-lg border border-gray-700 p-4">
 		<div class="flex flex-wrap gap-4">
 			<div class="flex-1 min-w-[200px]">
-				<label class="text-sm font-medium">Search</label>
+				<label class="text-sm font-medium text-gray-300">Search</label>
 				<div class="flex gap-2 mt-1">
 					<input
 						type="text"
 						bind:value={searchInput}
 						placeholder="Search by name..."
-						class="flex-1 rounded-md border border-gray-300 dark:border-gray-600 px-3 py-2 bg-white dark:bg-gray-700 dark:text-white"
+						class="flex-1 rounded-md border border-gray-600 px-3 py-2 bg-gray-700 text-white placeholder-gray-400"
 						onkeydown={(e) => e.key === 'Enter' && handleSearch()}
 					/>
 					<Button onclick={handleSearch}>Search</Button>
 				</div>
 			</div>
 			<div>
-				<label class="text-sm font-medium">Status</label>
+				<label class="text-sm font-medium text-gray-300">Status</label>
 				<select
-					class="mt-1 block w-full rounded-md border border-gray-300 dark:border-gray-600 px-3 py-2 bg-white dark:bg-gray-700 dark:text-white"
+					class="mt-1 block w-full rounded-md border border-gray-600 px-3 py-2 bg-gray-700 text-white"
 					value={data.filters.status || ''}
 					onchange={(e) => applyFilters({ status: e.currentTarget.value || null })}
 				>
@@ -138,9 +138,9 @@
 				</select>
 			</div>
 			<div>
-				<label class="text-sm font-medium">Gender</label>
+				<label class="text-sm font-medium text-gray-300">Gender</label>
 				<select
-					class="mt-1 block w-full rounded-md border border-gray-300 dark:border-gray-600 px-3 py-2 bg-white dark:bg-gray-700 dark:text-white"
+					class="mt-1 block w-full rounded-md border border-gray-600 px-3 py-2 bg-gray-700 text-white"
 					value={data.filters.gender || ''}
 					onchange={(e) => applyFilters({ gender: e.currentTarget.value || null })}
 				>
@@ -151,9 +151,9 @@
 				</select>
 			</div>
 			<div>
-				<label class="text-sm font-medium">Franchise</label>
+				<label class="text-sm font-medium text-gray-300">Franchise</label>
 				<select
-					class="mt-1 block w-full rounded-md border border-gray-300 dark:border-gray-600 px-3 py-2 bg-white dark:bg-gray-700 dark:text-white"
+					class="mt-1 block w-full rounded-md border border-gray-600 px-3 py-2 bg-gray-700 text-white"
 					value={data.filters.franchise || ''}
 					onchange={(e) => applyFilters({ franchise: e.currentTarget.value || null })}
 				>
@@ -173,19 +173,19 @@
 
 	<!-- Overdue Payments Alert -->
 	{#if data.overduePayments.length > 0}
-		<div class="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4">
-			<h3 class="text-lg font-semibold text-red-800 dark:text-red-200 mb-2">⚠️ Overdue Payments</h3>
+		<div class="bg-red-900/30 border border-red-700 rounded-lg p-4">
+			<h3 class="text-lg font-semibold text-red-400 mb-2">⚠️ Overdue Payments</h3>
 			<div class="space-y-2">
 				{#each data.overduePayments as payment}
-					<div class="flex items-center justify-between bg-white p-3 rounded">
+					<div class="flex items-center justify-between bg-gray-800 p-3 rounded border border-gray-700">
 						<div>
-							<div class="font-medium">{payment.expand?.pro?.name || 'Unknown Pro'}</div>
-							<div class="text-sm text-muted-foreground">
+							<div class="font-medium text-white">{payment.expand?.pro?.name || 'Unknown Pro'}</div>
+							<div class="text-sm text-gray-400">
 								Due: {formatDate(payment.dueDate)}
 							</div>
 						</div>
 						<div class="text-right">
-							<div class="font-bold text-red-600">{formatCurrency(payment.amount)}</div>
+							<div class="font-bold text-red-400">{formatCurrency(payment.amount)}</div>
 							<Badge class={getStatusColor(payment.status)}>{payment.status}</Badge>
 						</div>
 					</div>
@@ -195,33 +195,33 @@
 	{/if}
 
 	<!-- Recent Tournaments -->
-	<div class="bg-white dark:bg-gray-800 rounded-lg border dark:border-gray-700">
-		<div class="p-6 border-b dark:border-gray-700">
+	<div class="bg-gray-800 rounded-lg border border-gray-700">
+		<div class="p-6 border-b border-gray-700">
 			<div class="flex items-center justify-between">
-				<h2 class="text-xl font-semibold">Recent Tournaments</h2>
+				<h2 class="text-xl font-semibold text-white">Recent Tournaments</h2>
 				<Button href="/dashboard/pros/tournaments" variant="outline">View All</Button>
 			</div>
 		</div>
-		<div class="divide-y">
+		<div class="divide-y divide-gray-700">
 			{#each data.tournaments.slice(0, 5) as tournament}
-				<div class="p-4 hover:bg-gray-50 dark:hover:bg-gray-700">
+				<div class="p-4 hover:bg-gray-700/50">
 					<div class="flex items-center justify-between">
 						<div>
-							<h3 class="font-medium">{tournament.name}</h3>
-							<div class="text-sm text-muted-foreground">
+							<h3 class="font-medium text-white">{tournament.name}</h3>
+							<div class="text-sm text-gray-400">
 								Season {tournament.season} • {formatDate(tournament.startDate)} - {formatDate(
 									tournament.endDate
 								)}
 							</div>
 						</div>
 						<div class="text-right">
-							<div class="font-semibold">{formatCurrency(tournament.prizePool)}</div>
+							<div class="font-semibold text-white">{formatCurrency(tournament.prizePool)}</div>
 							<Badge
 								class={tournament.status === 'completed'
-									? 'bg-green-100 text-green-800'
+									? 'bg-green-600 text-white'
 									: tournament.status === 'in_progress'
-										? 'bg-blue-100 text-blue-800'
-										: 'bg-gray-100 text-gray-800'}
+										? 'bg-blue-600 text-white'
+										: 'bg-gray-600 text-white'}
 							>
 								{tournament.status}
 							</Badge>
@@ -229,16 +229,16 @@
 					</div>
 				</div>
 			{:else}
-				<div class="p-8 text-center text-muted-foreground">No tournaments found</div>
+				<div class="p-8 text-center text-gray-400">No tournaments found</div>
 			{/each}
 		</div>
 	</div>
 
 	<!-- Pros List -->
-	<div class="bg-white dark:bg-gray-800 rounded-lg border dark:border-gray-700">
-		<div class="p-6 border-b dark:border-gray-700">
+	<div class="bg-gray-800 rounded-lg border border-gray-700">
+		<div class="p-6 border-b border-gray-700">
 			<div class="flex items-center justify-between">
-				<h2 class="text-xl font-semibold">
+				<h2 class="text-xl font-semibold text-white">
 					Professional Players ({data.pros.length})
 				</h2>
 				<Button href="/dashboard/pros/new" variant="outline">Add Pro</Button>
@@ -246,23 +246,23 @@
 		</div>
 		<div class="overflow-x-auto">
 			<table class="w-full">
-				<thead class="bg-gray-50 dark:bg-gray-700 border-b dark:border-gray-600">
+				<thead class="bg-gray-900 border-b border-gray-700">
 					<tr>
-						<th class="px-4 py-3 text-left text-sm font-medium text-gray-700">Pro</th>
-						<th class="px-4 py-3 text-left text-sm font-medium text-gray-700">Franchise</th>
-						<th class="px-4 py-3 text-left text-sm font-medium text-gray-700">Gender</th>
-						<th class="px-4 py-3 text-right text-sm font-medium text-gray-700">Tournaments</th>
-						<th class="px-4 py-3 text-right text-sm font-medium text-gray-700">Wins</th>
-						<th class="px-4 py-3 text-right text-sm font-medium text-gray-700">Podiums</th>
-						<th class="px-4 py-3 text-right text-sm font-medium text-gray-700">Earnings</th>
-						<th class="px-4 py-3 text-center text-sm font-medium text-gray-700">Status</th>
-						<th class="px-4 py-3 text-center text-sm font-medium text-gray-700">Actions</th>
+						<th class="px-4 py-3 text-left text-sm font-medium text-gray-300">Pro</th>
+						<th class="px-4 py-3 text-left text-sm font-medium text-gray-300">Franchise</th>
+						<th class="px-4 py-3 text-left text-sm font-medium text-gray-300">Gender</th>
+						<th class="px-4 py-3 text-right text-sm font-medium text-gray-300">Tournaments</th>
+						<th class="px-4 py-3 text-right text-sm font-medium text-gray-300">Wins</th>
+						<th class="px-4 py-3 text-right text-sm font-medium text-gray-300">Podiums</th>
+						<th class="px-4 py-3 text-right text-sm font-medium text-gray-300">Earnings</th>
+						<th class="px-4 py-3 text-center text-sm font-medium text-gray-300">Status</th>
+						<th class="px-4 py-3 text-center text-sm font-medium text-gray-300">Actions</th>
 					</tr>
 				</thead>
-				<tbody class="divide-y">
+				<tbody class="divide-y divide-gray-700">
 					{#each data.pros as pro}
 						{@const stats = data.proStats[pro.id] || {}}
-						<tr class="hover:bg-gray-50 dark:hover:bg-gray-700">
+						<tr class="hover:bg-gray-700/50">
 							<td class="px-4 py-3">
 								<div class="flex items-center gap-3">
 									{#if pro.photo}
@@ -273,51 +273,51 @@
 										/>
 									{:else}
 										<div
-											class="w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center text-gray-600 font-semibold text-sm"
+											class="w-10 h-10 rounded-full bg-gray-600 flex items-center justify-center text-gray-300 font-semibold text-sm"
 										>
 											{pro.name.charAt(0)}
 										</div>
 									{/if}
 									<div>
-										<div class="font-medium">{pro.name}</div>
+										<div class="font-medium text-white">{pro.name}</div>
 										{#if pro.nickname}
-											<div class="text-xs text-muted-foreground">"{pro.nickname}"</div>
+											<div class="text-xs text-gray-400">"{pro.nickname}"</div>
 										{/if}
 									</div>
 								</div>
 							</td>
 							<td class="px-4 py-3 text-sm">
 								{#if pro.expand?.franchise}
-									<span class="text-blue-600">{pro.expand.franchise.name}</span>
+									<span class="text-blue-400">{pro.expand.franchise.name}</span>
 								{:else}
 									<span class="text-gray-400">Independent</span>
 								{/if}
 							</td>
 							<td class="px-4 py-3 text-sm">
 								{#if pro.gender === 'male'}
-									<span class="text-blue-600">♂ Male</span>
+									<span class="text-blue-400">♂ Male</span>
 								{:else if pro.gender === 'female'}
-									<span class="text-pink-600">♀ Female</span>
+									<span class="text-pink-400">♀ Female</span>
 								{:else}
-									<span class="text-gray-600">{pro.gender || 'N/A'}</span>
+									<span class="text-gray-400">{pro.gender || 'N/A'}</span>
 								{/if}
 							</td>
-							<td class="px-4 py-3 text-right text-sm">{stats.tournamentsPlayed || 0}</td>
+							<td class="px-4 py-3 text-right text-sm text-white">{stats.tournamentsPlayed || 0}</td>
 							<td class="px-4 py-3 text-right text-sm font-medium">
 								{#if stats.wins > 0}
-									<span class="text-yellow-600">🏆 {stats.wins}</span>
+									<span class="text-yellow-400">🏆 {stats.wins}</span>
 								{:else}
 									<span class="text-gray-400">0</span>
 								{/if}
 							</td>
 							<td class="px-4 py-3 text-right text-sm">
 								{#if stats.podiums > 0}
-									<span class="text-orange-600">{stats.podiums}</span>
+									<span class="text-orange-400">{stats.podiums}</span>
 								{:else}
 									<span class="text-gray-400">0</span>
 								{/if}
 							</td>
-							<td class="px-4 py-3 text-right text-sm font-bold">
+							<td class="px-4 py-3 text-right text-sm font-bold text-white">
 								{formatCurrency(stats.totalEarnings || 0)}
 							</td>
 							<td class="px-4 py-3 text-center">
@@ -331,7 +331,7 @@
 						</tr>
 					{:else}
 						<tr>
-							<td colspan="9" class="p-8 text-center text-muted-foreground">
+							<td colspan="9" class="p-8 text-center text-gray-400">
 								No pros found. Try adjusting your filters.
 							</td>
 						</tr>

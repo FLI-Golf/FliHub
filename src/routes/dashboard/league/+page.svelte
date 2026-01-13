@@ -7,10 +7,19 @@
 
 	const pbUrl = 'https://pocketbase-production-6ab5.up.railway.app';
 
-	function getLogoUrl(league: any, field: string): string | null {
-		if (!league[field] || league[field].length === 0) return null;
-		const filename = league[field][0];
-		return `${pbUrl}/api/files/${league.collectionId}/${league.id}/${filename}`;
+	function getAllLogoUrls(league: any, field: string): { url: string; filename: string; ext: string }[] {
+		if (!league[field] || league[field].length === 0) return [];
+		
+		return league[field]
+			.filter((f: string) => {
+				const ext = f.toLowerCase().split('.').pop();
+				return ['png', 'jpg', 'jpeg', 'svg'].includes(ext || '');
+			})
+			.map((filename: string) => ({
+				url: `${pbUrl}/api/files/${league.collectionId}/${league.id}/${filename}`,
+				filename,
+				ext: filename.split('.').pop()?.toUpperCase() || ''
+			}));
 	}
 
 	function formatCurrency(value: number | null | undefined): string {
@@ -26,103 +35,143 @@
 	function getStatusColor(status: string): string {
 		switch (status) {
 			case 'active':
-				return 'bg-green-500';
+				return 'bg-green-600 text-white';
 			case 'pending':
-				return 'bg-yellow-500';
+				return 'bg-yellow-600 text-white';
 			case 'inactive':
-				return 'bg-gray-500';
+				return 'bg-gray-600 text-white';
 			case 'for_sale':
-				return 'bg-blue-500';
+				return 'bg-blue-600 text-white';
 			default:
-				return 'bg-gray-500';
+				return 'bg-gray-600 text-white';
 		}
 	}
 </script>
 
 <div class="container mx-auto py-8">
 	<div class="mb-8">
-		<h1 class="text-3xl font-bold">League Management</h1>
-		<p class="text-muted-foreground mt-2">Manage league ownership, branding, and operations</p>
+		<h1 class="text-3xl font-bold text-white">League Management</h1>
+		<p class="text-gray-400 mt-2">Manage league ownership, branding, and operations</p>
 	</div>
 
-	<div class="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-		{#each data.leagues as league}
-			<a href="/dashboard/league/{league.slug}" class="block transition-transform hover:scale-105">
-				<Card class="h-full p-6">
-					<div class="flex items-start justify-between mb-4">
-						<div class="flex-1">
-							<h3 class="text-xl font-semibold">{league.name}</h3>
-							{#if league.tagline}
-								<p class="text-sm text-muted-foreground mt-1">{league.tagline}</p>
-							{/if}
+	{#each data.leagues as league}
+		<a href="/dashboard/league/{league.slug}" class="block mb-6">
+			<div class="p-6 bg-gray-800 rounded-lg border border-gray-700 hover:border-gray-600">
+				<div class="flex items-start justify-between mb-6">
+					<div class="flex-1">
+						<h3 class="text-2xl font-semibold text-white">{league.name}</h3>
+						{#if league.tagline}
+							<p class="text-sm text-gray-400 mt-1">{league.tagline}</p>
+						{/if}
+					</div>
+					<Badge class={getStatusColor(league.status)}>
+						{league.status}
+					</Badge>
+				</div>
+
+				<!-- All Logos Grid -->
+				<div class="space-y-6">
+					<!-- Men's Logos (Red-White-Blue) -->
+					{#if league.logoMens?.length > 0}
+						<div>
+							<h4 class="text-sm font-medium text-blue-400 mb-3">Men's Logos (Red-White-Blue)</h4>
+							<div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+								{#each getAllLogoUrls(league, 'logoMens') as logo}
+									<div class="bg-white rounded-lg p-3 flex flex-col items-center">
+										<div class="h-24 w-full flex items-center justify-center mb-2">
+											<img
+												src={logo.url}
+												alt="{league.name} Men's Logo"
+												class="max-h-full max-w-full object-contain"
+											/>
+										</div>
+										<span class="text-xs text-gray-500 font-medium">{logo.ext}</span>
+									</div>
+								{/each}
+							</div>
 						</div>
-						<Badge class={getStatusColor(league.status)}>
-							{league.status}
-						</Badge>
-					</div>
+					{/if}
 
-					<!-- Logo Preview -->
-					<div class="mb-4 flex gap-4">
-						{#if getLogoUrl(league, 'logoMens')}
-							<div class="flex-1">
-								<p class="text-xs text-muted-foreground mb-1">Men's</p>
-								<img
-									src={getLogoUrl(league, 'logoMens')}
-									alt="{league.name} Men's Logo"
-									class="h-20 w-full object-contain bg-gray-50 rounded p-2"
-								/>
+					<!-- Women's Logos (Pink-White-Blue) -->
+					{#if league.logoWomens?.length > 0}
+						<div>
+							<h4 class="text-sm font-medium text-pink-400 mb-3">Women's Logos (Pink-White-Blue)</h4>
+							<div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+								{#each getAllLogoUrls(league, 'logoWomens') as logo}
+									<div class="bg-white rounded-lg p-3 flex flex-col items-center">
+										<div class="h-24 w-full flex items-center justify-center mb-2">
+											<img
+												src={logo.url}
+												alt="{league.name} Women's Logo"
+												class="max-h-full max-w-full object-contain"
+											/>
+										</div>
+										<span class="text-xs text-gray-500 font-medium">{logo.ext}</span>
+									</div>
+								{/each}
 							</div>
-						{/if}
-						{#if getLogoUrl(league, 'logoWomens')}
-							<div class="flex-1">
-								<p class="text-xs text-muted-foreground mb-1">Women's</p>
-								<img
-									src={getLogoUrl(league, 'logoWomens')}
-									alt="{league.name} Women's Logo"
-									class="h-20 w-full object-contain bg-gray-50 rounded p-2"
-								/>
-							</div>
-						{/if}
-					</div>
+						</div>
+					{/if}
 
-					<!-- League Info -->
-					<div class="space-y-2 text-sm">
-						{#if league.foundedYear}
-							<div class="flex justify-between">
-								<span class="text-muted-foreground">Founded:</span>
-								<span class="font-medium">{league.foundedYear}</span>
+					<!-- Monochrome Logos (Black-White) -->
+					{#if league.logoMonochrome?.length > 0}
+						<div>
+							<h4 class="text-sm font-medium text-gray-400 mb-3">Monochrome Logos (Black-White)</h4>
+							<div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+								{#each getAllLogoUrls(league, 'logoMonochrome') as logo}
+									<div class="bg-white rounded-lg p-3 flex flex-col items-center">
+										<div class="h-24 w-full flex items-center justify-center mb-2">
+											<img
+												src={logo.url}
+												alt="{league.name} Monochrome Logo"
+												class="max-h-full max-w-full object-contain"
+											/>
+										</div>
+										<span class="text-xs text-gray-500 font-medium">{logo.ext}</span>
+									</div>
+								{/each}
 							</div>
-						{/if}
+						</div>
+					{/if}
+				</div>
 
-						{#if league.ownerName}
-							<div class="flex justify-between">
-								<span class="text-muted-foreground">Owner:</span>
-								<span class="font-medium">{league.ownerName}</span>
-							</div>
-						{/if}
+				<!-- League Info -->
+				<div class="mt-6 pt-6 border-t border-gray-700 grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+					{#if league.foundedYear}
+						<div>
+							<span class="text-gray-400 block">Founded</span>
+							<span class="font-medium text-white">{league.foundedYear}</span>
+						</div>
+					{/if}
 
-						{#if league.projectedRevenue}
-							<div class="flex justify-between">
-								<span class="text-muted-foreground">Projected Revenue:</span>
-								<span class="font-medium">{formatCurrency(league.projectedRevenue)}</span>
-							</div>
-						{/if}
+					{#if league.ownerName}
+						<div>
+							<span class="text-gray-400 block">Owner</span>
+							<span class="font-medium text-white">{league.ownerName}</span>
+						</div>
+					{/if}
 
-						{#if league.valuationCurrent}
-							<div class="flex justify-between">
-								<span class="text-muted-foreground">Valuation:</span>
-								<span class="font-medium">{formatCurrency(league.valuationCurrent)}</span>
-							</div>
-						{/if}
-					</div>
-				</Card>
-			</a>
-		{/each}
-	</div>
+					{#if league.projectedRevenue}
+						<div>
+							<span class="text-gray-400 block">Projected Revenue</span>
+							<span class="font-medium text-white">{formatCurrency(league.projectedRevenue)}</span>
+						</div>
+					{/if}
+
+					{#if league.valuationCurrent}
+						<div>
+							<span class="text-gray-400 block">Valuation</span>
+							<span class="font-medium text-white">{formatCurrency(league.valuationCurrent)}</span>
+						</div>
+					{/if}
+				</div>
+			</div>
+		</a>
+	{/each}
 
 	{#if data.leagues.length === 0}
-		<Card class="py-12 text-center">
-			<p class="text-muted-foreground">No leagues found. Create your first league to get started.</p>
-		</Card>
+		<div class="py-12 text-center bg-gray-800 rounded-lg border border-gray-700">
+			<p class="text-gray-400">No leagues found. Create your first league to get started.</p>
+		</div>
 	{/if}
 </div>

@@ -13,7 +13,8 @@
 		TrendingUp,
 		Star,
 		UserCircle,
-		Network
+		Network,
+		Target
 	} from 'lucide-svelte';
 
 	const data = {
@@ -40,6 +41,11 @@
 				url: '/dashboard/franchise-sales',
 				icon: TrendingUp,
 				roles: ['sales', 'admin']
+			},
+			{
+				title: 'Marketing Goals',
+				url: '/dashboard/marketing-goals',
+				icon: Target
 			},
 			{
 				title: 'League',
