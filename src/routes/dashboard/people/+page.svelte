@@ -36,9 +36,13 @@
 	const roleOptions = [
 		{ value: 'leader', label: 'Leader' },
 		{ value: 'admin', label: 'Admin' },
+		{ value: 'sales', label: 'Sales' },
 		{ value: 'vendor', label: 'Vendor' },
 		{ value: 'pro', label: 'Pro' },
-		{ value: 'franchise_owner', label: 'Franchise Owner' }
+		{ value: 'franchise_owner', label: 'Franchise Owner' },
+		{ value: 'league_owner', label: 'League Owner' },
+		{ value: 'broadcaster', label: 'Broadcaster' },
+		{ value: 'manager', label: 'Manager' }
 	];
 	
 	const statusOptions = [

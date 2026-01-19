@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-export const UserRoleEnum = z.enum(['leader', 'admin', 'sales', 'vendor', 'pro', 'franchise_owner']);
+export const UserRoleEnum = z.enum(['leader', 'admin', 'sales', 'vendor', 'pro', 'franchise_owner', 'league_owner', 'broadcaster', 'manager']);
 export const UserStatusEnum = z.enum(['active', 'inactive', 'pending']);
 
 export const UserProfileSchema = z.object({
@@ -29,7 +29,10 @@ export const ROLE_DESCRIPTIONS: Record<UserRole, string> = {
 	sales: 'Manage franchise sales leads and opportunities',
 	vendor: 'Access to vendor-specific features and contracts',
 	pro: 'Professional player access to tournaments and events',
-	franchise_owner: 'Manage franchise locations and operations'
+	franchise_owner: 'Manage franchise locations and operations',
+	league_owner: 'Manage league operations and tournaments',
+	broadcaster: 'Access to broadcast and media features',
+	manager: 'Manage pros and access their information'
 };
 
 export const ROLE_LABELS: Record<UserRole, string> = {
@@ -38,5 +41,8 @@ export const ROLE_LABELS: Record<UserRole, string> = {
 	sales: 'Sales Representative',
 	vendor: 'Vendor',
 	pro: 'Professional',
-	franchise_owner: 'Franchise Owner'
+	franchise_owner: 'Franchise Owner',
+	league_owner: 'League Owner',
+	broadcaster: 'Broadcaster',
+	manager: 'Manager'
 };

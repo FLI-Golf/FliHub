@@ -3,10 +3,100 @@
 	import { Badge } from '$lib/components/ui/badge';
 	import type { PageData } from './$types';
 	import { goto } from '$app/navigation';
+	import { ChevronDown, ChevronUp, ArrowUp, ArrowDown, ArrowUpDown } from 'lucide-svelte';
 
 	let { data }: { data: PageData } = $props();
 
 	let searchInput = $state(data.filters.search || '');
+	let tournamentsExpanded = $state(false);
+	
+	// Sorting state
+	type SortField = 'name' | 'role' | 'franchise' | 'contact' | 'tournaments' | 'wins' | 'earnings' | 'status';
+	type SortDirection = 'asc' | 'desc';
+	
+	let sortField = $state<SortField | null>(null);
+	let sortDirection = $state<SortDirection>('asc');
+	
+	const toggleSort = (field: SortField) => {
+		if (sortField === field) {
+			if (sortDirection === 'asc') {
+				sortDirection = 'desc';
+			} else {
+				sortField = null;
+				sortDirection = 'asc';
+			}
+		} else {
+			sortField = field;
+			sortDirection = 'asc';
+		}
+	};
+	
+	// Filtered and sorted talent data
+	const filteredAndSortedTalent = $derived.by(() => {
+		// First filter by search
+		let filtered = data.talent;
+		
+		if (searchInput.trim()) {
+			const query = searchInput.toLowerCase().trim();
+			filtered = data.talent.filter(t => 
+				t.name?.toLowerCase().includes(query) ||
+				t.nickname?.toLowerCase().includes(query) ||
+				t.email?.toLowerCase().includes(query) ||
+				t.franchise?.name?.toLowerCase().includes(query) ||
+				t.role?.toLowerCase().includes(query) ||
+				t.country?.toLowerCase().includes(query)
+			);
+		}
+		
+		// Then sort
+		if (!sortField) return filtered;
+		
+		return [...filtered].sort((a, b) => {
+			let aVal: any;
+			let bVal: any;
+			
+			switch (sortField) {
+				case 'name':
+					aVal = a.name?.toLowerCase() || '';
+					bVal = b.name?.toLowerCase() || '';
+					break;
+				case 'role':
+					aVal = a.role || '';
+					bVal = b.role || '';
+					break;
+				case 'franchise':
+					aVal = a.franchise?.name?.toLowerCase() || 'zzz'; // Put null at end
+					bVal = b.franchise?.name?.toLowerCase() || 'zzz';
+					break;
+				case 'contact':
+					aVal = a.email?.toLowerCase() || a.phone || 'zzz';
+					bVal = b.email?.toLowerCase() || b.phone || 'zzz';
+					break;
+				case 'tournaments':
+					aVal = a.role === 'pro' ? (a.tournamentsPlayed || 0) : -1;
+					bVal = b.role === 'pro' ? (b.tournamentsPlayed || 0) : -1;
+					break;
+				case 'wins':
+					aVal = a.role === 'pro' ? (a.wins || 0) : -1;
+					bVal = b.role === 'pro' ? (b.wins || 0) : -1;
+					break;
+				case 'earnings':
+					aVal = a.role === 'pro' ? (a.totalEarnings || 0) : -1;
+					bVal = b.role === 'pro' ? (b.totalEarnings || 0) : -1;
+					break;
+				case 'status':
+					aVal = a.status || '';
+					bVal = b.status || '';
+					break;
+				default:
+					return 0;
+			}
+			
+			if (aVal < bVal) return sortDirection === 'asc' ? -1 : 1;
+			if (aVal > bVal) return sortDirection === 'asc' ? 1 : -1;
+			return 0;
+		});
+	});
 
 	const formatCurrency = (amount: number) => {
 		return new Intl.NumberFormat('en-US', {
@@ -38,6 +128,32 @@
 		}
 	};
 
+	const getRoleColor = (role: string) => {
+		switch (role) {
+			case 'pro':
+				return 'bg-purple-600 text-white';
+			case 'broadcaster':
+				return 'bg-orange-600 text-white';
+			case 'manager':
+				return 'bg-cyan-600 text-white';
+			default:
+				return 'bg-gray-600 text-white';
+		}
+	};
+
+	const getRoleLabel = (role: string) => {
+		switch (role) {
+			case 'pro':
+				return 'Pro';
+			case 'broadcaster':
+				return 'Broadcaster';
+			case 'manager':
+				return 'Manager';
+			default:
+				return role;
+		}
+	};
+
 	const applyFilters = (updates: Record<string, string | null>) => {
 		const params = new URLSearchParams(window.location.search);
 		
@@ -65,8 +181,8 @@
 <div class="container mx-auto p-6 space-y-6">
 	<div class="flex items-center justify-between">
 		<div>
-			<h1 class="text-3xl font-bold text-white">Pro Management</h1>
-			<p class="text-gray-400">Manage professional players, tournaments, and payments</p>
+			<h1 class="text-3xl font-bold text-white">Talent Management</h1>
+			<p class="text-gray-400">Manage talent, tournaments, and payments</p>
 		</div>
 		<div class="flex gap-2">
 			<Button href="/dashboard/pros/tournaments">Tournaments</Button>
@@ -77,22 +193,26 @@
 	</div>
 
 	<!-- Stats Overview -->
-	<div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4">
+	<div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-9 gap-4">
 		<div class="bg-slate-800 p-6 rounded-lg border border-slate-600">
-			<div class="text-sm text-slate-400">Total Pros</div>
-			<div class="text-3xl font-bold text-white">{data.overallStats.totalPros}</div>
+			<div class="text-sm text-slate-400">Total Talent</div>
+			<div class="text-3xl font-bold text-white">{data.overallStats.totalTalent}</div>
 		</div>
 		<div class="bg-green-900/50 p-6 rounded-lg border border-green-700">
 			<div class="text-sm text-green-400">Active</div>
-			<div class="text-3xl font-bold text-green-400">{data.overallStats.activePros}</div>
+			<div class="text-3xl font-bold text-green-400">{data.overallStats.activeTalent}</div>
 		</div>
-		<div class="bg-blue-900/50 p-6 rounded-lg border border-blue-700">
-			<div class="text-sm text-blue-400">Men</div>
-			<div class="text-3xl font-bold text-blue-400">{data.overallStats.mensPros}</div>
+		<div class="bg-purple-900/50 p-6 rounded-lg border border-purple-700">
+			<div class="text-sm text-purple-400">Pros</div>
+			<div class="text-3xl font-bold text-purple-400">{data.overallStats.totalPros}</div>
 		</div>
-		<div class="bg-pink-900/50 p-6 rounded-lg border border-pink-700">
-			<div class="text-sm text-pink-400">Women</div>
-			<div class="text-3xl font-bold text-pink-400">{data.overallStats.womensPros}</div>
+		<div class="bg-orange-900/50 p-6 rounded-lg border border-orange-700">
+			<div class="text-sm text-orange-400">Broadcasters</div>
+			<div class="text-3xl font-bold text-orange-400">{data.overallStats.totalBroadcasters}</div>
+		</div>
+		<div class="bg-cyan-900/50 p-6 rounded-lg border border-cyan-700">
+			<div class="text-sm text-cyan-400">Managers</div>
+			<div class="text-3xl font-bold text-cyan-400">{data.overallStats.totalManagers}</div>
 		</div>
 		<div class="bg-emerald-900/50 p-6 rounded-lg border border-emerald-700">
 			<div class="text-sm text-emerald-400">Total Earnings</div>
@@ -117,11 +237,12 @@
 					<input
 						type="text"
 						bind:value={searchInput}
-						placeholder="Search by name..."
+						placeholder="Search by name, franchise, role..."
 						class="flex-1 rounded-md border border-gray-600 px-3 py-2 bg-gray-700 text-white placeholder-gray-400"
-						onkeydown={(e) => e.key === 'Enter' && handleSearch()}
 					/>
-					<Button onclick={handleSearch}>Search</Button>
+					{#if searchInput.trim()}
+						<Button variant="outline" onclick={() => searchInput = ''}>Clear</Button>
+					{/if}
 				</div>
 			</div>
 			<div>
@@ -151,6 +272,19 @@
 				</select>
 			</div>
 			<div>
+				<label class="text-sm font-medium text-gray-300">Role</label>
+				<select
+					class="mt-1 block w-full rounded-md border border-gray-600 px-3 py-2 bg-gray-700 text-white"
+					value={data.filters.role || ''}
+					onchange={(e) => applyFilters({ role: e.currentTarget.value || null })}
+				>
+					<option value="">All Roles</option>
+					<option value="pro">Pros</option>
+					<option value="broadcaster">Broadcasters</option>
+					<option value="manager">Managers</option>
+				</select>
+			</div>
+			<div>
 				<label class="text-sm font-medium text-gray-300">Franchise</label>
 				<select
 					class="mt-1 block w-full rounded-md border border-gray-600 px-3 py-2 bg-gray-700 text-white"
@@ -163,7 +297,7 @@
 					{/each}
 				</select>
 			</div>
-			{#if data.filters.status || data.filters.gender || data.filters.franchise || data.filters.search}
+			{#if data.filters.status || data.filters.gender || data.filters.franchise || data.filters.role || data.filters.search}
 				<div class="flex items-end">
 					<Button variant="outline" onclick={clearFilters}>Clear Filters</Button>
 				</div>
@@ -194,150 +328,257 @@
 		</div>
 	{/if}
 
-	<!-- Recent Tournaments -->
-	<div class="bg-gray-800 rounded-lg border border-gray-700">
-		<div class="p-6 border-b border-gray-700">
-			<div class="flex items-center justify-between">
-				<h2 class="text-xl font-semibold text-white">Recent Tournaments</h2>
-				<Button href="/dashboard/pros/tournaments" variant="outline">View All</Button>
-			</div>
-		</div>
-		<div class="divide-y divide-gray-700">
-			{#each data.tournaments.slice(0, 5) as tournament}
-				<div class="p-4 hover:bg-gray-700/50">
-					<div class="flex items-center justify-between">
-						<div>
-							<h3 class="font-medium text-white">{tournament.name}</h3>
-							<div class="text-sm text-gray-400">
-								Season {tournament.season} • {formatDate(tournament.startDate)} - {formatDate(
-									tournament.endDate
-								)}
-							</div>
-						</div>
-						<div class="text-right">
-							<div class="font-semibold text-white">{formatCurrency(tournament.prizePool)}</div>
-							<Badge
-								class={tournament.status === 'completed'
-									? 'bg-green-600 text-white'
-									: tournament.status === 'in_progress'
-										? 'bg-blue-600 text-white'
-										: 'bg-gray-600 text-white'}
-							>
-								{tournament.status}
-							</Badge>
-						</div>
-					</div>
-				</div>
-			{:else}
-				<div class="p-8 text-center text-gray-400">No tournaments found</div>
-			{/each}
-		</div>
-	</div>
-
-	<!-- Pros List -->
+	<!-- Talent List -->
 	<div class="bg-gray-800 rounded-lg border border-gray-700">
 		<div class="p-6 border-b border-gray-700">
 			<div class="flex items-center justify-between">
 				<h2 class="text-xl font-semibold text-white">
-					Professional Players ({data.pros.length})
+					Talent ({filteredAndSortedTalent.length}{searchInput.trim() ? ` of ${data.talent.length}` : ''})
 				</h2>
-				<Button href="/dashboard/pros/new" variant="outline">Add Pro</Button>
+				<Button href="/dashboard/pros/new" variant="outline">Add Talent</Button>
 			</div>
 		</div>
 		<div class="overflow-x-auto">
 			<table class="w-full">
 				<thead class="bg-gray-900 border-b border-gray-700">
 					<tr>
-						<th class="px-4 py-3 text-left text-sm font-medium text-gray-300">Pro</th>
-						<th class="px-4 py-3 text-left text-sm font-medium text-gray-300">Franchise</th>
-						<th class="px-4 py-3 text-left text-sm font-medium text-gray-300">Gender</th>
-						<th class="px-4 py-3 text-right text-sm font-medium text-gray-300">Tournaments</th>
-						<th class="px-4 py-3 text-right text-sm font-medium text-gray-300">Wins</th>
-						<th class="px-4 py-3 text-right text-sm font-medium text-gray-300">Podiums</th>
-						<th class="px-4 py-3 text-right text-sm font-medium text-gray-300">Earnings</th>
-						<th class="px-4 py-3 text-center text-sm font-medium text-gray-300">Status</th>
+						<th class="px-4 py-3 text-left text-sm font-medium text-gray-300">
+							<button type="button" class="flex items-center gap-1 hover:text-white transition-colors cursor-pointer" onclick={() => toggleSort('name')}>
+								Name
+								{#if sortField === 'name'}
+									{#if sortDirection === 'asc'}<ArrowUp class="w-4 h-4" />{:else}<ArrowDown class="w-4 h-4" />{/if}
+								{:else}
+									<ArrowUpDown class="w-4 h-4 opacity-30" />
+								{/if}
+							</button>
+						</th>
+						<th class="px-4 py-3 text-left text-sm font-medium text-gray-300">
+							<button type="button" class="flex items-center gap-1 hover:text-white transition-colors cursor-pointer" onclick={() => toggleSort('role')}>
+								Role
+								{#if sortField === 'role'}
+									{#if sortDirection === 'asc'}<ArrowUp class="w-4 h-4" />{:else}<ArrowDown class="w-4 h-4" />{/if}
+								{:else}
+									<ArrowUpDown class="w-4 h-4 opacity-30" />
+								{/if}
+							</button>
+						</th>
+						<th class="px-4 py-3 text-left text-sm font-medium text-gray-300">
+							<button type="button" class="flex items-center gap-1 hover:text-white transition-colors cursor-pointer" onclick={() => toggleSort('franchise')}>
+								Franchise
+								{#if sortField === 'franchise'}
+									{#if sortDirection === 'asc'}<ArrowUp class="w-4 h-4" />{:else}<ArrowDown class="w-4 h-4" />{/if}
+								{:else}
+									<ArrowUpDown class="w-4 h-4 opacity-30" />
+								{/if}
+							</button>
+						</th>
+						<th class="px-4 py-3 text-left text-sm font-medium text-gray-300">
+							<button type="button" class="flex items-center gap-1 hover:text-white transition-colors cursor-pointer" onclick={() => toggleSort('contact')}>
+								Contact
+								{#if sortField === 'contact'}
+									{#if sortDirection === 'asc'}<ArrowUp class="w-4 h-4" />{:else}<ArrowDown class="w-4 h-4" />{/if}
+								{:else}
+									<ArrowUpDown class="w-4 h-4 opacity-30" />
+								{/if}
+							</button>
+						</th>
+						<th class="px-4 py-3 text-right text-sm font-medium text-gray-300">
+							<button type="button" class="flex items-center gap-1 justify-end hover:text-white transition-colors cursor-pointer" onclick={() => toggleSort('tournaments')}>
+								Tournaments
+								{#if sortField === 'tournaments'}
+									{#if sortDirection === 'asc'}<ArrowUp class="w-4 h-4" />{:else}<ArrowDown class="w-4 h-4" />{/if}
+								{:else}
+									<ArrowUpDown class="w-4 h-4 opacity-30" />
+								{/if}
+							</button>
+						</th>
+						<th class="px-4 py-3 text-right text-sm font-medium text-gray-300">
+							<button type="button" class="flex items-center gap-1 justify-end hover:text-white transition-colors cursor-pointer" onclick={() => toggleSort('wins')}>
+								Wins
+								{#if sortField === 'wins'}
+									{#if sortDirection === 'asc'}<ArrowUp class="w-4 h-4" />{:else}<ArrowDown class="w-4 h-4" />{/if}
+								{:else}
+									<ArrowUpDown class="w-4 h-4 opacity-30" />
+								{/if}
+							</button>
+						</th>
+						<th class="px-4 py-3 text-right text-sm font-medium text-gray-300">
+							<button type="button" class="flex items-center gap-1 justify-end hover:text-white transition-colors cursor-pointer" onclick={() => toggleSort('earnings')}>
+								Earnings
+								{#if sortField === 'earnings'}
+									{#if sortDirection === 'asc'}<ArrowUp class="w-4 h-4" />{:else}<ArrowDown class="w-4 h-4" />{/if}
+								{:else}
+									<ArrowUpDown class="w-4 h-4 opacity-30" />
+								{/if}
+							</button>
+						</th>
+						<th class="px-4 py-3 text-center text-sm font-medium text-gray-300">
+							<button type="button" class="flex items-center gap-1 justify-center hover:text-white transition-colors cursor-pointer" onclick={() => toggleSort('status')}>
+								Status
+								{#if sortField === 'status'}
+									{#if sortDirection === 'asc'}<ArrowUp class="w-4 h-4" />{:else}<ArrowDown class="w-4 h-4" />{/if}
+								{:else}
+									<ArrowUpDown class="w-4 h-4 opacity-30" />
+								{/if}
+							</button>
+						</th>
 						<th class="px-4 py-3 text-center text-sm font-medium text-gray-300">Actions</th>
 					</tr>
 				</thead>
 				<tbody class="divide-y divide-gray-700">
-					{#each data.pros as pro}
-						{@const stats = data.proStats[pro.id] || {}}
+					{#each filteredAndSortedTalent as talent}
 						<tr class="hover:bg-gray-700/50">
 							<td class="px-4 py-3">
 								<div class="flex items-center gap-3">
-									{#if pro.photo}
+									{#if talent.photo || talent.avatar}
 										<img
-											src={pro.photo}
-											alt={pro.name}
+											src={talent.photo || talent.avatar}
+											alt={talent.name}
 											class="w-10 h-10 rounded-full object-cover"
 										/>
 									{:else}
 										<div
 											class="w-10 h-10 rounded-full bg-gray-600 flex items-center justify-center text-gray-300 font-semibold text-sm"
 										>
-											{pro.name.charAt(0)}
+											{talent.name.charAt(0)}
 										</div>
 									{/if}
 									<div>
-										<div class="font-medium text-white">{pro.name}</div>
-										{#if pro.nickname}
-											<div class="text-xs text-gray-400">"{pro.nickname}"</div>
+										<div class="font-medium text-white">{talent.name}</div>
+										{#if talent.nickname}
+											<div class="text-xs text-gray-400">"{talent.nickname}"</div>
+										{:else if talent.country}
+											<div class="text-xs text-gray-400">{talent.country}</div>
 										{/if}
 									</div>
 								</div>
 							</td>
-							<td class="px-4 py-3 text-sm">
-								{#if pro.expand?.franchise}
-									<span class="text-blue-400">{pro.expand.franchise.name}</span>
-								{:else}
-									<span class="text-gray-400">Independent</span>
+							<td class="px-4 py-3">
+								<Badge class={getRoleColor(talent.role)}>{getRoleLabel(talent.role)}</Badge>
+								{#if talent.gender}
+									<span class="ml-2 text-xs {talent.gender === 'male' ? 'text-blue-400' : 'text-pink-400'}">
+										{talent.gender === 'male' ? '♂' : '♀'}
+									</span>
 								{/if}
 							</td>
 							<td class="px-4 py-3 text-sm">
-								{#if pro.gender === 'male'}
-									<span class="text-blue-400">♂ Male</span>
-								{:else if pro.gender === 'female'}
-									<span class="text-pink-400">♀ Female</span>
+								{#if talent.franchise}
+									<a href="/dashboard/franchises/{talent.franchise.id}" class="text-blue-400 hover:underline">
+										{talent.franchise.name}
+									</a>
 								{:else}
-									<span class="text-gray-400">{pro.gender || 'N/A'}</span>
+									<span class="text-gray-500">—</span>
 								{/if}
 							</td>
-							<td class="px-4 py-3 text-right text-sm text-white">{stats.tournamentsPlayed || 0}</td>
+							<td class="px-4 py-3 text-sm">
+								{#if talent.email}
+									<div class="text-gray-300">{talent.email}</div>
+								{/if}
+								{#if talent.phone}
+									<div class="text-gray-400 text-xs">{talent.phone}</div>
+								{/if}
+								{#if !talent.email && !talent.phone}
+									<span class="text-gray-500">—</span>
+								{/if}
+							</td>
+							<td class="px-4 py-3 text-right text-sm text-white">
+								{#if talent.role === 'pro'}
+									{talent.tournamentsPlayed || 0}
+								{:else}
+									<span class="text-gray-500">—</span>
+								{/if}
+							</td>
 							<td class="px-4 py-3 text-right text-sm font-medium">
-								{#if stats.wins > 0}
-									<span class="text-yellow-400">🏆 {stats.wins}</span>
+								{#if talent.role === 'pro'}
+									{#if talent.wins && talent.wins > 0}
+										<span class="text-yellow-400">🏆 {talent.wins}</span>
+									{:else}
+										<span class="text-gray-400">0</span>
+									{/if}
 								{:else}
-									<span class="text-gray-400">0</span>
-								{/if}
-							</td>
-							<td class="px-4 py-3 text-right text-sm">
-								{#if stats.podiums > 0}
-									<span class="text-orange-400">{stats.podiums}</span>
-								{:else}
-									<span class="text-gray-400">0</span>
+									<span class="text-gray-500">—</span>
 								{/if}
 							</td>
 							<td class="px-4 py-3 text-right text-sm font-bold text-white">
-								{formatCurrency(stats.totalEarnings || 0)}
+								{#if talent.role === 'pro'}
+									{formatCurrency(talent.totalEarnings || 0)}
+								{:else}
+									<span class="text-gray-500">—</span>
+								{/if}
 							</td>
 							<td class="px-4 py-3 text-center">
-								<Badge class={getStatusColor(pro.status)}>{pro.status}</Badge>
+								<Badge class={getStatusColor(talent.status)}>{talent.status}</Badge>
 							</td>
 							<td class="px-4 py-3 text-center">
-								<Button href="/dashboard/pros/{pro.id}" variant="outline" size="sm"
-									>View</Button
-								>
+								{#if talent.role === 'pro'}
+									<Button href="/dashboard/pros/{talent.id}" variant="outline" size="sm">View</Button>
+								{:else}
+									<Button href="/dashboard/people?search={encodeURIComponent(talent.name)}" variant="outline" size="sm">View</Button>
+								{/if}
 							</td>
 						</tr>
 					{:else}
 						<tr>
 							<td colspan="9" class="p-8 text-center text-gray-400">
-								No pros found. Try adjusting your filters.
+								No talent found. Try adjusting your filters.
 							</td>
 						</tr>
 					{/each}
 				</tbody>
 			</table>
 		</div>
+	</div>
+
+	<!-- Recent Tournaments (Collapsible) -->
+	<div class="bg-gray-800 rounded-lg border border-gray-700">
+		<button
+			class="w-full p-6 flex items-center justify-between cursor-pointer hover:bg-gray-700/50 transition-colors"
+			onclick={() => tournamentsExpanded = !tournamentsExpanded}
+		>
+			<div class="flex items-center gap-3">
+				<h2 class="text-xl font-semibold text-white">Recent Tournaments</h2>
+				<span class="text-sm text-gray-400">({data.tournaments.length})</span>
+			</div>
+			<div class="flex items-center gap-2">
+				<Button href="/dashboard/pros/tournaments" variant="outline" onclick={(e) => e.stopPropagation()}>View All</Button>
+				{#if tournamentsExpanded}
+					<ChevronUp class="w-5 h-5 text-gray-400" />
+				{:else}
+					<ChevronDown class="w-5 h-5 text-gray-400" />
+				{/if}
+			</div>
+		</button>
+		{#if tournamentsExpanded}
+			<div class="divide-y divide-gray-700 border-t border-gray-700">
+				{#each data.tournaments.slice(0, 5) as tournament}
+					<div class="p-4 hover:bg-gray-700/50">
+						<div class="flex items-center justify-between">
+							<div>
+								<h3 class="font-medium text-white">{tournament.name}</h3>
+								<div class="text-sm text-gray-400">
+									Season {tournament.season} • {formatDate(tournament.startDate)} - {formatDate(
+										tournament.endDate
+									)}
+								</div>
+							</div>
+							<div class="text-right">
+								<div class="font-semibold text-white">{formatCurrency(tournament.prizePool)}</div>
+								<Badge
+									class={tournament.status === 'completed'
+										? 'bg-green-600 text-white'
+										: tournament.status === 'in_progress'
+											? 'bg-blue-600 text-white'
+											: 'bg-gray-600 text-white'}
+								>
+									{tournament.status}
+								</Badge>
+							</div>
+						</div>
+					</div>
+				{:else}
+					<div class="p-8 text-center text-gray-400">No tournaments found</div>
+				{/each}
+			</div>
+		{/if}
 	</div>
 </div>
