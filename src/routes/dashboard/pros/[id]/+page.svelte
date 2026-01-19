@@ -97,56 +97,56 @@
 	</div>
 
 	<!-- Career Stats -->
-	<div class="bg-white rounded-lg border p-6">
-		<h2 class="text-2xl font-bold mb-4">Career Statistics</h2>
+	<div class="bg-gray-800 rounded-lg border border-gray-700 p-6">
+		<h2 class="text-2xl font-bold mb-4 text-white">Career Statistics</h2>
 		<div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
-			<div class="text-center p-4 bg-green-50 rounded-lg">
-				<div class="text-3xl font-bold text-green-600">{formatCurrency(data.stats.totalEarnings)}</div>
-				<div class="text-sm text-muted-foreground mt-1">Total Earnings</div>
+			<div class="text-center p-4 bg-green-900/50 rounded-lg border border-green-700">
+				<div class="text-3xl font-bold text-green-400">{formatCurrency(data.stats.totalEarnings)}</div>
+				<div class="text-sm text-gray-400 mt-1">Total Earnings</div>
 			</div>
-			<div class="text-center p-4 bg-blue-50 rounded-lg">
-				<div class="text-3xl font-bold text-blue-600">{data.stats.tournamentsPlayed}</div>
-				<div class="text-sm text-muted-foreground mt-1">Tournaments</div>
+			<div class="text-center p-4 bg-blue-900/50 rounded-lg border border-blue-700">
+				<div class="text-3xl font-bold text-blue-400">{data.stats.tournamentsPlayed}</div>
+				<div class="text-sm text-gray-400 mt-1">Tournaments</div>
 			</div>
-			<div class="text-center p-4 bg-yellow-50 rounded-lg">
-				<div class="text-3xl font-bold text-yellow-600">🏆 {data.stats.wins}</div>
-				<div class="text-sm text-muted-foreground mt-1">Wins</div>
+			<div class="text-center p-4 bg-yellow-900/50 rounded-lg border border-yellow-700">
+				<div class="text-3xl font-bold text-yellow-400">🏆 {data.stats.wins}</div>
+				<div class="text-sm text-gray-400 mt-1">Wins</div>
 			</div>
-			<div class="text-center p-4 bg-orange-50 rounded-lg">
-				<div class="text-3xl font-bold text-orange-600">{data.stats.podiums}</div>
-				<div class="text-sm text-muted-foreground mt-1">Podiums</div>
+			<div class="text-center p-4 bg-orange-900/50 rounded-lg border border-orange-700">
+				<div class="text-3xl font-bold text-orange-400">{data.stats.podiums}</div>
+				<div class="text-sm text-gray-400 mt-1">Podiums</div>
 			</div>
-			<div class="text-center p-4 bg-purple-50 rounded-lg">
-				<div class="text-3xl font-bold text-purple-600">{data.stats.topTens}</div>
-				<div class="text-sm text-muted-foreground mt-1">Top 10s</div>
+			<div class="text-center p-4 bg-purple-900/50 rounded-lg border border-purple-700">
+				<div class="text-3xl font-bold text-purple-400">{data.stats.topTens}</div>
+				<div class="text-sm text-gray-400 mt-1">Top 10s</div>
 			</div>
-			<div class="text-center p-4 bg-gray-50 rounded-lg">
-				<div class="text-3xl font-bold text-gray-600">
+			<div class="text-center p-4 bg-slate-700/50 rounded-lg border border-slate-600">
+				<div class="text-3xl font-bold text-slate-300">
 					{data.stats.avgPlacement > 0 ? data.stats.avgPlacement.toFixed(1) : 'N/A'}
 				</div>
-				<div class="text-sm text-muted-foreground mt-1">Avg Placement</div>
+				<div class="text-sm text-gray-400 mt-1">Avg Placement</div>
 			</div>
 		</div>
 
 		<!-- Detailed Breakdown -->
-		<div class="grid grid-cols-2 md:grid-cols-4 gap-4 mt-6 pt-6 border-t">
+		<div class="grid grid-cols-2 md:grid-cols-4 gap-4 mt-6 pt-6 border-t border-gray-700">
 			<div>
-				<div class="text-sm text-muted-foreground">Best Finish</div>
-				<div class="text-2xl font-bold">
+				<div class="text-sm text-gray-400">Best Finish</div>
+				<div class="text-2xl font-bold text-white">
 					{data.stats.bestPlacement ? getPlacementBadge(data.stats.bestPlacement) : 'N/A'}
 				</div>
 			</div>
 			<div>
-				<div class="text-sm text-muted-foreground">2nd Place</div>
-				<div class="text-2xl font-bold">🥈 {data.stats.secondPlace}</div>
+				<div class="text-sm text-gray-400">2nd Place</div>
+				<div class="text-2xl font-bold text-white">🥈 {data.stats.secondPlace}</div>
 			</div>
 			<div>
-				<div class="text-sm text-muted-foreground">3rd Place</div>
-				<div class="text-2xl font-bold">🥉 {data.stats.thirdPlace}</div>
+				<div class="text-sm text-gray-400">3rd Place</div>
+				<div class="text-2xl font-bold text-white">🥉 {data.stats.thirdPlace}</div>
 			</div>
 			<div>
-				<div class="text-sm text-muted-foreground">Top 5s</div>
-				<div class="text-2xl font-bold">{data.stats.topFives}</div>
+				<div class="text-sm text-gray-400">Top 5s</div>
+				<div class="text-2xl font-bold text-white">{data.stats.topFives}</div>
 			</div>
 		</div>
 
@@ -165,35 +165,35 @@
 
 	<!-- Season Performance -->
 	{#if data.seasonStats.length > 0}
-		<div class="bg-white rounded-lg border p-6">
-			<h2 class="text-2xl font-bold mb-4">Season Performance</h2>
+		<div class="bg-gray-800 rounded-lg border border-gray-700 p-6">
+			<h2 class="text-2xl font-bold mb-4 text-white">Season Performance</h2>
 			<div class="overflow-x-auto">
 				<table class="w-full">
-					<thead class="bg-gray-50 border-b">
+					<thead class="bg-gray-900 border-b border-gray-700">
 						<tr>
-							<th class="px-4 py-3 text-left text-sm font-medium">Season</th>
-							<th class="px-4 py-3 text-right text-sm font-medium">Tournaments</th>
-							<th class="px-4 py-3 text-right text-sm font-medium">Wins</th>
-							<th class="px-4 py-3 text-right text-sm font-medium">Podiums</th>
-							<th class="px-4 py-3 text-right text-sm font-medium">Avg Place</th>
-							<th class="px-4 py-3 text-right text-sm font-medium">Earnings</th>
+							<th class="px-4 py-3 text-left text-sm font-medium text-gray-300">Season</th>
+							<th class="px-4 py-3 text-right text-sm font-medium text-gray-300">Tournaments</th>
+							<th class="px-4 py-3 text-right text-sm font-medium text-gray-300">Wins</th>
+							<th class="px-4 py-3 text-right text-sm font-medium text-gray-300">Podiums</th>
+							<th class="px-4 py-3 text-right text-sm font-medium text-gray-300">Avg Place</th>
+							<th class="px-4 py-3 text-right text-sm font-medium text-gray-300">Earnings</th>
 						</tr>
 					</thead>
-					<tbody class="divide-y">
+					<tbody class="divide-y divide-gray-700">
 						{#each data.seasonStats as season}
-							<tr class="hover:bg-gray-50">
-								<td class="px-4 py-3 font-medium">{season.season}</td>
-								<td class="px-4 py-3 text-right">{season.tournaments}</td>
+							<tr class="hover:bg-gray-700/50">
+								<td class="px-4 py-3 font-medium text-white">{season.season}</td>
+								<td class="px-4 py-3 text-right text-white">{season.tournaments}</td>
 								<td class="px-4 py-3 text-right">
 									{#if season.wins > 0}
-										<span class="text-yellow-600 font-bold">🏆 {season.wins}</span>
+										<span class="text-yellow-400 font-bold">🏆 {season.wins}</span>
 									{:else}
-										<span class="text-gray-400">0</span>
+										<span class="text-gray-500">0</span>
 									{/if}
 								</td>
-								<td class="px-4 py-3 text-right">{season.podiums}</td>
-								<td class="px-4 py-3 text-right">{season.avgPlacement.toFixed(1)}</td>
-								<td class="px-4 py-3 text-right font-bold">{formatCurrency(season.earnings)}</td>
+								<td class="px-4 py-3 text-right text-white">{season.podiums}</td>
+								<td class="px-4 py-3 text-right text-white">{season.avgPlacement.toFixed(1)}</td>
+								<td class="px-4 py-3 text-right font-bold text-white">{formatCurrency(season.earnings)}</td>
 							</tr>
 						{/each}
 					</tbody>
@@ -203,21 +203,21 @@
 	{/if}
 
 	<!-- Tournament Results -->
-	<div class="bg-white rounded-lg border p-6">
-		<h2 class="text-2xl font-bold mb-4">Tournament Results ({data.results.length})</h2>
+	<div class="bg-gray-800 rounded-lg border border-gray-700 p-6">
+		<h2 class="text-2xl font-bold mb-4 text-white">Tournament Results ({data.results.length})</h2>
 		{#if data.results.length > 0}
 			<div class="space-y-3">
 				{#each data.results as result}
-					<div class="flex items-center justify-between p-4 bg-gray-50 rounded-lg hover:bg-gray-100">
+					<div class="flex items-center justify-between p-4 bg-gray-700/50 rounded-lg hover:bg-gray-700 border border-gray-600">
 						<div class="flex items-center gap-4">
-							<div class="text-3xl font-bold w-16 text-center">
+							<div class="text-3xl font-bold w-16 text-center text-white">
 								{getPlacementBadge(result.placement)}
 							</div>
 							<div>
-								<div class="font-semibold">
+								<div class="font-semibold text-white">
 									{result.expand?.tournament?.name || 'Unknown Tournament'}
 								</div>
-								<div class="text-sm text-muted-foreground">
+								<div class="text-sm text-gray-400">
 									Season {result.expand?.tournament?.season || 'N/A'} •
 									{result.division === 'mens' ? "Men's" : "Women's"} Division
 									{#if result.score}
@@ -227,11 +227,11 @@
 							</div>
 						</div>
 						<div class="text-right">
-							<div class="text-xl font-bold text-green-600">
+							<div class="text-xl font-bold text-green-400">
 								{formatCurrency(result.proEarnings || 0)}
 							</div>
 							{#if result.franchiseEarnings}
-								<div class="text-xs text-muted-foreground">
+								<div class="text-xs text-gray-400">
 									+{formatCurrency(result.franchiseEarnings)} franchise
 								</div>
 							{/if}
@@ -240,39 +240,39 @@
 				{/each}
 			</div>
 		{:else}
-			<div class="text-center py-8 text-muted-foreground">No tournament results yet</div>
+			<div class="text-center py-8 text-gray-400">No tournament results yet</div>
 		{/if}
 	</div>
 
 	<!-- Payment History -->
-	<div class="bg-white rounded-lg border p-6">
-		<h2 class="text-2xl font-bold mb-4">Payment History</h2>
+	<div class="bg-gray-800 rounded-lg border border-gray-700 p-6">
+		<h2 class="text-2xl font-bold mb-4 text-white">Payment History</h2>
 		<div class="grid grid-cols-3 gap-4 mb-6">
-			<div class="text-center p-4 bg-green-50 rounded-lg">
-				<div class="text-2xl font-bold text-green-600">
+			<div class="text-center p-4 bg-green-900/50 rounded-lg border border-green-700">
+				<div class="text-2xl font-bold text-green-400">
 					{formatCurrency(data.paymentStats.totalPaid)}
 				</div>
-				<div class="text-sm text-muted-foreground">Total Paid</div>
+				<div class="text-sm text-gray-400">Total Paid</div>
 			</div>
-			<div class="text-center p-4 bg-yellow-50 rounded-lg">
-				<div class="text-2xl font-bold text-yellow-600">
+			<div class="text-center p-4 bg-yellow-900/50 rounded-lg border border-yellow-700">
+				<div class="text-2xl font-bold text-yellow-400">
 					{formatCurrency(data.paymentStats.totalPending)}
 				</div>
-				<div class="text-sm text-muted-foreground">Pending</div>
+				<div class="text-sm text-gray-400">Pending</div>
 			</div>
-			<div class="text-center p-4 bg-blue-50 rounded-lg">
-				<div class="text-2xl font-bold text-blue-600">{data.paymentStats.totalPayments}</div>
-				<div class="text-sm text-muted-foreground">Total Payments</div>
+			<div class="text-center p-4 bg-blue-900/50 rounded-lg border border-blue-700">
+				<div class="text-2xl font-bold text-blue-400">{data.paymentStats.totalPayments}</div>
+				<div class="text-sm text-gray-400">Total Payments</div>
 			</div>
 		</div>
 
 		{#if data.payments.length > 0}
 			<div class="space-y-2">
 				{#each data.payments as payment}
-					<div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+					<div class="flex items-center justify-between p-3 bg-gray-700/50 rounded-lg border border-gray-600">
 						<div>
-							<div class="font-medium">{payment.description || payment.paymentType}</div>
-							<div class="text-sm text-muted-foreground">
+							<div class="font-medium text-white">{payment.description || payment.paymentType}</div>
+							<div class="text-sm text-gray-400">
 								{#if payment.dueDate}
 									Due: {formatDate(payment.dueDate)}
 								{/if}
@@ -282,13 +282,13 @@
 							</div>
 						</div>
 						<div class="text-right">
-							<div class="font-bold">{formatCurrency(payment.amount)}</div>
+							<div class="font-bold text-white">{formatCurrency(payment.amount)}</div>
 							<Badge
 								class={payment.status === 'paid'
-									? 'bg-green-100 text-green-800'
+									? 'bg-green-900 text-green-400'
 									: payment.status === 'pending'
-										? 'bg-yellow-100 text-yellow-800'
-										: 'bg-gray-100 text-gray-800'}
+										? 'bg-yellow-900 text-yellow-400'
+										: 'bg-gray-700 text-gray-400'}
 							>
 								{payment.status}
 							</Badge>
@@ -297,73 +297,73 @@
 				{/each}
 			</div>
 		{:else}
-			<div class="text-center py-8 text-muted-foreground">No payment records</div>
+			<div class="text-center py-8 text-gray-400">No payment records</div>
 		{/if}
 	</div>
 
 	<!-- Bio & Additional Info -->
 	{#if data.pro.bio || data.pro.careerHighlights || data.pro.personalMotivation}
-		<div class="bg-white rounded-lg border p-6">
-			<h2 class="text-2xl font-bold mb-4">About</h2>
+		<div class="bg-gray-800 rounded-lg border border-gray-700 p-6">
+			<h2 class="text-2xl font-bold mb-4 text-white">About</h2>
 			{#if data.pro.bio}
-				<div class="prose max-w-none mb-6">
-					<h3 class="text-lg font-semibold">Biography</h3>
-					{@html data.pro.bio}
+				<div class="prose prose-invert max-w-none mb-6">
+					<h3 class="text-lg font-semibold text-white">Biography</h3>
+					<div class="text-gray-300">{@html data.pro.bio}</div>
 				</div>
 			{/if}
 			{#if data.pro.careerHighlights}
-				<div class="prose max-w-none mb-6">
-					<h3 class="text-lg font-semibold">Career Highlights</h3>
-					{@html data.pro.careerHighlights}
+				<div class="prose prose-invert max-w-none mb-6">
+					<h3 class="text-lg font-semibold text-white">Career Highlights</h3>
+					<div class="text-gray-300">{@html data.pro.careerHighlights}</div>
 				</div>
 			{/if}
 			{#if data.pro.personalMotivation}
-				<div class="prose max-w-none">
-					<h3 class="text-lg font-semibold">Personal Motivation</h3>
-					{@html data.pro.personalMotivation}
+				<div class="prose prose-invert max-w-none">
+					<h3 class="text-lg font-semibold text-white">Personal Motivation</h3>
+					<div class="text-gray-300">{@html data.pro.personalMotivation}</div>
 				</div>
 			{/if}
 		</div>
 	{/if}
 
 	<!-- Additional Details -->
-	<div class="bg-white rounded-lg border p-6">
-		<h2 class="text-2xl font-bold mb-4">Additional Information</h2>
+	<div class="bg-gray-800 rounded-lg border border-gray-700 p-6">
+		<h2 class="text-2xl font-bold mb-4 text-white">Additional Information</h2>
 		<div class="grid grid-cols-2 md:grid-cols-3 gap-6">
 			{#if data.pro.residence}
 				<div>
-					<div class="text-sm text-muted-foreground">Residence</div>
-					<div class="font-medium">{data.pro.residence}</div>
+					<div class="text-sm text-gray-400">Residence</div>
+					<div class="font-medium text-white">{data.pro.residence}</div>
 				</div>
 			{/if}
 			{#if data.pro.dateOfBirth}
 				<div>
-					<div class="text-sm text-muted-foreground">Date of Birth</div>
-					<div class="font-medium">{formatDate(data.pro.dateOfBirth)}</div>
+					<div class="text-sm text-gray-400">Date of Birth</div>
+					<div class="font-medium text-white">{formatDate(data.pro.dateOfBirth)}</div>
 				</div>
 			{/if}
 			{#if data.pro.height}
 				<div>
-					<div class="text-sm text-muted-foreground">Height</div>
-					<div class="font-medium">{data.pro.height}</div>
+					<div class="text-sm text-gray-400">Height</div>
+					<div class="font-medium text-white">{data.pro.height}</div>
 				</div>
 			{/if}
 			{#if data.pro.weight}
 				<div>
-					<div class="text-sm text-muted-foreground">Weight</div>
-					<div class="font-medium">{data.pro.weight}</div>
+					<div class="text-sm text-gray-400">Weight</div>
+					<div class="font-medium text-white">{data.pro.weight}</div>
 				</div>
 			{/if}
 			{#if data.pro.primarySponsor}
 				<div>
-					<div class="text-sm text-muted-foreground">Primary Sponsor</div>
-					<div class="font-medium">{data.pro.primarySponsor}</div>
+					<div class="text-sm text-gray-400">Primary Sponsor</div>
+					<div class="font-medium text-white">{data.pro.primarySponsor}</div>
 				</div>
 			{/if}
 			{#if data.pro.favoriteDisc}
 				<div>
-					<div class="text-sm text-muted-foreground">Favorite Disc</div>
-					<div class="font-medium">{data.pro.favoriteDisc}</div>
+					<div class="text-sm text-gray-400">Favorite Disc</div>
+					<div class="font-medium text-white">{data.pro.favoriteDisc}</div>
 				</div>
 			{/if}
 		</div>

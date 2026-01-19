@@ -58,7 +58,7 @@
 				icon: Trophy
 			},
 			{
-				title: 'Manage Pros',
+				title: 'Manage Talent',
 				url: '/dashboard/pros',
 				icon: UserCircle
 			},

@@ -97,9 +97,14 @@ export class RoleManager {
 	}
 
 	/**
-	 * Link a user profile to a pro
+	 * Grant a user access to a pro's information via the pro_access junction table
 	 */
-	async linkProProfile(userId: string, proId: string): Promise<void> {
+	async grantProAccess(
+		userId: string,
+		proId: string,
+		accessType: 'self' | 'manager' | 'broadcaster' | 'agent',
+		permissions: string[] = ['view_profile']
+	): Promise<void> {
 		const profiles = await this.pb.collection('user_profiles').getFullList({
 			filter: `userId = "${userId}"`
 		});
@@ -109,12 +114,91 @@ export class RoleManager {
 		}
 
 		const profile = profiles[0];
-		await this.pb.collection('user_profiles').update(profile.id, {
-			proReference: proId
+
+		// Check if access already exists
+		const existing = await this.pb.collection('pro_access').getFullList({
+			filter: `userProfile = "${profile.id}" && pro = "${proId}"`
 		});
 
-		// Ensure 'pro' is in available roles
-		await this.addAvailableRole(userId, 'pro');
+		if (existing.length > 0) {
+			// Update existing access
+			await this.pb.collection('pro_access').update(existing[0].id, {
+				accessType,
+				permissions,
+				isActive: true
+			});
+		} else {
+			// Create new access
+			await this.pb.collection('pro_access').create({
+				userProfile: profile.id,
+				pro: proId,
+				accessType,
+				permissions,
+				isActive: true
+			});
+		}
+
+		// Add appropriate role to available roles based on access type
+		if (accessType === 'self') {
+			await this.addAvailableRole(userId, 'pro');
+		} else if (accessType === 'manager') {
+			await this.addAvailableRole(userId, 'manager');
+		} else if (accessType === 'broadcaster') {
+			await this.addAvailableRole(userId, 'broadcaster');
+		}
+	}
+
+	/**
+	 * Revoke a user's access to a pro
+	 */
+	async revokeProAccess(userId: string, proId: string): Promise<void> {
+		const profiles = await this.pb.collection('user_profiles').getFullList({
+			filter: `userId = "${userId}"`
+		});
+
+		if (profiles.length === 0) {
+			throw new Error(`User profile not found for userId: ${userId}`);
+		}
+
+		const profile = profiles[0];
+
+		const existing = await this.pb.collection('pro_access').getFullList({
+			filter: `userProfile = "${profile.id}" && pro = "${proId}"`
+		});
+
+		if (existing.length > 0) {
+			await this.pb.collection('pro_access').delete(existing[0].id);
+		}
+	}
+
+	/**
+	 * Get all pros a user has access to
+	 */
+	async getUserProAccess(userId: string): Promise<any[]> {
+		const profiles = await this.pb.collection('user_profiles').getFullList({
+			filter: `userId = "${userId}"`
+		});
+
+		if (profiles.length === 0) {
+			return [];
+		}
+
+		const profile = profiles[0];
+
+		return await this.pb.collection('pro_access').getFullList({
+			filter: `userProfile = "${profile.id}" && isActive = true`,
+			expand: 'pro'
+		});
+	}
+
+	/**
+	 * Get all users who have access to a specific pro
+	 */
+	async getProAccessUsers(proId: string): Promise<any[]> {
+		return await this.pb.collection('pro_access').getFullList({
+			filter: `pro = "${proId}" && isActive = true`,
+			expand: 'userProfile'
+		});
 	}
 
 	/**

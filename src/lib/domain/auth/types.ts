@@ -85,7 +85,8 @@ export const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
 		'tournaments:register',
 		'profile:*:own',
 		'stats:read:own',
-		'contracts:read:own'
+		'contracts:read:own',
+		'pro_payments:read:own'
 	],
 
 	franchise_owner: [
@@ -94,6 +95,29 @@ export const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
 		'reports:read:own',
 		'profile:*:own',
 		'users:read:own'
+	],
+
+	league_owner: [
+		'league:*:own',
+		'tournaments:*:own',
+		'reports:read:own',
+		'profile:*:own'
+	],
+
+	broadcaster: [
+		'tournaments:read',
+		'pros:read',
+		'profile:*:own',
+		'broadcasts:*:own'
+	],
+
+	manager: [
+		'pros:read:managed',
+		'pros:write:managed',
+		'pro_payments:read:managed',
+		'contracts:read:managed',
+		'tournaments:read',
+		'profile:*:own'
 	]
 };
 
@@ -103,5 +127,8 @@ export const DEFAULT_ROUTES: Record<UserRole, string> = {
 	sales: '/dashboard/sales',
 	vendor: '/dashboard/vendors',
 	pro: '/dashboard/pros',
-	franchise_owner: '/dashboard/franchise'
+	franchise_owner: '/dashboard/franchise',
+	league_owner: '/dashboard/league',
+	broadcaster: '/dashboard/broadcasts',
+	manager: '/dashboard/managed-pros'
 };

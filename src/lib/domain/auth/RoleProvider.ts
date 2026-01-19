@@ -166,17 +166,100 @@ export class RoleProvider {
 	}
 
 	/**
-	 * Get user's linked pro profile
+	 * Get all pros the user has access to (via pro_access junction)
 	 */
-	async getLinkedPro(userId: string): Promise<any | null> {
+	async getAccessiblePros(userId: string): Promise<any[]> {
 		try {
 			const profile = await this.getUserProfile(userId);
-			if (!profile || !profile.proReference) return null;
+			if (!profile) return [];
 
-			return await this.pb.collection('pros').getOne(profile.proReference);
+			const accessRecords = await this.pb.collection('pro_access').getFullList({
+				filter: `userProfile = "${profile.id}" && isActive = true`,
+				expand: 'pro'
+			});
+
+			return accessRecords.map((record: any) => ({
+				...record.expand?.pro,
+				accessType: record.accessType,
+				permissions: record.permissions
+			}));
 		} catch (error) {
-			console.error('Error getting linked pro:', error);
+			console.error('Error getting accessible pros:', error);
+			return [];
+		}
+	}
+
+	/**
+	 * Check if user has access to a specific pro
+	 */
+	async hasProAccess(userId: string, proId: string): Promise<boolean> {
+		try {
+			const profile = await this.getUserProfile(userId);
+			if (!profile) return false;
+
+			const accessRecords = await this.pb.collection('pro_access').getFullList({
+				filter: `userProfile = "${profile.id}" && pro = "${proId}" && isActive = true`
+			});
+
+			return accessRecords.length > 0;
+		} catch (error) {
+			console.error('Error checking pro access:', error);
+			return false;
+		}
+	}
+
+	/**
+	 * Get user's access type for a specific pro
+	 */
+	async getProAccessType(userId: string, proId: string): Promise<string | null> {
+		try {
+			const profile = await this.getUserProfile(userId);
+			if (!profile) return null;
+
+			const accessRecords = await this.pb.collection('pro_access').getFullList({
+				filter: `userProfile = "${profile.id}" && pro = "${proId}" && isActive = true`
+			});
+
+			return accessRecords.length > 0 ? accessRecords[0].accessType : null;
+		} catch (error) {
+			console.error('Error getting pro access type:', error);
 			return null;
+		}
+	}
+
+	/**
+	 * Get user's permissions for a specific pro
+	 */
+	async getProPermissions(userId: string, proId: string): Promise<string[]> {
+		try {
+			const profile = await this.getUserProfile(userId);
+			if (!profile) return [];
+
+			const accessRecords = await this.pb.collection('pro_access').getFullList({
+				filter: `userProfile = "${profile.id}" && pro = "${proId}" && isActive = true`
+			});
+
+			return accessRecords.length > 0 ? (accessRecords[0].permissions || []) : [];
+		} catch (error) {
+			console.error('Error getting pro permissions:', error);
+			return [];
+		}
+	}
+
+	/**
+	 * Get all managers for a specific pro
+	 */
+	async getProManagers(proId: string): Promise<any[]> {
+		try {
+			const accessRecords = await this.pb.collection('pro_access').getFullList({
+				filter: `pro = "${proId}" && accessType = "manager" && isActive = true`,
+				expand: 'userProfile'
+			});
+
+			return accessRecords.map((record: any) => record.expand?.userProfile);
+		} catch (error) {
+			console.error('Error getting pro managers:', error);
+			return [];
 		}
 	}
 
