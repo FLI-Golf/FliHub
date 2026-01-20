@@ -62,7 +62,7 @@
 			<p class="text-muted-foreground">Manage tournament events and prize pools</p>
 		</div>
 		<div class="flex gap-2">
-			<Button href="/dashboard/pros">← Back to Pros</Button>
+			<Button href="/dashboard/talent">← Back to Pros</Button>
 			<Button onclick={openCreateModal}>Create Tournament</Button>
 		</div>
 	</div>
@@ -77,8 +77,8 @@
 					onchange={(e) => {
 						const season = e.currentTarget.value;
 						window.location.href = season
-							? `/dashboard/pros/tournaments?season=${season}`
-							: '/dashboard/pros/tournaments';
+							? `/dashboard/talent/tournaments?season=${season}`
+							: '/dashboard/talent/tournaments';
 					}}
 				>
 					<option value="">All Seasons</option>
@@ -94,8 +94,8 @@
 					onchange={(e) => {
 						const status = e.currentTarget.value;
 						window.location.href = status
-							? `/dashboard/pros/tournaments?status=${status}`
-							: '/dashboard/pros/tournaments';
+							? `/dashboard/talent/tournaments?status=${status}`
+							: '/dashboard/talent/tournaments';
 					}}
 				>
 					<option value="">All Statuses</option>
@@ -146,7 +146,7 @@
 							</div>
 							<div class="flex gap-2">
 								<Button
-									href="/dashboard/pros/tournaments/{tournament.id}"
+									href="/dashboard/talent/tournaments/{tournament.id}"
 									variant="outline"
 									size="sm">View</Button
 								>

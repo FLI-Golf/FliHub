@@ -8,7 +8,7 @@ export const load: PageServerLoad = async ({ locals, params }) => {
 	const paymentRepo = new ProPaymentRepo(pb);
 
 	try {
-		const pro = await pb.collection('pros').getOne(params.id, {
+		const pro = await pb.collection('talent').getOne(params.id, {
 			expand: 'franchise'
 		});
 

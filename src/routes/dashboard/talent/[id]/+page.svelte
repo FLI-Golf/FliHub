@@ -91,8 +91,8 @@
 			</div>
 		</div>
 		<div class="flex gap-2">
-			<Button href="/dashboard/pros">← Back</Button>
-			<Button href="/dashboard/pros/{data.pro.id}/edit" variant="outline">Edit</Button>
+			<Button href="/dashboard/talent">← Back</Button>
+			<Button href="/dashboard/talent/{data.pro.id}/edit" variant="outline">Edit</Button>
 		</div>
 	</div>
 

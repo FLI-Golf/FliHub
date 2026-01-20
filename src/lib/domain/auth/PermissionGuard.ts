@@ -93,9 +93,9 @@ export class PermissionGuard {
 
 			case 'pro':
 				if (!profile.proReference) {
-					return '/dashboard/pros?setup=true';
+					return '/dashboard/talent?setup=true';
 				}
-				return '/dashboard/pros';
+				return '/dashboard/talent';
 
 			case 'leader':
 				// Check if they're a department head

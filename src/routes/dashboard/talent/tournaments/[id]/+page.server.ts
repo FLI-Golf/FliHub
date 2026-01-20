@@ -17,7 +17,7 @@ export const load: PageServerLoad = async ({ locals, params }) => {
 		const [results, franchises, pros, franchisePayouts] = await Promise.all([
 			resultRepo.findByTournament(params.id),
 			pb.collection('franchises').getFullList({ sort: 'name' }),
-			pb.collection('pros').getFullList({ sort: 'name' }),
+			pb.collection('talent').getFullList({ sort: 'name' }),
 			pb
 				.collection('franchise_payouts')
 				.getFullList({ filter: `tournament = '${params.id}'`, expand: 'franchise' })
@@ -61,7 +61,7 @@ export const actions: Actions = {
 		try {
 			// Get tournament and pro details
 			const tournament = await pb.collection('tournaments').getOne(params.id);
-			const pro = await pb.collection('pros').getOne(proId);
+			const pro = await pb.collection('talent').getOne(proId);
 
 			// Get franchise if pro has one
 			let franchiseId = formData.get('franchise') as string;

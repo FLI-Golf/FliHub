@@ -79,7 +79,7 @@
 			</p>
 		</div>
 		<div class="flex gap-2">
-			<Button href="/dashboard/pros">← Back to Pros</Button>
+			<Button href="/dashboard/talent">← Back to Pros</Button>
 			<Button onclick={openCreateModal}>Create Event</Button>
 		</div>
 	</div>
@@ -114,8 +114,8 @@
 					onchange={(e) => {
 						const status = e.currentTarget.value;
 						window.location.href = status
-							? `/dashboard/pros/special-events?status=${status}`
-							: '/dashboard/pros/special-events';
+							? `/dashboard/talent/special-events?status=${status}`
+							: '/dashboard/talent/special-events';
 					}}
 				>
 					<option value="">All Statuses</option>
@@ -131,8 +131,8 @@
 					onchange={(e) => {
 						const type = e.currentTarget.value;
 						window.location.href = type
-							? `/dashboard/pros/special-events?type=${type}`
-							: '/dashboard/pros/special-events';
+							? `/dashboard/talent/special-events?type=${type}`
+							: '/dashboard/talent/special-events';
 					}}
 				>
 					<option value="">All Types</option>

@@ -52,7 +52,7 @@
 			</p>
 		</div>
 		<div class="flex gap-2">
-			<Button href="/dashboard/pros/tournaments">← Back</Button>
+			<Button href="/dashboard/talent/tournaments">← Back</Button>
 			<Button onclick={() => (showAddResultModal = true)}>Add Result</Button>
 		</div>
 	</div>

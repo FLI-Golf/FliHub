@@ -126,7 +126,7 @@ export const DEFAULT_ROUTES: Record<UserRole, string> = {
 	admin: '/dashboard',
 	sales: '/dashboard/sales',
 	vendor: '/dashboard/vendors',
-	pro: '/dashboard/pros',
+	pro: '/dashboard/talent',
 	franchise_owner: '/dashboard/franchise',
 	league_owner: '/dashboard/league',
 	broadcaster: '/dashboard/broadcasts',

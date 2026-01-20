@@ -23,7 +23,7 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 		}
 
 		const [pros, tournaments, specialEvents] = await Promise.all([
-			pb.collection('pros').getFullList({ sort: 'name' }),
+			pb.collection('talent').getFullList({ sort: 'name' }),
 			pb.collection('tournaments').getFullList({ sort: '-season,-tournamentNumber' }),
 			pb.collection('special_events').getFullList({ sort: '-eventDate' })
 		]);

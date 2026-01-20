@@ -7,7 +7,12 @@
 
 	let { data }: { data: PageData } = $props();
 
-	let searchInput = $state(data.filters.search || '');
+	let searchInput = $state(data.filters?.search || '');
+	
+	// Update searchInput when data changes (e.g., on navigation)
+	$effect(() => {
+		searchInput = data.filters?.search || '';
+	});
 	let tournamentsExpanded = $state(false);
 	
 	// Sorting state
@@ -73,16 +78,16 @@
 					bVal = b.email?.toLowerCase() || b.phone || 'zzz';
 					break;
 				case 'tournaments':
-					aVal = a.role === 'pro' ? (a.tournamentsPlayed || 0) : -1;
-					bVal = b.role === 'pro' ? (b.tournamentsPlayed || 0) : -1;
+					aVal = a.talentType?.includes('player') ? (a.tournamentsPlayed || 0) : -1;
+					bVal = b.talentType?.includes('player') ? (b.tournamentsPlayed || 0) : -1;
 					break;
 				case 'wins':
-					aVal = a.role === 'pro' ? (a.wins || 0) : -1;
-					bVal = b.role === 'pro' ? (b.wins || 0) : -1;
+					aVal = a.talentType?.includes('player') ? (a.wins || 0) : -1;
+					bVal = b.talentType?.includes('player') ? (b.wins || 0) : -1;
 					break;
 				case 'earnings':
-					aVal = a.role === 'pro' ? (a.totalEarnings || 0) : -1;
-					bVal = b.role === 'pro' ? (b.totalEarnings || 0) : -1;
+					aVal = a.talentType?.includes('player') ? (a.totalEarnings || 0) : -1;
+					bVal = b.talentType?.includes('player') ? (b.totalEarnings || 0) : -1;
 					break;
 				case 'status':
 					aVal = a.status || '';
@@ -128,29 +133,33 @@
 		}
 	};
 
-	const getRoleColor = (role: string) => {
-		switch (role) {
-			case 'pro':
+	const getTalentTypeColor = (type: string) => {
+		switch (type) {
+			case 'player':
 				return 'bg-purple-600 text-white';
 			case 'broadcaster':
 				return 'bg-orange-600 text-white';
-			case 'manager':
+			case 'commentator':
 				return 'bg-cyan-600 text-white';
+			case 'analyst':
+				return 'bg-blue-600 text-white';
 			default:
 				return 'bg-gray-600 text-white';
 		}
 	};
 
-	const getRoleLabel = (role: string) => {
-		switch (role) {
-			case 'pro':
-				return 'Pro';
+	const getTalentTypeLabel = (type: string) => {
+		switch (type) {
+			case 'player':
+				return 'Player';
 			case 'broadcaster':
 				return 'Broadcaster';
-			case 'manager':
-				return 'Manager';
+			case 'commentator':
+				return 'Commentator';
+			case 'analyst':
+				return 'Analyst';
 			default:
-				return role;
+				return type;
 		}
 	};
 
@@ -165,7 +174,7 @@
 			}
 		});
 		
-		goto(`/dashboard/pros?${params.toString()}`);
+		goto(`/dashboard/talent?${params.toString()}`);
 	};
 
 	const handleSearch = () => {
@@ -174,7 +183,7 @@
 
 	const clearFilters = () => {
 		searchInput = '';
-		goto('/dashboard/pros');
+		goto('/dashboard/talent');
 	};
 </script>
 
@@ -185,10 +194,10 @@
 			<p class="text-gray-400">Manage talent, tournaments, and payments</p>
 		</div>
 		<div class="flex gap-2">
-			<Button href="/dashboard/pros/tournaments">Tournaments</Button>
-			<Button href="/dashboard/pros/payments">Payments</Button>
-			<Button href="/dashboard/pros/special-events">Special Events</Button>
-			<Button href="/dashboard/pros/franchise-payouts">Franchise Payouts</Button>
+			<Button href="/dashboard/talent/tournaments">Tournaments</Button>
+			<Button href="/dashboard/talent/payments">Payments</Button>
+			<Button href="/dashboard/talent/special-events">Special Events</Button>
+			<Button href="/dashboard/talent/franchise-payouts">Franchise Payouts</Button>
 		</div>
 	</div>
 
@@ -203,16 +212,20 @@
 			<div class="text-3xl font-bold text-green-400">{data.overallStats.activeTalent}</div>
 		</div>
 		<div class="bg-purple-900/50 p-6 rounded-lg border border-purple-700">
-			<div class="text-sm text-purple-400">Pros</div>
-			<div class="text-3xl font-bold text-purple-400">{data.overallStats.totalPros}</div>
+			<div class="text-sm text-purple-400">Players</div>
+			<div class="text-3xl font-bold text-purple-400">{data.overallStats.totalPlayers}</div>
 		</div>
 		<div class="bg-orange-900/50 p-6 rounded-lg border border-orange-700">
 			<div class="text-sm text-orange-400">Broadcasters</div>
 			<div class="text-3xl font-bold text-orange-400">{data.overallStats.totalBroadcasters}</div>
 		</div>
 		<div class="bg-cyan-900/50 p-6 rounded-lg border border-cyan-700">
-			<div class="text-sm text-cyan-400">Managers</div>
-			<div class="text-3xl font-bold text-cyan-400">{data.overallStats.totalManagers}</div>
+			<div class="text-sm text-cyan-400">Commentators</div>
+			<div class="text-3xl font-bold text-cyan-400">{data.overallStats.totalCommentators}</div>
+		</div>
+		<div class="bg-blue-900/50 p-6 rounded-lg border border-blue-700">
+			<div class="text-sm text-blue-400">Analysts</div>
+			<div class="text-3xl font-bold text-blue-400">{data.overallStats.totalAnalysts}</div>
 		</div>
 		<div class="bg-emerald-900/50 p-6 rounded-lg border border-emerald-700">
 			<div class="text-sm text-emerald-400">Total Earnings</div>
@@ -272,16 +285,17 @@
 				</select>
 			</div>
 			<div>
-				<label class="text-sm font-medium text-gray-300">Role</label>
+				<label class="text-sm font-medium text-gray-300">Talent Type</label>
 				<select
 					class="mt-1 block w-full rounded-md border border-gray-600 px-3 py-2 bg-gray-700 text-white"
-					value={data.filters.role || ''}
-					onchange={(e) => applyFilters({ role: e.currentTarget.value || null })}
+					value={data.filters.talentType || ''}
+					onchange={(e) => applyFilters({ talentType: e.currentTarget.value || null })}
 				>
-					<option value="">All Roles</option>
-					<option value="pro">Pros</option>
+					<option value="">All Types</option>
+					<option value="player">Players</option>
 					<option value="broadcaster">Broadcasters</option>
-					<option value="manager">Managers</option>
+					<option value="commentator">Commentators</option>
+					<option value="analyst">Analysts</option>
 				</select>
 			</div>
 			<div>
@@ -297,7 +311,7 @@
 					{/each}
 				</select>
 			</div>
-			{#if data.filters.status || data.filters.gender || data.filters.franchise || data.filters.role || data.filters.search}
+			{#if data.filters.status || data.filters.gender || data.filters.franchise || data.filters.talentType || data.filters.search}
 				<div class="flex items-end">
 					<Button variant="outline" onclick={clearFilters}>Clear Filters</Button>
 				</div>
@@ -335,7 +349,7 @@
 				<h2 class="text-xl font-semibold text-white">
 					Talent ({filteredAndSortedTalent.length}{searchInput.trim() ? ` of ${data.talent.length}` : ''})
 				</h2>
-				<Button href="/dashboard/pros/new" variant="outline">Add Talent</Button>
+				<Button href="/dashboard/talent/new" variant="outline">Add Talent</Button>
 			</div>
 		</div>
 		<div class="overflow-x-auto">
@@ -353,14 +367,7 @@
 							</button>
 						</th>
 						<th class="px-4 py-3 text-left text-sm font-medium text-gray-300">
-							<button type="button" class="flex items-center gap-1 hover:text-white transition-colors cursor-pointer" onclick={() => toggleSort('role')}>
-								Role
-								{#if sortField === 'role'}
-									{#if sortDirection === 'asc'}<ArrowUp class="w-4 h-4" />{:else}<ArrowDown class="w-4 h-4" />{/if}
-								{:else}
-									<ArrowUpDown class="w-4 h-4 opacity-30" />
-								{/if}
-							</button>
+							Type
 						</th>
 						<th class="px-4 py-3 text-left text-sm font-medium text-gray-300">
 							<button type="button" class="flex items-center gap-1 hover:text-white transition-colors cursor-pointer" onclick={() => toggleSort('franchise')}>
@@ -454,7 +461,7 @@
 								</div>
 							</td>
 							<td class="px-4 py-3">
-								<Badge class={getRoleColor(talent.role)}>{getRoleLabel(talent.role)}</Badge>
+								<Badge class={getTalentTypeColor(talent.talentType[0] || "player")}>{talent.talentType.map(t => getTalentTypeLabel(t)).join(", ")}</Badge>
 								{#if talent.gender}
 									<span class="ml-2 text-xs {talent.gender === 'male' ? 'text-blue-400' : 'text-pink-400'}">
 										{talent.gender === 'male' ? '♂' : '♀'}
@@ -482,14 +489,14 @@
 								{/if}
 							</td>
 							<td class="px-4 py-3 text-right text-sm text-white">
-								{#if talent.role === 'pro'}
+								{#if talent.talentType.includes('player')}
 									{talent.tournamentsPlayed || 0}
 								{:else}
 									<span class="text-gray-500">—</span>
 								{/if}
 							</td>
 							<td class="px-4 py-3 text-right text-sm font-medium">
-								{#if talent.role === 'pro'}
+								{#if talent.talentType.includes('player')}
 									{#if talent.wins && talent.wins > 0}
 										<span class="text-yellow-400">🏆 {talent.wins}</span>
 									{:else}
@@ -500,7 +507,7 @@
 								{/if}
 							</td>
 							<td class="px-4 py-3 text-right text-sm font-bold text-white">
-								{#if talent.role === 'pro'}
+								{#if talent.talentType.includes('player')}
 									{formatCurrency(talent.totalEarnings || 0)}
 								{:else}
 									<span class="text-gray-500">—</span>
@@ -510,8 +517,8 @@
 								<Badge class={getStatusColor(talent.status)}>{talent.status}</Badge>
 							</td>
 							<td class="px-4 py-3 text-center">
-								{#if talent.role === 'pro'}
-									<Button href="/dashboard/pros/{talent.id}" variant="outline" size="sm">View</Button>
+								{#if talent.talentType.includes('player')}
+									<Button href="/dashboard/talent/{talent.id}" variant="outline" size="sm">View</Button>
 								{:else}
 									<Button href="/dashboard/people?search={encodeURIComponent(talent.name)}" variant="outline" size="sm">View</Button>
 								{/if}
@@ -540,7 +547,7 @@
 				<span class="text-sm text-gray-400">({data.tournaments.length})</span>
 			</div>
 			<div class="flex items-center gap-2">
-				<Button href="/dashboard/pros/tournaments" variant="outline" onclick={(e) => e.stopPropagation()}>View All</Button>
+				<Button href="/dashboard/talent/tournaments" variant="outline" onclick={(e) => e.stopPropagation()}>View All</Button>
 				{#if tournamentsExpanded}
 					<ChevronUp class="w-5 h-5 text-gray-400" />
 				{:else}

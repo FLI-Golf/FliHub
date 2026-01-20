@@ -86,7 +86,7 @@
 			<p class="text-muted-foreground">Manage payments to professional players</p>
 		</div>
 		<div class="flex gap-2">
-			<Button href="/dashboard/pros">← Back to Pros</Button>
+			<Button href="/dashboard/talent">← Back to Pros</Button>
 			<Button onclick={openCreateModal}>Create Payment</Button>
 		</div>
 	</div>
@@ -117,8 +117,8 @@
 					onchange={(e) => {
 						const status = e.currentTarget.value;
 						window.location.href = status
-							? `/dashboard/pros/payments?status=${status}`
-							: '/dashboard/pros/payments';
+							? `/dashboard/talent/payments?status=${status}`
+							: '/dashboard/talent/payments';
 					}}
 				>
 					<option value="">All Statuses</option>
@@ -137,8 +137,8 @@
 					onchange={(e) => {
 						const proId = e.currentTarget.value;
 						window.location.href = proId
-							? `/dashboard/pros/payments?pro=${proId}`
-							: '/dashboard/pros/payments';
+							? `/dashboard/talent/payments?pro=${proId}`
+							: '/dashboard/talent/payments';
 					}}
 				>
 					<option value="">All Pros</option>

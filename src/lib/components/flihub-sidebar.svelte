@@ -58,9 +58,15 @@
 				icon: Trophy
 			},
 			{
-				title: 'Manage Talent',
-				url: '/dashboard/pros',
+				title: 'Talent Management',
+				url: '/dashboard/talent',
 				icon: UserCircle
+			},
+			{
+				title: 'Manager Dashboard',
+				url: '/dashboard/managers',
+				icon: Users,
+				roles: ['admin']
 			},
 			{
 				title: 'Departments',
