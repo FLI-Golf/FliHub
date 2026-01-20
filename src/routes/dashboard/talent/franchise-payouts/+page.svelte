@@ -56,7 +56,7 @@
 			<h1 class="text-3xl font-bold">Franchise Payouts</h1>
 			<p class="text-muted-foreground">Track franchise earnings from tournament results</p>
 		</div>
-		<Button href="/dashboard/pros">← Back to Pros</Button>
+		<Button href="/dashboard/talent">← Back to Pros</Button>
 	</div>
 
 	<!-- Stats -->
@@ -85,8 +85,8 @@
 					onchange={(e) => {
 						const franchiseId = e.currentTarget.value;
 						window.location.href = franchiseId
-							? `/dashboard/pros/franchise-payouts?franchise=${franchiseId}`
-							: '/dashboard/pros/franchise-payouts';
+							? `/dashboard/talent/franchise-payouts?franchise=${franchiseId}`
+							: '/dashboard/talent/franchise-payouts';
 					}}
 				>
 					<option value="">All Franchises</option>
@@ -121,7 +121,7 @@
 								<div class="text-right">
 									<div class="text-2xl font-bold">{formatCurrency(totals.total)}</div>
 									<Button
-										href="/dashboard/pros/franchise-payouts?franchise={franchise.id}"
+										href="/dashboard/talent/franchise-payouts?franchise={franchise.id}"
 										variant="outline"
 										size="sm"
 										class="mt-2">View Details</Button

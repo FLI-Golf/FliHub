@@ -42,7 +42,7 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 			pb.collection('franchise_opportunities').getList(1, 1, { fields: 'id' }),
 			pb.collection('franchise_leads').getList(1, 1, { fields: 'id' }),
 			pb.collection('franchise_territories').getList(1, 1, { fields: 'id' }),
-			pb.collection('pros').getList(1, 1, { fields: 'id' }),
+			pb.collection('talent').getList(1, 1, { fields: 'id' }),
 			pb.collection('campaigns').getList(1, 1, { fields: 'id' }),
 			pb.collection('marketing_goals').getList(1, 1, { fields: 'id' }),
 			pb.collection('vendors').getList(1, 1, { fields: 'id' })
@@ -190,7 +190,7 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 		console.log('Fetching pro players data...');
 		let allPros = [];
 		try {
-			allPros = await pb.collection('pros').getFullList();
+			allPros = await pb.collection('talent').getFullList();
 			console.log(`✓ Fetched ${allPros.length} pro players`);
 		} catch (err: any) {
 			console.error('✗ Failed to fetch pros:', err.message);

@@ -1,7 +1,7 @@
 import PocketBase from 'pocketbase';
 import { readFileSync } from 'fs';
 import { parse } from 'csv-parse/sync';
-import { ManagerSchema, TaskSchema, BroadcastPartnerSchema } from '../domain/schemas';
+import { TaskSchema, BroadcastPartnerSchema } from '../domain/schemas';
 
 interface ImportOptions {
 	url: string;
