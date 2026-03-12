@@ -3,13 +3,16 @@
 	import { Button } from '$lib/components/ui/button';
 	import { Input } from '$lib/components/ui/input';
 	import UploadMediaModal from '$lib/components/media/upload-media-modal.svelte';
-	import { Upload, Search, Trash2, ExternalLink, Image, Filter } from 'lucide-svelte';
+	import EditMediaModal from '$lib/components/media/edit-media-modal.svelte';
+	import { Upload, Search, Trash2, ExternalLink, Image, Pencil } from 'lucide-svelte';
 
 	let { data }: { data: PageData } = $props();
 
 	const PB_URL = 'https://pocketbase-production-6ab5.up.railway.app';
 
 	let showUploadModal = $state(false);
+	let showEditModal = $state(false);
+	let editingAsset = $state<any>(null);
 	let assets = $state(data.assets || []);
 	let searchQuery = $state('');
 	let typeFilter = $state('all');
@@ -62,6 +65,15 @@
 
 	function handleUploaded(asset: any) {
 		assets = [asset, ...assets];
+	}
+
+	function openEdit(asset: any) {
+		editingAsset = asset;
+		showEditModal = true;
+	}
+
+	function handleUpdated(updated: any) {
+		assets = assets.map((a: any) => a.id === updated.id ? { ...a, ...updated } : a);
 	}
 </script>
 
@@ -157,6 +169,7 @@
 						>
 							<ExternalLink class="size-4" />
 						</a>
+
 						<button
 							onclick={() => deleteAsset(asset.id)}
 							class="p-2 rounded-full bg-red-500/70 hover:bg-red-500 text-white transition-colors"
@@ -194,3 +207,14 @@
 	campaigns={data.campaigns}
 	onUploaded={handleUploaded}
 />
+
+{#if editingAsset}
+	<EditMediaModal
+		bind:open={showEditModal}
+		asset={editingAsset}
+		franchises={data.franchises}
+		projects={data.projects}
+		campaigns={data.campaigns}
+		onUpdated={handleUpdated}
+	/>
+{/if}
