@@ -113,7 +113,7 @@
 				bind:value={franchiseFilter}
 				class="flex h-10 rounded-md border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-500"
 			>
-				<option value="all">All Franchises</option>
+				<option value="all">FLI League</option>
 				{#each data.franchises as f}
 					<option value={f.id}>{f.name}</option>
 				{/each}
