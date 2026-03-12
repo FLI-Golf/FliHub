@@ -65,8 +65,8 @@
 				},
 				body: JSON.stringify({
 					...formData,
-					budget: formData.project_budget ? parseFloat(formData.project_budget) : undefined,
-					forecastedExpenses: formData.project_forecasted_expenses ? parseFloat(formData.project_forecasted_expenses) : undefined
+					project_budget: formData.project_budget ? parseFloat(formData.project_budget) : null,
+					project_forecasted_expenses: formData.project_forecasted_expenses ? parseFloat(formData.project_forecasted_expenses) : null
 				})
 			});
 
