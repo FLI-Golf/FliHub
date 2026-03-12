@@ -17,10 +17,10 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 			description: data.description || '',
 			type: data.type,
 			status: data.status,
-			// department is a relation field — send null when empty to avoid PocketBase validation error
-			department: data.department || null,
+			department: data.department,
 			startDate: data.startDate || null,
 			endDate: data.endDate || null,
+			project_budget_mode: data.project_budget_mode || 'auto',
 			project_budget: data.project_budget || null,
 			project_forecasted_expenses: data.project_forecasted_expenses || null,
 			project_actual_expenses: 0,
