@@ -14,7 +14,8 @@
 		Star,
 		UserCircle,
 		Network,
-		Target
+		Target,
+		Images
 	} from 'lucide-svelte';
 
 	const data = {
@@ -97,6 +98,11 @@
 				title: 'Expenses',
 				url: '/dashboard/expenses',
 				icon: Receipt
+			},
+			{
+				title: 'Media',
+				url: '/dashboard/media',
+				icon: Images
 			},
 			{
 				title: 'Approvals',
