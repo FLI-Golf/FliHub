@@ -174,7 +174,13 @@
 						>
 							<ExternalLink class="size-4" />
 						</a>
-
+						<button
+							onclick={() => openEdit(asset)}
+							class="p-2 rounded-full bg-blue-500/70 hover:bg-blue-500 text-white transition-colors"
+							title="Edit"
+						>
+							<Pencil class="size-4" />
+						</button>
 						<button
 							onclick={() => deleteAsset(asset.id)}
 							class="p-2 rounded-full bg-red-500/70 hover:bg-red-500 text-white transition-colors"
