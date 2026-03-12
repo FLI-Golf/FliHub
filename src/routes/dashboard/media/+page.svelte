@@ -63,6 +63,11 @@
 		}
 	}
 
+	// Look up relation names from loaded lists (avoids PocketBase expand errors on empty relations)
+	function franchiseName(id: string) {
+		return data.franchises?.find((f: any) => f.id === id)?.name || '';
+	}
+
 	function handleUploaded(asset: any) {
 		assets = [asset, ...assets];
 	}
@@ -186,8 +191,8 @@
 							<span class="text-xs px-1.5 py-0.5 rounded border {assetTypeColors[asset.asset_type] || assetTypeColors.other}">
 								{assetTypeLabels[asset.asset_type] || asset.asset_type}
 							</span>
-							{#if asset.expand?.franchise}
-								<span class="text-xs text-slate-400 truncate ml-1">{asset.expand.franchise.name}</span>
+							{#if asset.franchise}
+								<span class="text-xs text-slate-400 truncate ml-1">{franchiseName(asset.franchise)}</span>
 							{/if}
 						</div>
 						{#if asset.tags}
