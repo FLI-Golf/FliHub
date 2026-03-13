@@ -192,7 +192,7 @@
 			<MetricCard
 				title="Actual Spent"
 				value={formatCurrency(stats.budget.actual)}
-				subtitle="{((stats.budget.actual / stats.budget.total) * 100).toFixed(0)}% of total budget"
+				subtitle={stats.budget.total > 0 ? `${((stats.budget.actual / stats.budget.total) * 100).toFixed(0)}% of total budget` : 'No budget set'}
 				icon={TrendingUp}
 			/>
 			

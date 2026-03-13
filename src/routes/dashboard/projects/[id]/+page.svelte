@@ -263,13 +263,22 @@
 
 	<!-- Project Details -->
 	<div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-		<!-- Info Card -->
-		<Card class="p-6">
+		<!-- Info Card — click anywhere to edit -->
+		<Card class="p-6 cursor-pointer hover:ring-2 hover:ring-blue-500/50 transition-all" onclick={() => showEditModal = true}>
 			<h2 class="text-xl font-semibold mb-4 flex items-center gap-2">
 				<FileText class="size-5" />
-				Project Information
+				Project Details
+				<Edit class="size-4 ml-auto text-muted-foreground" />
 			</h2>
 			<div class="space-y-3">
+				<div class="flex justify-between">
+					<span class="text-muted-foreground">Status</span>
+					<span class="font-medium capitalize">{project.status?.replace('_', ' ') || '-'}</span>
+				</div>
+				<div class="flex justify-between">
+					<span class="text-muted-foreground">Type</span>
+					<span class="font-medium capitalize">{project.type?.replace('_', ' ') || '-'}</span>
+				</div>
 				<div class="flex justify-between">
 					<span class="text-muted-foreground">Start Date</span>
 					<span class="font-medium">{formatDate(project.startDate)}</span>
@@ -281,6 +290,10 @@
 				<div class="flex justify-between">
 					<span class="text-muted-foreground">Fiscal Year</span>
 					<span class="font-medium">{project.fiscalYear || '-'}</span>
+				</div>
+				<div class="flex justify-between">
+					<span class="text-muted-foreground">Budget Mode</span>
+					<span class="font-medium capitalize">{project.project_budget_mode || '-'}</span>
 				</div>
 				{#if project.expand?.department}
 					<div class="flex justify-between">
@@ -294,6 +307,7 @@
 						<span class="font-medium">{project.expand.approvedBy.name || project.expand.approvedBy.email}</span>
 					</div>
 				{/if}
+				<p class="text-xs text-muted-foreground pt-2 border-t">Click to edit details</p>
 			</div>
 		</Card>
 
