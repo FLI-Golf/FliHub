@@ -1,56 +1,63 @@
 import type { PageServerLoad } from './$types';
 
 export const load: PageServerLoad = async ({ locals }) => {
-	console.log('1. Function started');
-	
 	const pb = locals.pb;
-	console.log('2. Got pb instance');
 
-	// Fetch projects
-	let projects = [];
-	console.log('3. About to fetch projects...');
-	try {
-		projects = await pb.collection('projects').getFullList({ sort: '-id' });
-		console.log(`4. ✓ Fetched ${projects.length} projects`);
-		if (projects.length > 0) {
-			console.log('First project sample:', {
-				id: projects[0].id,
-				name: projects[0].name,
-				status: projects[0].status
-			});
+	const [projects, departments, tasks] = await Promise.all([
+		pb.collection('projects').getFullList({ sort: '-id' }).catch(() => []),
+		pb.collection('departments').getFullList({ sort: 'name' }).catch(() => []),
+		pb.collection('tasks').getFullList({ fields: 'projectId,task_actual_cost,task_budget' }).catch(() => [])
+	]);
+
+	// Aggregate task costs per project
+	const taskCostByProject: Record<string, number> = {};
+	for (const task of tasks) {
+		if (task.projectId) {
+			taskCostByProject[task.projectId] = (taskCostByProject[task.projectId] || 0) + (task.task_actual_cost || 0);
 		}
-	} catch (err: any) {
-		console.error('4. ✗ Error fetching projects:', err?.message);
 	}
 
-	// Fetch departments
-	let departments = [];
-	console.log('5. About to fetch departments...');
-	try {
-		departments = await pb.collection('departments').getFullList({ sort: 'name' });
-		console.log(`6. ✓ Fetched ${departments.length} departments`);
-	} catch (err: any) {
-		console.error('6. ✗ Error fetching departments:', err?.message);
+	// Enrich projects with computed actual expenses from tasks
+	const enrichedProjects = projects.map((p: any) => ({
+		...p,
+		project_actual_expenses: taskCostByProject[p.id] || p.project_actual_expenses || 0
+	}));
+
+	// Calculate stats
+	const byStatus = { draft: 0, planned: 0, in_progress: 0, completed: 0, cancelled: 0 } as Record<string, number>;
+	const byType   = { tournament: 0, activation: 0, event: 0, campaign: 0 } as Record<string, number>;
+	let totalBudget = 0, totalForecasted = 0, totalActual = 0;
+	let overBudget = 0, nearingBudget = 0;
+
+	for (const p of enrichedProjects) {
+		if (p.status in byStatus) byStatus[p.status]++;
+		if (p.type   in byType)   byType[p.type]++;
+		totalBudget     += p.project_budget              || 0;
+		totalForecasted += p.project_forecasted_expenses || 0;
+		totalActual     += p.project_actual_expenses     || 0;
+
+		if (p.project_budget > 0) {
+			const pct = (p.project_actual_expenses / p.project_budget) * 100;
+			if (pct >= 100) overBudget++;
+			else if (pct >= 80) nearingBudget++;
+		}
 	}
 
-	// Build return object
-	console.log('7. Building return object...');
-	const returnData = {
-		projects,
+	return {
+		projects: enrichedProjects,
 		departments,
 		stats: {
-			total: projects.length,
-			byStatus: { draft: 0, planned: 0, in_progress: 0, completed: 0, cancelled: 0 },
-			byType: { tournament: 0, activation: 0, event: 0, campaign: 0 },
-			budget: { total: 0, forecasted: 0, actual: 0, variance: 0, remaining: 0 }
+			total: enrichedProjects.length,
+			byStatus,
+			byType,
+			budget: {
+				total:      totalBudget,
+				forecasted: totalForecasted,
+				actual:     totalActual,
+				variance:   totalBudget - totalActual,
+				remaining:  totalBudget - totalActual
+			}
 		},
-		alerts: {
-			overBudget: 0,
-			nearingBudget: 0
-		}
+		alerts: { overBudget, nearingBudget }
 	};
-	
-	console.log('8. Return object built successfully');
-	console.log('9. Returning data...');
-	return returnData;
 };
