@@ -27,16 +27,30 @@
 		Video,
 		MoreHorizontal
 	} from 'lucide-svelte';
+	import EditExpenseModal from '$lib/components/expenses/edit-expense-modal.svelte';
 	
 	let { data }: { data: PageData } = $props();
 	
-	let expenses = $derived(data.expenses || []);
+	let expenses = $state(data.expenses || []);
 	let stats = $derived(data.stats);
 	let topCategories = $derived(data.topCategories || []);
 	let pendingApprovals = $derived(data.pendingApprovals || []);
 	
 	let statusFilter = $state<string>('all');
 	let categoryFilter = $state<string>('all');
+	let showEditModal = $state(false);
+	let selectedExpense = $state<any>(null);
+
+	function handleRowClick(expense: any) {
+		selectedExpense = expense;
+		showEditModal = true;
+	}
+
+	function handleExpenseUpdated(updated: any) {
+		// Update the expense in the local list
+		const idx = expenses.findIndex((e: any) => e.id === updated.id);
+		if (idx !== -1) expenses[idx] = { ...expenses[idx], ...updated };
+	}
 	
 	// Filter expenses based on selected tabs
 	let filteredExpenses = $derived(expenses.filter(expense => {
@@ -351,8 +365,8 @@
 								</td>
 							</tr>
 						{:else}
-							{#each filteredExpenses.slice(0, 50) as expense}
-								<tr class="hover:bg-slate-50 dark:hover:bg-slate-900/50 transition-colors">
+							{#each filteredExpenses.slice(0, 50) as expense, i}
+								<tr class="hover:bg-green-800 dark:hover:bg-green-800/50 transition-colors cursor-pointer {i % 2 === 1 ? 'bg-blue-800 dark:bg-blue-800/30' : ''}" onclick={() => handleRowClick(expense)}>
 									<td class="px-6 py-4">
 										<div class="font-medium">{expense.description}</div>
 										{#if expense.notes}
@@ -392,3 +406,11 @@
 		</Card>
 	</div>
 </div>
+
+{#if selectedExpense}
+	<EditExpenseModal
+		bind:open={showEditModal}
+		expense={selectedExpense}
+		onUpdated={handleExpenseUpdated}
+	/>
+{/if}
