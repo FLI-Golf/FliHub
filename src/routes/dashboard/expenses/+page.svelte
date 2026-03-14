@@ -268,30 +268,40 @@
 
 	<!-- Top Categories -->
 	{#if topCategories.length > 0}
-		<div>
-			<h2 class="text-xl font-semibold mb-4">Top Expense Categories</h2>
-			<Card class="p-6">
-				<div class="space-y-4">
-					{#each topCategories as [category, data]}
-						<div>
-							<div class="flex justify-between items-center mb-2">
-								<span class="text-sm font-medium">{formatCategory(category)}</span>
-								<div class="text-right">
-									<p class="text-sm font-semibold">{formatCurrency(data.amount)}</p>
-									<p class="text-xs text-muted-foreground">{data.count} {data.count === 1 ? 'expense' : 'expenses'}</p>
-								</div>
-							</div>
-							<div class="w-full bg-slate-200 dark:bg-slate-700 rounded-full h-2">
-								<div 
-									class="bg-primary h-2 rounded-full transition-all duration-500"
-									style="width: {(data.amount / stats.amounts.total * 100).toFixed(1)}%"
-								></div>
-							</div>
+		{@const maxAmount = Math.max(...topCategories.map(([, d]) => d.amount))}
+		{@const barColors = [
+			'bg-blue-500', 'bg-violet-500', 'bg-emerald-500', 'bg-amber-500',
+			'bg-rose-500', 'bg-cyan-500', 'bg-orange-500', 'bg-pink-500',
+			'bg-teal-500', 'bg-indigo-500'
+		]}
+		<Card class="p-4">
+			<h2 class="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-3">Top Expense Categories</h2>
+			<div class="space-y-2">
+				{#each topCategories as [category, catData], i}
+					{@const pct = maxAmount > 0 ? (catData.amount / maxAmount * 100) : 0}
+					{@const totalPct = stats.amounts.total > 0 ? (catData.amount / stats.amounts.total * 100) : 0}
+					{@const color = barColors[i % barColors.length]}
+					<div class="flex items-center gap-3 min-w-0">
+						<!-- Color dot -->
+						<div class="size-2 rounded-full {color} shrink-0"></div>
+						<!-- Category name -->
+						<span class="text-xs truncate w-40 shrink-0" title={category}>{category}</span>
+						<!-- Bar -->
+						<div class="flex-1 bg-slate-200 dark:bg-slate-800 rounded-full h-2 overflow-hidden">
+							<div class="{color} h-2 rounded-full transition-all duration-500" style="width: {pct.toFixed(1)}%"></div>
 						</div>
-					{/each}
-				</div>
-			</Card>
-		</div>
+						<!-- % -->
+						<span class="text-xs text-muted-foreground w-8 text-right shrink-0">{totalPct.toFixed(0)}%</span>
+						<!-- Amount -->
+						<span class="text-xs font-semibold w-20 text-right shrink-0">{formatCurrency(catData.amount)}</span>
+					</div>
+				{/each}
+			</div>
+			<div class="mt-3 pt-3 border-t border-slate-200 dark:border-slate-700 flex justify-between">
+				<span class="text-xs text-muted-foreground">{topCategories.reduce((s, [, d]) => s + d.count, 0)} expenses</span>
+				<span class="text-xs font-semibold">{formatCurrency(stats.amounts.total)}</span>
+			</div>
+		</Card>
 	{/if}
 
 	<!-- Expenses Table with Tabs -->
