@@ -216,6 +216,8 @@
 	franchises={data.franchises}
 	projects={data.projects}
 	campaigns={data.campaigns}
+	pbUrl={data.pbUrl}
+	authToken={data.authToken}
 	onUploaded={handleUploaded}
 />
 
