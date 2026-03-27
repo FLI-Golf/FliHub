@@ -16,5 +16,10 @@ export const load: PageServerLoad = async ({ locals }) => {
 		locals.pb.collection('campaigns').getFullList({ sort: 'name', fields: 'id,name' }).catch(() => [])
 	]);
 
-	return { assets, franchises, projects, campaigns };
+	// Pass PocketBase URL and auth token to the client so uploads go directly
+	// to PocketBase, bypassing Netlify's 1MB function body limit.
+	const pbUrl = env.POCKETBASE_URL || 'http://127.0.0.1:8090';
+	const authToken = locals.pb.authStore.token || '';
+
+	return { assets, franchises, projects, campaigns, pbUrl, authToken };
 };

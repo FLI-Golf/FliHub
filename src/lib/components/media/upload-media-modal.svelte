@@ -4,12 +4,15 @@
 	import { Input } from '$lib/components/ui/input';
 	import { Label } from '$lib/components/ui/label';
 	import { Upload, Save, X, Image } from 'lucide-svelte';
+	import PocketBase from 'pocketbase';
 
 	let {
 		open = $bindable(false),
 		franchises = [],
 		projects = [],
 		campaigns = [],
+		pbUrl = 'http://127.0.0.1:8090',
+		authToken = '',
 		onUploaded = () => {}
 	} = $props();
 
@@ -60,6 +63,12 @@
 		error = '';
 
 		try {
+			// Upload directly to PocketBase to avoid Netlify's 1MB function body limit.
+			const client = new PocketBase(pbUrl);
+			if (authToken) {
+				client.authStore.save(authToken, null);
+			}
+
 			const body = new FormData();
 			body.append('title', formData.title);
 			body.append('asset_type', formData.asset_type);
@@ -70,22 +79,12 @@
 			if (formData.tags)      body.append('tags',      formData.tags);
 			if (formData.notes)     body.append('notes',     formData.notes);
 
-			const response = await fetch('/api/media', {
-				method: 'POST',
-				body
-			});
-
-			if (!response.ok) {
-				const data = await response.json();
-				throw new Error(data.message || 'Upload failed');
-			}
-
-			const asset = await response.json();
+			const asset = await client.collection('media_assets').create(body);
 			resetForm();
 			open = false;
 			onUploaded(asset);
-		} catch (err) {
-			error = err instanceof Error ? err.message : 'An error occurred';
+		} catch (err: any) {
+			error = err?.message || 'An error occurred';
 		} finally {
 			isSubmitting = false;
 		}
