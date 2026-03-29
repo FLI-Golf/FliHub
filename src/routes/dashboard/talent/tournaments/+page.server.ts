@@ -1,10 +1,12 @@
+import { RequestContext } from '$lib/infra/RequestContext';
 import type { PageServerLoad, Actions } from './$types';
 import { TournamentRepo } from '$lib/infra/pocketbase/repositories';
 import { fail, redirect } from '@sveltejs/kit';
 
 export const load: PageServerLoad = async ({ locals, url }) => {
-	const pb = locals.pb;
-	const tournamentRepo = new TournamentRepo(pb);
+	const ctx = await RequestContext.from(locals, url);
+	const { pb, userId, profile: userProfile, role } = ctx;
+		const tournamentRepo = new TournamentRepo(pb);
 
 	const season = url.searchParams.get('season');
 	const status = url.searchParams.get('status');

@@ -1,12 +1,10 @@
+import { RequestContext } from '$lib/infra/RequestContext';
 import type { PageServerLoad } from './$types';
-import { redirect } from '@sveltejs/kit';
 
-export const load: PageServerLoad = async ({ locals }) => {
-	const pb = locals.pb;
-
-	if (!pb.authStore.isValid) {
-		throw redirect(303, '/login');
-	}
+export const load: PageServerLoad = async ({ locals, url }) => {
+	const ctx = await RequestContext.from(locals, url);
+	const { pb, userId, profile: userProfile, role } = ctx;
+	
 
 	console.log('=== APPROVALS PAGE LOAD START ===');
 
@@ -20,7 +18,7 @@ export const load: PageServerLoad = async ({ locals }) => {
 
 		// Get current user profile
 		const userProfiles = await pb.collection('user_profiles').getFullList({
-			filter: `userId = "${pb.authStore.model?.id}"`
+			filter: `userId = "${userId}"`
 		});
 		const userProfile = userProfiles[0];
 

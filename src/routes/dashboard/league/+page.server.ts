@@ -1,13 +1,8 @@
+import { RequestContext } from '$lib/infra/RequestContext';
 import type { PageServerLoad } from './$types';
-import { pb } from '$lib/pocketbase';
 
-export const load: PageServerLoad = async () => {
-	const leagues = await pb.collection('league').getFullList({
-		sort: '-created',
-		expand: 'owner'
-	});
-
-	return {
-		leagues
-	};
+export const load: PageServerLoad = async ({ locals, url }) => {
+	const { pb } = await RequestContext.from(locals, url);
+	const leagues = await pb.collection('league').getFullList({ sort: '-created', expand: 'owner' }).catch(() => []);
+	return { leagues };
 };

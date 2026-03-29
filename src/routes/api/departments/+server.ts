@@ -5,7 +5,7 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 	try {
 		const data = await request.json();
 		
-		const department = await locals.pb.collection('departments_collection').create(data);
+		const department = await locals.pb.collection('departments').create(data);
 		
 		return json(department, { status: 201 });
 	} catch (error: any) {

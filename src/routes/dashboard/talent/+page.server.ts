@@ -1,3 +1,4 @@
+import { RequestContext } from '$lib/infra/RequestContext';
 import type { PageServerLoad } from './$types';
 import { TournamentRepo, ProPaymentRepo } from '$lib/infra/pocketbase/repositories';
 
@@ -26,8 +27,9 @@ interface TalentRecord {
 }
 
 export const load: PageServerLoad = async ({ locals, url }) => {
-	const pb = locals.pb;
-
+	const ctx = await RequestContext.from(locals, url);
+	const { pb, userId, profile: userProfile, role } = ctx;
+	
 	const statusFilter = url.searchParams.get('status');
 	const genderFilter = url.searchParams.get('gender');
 	const franchiseFilter = url.searchParams.get('franchise');

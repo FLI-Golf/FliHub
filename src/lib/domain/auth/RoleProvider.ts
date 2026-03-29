@@ -138,7 +138,7 @@ export class RoleProvider {
 	 */
 	async getDepartmentHead(departmentId: string): Promise<any | null> {
 		try {
-			const department = await this.pb.collection('departments_collection').getOne(departmentId, {
+			const department = await this.pb.collection('departments').getOne(departmentId, {
 				expand: 'headOfDepartment'
 			});
 
@@ -283,7 +283,7 @@ export class RoleProvider {
 	 */
 	async getUserDepartment(userProfileId: string): Promise<any | null> {
 		try {
-			const departments = await this.pb.collection('departments_collection').getFullList({
+			const departments = await this.pb.collection('departments').getFullList({
 				filter: `headOfDepartment = "${userProfileId}"`
 			});
 

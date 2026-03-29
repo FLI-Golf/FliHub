@@ -1,27 +1,18 @@
+import { RequestContext } from '$lib/infra/RequestContext';
 import type { PageServerLoad } from './$types';
-import { redirect } from '@sveltejs/kit';
 
 export const load: PageServerLoad = async ({ locals }) => {
-	const pb = locals.pb;
-
-	if (!pb.authStore.isValid) {
-		throw redirect(303, '/auth/login');
-	}
+	const ctx = await RequestContext.from(locals, url);
+	const { pb, userId, profile: userProfile, role } = ctx;
+	
 
 	// Get user profile to check role
-	const userId = pb.authStore.model?.id;
-	if (!userId) {
-		throw redirect(303, '/auth/login');
-	}
 
 	try {
 		const userProfile = await pb.collection('user_profiles').getFirstListItem(`userId="${userId}"`);
 		const role = userProfile.role || 'leader';
 
 		// Only admin can access franchise sales dashboard
-		if (role !== 'admin') {
-			throw redirect(303, '/dashboard');
-		}
 
 		console.log('Fetching franchise sales data...');
 
@@ -135,6 +126,5 @@ export const load: PageServerLoad = async ({ locals }) => {
 		};
 	} catch (error: any) {
 		console.error('Error loading franchise sales dashboard:', error);
-		throw redirect(303, '/dashboard');
-	}
+		}
 };

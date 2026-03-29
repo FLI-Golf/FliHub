@@ -1,43 +1,26 @@
-import { redirect } from '@sveltejs/kit';
+import { RequestContext } from '$lib/infra/RequestContext';
 import type { LayoutServerLoad } from './$types';
 
-export const load: LayoutServerLoad = async ({ locals }) => {
-	if (!locals.pb.authStore.isValid) {
-		throw redirect(303, '/auth/login');
-	}
-
-	// Fetch user profile to get role and other details
-	let userProfile = null;
-	let userDepartment = null;
+export const load: LayoutServerLoad = async ({ locals, url }) => {
 	try {
-		const profiles = await locals.pb.collection('user_profiles').getFullList({
-			filter: `userId = "${locals.pb.authStore.model?.id}"`
-		});
-		userProfile = profiles[0] || null;
+		const ctx = await RequestContext.from(locals, url);
+		const { pb, profile } = ctx;
 
-		// Redirect sales users to their dashboard if they're on the main dashboard
-		if (userProfile?.role === 'sales' && locals.url?.pathname === '/dashboard') {
-			throw redirect(303, '/dashboard/sales');
+		let userDepartment = null;
+		if (profile?.role === 'leader' && profile?.id) {
+			const depts = await pb.collection('departments')
+				.getFullList({ filter: `headOfDepartment = "${profile.id}"` })
+				.catch(() => []);
+			userDepartment = depts[0] ?? null;
 		}
 
-		// If user is a leader, check for their department
-		if (userProfile?.role === 'leader' && userProfile?.id) {
-			const departments = await locals.pb.collection('departments_collection').getFullList({
-				filter: `headOfDepartment = "${userProfile.id}"`
-			});
-			userDepartment = departments[0] || null;
-		}
-	} catch (error) {
-		// If it's a redirect, re-throw it
-		if (error instanceof Response && error.status === 303) {
-			throw error;
-		}
-		console.error('Failed to fetch user profile:', error);
+		return {
+			user: locals.pb?.authStore?.model ?? null,
+			userProfile: profile,
+			userDepartment
+		};
+	} catch (err: any) {
+		console.error('Layout load error:', err?.message ?? err);
+		return { user: null, userProfile: null, userDepartment: null };
 	}
-
-	return {
-		user: locals.pb.authStore.model,
-		userProfile,
-		userDepartment
-	};
 };

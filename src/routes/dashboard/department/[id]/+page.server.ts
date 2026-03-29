@@ -2,8 +2,7 @@ import type { PageServerLoad } from './$types';
 import { error } from '@sveltejs/kit';
 
 export const load: PageServerLoad = async ({ locals, params }) => {
-	const pb = locals.pb;
-	const departmentId = params.id;
+		const departmentId = params.id;
 
 	// Return dummy data for now to test if route works
 	return {

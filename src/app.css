@@ -1,65 +1,72 @@
 @import 'tailwindcss';
 
 :root {
-	/* Pure black and white theme */
-	--background: 0 0% 100%;
-	--foreground: 0 0% 0%;
+	/* Light theme — warm white base with vivid accents */
+	--background: 210 20% 98%;
+	--foreground: 222 47% 11%;
 	--card: 0 0% 100%;
-	--card-foreground: 0 0% 0%;
+	--card-foreground: 222 47% 11%;
 	--popover: 0 0% 100%;
-	--popover-foreground: 0 0% 0%;
-	--primary: 0 0% 0%;
+	--popover-foreground: 222 47% 11%;
+	--primary: 160 84% 39%;
 	--primary-foreground: 0 0% 100%;
-	--secondary: 0 0% 96%;
-	--secondary-foreground: 0 0% 0%;
-	--muted: 0 0% 96%;
-	--muted-foreground: 0 0% 40%;
-	--accent: 0 0% 96%;
-	--accent-foreground: 0 0% 0%;
-	--destructive: 0 0% 0%;
+	--secondary: 217 33% 94%;
+	--secondary-foreground: 222 47% 11%;
+	--muted: 210 20% 95%;
+	--muted-foreground: 215 16% 47%;
+	--accent: 217 91% 95%;
+	--accent-foreground: 217 91% 30%;
+	--destructive: 0 84% 60%;
 	--destructive-foreground: 0 0% 100%;
-	--border: 0 0% 90%;
-	--input: 0 0% 90%;
-	--ring: 0 0% 0%;
+	--border: 214 32% 91%;
+	--input: 214 32% 91%;
+	--ring: 160 84% 39%;
 	--radius: 0.5rem;
-	
+
 	/* Sidebar */
-	--sidebar-background: 0 0% 100%;
-	--sidebar-foreground: 0 0% 0%;
-	--sidebar-accent: 0 0% 96%;
-	--sidebar-accent-foreground: 0 0% 0%;
-	--sidebar-border: 0 0% 90%;
-	--sidebar-ring: 0 0% 0%;
+	--sidebar-background: 222 47% 99%;
+	--sidebar-foreground: 222 47% 11%;
+	--sidebar-accent: 160 84% 95%;
+	--sidebar-accent-foreground: 160 84% 25%;
+	--sidebar-border: 214 32% 91%;
+	--sidebar-ring: 160 84% 39%;
+
+	/* Section accent colors */
+	--color-sales: 160 84% 39%;
+	--color-operations: 217 91% 60%;
+	--color-league: 262 83% 58%;
+	--color-marketing: 25 95% 53%;
+	--color-system: 0 84% 60%;
 }
 
 .dark {
-	--background: 222 47% 11%;
-	--foreground: 210 40% 98%;
-	--card: 222 47% 15%;
-	--card-foreground: 210 40% 98%;
-	--popover: 222 47% 15%;
-	--popover-foreground: 210 40% 98%;
-	--primary: 217 91% 60%;
-	--primary-foreground: 222 47% 11%;
+	--background: 222 47% 9%;
+	--foreground: 210 40% 96%;
+	--card: 222 47% 12%;
+	--card-foreground: 210 40% 96%;
+	--popover: 222 47% 13%;
+	--popover-foreground: 210 40% 96%;
+	--primary: 160 84% 45%;
+	--primary-foreground: 222 47% 9%;
 	--secondary: 217 33% 17%;
-	--secondary-foreground: 210 40% 98%;
-	--muted: 223 47% 20%;
-	--muted-foreground: 215 20% 65%;
-	--accent: 262 83% 58%;
-	--accent-foreground: 210 40% 98%;
-	--destructive: 0 63% 31%;
-	--destructive-foreground: 210 40% 98%;
-	--border: 217 33% 25%;
-	--input: 217 33% 25%;
-	--ring: 217 91% 60%;
-	
-	/* Sidebar */
-	--sidebar-background: 222 47% 11%;
-	--sidebar-foreground: 210 40% 98%;
-	--sidebar-accent: 262 83% 58%;
-	--sidebar-accent-foreground: 210 40% 98%;
-	--sidebar-border: 217 33% 25%;
-	--sidebar-ring: 217 91% 60%;
+	--secondary-foreground: 210 40% 96%;
+	--muted: 223 47% 16%;
+	--muted-foreground: 215 20% 55%;
+	--accent: 217 91% 20%;
+	--accent-foreground: 217 91% 80%;
+	--destructive: 0 63% 45%;
+	--destructive-foreground: 210 40% 96%;
+	--border: 217 33% 20%;
+	--input: 217 33% 20%;
+	--ring: 160 84% 45%;
+
+	/* Sidebar dark */
+	--sidebar-background: 222 47% 8%;
+	--sidebar-foreground: 210 40% 96%;
+	--sidebar-accent: 160 84% 15%;
+	--sidebar-accent-foreground: 160 84% 70%;
+	--sidebar-border: 217 33% 18%;
+	--sidebar-ring: 160 84% 45%;
 }
 
 * {
@@ -69,5 +76,26 @@
 body {
 	background-color: hsl(var(--background));
 	color: hsl(var(--foreground));
-	font-feature-settings: "rlig" 1, "calt" 1;
+	font-feature-settings: 'rlig' 1, 'calt' 1;
 }
+
+/* Thin scrollbar */
+::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: hsl(var(--border)); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: hsl(var(--muted-foreground) / 0.4); }
+
+/* Card hover lift */
+.card-hover {
+	transition: box-shadow 0.2s ease, transform 0.15s ease;
+}
+.card-hover:hover {
+	box-shadow: 0 8px 24px -4px hsl(var(--foreground) / 0.08);
+	transform: translateY(-1px);
+}
+
+/* Section color left-border helpers */
+.metric-sales     { border-left: 3px solid hsl(var(--color-sales)); }
+.metric-ops       { border-left: 3px solid hsl(var(--color-operations)); }
+.metric-league    { border-left: 3px solid hsl(var(--color-league)); }
+.metric-marketing { border-left: 3px solid hsl(var(--color-marketing)); }

@@ -226,7 +226,7 @@ export class RoleManager {
 	 * Set a user as head of a department
 	 */
 	async setDepartmentHead(departmentId: string, userProfileId: string): Promise<void> {
-		await this.pb.collection('departments_collection').update(departmentId, {
+		await this.pb.collection('departments').update(departmentId, {
 			headOfDepartment: userProfileId
 		});
 
@@ -256,7 +256,7 @@ export class RoleManager {
 	 * Remove user as head of department
 	 */
 	async removeDepartmentHead(departmentId: string): Promise<void> {
-		await this.pb.collection('departments_collection').update(departmentId, {
+		await this.pb.collection('departments').update(departmentId, {
 			headOfDepartment: null
 		});
 	}

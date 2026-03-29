@@ -1,8 +1,10 @@
+import { RequestContext } from '$lib/infra/RequestContext';
 import type { PageServerLoad } from './$types';
 
-export const load: PageServerLoad = async ({ locals }) => {
-	const pb = locals.pb;
-
+export const load: PageServerLoad = async ({ locals, url }) => {
+	const ctx = await RequestContext.from(locals, url);
+	const { pb, userId, profile: userProfile, role } = ctx;
+	
 	try {
 		// Fetch all expenses with expanded relations
 		const expenses = await pb.collection('expenses').getFullList({

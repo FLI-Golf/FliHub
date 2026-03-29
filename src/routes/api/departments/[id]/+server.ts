@@ -5,7 +5,7 @@ export const PATCH: RequestHandler = async ({ request, locals, params }) => {
 	try {
 		const data = await request.json();
 		
-		const department = await locals.pb.collection('departments_collection').update(params.id, data);
+		const department = await locals.pb.collection('departments').update(params.id, data);
 		
 		return json(department);
 	} catch (error: any) {
@@ -19,7 +19,7 @@ export const PATCH: RequestHandler = async ({ request, locals, params }) => {
 
 export const DELETE: RequestHandler = async ({ locals, params }) => {
 	try {
-		await locals.pb.collection('departments_collection').delete(params.id);
+		await locals.pb.collection('departments').delete(params.id);
 		
 		return json({ success: true });
 	} catch (error: any) {

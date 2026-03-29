@@ -1,10 +1,12 @@
+import { RequestContext } from '$lib/infra/RequestContext';
 import type { PageServerLoad, Actions } from './$types';
 import { ProPaymentRepo } from '$lib/infra/pocketbase/repositories';
 import { fail } from '@sveltejs/kit';
 
 export const load: PageServerLoad = async ({ locals, url }) => {
-	const pb = locals.pb;
-	const paymentRepo = new ProPaymentRepo(pb);
+	const ctx = await RequestContext.from(locals, url);
+	const { pb, userId, profile: userProfile, role } = ctx;
+		const paymentRepo = new ProPaymentRepo(pb);
 
 	const status = url.searchParams.get('status');
 	const proId = url.searchParams.get('pro');

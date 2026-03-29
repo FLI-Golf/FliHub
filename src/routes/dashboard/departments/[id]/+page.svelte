@@ -8,11 +8,12 @@
 	import ProjectStatusChart from '$lib/components/charts/ProjectStatusChart.svelte';
 	import BurnRateChart from '$lib/components/charts/BurnRateChart.svelte';
 	import FinancialHealthCard from '$lib/components/charts/FinancialHealthCard.svelte';
-	import { 
-		Building2, 
-		Users, 
-		DollarSign, 
-		FolderKanban, 
+	import { DepartmentProvider } from '$lib/domain/providers/DepartmentProvider.svelte';
+	import {
+		Building2,
+		Users,
+		DollarSign,
+		FolderKanban,
 		Receipt,
 		ArrowLeft,
 		TrendingUp,
@@ -21,7 +22,9 @@
 
 	let { data }: { data: PageData } = $props();
 
-	let selectedPhase = $state<string>('all');
+	// Initialise the provider — sets Svelte context so child components
+	// can call DepartmentProvider.inject() without prop drilling.
+	const dept = DepartmentProvider.provide(data.department);
 
 	function formatCurrency(amount: number): string {
 		return new Intl.NumberFormat('en-US', {
@@ -32,74 +35,16 @@
 		}).format(amount);
 	}
 
-	// Calculate phase-filtered metrics
-	let phaseFilteredMetrics = $derived.by(() => {
-		if (selectedPhase === 'all') {
-			return data.metrics;
-		}
-		const phase = data.metrics.phases[selectedPhase as keyof typeof data.metrics.phases];
-		return {
-			budget: {
-				total: data.metrics.budget.total / 3, // Distribute evenly
-				allocated: phase?.budget || 0,
-				actual: phase?.actual || 0,
-				forecasted: phase?.forecasted || 0,
-				remaining: (data.metrics.budget.total / 3) - (phase?.actual || 0)
-			},
-			projects: {
-				total: phase?.projectCount || 0,
-				draft: 0,
-				planned: 0,
-				in_progress: 0,
-				completed: 0,
-				cancelled: 0
-			},
-			expenses: data.metrics.expenses,
-			phases: data.metrics.phases
-		};
-	});
-
-	// Filter projects by phase
-	let phaseFilteredProjects = $derived.by(() => {
-		if (selectedPhase === 'all') {
-			return data.projects;
-		}
-		
-		const PHASE1_START = new Date('2026-01-01');
-		const PHASE1_END = new Date('2026-09-30');
-		const PHASE2_START = new Date('2026-10-01');
-		const PHASE2_END = new Date('2027-03-31');
-		const PHASE3_START = new Date('2027-04-01');
-		const PHASE3_END = new Date('2027-12-31');
-
-		function getProjectPhase(project: any): string {
-			const startDate = project.startDate ? new Date(project.startDate) : null;
-			const name = project.name || '';
-			
-			if (name.match(/^P1[\s-]/i)) return 'phase1';
-			if (name.match(/^P2[\s-]/i)) return 'phase2';
-			if (name.match(/^P3[\s-]/i)) return 'phase3';
-			
-			if (startDate) {
-				if (startDate >= PHASE1_START && startDate <= PHASE1_END) return 'phase1';
-				if (startDate >= PHASE2_START && startDate <= PHASE2_END) return 'phase2';
-				if (startDate >= PHASE3_START && startDate <= PHASE3_END) return 'phase3';
-			}
-			
-			return 'phase1';
-		}
-
-		return data.projects.filter(p => getProjectPhase(p) === selectedPhase);
-	});
-
-	let pendingExpenses = $derived(
-		(data.metrics.expenses.draft + data.metrics.expenses.submitted) * 
-		(data.metrics.expenses.totalAmount / Math.max(data.metrics.expenses.total, 1))
-	);
+	// All derived state lives in the provider — just alias for template clarity
+	const phaseFilteredMetrics  = $derived(dept.filteredMetrics);
+	const phaseFilteredProjects = $derived(dept.filteredProjects);
+	const pendingExpenses        = $derived(dept.pendingExpenseAmount);
+	const spendPct               = $derived(dept.spendPct);
+	const metrics                = $derived(dept.metrics!);
 </script>
 
 <svelte:head>
-	<title>{data.department.name} - Department Details - FliHub</title>
+	<title>{dept.department?.name} - Department Details - FliHub</title>
 </svelte:head>
 
 <div class="flex flex-col gap-6">
@@ -116,16 +61,16 @@
 					<Building2 class="size-8 text-blue-600 dark:text-blue-400" />
 				</div>
 				<div>
-					<h1 class="text-4xl font-bold mb-2 tracking-tight">{data.department.name}</h1>
-					{#if data.department.code}
-						<p class="text-muted-foreground text-base mb-2">Code: {data.department.code}</p>
+					<h1 class="text-4xl font-bold mb-2 tracking-tight">{dept.department?.name}</h1>
+					{#if dept.department?.code}
+						<p class="text-muted-foreground text-base mb-2">Code: {dept.department?.code}</p>
 					{/if}
-					{#if data.department.expand?.headOfDepartment}
+					{#if dept.department?.headOfDepartmentName}
 						<div class="flex items-center gap-2 text-muted-foreground">
 							<Users class="size-4" />
 							<span>
-								Head: {data.department.expand.headOfDepartment.firstName} 
-								{data.department.expand.headOfDepartment.lastName}
+								Head: {dept.department?.headOfDepartmentName} 
+								{dept.department?.expand.headOfDepartment.lastName}
 							</span>
 						</div>
 					{/if}
@@ -133,10 +78,10 @@
 			</div>
 		</div>
 
-		{#if data.department.description}
+		{#if dept.department?.description}
 			<Card class="mt-4 p-4">
 				<div class="prose dark:prose-invert max-w-none">
-					{@html data.department.description}
+					{@html dept.department?.description}
 				</div>
 			</Card>
 		{/if}
@@ -145,8 +90,8 @@
 	<!-- Phase Filter -->
 	<div>
 		<PhaseFilter 
-			activePhase={selectedPhase}
-			onPhaseChange={(phase) => selectedPhase = phase}
+			activePhase={dept.selectedPhase}
+			onPhaseChange={(phase) => dept.setPhase(phase as any)}
 		/>
 	</div>
 
@@ -154,52 +99,218 @@
 	<div>
 		<h2 class="text-2xl font-bold mb-4">Overview</h2>
 		<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-			<Card class="p-6">
-				<div class="flex items-center justify-between">
-					<div>
-						<p class="text-sm text-muted-foreground mb-1">Annual Budget</p>
-						<p class="text-2xl font-bold">{formatCurrency(data.metrics.budget.total)}</p>
-					</div>
-					<DollarSign class="size-8 text-blue-500 opacity-50" />
-				</div>
-			</Card>
 
-			<Card class="p-6">
-				<div class="flex items-center justify-between">
-					<div>
-						<p class="text-sm text-muted-foreground mb-1">Total Projects</p>
-						<p class="text-2xl font-bold">{phaseFilteredMetrics.projects.total}</p>
-						<p class="text-xs text-muted-foreground mt-1">
-							{selectedPhase === 'all' ? 'All phases' : selectedPhase === 'phase1' ? 'Phase 1' : selectedPhase === 'phase2' ? 'Phase 2' : 'Phase 3'}
-						</p>
+			<!-- Annual Budget card -->
+			<div class="group/card relative">
+				<Card class="p-6 transition-all duration-200 group-hover/card:shadow-lg group-hover/card:-translate-y-0.5 border-l-4 border-l-blue-500 cursor-default">
+					<div class="flex items-center justify-between">
+						<div>
+							<p class="text-sm text-muted-foreground mb-1">Annual Budget</p>
+							<p class="text-2xl font-bold">{formatCurrency(metrics.budget.total)}</p>
+							<p class="text-xs text-muted-foreground mt-1">
+								{formatCurrency(metrics.budget.allocated)} allocated to projects
+							</p>
+						</div>
+						<div class="flex size-12 items-center justify-center rounded-xl bg-blue-100 dark:bg-blue-900/30 transition-transform duration-200 group-hover/card:scale-110">
+							<DollarSign class="size-6 text-blue-600 dark:text-blue-400" />
+						</div>
 					</div>
-					<FolderKanban class="size-8 text-green-500 opacity-50" />
+				</Card>
+				<!-- Hover tooltip -->
+				<div class="pointer-events-none absolute left-0 top-full mt-2 z-50 w-64 opacity-0 translate-y-1 group-hover/card:opacity-100 group-hover/card:translate-y-0 transition-all duration-200">
+					<div class="rounded-xl border bg-popover text-popover-foreground shadow-xl p-4 text-sm space-y-2.5">
+						<p class="font-semibold text-xs uppercase tracking-wider text-blue-600 dark:text-blue-400 mb-1">Budget Breakdown</p>
+						<div class="flex justify-between">
+							<span class="text-muted-foreground">Total Budget</span>
+							<span class="font-semibold">{formatCurrency(metrics.budget.total)}</span>
+						</div>
+						<div class="flex justify-between">
+							<span class="text-muted-foreground">Allocated</span>
+							<span class="font-semibold text-blue-600">{formatCurrency(metrics.budget.allocated)}</span>
+						</div>
+						<div class="flex justify-between">
+							<span class="text-muted-foreground">Actual Spent</span>
+							<span class="font-semibold text-orange-600">{formatCurrency(metrics.budget.actual)}</span>
+						</div>
+						<div class="flex justify-between">
+							<span class="text-muted-foreground">Forecasted</span>
+							<span class="font-semibold text-purple-600">{formatCurrency(metrics.budget.forecasted)}</span>
+						</div>
+						<div class="h-px bg-border my-1"></div>
+						<div class="flex justify-between">
+							<span class="text-muted-foreground">Remaining</span>
+							<span class="font-bold {metrics.budget.remaining >= 0 ? 'text-emerald-600' : 'text-red-600'}">
+								{formatCurrency(metrics.budget.remaining)}
+							</span>
+						</div>
+						<!-- Mini progress bar -->
+						<div class="mt-1">
+							<div class="h-1.5 w-full rounded-full bg-muted overflow-hidden">
+								<div
+									class="h-full rounded-full {metrics.budget.actual / Math.max(metrics.budget.total, 1) > 0.9 ? 'bg-red-500' : metrics.budget.actual / Math.max(metrics.budget.total, 1) > 0.7 ? 'bg-orange-500' : 'bg-blue-500'}"
+									style="width: {Math.min(100, (metrics.budget.actual / Math.max(metrics.budget.total, 1)) * 100).toFixed(1)}%"
+								></div>
+							</div>
+							<p class="text-[10px] text-muted-foreground mt-1">
+								{((metrics.budget.actual / Math.max(metrics.budget.total, 1)) * 100).toFixed(1)}% of budget used
+							</p>
+						</div>
+					</div>
 				</div>
-			</Card>
+			</div>
 
-			<Card class="p-6">
-				<div class="flex items-center justify-between">
-					<div>
-						<p class="text-sm text-muted-foreground mb-1">Total Expenses</p>
-						<p class="text-2xl font-bold">{formatCurrency(data.metrics.expenses.totalAmount)}</p>
-						<p class="text-xs text-muted-foreground mt-1">{data.metrics.expenses.total} transactions</p>
+			<!-- Total Projects card -->
+			<div class="group/card relative">
+				<Card class="p-6 transition-all duration-200 group-hover/card:shadow-lg group-hover/card:-translate-y-0.5 border-l-4 border-l-emerald-500 cursor-default">
+					<div class="flex items-center justify-between">
+						<div>
+							<p class="text-sm text-muted-foreground mb-1">Total Projects</p>
+							<p class="text-2xl font-bold">{phaseFilteredMetrics.projects.total}</p>
+							<p class="text-xs text-muted-foreground mt-1">
+								{dept.selectedPhase === 'all' ? 'All phases' : dept.selectedPhase === 'phase1' ? 'Phase 1' : dept.selectedPhase === 'phase2' ? 'Phase 2' : 'Phase 3'}
+							</p>
+						</div>
+						<div class="flex size-12 items-center justify-center rounded-xl bg-emerald-100 dark:bg-emerald-900/30 transition-transform duration-200 group-hover/card:scale-110">
+							<FolderKanban class="size-6 text-emerald-600 dark:text-emerald-400" />
+						</div>
 					</div>
-					<Receipt class="size-8 text-orange-500 opacity-50" />
+				</Card>
+				<div class="pointer-events-none absolute left-0 top-full mt-2 z-50 w-64 opacity-0 translate-y-1 group-hover/card:opacity-100 group-hover/card:translate-y-0 transition-all duration-200">
+					<div class="rounded-xl border bg-popover text-popover-foreground shadow-xl p-4 text-sm space-y-2.5">
+						<p class="font-semibold text-xs uppercase tracking-wider text-emerald-600 dark:text-emerald-400 mb-1">Project Status Breakdown</p>
+						{#each [
+							{ label: 'In Progress', count: metrics.projects.in_progress, color: 'bg-blue-500' },
+							{ label: 'Planned', count: metrics.projects.planned, color: 'bg-yellow-500' },
+							{ label: 'Completed', count: metrics.projects.completed, color: 'bg-emerald-500' },
+							{ label: 'Draft', count: metrics.projects.draft, color: 'bg-slate-400' },
+							{ label: 'Cancelled', count: metrics.projects.cancelled, color: 'bg-red-400' }
+						] as row}
+							{#if row.count > 0}
+								<div class="flex items-center justify-between gap-2">
+									<div class="flex items-center gap-2">
+										<span class="size-2 rounded-full {row.color} shrink-0"></span>
+										<span class="text-muted-foreground">{row.label}</span>
+									</div>
+									<span class="font-semibold tabular-nums">{row.count}</span>
+								</div>
+							{/if}
+						{/each}
+						<div class="h-px bg-border my-1"></div>
+						<div class="flex justify-between">
+							<span class="text-muted-foreground">Phase 1</span>
+							<span class="font-semibold">{metrics.phases.phase1.projectCount}</span>
+						</div>
+						<div class="flex justify-between">
+							<span class="text-muted-foreground">Phase 2</span>
+							<span class="font-semibold">{metrics.phases.phase2.projectCount}</span>
+						</div>
+						<div class="flex justify-between">
+							<span class="text-muted-foreground">Phase 3</span>
+							<span class="font-semibold">{metrics.phases.phase3.projectCount}</span>
+						</div>
+					</div>
 				</div>
-			</Card>
+			</div>
 
-			<Card class="p-6">
-				<div class="flex items-center justify-between">
-					<div>
-						<p class="text-sm text-muted-foreground mb-1">Actual Spent</p>
-						<p class="text-2xl font-bold">{formatCurrency(phaseFilteredMetrics.budget.actual)}</p>
-						<p class="text-xs text-muted-foreground mt-1">
-							{selectedPhase === 'all' ? 'All phases' : selectedPhase === 'phase1' ? 'Phase 1' : selectedPhase === 'phase2' ? 'Phase 2' : 'Phase 3'}
-						</p>
+			<!-- Total Expenses card -->
+			<div class="group/card relative">
+				<Card class="p-6 transition-all duration-200 group-hover/card:shadow-lg group-hover/card:-translate-y-0.5 border-l-4 border-l-orange-500 cursor-default">
+					<div class="flex items-center justify-between">
+						<div>
+							<p class="text-sm text-muted-foreground mb-1">Total Expenses</p>
+							<p class="text-2xl font-bold">{formatCurrency(metrics.expenses.totalAmount)}</p>
+							<p class="text-xs text-muted-foreground mt-1">{metrics.expenses.total} transactions</p>
+						</div>
+						<div class="flex size-12 items-center justify-center rounded-xl bg-orange-100 dark:bg-orange-900/30 transition-transform duration-200 group-hover/card:scale-110">
+							<Receipt class="size-6 text-orange-600 dark:text-orange-400" />
+						</div>
 					</div>
-					<TrendingUp class="size-8 text-purple-500 opacity-50" />
+				</Card>
+				<div class="pointer-events-none absolute left-0 top-full mt-2 z-50 w-64 opacity-0 translate-y-1 group-hover/card:opacity-100 group-hover/card:translate-y-0 transition-all duration-200">
+					<div class="rounded-xl border bg-popover text-popover-foreground shadow-xl p-4 text-sm space-y-2.5">
+						<p class="font-semibold text-xs uppercase tracking-wider text-orange-600 dark:text-orange-400 mb-1">Expense Status</p>
+						{#each [
+							{ label: 'Paid', count: metrics.expenses.paid, color: 'bg-emerald-500' },
+							{ label: 'Approved', count: metrics.expenses.approved, color: 'bg-blue-500' },
+							{ label: 'Submitted', count: metrics.expenses.submitted, color: 'bg-yellow-500' },
+							{ label: 'Draft', count: metrics.expenses.draft, color: 'bg-slate-400' }
+						] as row}
+							<div class="flex items-center justify-between gap-2">
+								<div class="flex items-center gap-2">
+									<span class="size-2 rounded-full {row.color} shrink-0"></span>
+									<span class="text-muted-foreground">{row.label}</span>
+								</div>
+								<span class="font-semibold tabular-nums">{row.count}</span>
+							</div>
+						{/each}
+						<div class="h-px bg-border my-1"></div>
+						<div class="flex justify-between">
+							<span class="text-muted-foreground">Approved amount</span>
+							<span class="font-semibold text-emerald-600">{formatCurrency(metrics.expenses.approvedAmount)}</span>
+						</div>
+						<div class="flex justify-between">
+							<span class="text-muted-foreground">Pending amount</span>
+							<span class="font-semibold text-yellow-600">{formatCurrency(pendingExpenses)}</span>
+						</div>
+					</div>
 				</div>
-			</Card>
+			</div>
+
+			<!-- Actual Spent card -->
+			<div class="group/card relative">
+				<Card class="p-6 transition-all duration-200 group-hover/card:shadow-lg group-hover/card:-translate-y-0.5 border-l-4 {spendPct > 90 ? 'border-l-red-500' : spendPct > 70 ? 'border-l-yellow-500' : 'border-l-violet-500'} cursor-default">
+					<div class="flex items-center justify-between">
+						<div>
+							<p class="text-sm text-muted-foreground mb-1">Actual Spent</p>
+							<p class="text-2xl font-bold">{formatCurrency(phaseFilteredMetrics.budget.actual)}</p>
+							<p class="text-xs text-muted-foreground mt-1">
+								{dept.selectedPhase === 'all' ? 'All phases' : dept.selectedPhase === 'phase1' ? 'Phase 1' : dept.selectedPhase === 'phase2' ? 'Phase 2' : 'Phase 3'}
+							</p>
+						</div>
+						<div class="flex size-12 items-center justify-center rounded-xl {spendPct > 90 ? 'bg-red-100 dark:bg-red-900/30' : spendPct > 70 ? 'bg-yellow-100 dark:bg-yellow-900/30' : 'bg-violet-100 dark:bg-violet-900/30'} transition-transform duration-200 group-hover/card:scale-110">
+							<TrendingUp class="size-6 {spendPct > 90 ? 'text-red-600 dark:text-red-400' : spendPct > 70 ? 'text-yellow-600 dark:text-yellow-400' : 'text-violet-600 dark:text-violet-400'}" />
+						</div>
+					</div>
+				</Card>
+				<div class="pointer-events-none absolute left-0 top-full mt-2 z-50 w-64 opacity-0 translate-y-1 group-hover/card:opacity-100 group-hover/card:translate-y-0 transition-all duration-200">
+					<div class="rounded-xl border bg-popover text-popover-foreground shadow-xl p-4 text-sm space-y-2.5">
+						<p class="font-semibold text-xs uppercase tracking-wider text-violet-600 dark:text-violet-400 mb-1">Spend Analysis</p>
+						<div class="flex justify-between">
+							<span class="text-muted-foreground">Actual spent</span>
+							<span class="font-semibold">{formatCurrency(phaseFilteredMetrics.budget.actual)}</span>
+						</div>
+						<div class="flex justify-between">
+							<span class="text-muted-foreground">Forecasted</span>
+							<span class="font-semibold text-purple-600">{formatCurrency(phaseFilteredMetrics.budget.forecasted)}</span>
+						</div>
+						<div class="flex justify-between">
+							<span class="text-muted-foreground">Budget</span>
+							<span class="font-semibold">{formatCurrency(phaseFilteredMetrics.budget.total)}</span>
+						</div>
+						<div class="h-px bg-border my-1"></div>
+						<!-- Stacked bar: actual vs forecasted vs budget -->
+						<div>
+							<div class="flex h-2 w-full rounded-full overflow-hidden bg-muted gap-px">
+								<div class="bg-violet-500 rounded-l-full" style="width: {Math.min(100, spendPct).toFixed(1)}%"></div>
+								<div class="bg-purple-300 dark:bg-purple-700"
+									style="width: {Math.min(100 - Math.min(100, spendPct), ((phaseFilteredMetrics.budget.forecasted - phaseFilteredMetrics.budget.actual) / Math.max(phaseFilteredMetrics.budget.total, 1)) * 100).toFixed(1)}%">
+								</div>
+							</div>
+							<div class="flex gap-3 mt-1.5 text-[10px] text-muted-foreground">
+								<span class="flex items-center gap-1"><span class="size-1.5 rounded-full bg-violet-500 inline-block"></span>Actual {spendPct.toFixed(0)}%</span>
+								<span class="flex items-center gap-1"><span class="size-1.5 rounded-full bg-purple-300 dark:bg-purple-700 inline-block"></span>Forecast</span>
+							</div>
+						</div>
+						<div class="flex justify-between pt-1">
+							<span class="text-muted-foreground">Variance</span>
+							<span class="font-bold {phaseFilteredMetrics.budget.forecasted <= phaseFilteredMetrics.budget.total ? 'text-emerald-600' : 'text-red-600'}">
+								{formatCurrency(phaseFilteredMetrics.budget.total - phaseFilteredMetrics.budget.forecasted)}
+							</span>
+						</div>
+					</div>
+				</div>
+			</div>
+
 		</div>
 	</div>
 
@@ -207,9 +318,9 @@
 	<div>
 		<h2 class="text-2xl font-bold mb-4">
 			Financial Overview
-			{#if selectedPhase !== 'all'}
+			{#if dept.selectedPhase !== 'all'}
 				<span class="text-lg font-normal text-muted-foreground">
-					- {selectedPhase === 'phase1' ? 'Phase 1' : selectedPhase === 'phase2' ? 'Phase 2' : 'Phase 3'}
+					- {dept.selectedPhase === 'phase1' ? 'Phase 1' : dept.selectedPhase === 'phase2' ? 'Phase 2' : 'Phase 3'}
 				</span>
 			{/if}
 		</h2>
@@ -219,7 +330,7 @@
 				totalBudget={phaseFilteredMetrics.budget.total}
 				actualSpent={phaseFilteredMetrics.budget.actual}
 				forecasted={phaseFilteredMetrics.budget.forecasted}
-				approvedExpenses={data.metrics.expenses.approvedAmount}
+				approvedExpenses={metrics.expenses.approvedAmount}
 				pendingExpenses={pendingExpenses}
 			/>
 
@@ -248,11 +359,11 @@
 					<FolderKanban class="size-5 text-muted-foreground" />
 				</div>
 				<ProjectStatusChart 
-					draft={data.metrics.projects.draft}
-					planned={data.metrics.projects.planned}
-					active={data.metrics.projects.in_progress}
-					completed={data.metrics.projects.completed}
-					cancelled={data.metrics.projects.cancelled}
+					draft={metrics.projects.draft}
+					planned={metrics.projects.planned}
+					active={metrics.projects.in_progress}
+					completed={metrics.projects.completed}
+					cancelled={metrics.projects.cancelled}
 				/>
 			</Card>
 
@@ -274,10 +385,10 @@
 					<Receipt class="size-5 text-muted-foreground" />
 				</div>
 				<ExpenseBarChart 
-					draft={data.metrics.expenses.draft}
-					submitted={data.metrics.expenses.submitted}
-					approved={data.metrics.expenses.approved}
-					paid={data.metrics.expenses.paid}
+					draft={metrics.expenses.draft}
+					submitted={metrics.expenses.submitted}
+					approved={metrics.expenses.approved}
+					paid={metrics.expenses.paid}
 				/>
 			</Card>
 		</div>
@@ -287,9 +398,9 @@
 	<div>
 		<h2 class="text-2xl font-bold mb-4">
 			Projects ({phaseFilteredProjects.length})
-			{#if selectedPhase !== 'all'}
+			{#if dept.selectedPhase !== 'all'}
 				<span class="text-lg font-normal text-muted-foreground">
-					- {selectedPhase === 'phase1' ? 'Phase 1' : selectedPhase === 'phase2' ? 'Phase 2' : 'Phase 3'}
+					- {dept.selectedPhase === 'phase1' ? 'Phase 1' : dept.selectedPhase === 'phase2' ? 'Phase 2' : 'Phase 3'}
 				</span>
 			{/if}
 		</h2>
@@ -361,7 +472,7 @@
 			</Card>
 		{:else}
 			<Card class="p-8 text-center text-muted-foreground">
-				No projects found for this {selectedPhase === 'all' ? 'department' : 'phase'}
+				No projects found for this {dept.selectedPhase === 'all' ? 'department' : 'phase'}
 			</Card>
 		{/if}
 	</div>

@@ -1,3 +1,4 @@
+import { RequestContext } from '$lib/infra/RequestContext';
 import type { PageServerLoad, Actions } from './$types';
 import { TournamentResultRepo } from '$lib/infra/pocketbase/repositories';
 import { error, fail } from '@sveltejs/kit';
@@ -7,9 +8,10 @@ import {
 	formatCurrency
 } from '$lib/domain/services/PayoutCalculator';
 
-export const load: PageServerLoad = async ({ locals, params }) => {
-	const pb = locals.pb;
-	const resultRepo = new TournamentResultRepo(pb);
+export const load: PageServerLoad = async ({ locals, url, params }) => {
+	const ctx = await RequestContext.from(locals, url);
+	const { pb, userId, profile: userProfile, role } = ctx;
+		const resultRepo = new TournamentResultRepo(pb);
 
 	try {
 		const tournament = await pb.collection('tournaments').getOne(params.id);
