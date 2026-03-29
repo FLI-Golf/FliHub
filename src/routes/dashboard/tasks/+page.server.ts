@@ -1,24 +1,15 @@
+import { RequestContext } from '$lib/infra/RequestContext';
 import type { PageServerLoad } from './$types';
 
-export const load: PageServerLoad = async ({ locals }) => {
-	const pb = locals.pb;
-
-	console.log('Loading tasks page...');
-	console.log('Auth state:', {
-		isValid: pb.authStore.isValid,
-		userId: pb.authStore.model?.id
-	});
-
-	try {
-		// Fetch all tasks - use -id instead of -created since created field may not exist
-		console.log('Fetching tasks from PocketBase...');
-		const tasks = await pb.collection('tasks').getFullList({
-			sort: '-id'
-		});
-		console.log(`Fetched ${tasks.length} tasks`);
-		if (tasks.length > 0) {
-			console.log('First task:', tasks[0]);
+export const load: PageServerLoad = async ({ locals, url }) => {
+	const ctx = await RequestContext.from(locals, url);
+	const { pb, userId, profile: userProfile, role } = ctx;
+	if (!locals.pb.authStore.isValid) {
+		const { redirect } = await import('@sveltejs/kit');
 		}
+	
+	try {
+		const tasks = await pb.collection('tasks').getFullList({ sort: '-id' }).catch(() => []);
 
 		// Calculate task statistics
 		const stats = {

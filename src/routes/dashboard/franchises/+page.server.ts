@@ -1,13 +1,16 @@
+import { RequestContext } from '$lib/infra/RequestContext';
 import type { PageServerLoad } from './$types';
 import { error } from '@sveltejs/kit';
 
-export const load: PageServerLoad = async ({ locals }) => {
+export const load: PageServerLoad = async ({ locals, url }) => {
+	const ctx = await RequestContext.from(locals, url);
+	const { pb, userId, profile: userProfile, role } = ctx;
 	if (!locals.pb) {
 		throw error(500, 'PocketBase not initialized');
 	}
 
 	try {
-		const franchises = await locals.pb.collection('franchises').getFullList({
+		const franchises = await pb.collection('franchises').getFullList({
 			expand: 'malePro,femalePro,franchiseeId',
 			sort: 'priority'
 		});

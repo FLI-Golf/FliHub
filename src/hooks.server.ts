@@ -1,17 +1,19 @@
-import { getPocketBase } from '$lib/infra/pocketbase/pbClient';
+import { createPocketBaseClient } from '$lib/infra/pocketbase/pbClient';
 import type { Handle } from '@sveltejs/kit';
 
 export const handle: Handle = async ({ event, resolve }) => {
 	try {
-		event.locals.pb = getPocketBase();
+		// Create a fresh per-request client — never share the singleton here,
+		// because admin-authenticated server loads would otherwise overwrite
+		// the user auth store and corrupt the session cookie.
+		event.locals.pb = createPocketBaseClient();
 
 		// Load auth state from cookie
 		event.locals.pb.authStore.loadFromCookie(event.request.headers.get('cookie') || '');
 
-		// Skip auth refresh to avoid blocking
 		const response = await resolve(event);
 
-		// Set auth cookie
+		// Persist the user auth state back to cookie
 		try {
 			response.headers.append(
 				'set-cookie',
@@ -24,7 +26,6 @@ export const handle: Handle = async ({ event, resolve }) => {
 		return response;
 	} catch (error) {
 		console.error('Hook error:', error);
-		// Don't throw - allow app to continue
 		return await resolve(event);
 	}
 };

@@ -1,10 +1,12 @@
+import { RequestContext } from '$lib/infra/RequestContext';
 import type { PageServerLoad } from './$types';
 import { TournamentResultRepo, ProPaymentRepo } from '$lib/infra/pocketbase/repositories';
 import { error } from '@sveltejs/kit';
 
-export const load: PageServerLoad = async ({ locals, params }) => {
-	const pb = locals.pb;
-	const resultRepo = new TournamentResultRepo(pb);
+export const load: PageServerLoad = async ({ locals, url, params }) => {
+	const ctx = await RequestContext.from(locals, url);
+	const { pb, userId, profile: userProfile, role } = ctx;
+		const resultRepo = new TournamentResultRepo(pb);
 	const paymentRepo = new ProPaymentRepo(pb);
 
 	try {

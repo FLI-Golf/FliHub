@@ -1,7 +1,9 @@
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import PocketBase from 'pocketbase';
-import { POCKETBASE_URL } from '$env/static/private';
+import { env } from '$env/dynamic/private';
+
+const POCKETBASE_URL = env.POCKETBASE_URL;
 
 const VENDORS = [
   { name: 'Smartboost Marketing', category: 'Marketing', contact: 'John Smith', email: 'john@smartboost.com' },

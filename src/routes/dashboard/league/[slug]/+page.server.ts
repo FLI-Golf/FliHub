@@ -1,9 +1,11 @@
+import { RequestContext } from '$lib/infra/RequestContext';
 import type { PageServerLoad } from './$types';
 import { error } from '@sveltejs/kit';
 
 export const load: PageServerLoad = async ({ params, locals }) => {
-	const pb = locals.pb;
-	
+	const ctx = await RequestContext.from(locals, url);
+	const { pb, userId, profile: userProfile, role } = ctx;
+		
 	try {
 		const [league, franchises, deals, opportunities, sponsors, expenses] = await Promise.all([
 			pb.collection('league').getFirstListItem(`slug="${params.slug}"`, {

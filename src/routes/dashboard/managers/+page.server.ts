@@ -1,8 +1,10 @@
+import { RequestContext } from '$lib/infra/RequestContext';
 import type { PageServerLoad } from './$types';
 
-export const load: PageServerLoad = async ({ locals }) => {
-	const pb = locals.pb;
-
+export const load: PageServerLoad = async ({ locals, url }) => {
+	const ctx = await RequestContext.from(locals, url);
+	const { pb, userId, profile: userProfile, role } = ctx;
+	
 	try {
 		// Get all managers (user_profiles with role='manager')
 		const managers = await pb.collection('user_profiles').getFullList({

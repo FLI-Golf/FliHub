@@ -1,29 +1,13 @@
+import { RequestContext } from '$lib/infra/RequestContext';
 import type { PageServerLoad } from './$types';
-import { redirect } from '@sveltejs/kit';
 
-export const load: PageServerLoad = async ({ locals }) => {
-	const pb = locals.pb;
-
-	console.log('Loading vendors page...');
-	console.log('Auth state:', {
-		isValid: pb.authStore.isValid,
-		userId: pb.authStore.model?.id
-	});
+export const load: PageServerLoad = async ({ locals, url }) => {
+	const ctx = await RequestContext.from(locals, url);
+	const { pb, userId, role, profile } = ctx;
 
 	try {
-		// Get current user's profile
-		const userId = pb.authStore.model?.id;
-		if (!userId) {
-			throw redirect(303, '/auth/login');
-		}
-
-		const userProfile = await pb.collection('user_profiles').getFirstListItem(`userId="${userId}"`);
-		const userRole = userProfile.role;
-
-		console.log('User role:', userRole);
-		console.log('User vendorId:', userProfile.vendorId);
-
-		let vendors = [];
+		const userRole = role ?? 'leader';
+		let vendors: any[] = [];
 		let stats = {
 			total: 0,
 			active: 0,
@@ -34,7 +18,7 @@ export const load: PageServerLoad = async ({ locals }) => {
 
 		// If user is a vendor, only show their assigned vendor
 		if (userRole === 'vendor') {
-			if (!userProfile.vendorId) {
+			if (!profile?.vendorId) {
 				return {
 					vendors: [],
 					stats,
@@ -44,7 +28,7 @@ export const load: PageServerLoad = async ({ locals }) => {
 			}
 
 			// Fetch only the assigned vendor
-			const vendor = await pb.collection('vendors').getOne(userProfile.vendorId);
+			const vendor = await pb.collection('vendors').getOne(profile?.vendorId);
 			vendors = [vendor];
 			console.log('Fetched assigned vendor:', vendor);
 		} else {

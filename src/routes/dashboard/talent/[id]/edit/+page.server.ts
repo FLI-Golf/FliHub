@@ -1,9 +1,11 @@
+import { RequestContext } from '$lib/infra/RequestContext';
 import type { PageServerLoad, Actions } from './$types';
 import { error, fail, redirect } from '@sveltejs/kit';
 
-export const load: PageServerLoad = async ({ locals, params }) => {
-	const pb = locals.pb;
-
+export const load: PageServerLoad = async ({ locals, url, params }) => {
+	const ctx = await RequestContext.from(locals, url);
+	const { pb, userId, profile: userProfile, role } = ctx;
+	
 	try {
 		const talent = await pb.collection('talent').getOne(params.id);
 		
@@ -104,15 +106,14 @@ export const actions: Actions = {
 
 			await pb.collection('talent').update(params.id, data);
 
-			throw redirect(303, `/dashboard/talent/${params.id}`);
-		} catch (err: any) {
+				} catch (err: any) {
 			if (err.status === 303) throw err; // Re-throw redirect
 			console.error('Error updating talent:', err);
 			return fail(500, { error: err.message || 'Failed to update talent' });
 		}
 	},
 
-	delete: async ({ locals, params }) => {
+	delete: async ({ locals, url, params }) => {
 		const pb = locals.pb;
 		const talentId = params.id!;
 
@@ -191,6 +192,5 @@ export const actions: Actions = {
 		}
 
 		// Redirect after successful deletion (outside try-catch to avoid catching redirect)
-		throw redirect(303, '/dashboard/talent');
-	}
+		}
 };

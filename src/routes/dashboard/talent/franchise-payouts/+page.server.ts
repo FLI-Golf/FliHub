@@ -1,9 +1,11 @@
+import { RequestContext } from '$lib/infra/RequestContext';
 import type { PageServerLoad, Actions } from './$types';
 import { fail } from '@sveltejs/kit';
 
 export const load: PageServerLoad = async ({ locals, url }) => {
-	const pb = locals.pb;
-
+	const ctx = await RequestContext.from(locals, url);
+	const { pb, userId, profile: userProfile, role } = ctx;
+	
 	const franchiseId = url.searchParams.get('franchise');
 	const season = url.searchParams.get('season');
 
