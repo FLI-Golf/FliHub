@@ -68,12 +68,12 @@
 	</div>
 
 	<!-- Filters -->
-	<div class="bg-white rounded-lg border p-4">
+	<div class="bg-slate-800 rounded-lg border border-slate-700 p-4">
 		<div class="flex gap-4">
 			<div>
-				<label class="text-sm font-medium">Season</label>
+				<label class="text-sm font-medium text-slate-300">Season</label>
 				<select
-					class="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2"
+					class="mt-1 block w-full rounded-md border border-slate-600 bg-slate-700 text-slate-100 px-3 py-2"
 					onchange={(e) => {
 						const season = e.currentTarget.value;
 						window.location.href = season
@@ -88,9 +88,9 @@
 				</select>
 			</div>
 			<div>
-				<label class="text-sm font-medium">Status</label>
+				<label class="text-sm font-medium text-slate-300">Status</label>
 				<select
-					class="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2"
+					class="mt-1 block w-full rounded-md border border-slate-600 bg-slate-700 text-slate-100 px-3 py-2"
 					onchange={(e) => {
 						const status = e.currentTarget.value;
 						window.location.href = status
@@ -111,17 +111,17 @@
 	</div>
 
 	<!-- Tournaments List -->
-	<div class="bg-white rounded-lg border">
-		<div class="divide-y">
-			{#each data.tournaments as tournament}
-				<div class="p-4 hover:bg-gray-50">
+	<div class="rounded-lg border border-slate-700 overflow-hidden">
+		<div class="divide-y divide-slate-700">
+			{#each data.tournaments as tournament, i}
+				<div class="p-4 {i % 2 === 0 ? 'bg-slate-800' : 'bg-slate-700/60'} hover:bg-slate-600/50 transition-colors">
 					<div class="flex items-start justify-between">
 						<div class="flex-1">
 							<div class="flex items-center gap-3">
-								<h3 class="text-lg font-semibold">{tournament.name}</h3>
+								<h3 class="text-lg font-semibold text-slate-100">{tournament.name}</h3>
 								<Badge class={getStatusColor(tournament.status)}>{tournament.status}</Badge>
 							</div>
-							<div class="mt-2 space-y-1 text-sm text-muted-foreground">
+							<div class="mt-2 space-y-1 text-sm text-slate-400">
 								<div>
 									Season {tournament.season}
 									{#if tournament.tournamentNumber}
@@ -141,8 +141,8 @@
 						</div>
 						<div class="text-right space-y-2">
 							<div>
-								<div class="text-sm text-muted-foreground">Prize Pool</div>
-								<div class="text-xl font-bold">{formatCurrency(tournament.prizePool)}</div>
+								<div class="text-sm text-slate-400">Prize Pool</div>
+								<div class="text-xl font-bold text-slate-100">{formatCurrency(tournament.prizePool)}</div>
 							</div>
 							<div class="flex gap-2">
 								<Button
@@ -158,7 +158,7 @@
 					</div>
 				</div>
 			{:else}
-				<div class="p-8 text-center text-muted-foreground">
+				<div class="p-8 text-center text-slate-400 bg-slate-800">
 					No tournaments found. Create your first tournament to get started.
 				</div>
 			{/each}

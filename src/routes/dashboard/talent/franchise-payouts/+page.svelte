@@ -61,22 +61,22 @@
 
 	<!-- Stats -->
 	<div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-		<div class="bg-white p-6 rounded-lg border">
-			<div class="text-sm text-muted-foreground">Total Pending</div>
-			<div class="text-3xl font-bold text-yellow-600">{formatCurrency(totalPending)}</div>
+		<div class="bg-slate-800 p-6 rounded-lg border border-slate-700">
+			<div class="text-sm text-slate-400">Total Pending</div>
+			<div class="text-3xl font-bold text-yellow-400">{formatCurrency(totalPending)}</div>
 		</div>
-		<div class="bg-white p-6 rounded-lg border">
-			<div class="text-sm text-muted-foreground">Total Paid</div>
-			<div class="text-3xl font-bold text-green-600">{formatCurrency(totalPaid)}</div>
+		<div class="bg-slate-800 p-6 rounded-lg border border-slate-700">
+			<div class="text-sm text-slate-400">Total Paid</div>
+			<div class="text-3xl font-bold text-emerald-400">{formatCurrency(totalPaid)}</div>
 		</div>
-		<div class="bg-white p-6 rounded-lg border">
-			<div class="text-sm text-muted-foreground">Total All Time</div>
-			<div class="text-3xl font-bold">{formatCurrency(totalAll)}</div>
+		<div class="bg-slate-800 p-6 rounded-lg border border-slate-700">
+			<div class="text-sm text-slate-400">Total All Time</div>
+			<div class="text-3xl font-bold text-slate-100">{formatCurrency(totalAll)}</div>
 		</div>
 	</div>
 
 	<!-- Filters -->
-	<div class="bg-white rounded-lg border p-4">
+	<div class="bg-slate-800 rounded-lg border border-slate-700 p-4">
 		<div class="flex gap-4">
 			<div>
 				<label class="text-sm font-medium">Franchise</label>
@@ -102,24 +102,24 @@
 
 	<!-- Franchise Summary -->
 	{#if !data.currentFranchiseId}
-		<div class="bg-white rounded-lg border">
-			<div class="p-6 border-b">
-				<h2 class="text-xl font-semibold">Franchise Summary</h2>
+		<div class="rounded-lg border border-slate-700 overflow-hidden">
+			<div class="p-6 border-b border-slate-700 bg-slate-800">
+				<h2 class="text-xl font-semibold text-slate-100">Franchise Summary</h2>
 			</div>
-			<div class="divide-y">
-				{#each data.franchises as franchise}
+			<div class="divide-y divide-slate-700">
+				{#each data.franchises as franchise, i}
 					{@const totals = data.franchiseTotals[franchise.id]}
 					{#if totals}
-						<div class="p-4 hover:bg-gray-50">
+						<div class="p-4 {i % 2 === 0 ? 'bg-slate-800' : 'bg-slate-700/60'} hover:bg-slate-600/50 transition-colors">
 							<div class="flex items-center justify-between">
 								<div>
-									<h3 class="font-semibold">{franchise.name}</h3>
-									<div class="text-sm text-muted-foreground mt-1">
+									<h3 class="font-semibold text-slate-100">{franchise.name}</h3>
+									<div class="text-sm text-slate-400 mt-1">
 										Pending: {formatCurrency(totals.pending)} | Paid: {formatCurrency(totals.paid)}
 									</div>
 								</div>
 								<div class="text-right">
-									<div class="text-2xl font-bold">{formatCurrency(totals.total)}</div>
+									<div class="text-2xl font-bold text-slate-100">{formatCurrency(totals.total)}</div>
 									<Button
 										href="/dashboard/talent/franchise-payouts?franchise={franchise.id}"
 										variant="outline"
@@ -136,24 +136,24 @@
 	{/if}
 
 	<!-- Payouts List -->
-	<div class="bg-white rounded-lg border">
-		<div class="p-6 border-b">
-			<h2 class="text-xl font-semibold">
+	<div class="rounded-lg border border-slate-700 overflow-hidden">
+		<div class="p-6 border-b border-slate-700 bg-slate-800">
+			<h2 class="text-xl font-semibold text-slate-100">
 				{data.currentFranchiseId ? 'Franchise Payout Details' : 'All Payouts'}
 			</h2>
 		</div>
-		<div class="divide-y">
-			{#each data.payouts as payout}
-				<div class="p-4 hover:bg-gray-50">
+		<div class="divide-y divide-slate-700">
+			{#each data.payouts as payout, i}
+				<div class="p-4 {i % 2 === 0 ? 'bg-slate-800' : 'bg-slate-700/60'} hover:bg-slate-600/50 transition-colors">
 					<div class="flex items-start justify-between">
 						<div class="flex-1">
 							<div class="flex items-center gap-3">
-								<h3 class="text-lg font-semibold">
+								<h3 class="text-lg font-semibold text-slate-100">
 									{payout.expand?.franchise?.name || 'Unknown Franchise'}
 								</h3>
 								<Badge class={getStatusColor(payout.status)}>{payout.status}</Badge>
 							</div>
-							<div class="mt-2 space-y-1 text-sm text-muted-foreground">
+							<div class="mt-2 space-y-1 text-sm text-slate-400">
 								<div>
 									🏆 {payout.expand?.tournament?.name || 'Unknown Tournament'} (Season {payout
 										.expand?.tournament?.season || 'N/A'})
@@ -172,7 +172,7 @@
 							</div>
 						</div>
 						<div class="text-right space-y-2">
-							<div class="text-2xl font-bold">{formatCurrency(payout.totalEarnings)}</div>
+							<div class="text-2xl font-bold text-slate-100">{formatCurrency(payout.totalEarnings)}</div>
 							<div class="flex gap-2">
 								{#if payout.status === 'pending'}
 									<form method="POST" action="?/markPaid" use:enhance>
@@ -190,7 +190,7 @@
 					</div>
 				</div>
 			{:else}
-				<div class="p-8 text-center text-muted-foreground">
+				<div class="p-8 text-center text-slate-400 bg-slate-800">
 					No franchise payouts found. Add tournament results to generate payouts.
 				</div>
 			{/each}

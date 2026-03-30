@@ -22,6 +22,7 @@
  */
 
 import type PocketBase from 'pocketbase';
+import { redirect } from '@sveltejs/kit';
 import { getAdminPocketBase } from './pocketbase/pbClient';
 
 export type UserRole = 'admin' | 'sales' | 'leader' | 'vendor' | 'pro' | 'franchise_owner';
