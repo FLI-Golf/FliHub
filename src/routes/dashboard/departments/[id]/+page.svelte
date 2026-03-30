@@ -68,10 +68,7 @@
 					{#if dept.department?.headOfDepartmentName}
 						<div class="flex items-center gap-2 text-muted-foreground">
 							<Users class="size-4" />
-							<span>
-								Head: {dept.department?.headOfDepartmentName} 
-								{dept.department?.expand.headOfDepartment.lastName}
-							</span>
+							<span>Head: {dept.department.headOfDepartmentName}</span>
 						</div>
 					{/if}
 				</div>
@@ -118,40 +115,40 @@
 				</Card>
 				<!-- Hover tooltip -->
 				<div class="pointer-events-none absolute left-0 top-full mt-2 z-50 w-64 opacity-0 translate-y-1 group-hover/card:opacity-100 group-hover/card:translate-y-0 transition-all duration-200">
-					<div class="rounded-xl border bg-popover text-popover-foreground shadow-xl p-4 text-sm space-y-2.5">
-						<p class="font-semibold text-xs uppercase tracking-wider text-blue-600 dark:text-blue-400 mb-1">Budget Breakdown</p>
+					<div class="rounded-xl border border-slate-700 bg-slate-900 text-slate-100 shadow-2xl p-4 text-sm space-y-2.5">
+						<p class="font-semibold text-xs uppercase tracking-wider text-blue-400 mb-1">Budget Breakdown</p>
 						<div class="flex justify-between">
-							<span class="text-muted-foreground">Total Budget</span>
+							<span class="text-slate-400">Total Budget</span>
 							<span class="font-semibold">{formatCurrency(metrics.budget.total)}</span>
 						</div>
 						<div class="flex justify-between">
-							<span class="text-muted-foreground">Allocated</span>
-							<span class="font-semibold text-blue-600">{formatCurrency(metrics.budget.allocated)}</span>
+							<span class="text-slate-400">Allocated</span>
+							<span class="font-semibold text-blue-400">{formatCurrency(metrics.budget.allocated)}</span>
 						</div>
 						<div class="flex justify-between">
-							<span class="text-muted-foreground">Actual Spent</span>
-							<span class="font-semibold text-orange-600">{formatCurrency(metrics.budget.actual)}</span>
+							<span class="text-slate-400">Actual Spent</span>
+							<span class="font-semibold text-orange-400">{formatCurrency(metrics.budget.actual)}</span>
 						</div>
 						<div class="flex justify-between">
-							<span class="text-muted-foreground">Forecasted</span>
-							<span class="font-semibold text-purple-600">{formatCurrency(metrics.budget.forecasted)}</span>
+							<span class="text-slate-400">Forecasted</span>
+							<span class="font-semibold text-purple-400">{formatCurrency(metrics.budget.forecasted)}</span>
 						</div>
-						<div class="h-px bg-border my-1"></div>
+						<div class="h-px bg-slate-700 my-1"></div>
 						<div class="flex justify-between">
-							<span class="text-muted-foreground">Remaining</span>
+							<span class="text-slate-400">Remaining</span>
 							<span class="font-bold {metrics.budget.remaining >= 0 ? 'text-emerald-600' : 'text-red-600'}">
 								{formatCurrency(metrics.budget.remaining)}
 							</span>
 						</div>
 						<!-- Mini progress bar -->
 						<div class="mt-1">
-							<div class="h-1.5 w-full rounded-full bg-muted overflow-hidden">
+							<div class="h-1.5 w-full rounded-full bg-slate-700 overflow-hidden">
 								<div
 									class="h-full rounded-full {metrics.budget.actual / Math.max(metrics.budget.total, 1) > 0.9 ? 'bg-red-500' : metrics.budget.actual / Math.max(metrics.budget.total, 1) > 0.7 ? 'bg-orange-500' : 'bg-blue-500'}"
 									style="width: {Math.min(100, (metrics.budget.actual / Math.max(metrics.budget.total, 1)) * 100).toFixed(1)}%"
 								></div>
 							</div>
-							<p class="text-[10px] text-muted-foreground mt-1">
+							<p class="text-[10px] text-slate-400 mt-1">
 								{((metrics.budget.actual / Math.max(metrics.budget.total, 1)) * 100).toFixed(1)}% of budget used
 							</p>
 						</div>
@@ -176,8 +173,8 @@
 					</div>
 				</Card>
 				<div class="pointer-events-none absolute left-0 top-full mt-2 z-50 w-64 opacity-0 translate-y-1 group-hover/card:opacity-100 group-hover/card:translate-y-0 transition-all duration-200">
-					<div class="rounded-xl border bg-popover text-popover-foreground shadow-xl p-4 text-sm space-y-2.5">
-						<p class="font-semibold text-xs uppercase tracking-wider text-emerald-600 dark:text-emerald-400 mb-1">Project Status Breakdown</p>
+					<div class="rounded-xl border border-slate-700 bg-slate-900 text-slate-100 shadow-2xl p-4 text-sm space-y-2.5">
+						<p class="font-semibold text-xs uppercase tracking-wider text-emerald-400 mb-1">Project Status Breakdown</p>
 						{#each [
 							{ label: 'In Progress', count: metrics.projects.in_progress, color: 'bg-blue-500' },
 							{ label: 'Planned', count: metrics.projects.planned, color: 'bg-yellow-500' },
@@ -189,23 +186,23 @@
 								<div class="flex items-center justify-between gap-2">
 									<div class="flex items-center gap-2">
 										<span class="size-2 rounded-full {row.color} shrink-0"></span>
-										<span class="text-muted-foreground">{row.label}</span>
+										<span class="text-slate-400">{row.label}</span>
 									</div>
 									<span class="font-semibold tabular-nums">{row.count}</span>
 								</div>
 							{/if}
 						{/each}
-						<div class="h-px bg-border my-1"></div>
+						<div class="h-px bg-slate-700 my-1"></div>
 						<div class="flex justify-between">
-							<span class="text-muted-foreground">Phase 1</span>
+							<span class="text-slate-400">Phase 1</span>
 							<span class="font-semibold">{metrics.phases.phase1.projectCount}</span>
 						</div>
 						<div class="flex justify-between">
-							<span class="text-muted-foreground">Phase 2</span>
+							<span class="text-slate-400">Phase 2</span>
 							<span class="font-semibold">{metrics.phases.phase2.projectCount}</span>
 						</div>
 						<div class="flex justify-between">
-							<span class="text-muted-foreground">Phase 3</span>
+							<span class="text-slate-400">Phase 3</span>
 							<span class="font-semibold">{metrics.phases.phase3.projectCount}</span>
 						</div>
 					</div>
@@ -227,8 +224,8 @@
 					</div>
 				</Card>
 				<div class="pointer-events-none absolute left-0 top-full mt-2 z-50 w-64 opacity-0 translate-y-1 group-hover/card:opacity-100 group-hover/card:translate-y-0 transition-all duration-200">
-					<div class="rounded-xl border bg-popover text-popover-foreground shadow-xl p-4 text-sm space-y-2.5">
-						<p class="font-semibold text-xs uppercase tracking-wider text-orange-600 dark:text-orange-400 mb-1">Expense Status</p>
+					<div class="rounded-xl border border-slate-700 bg-slate-900 text-slate-100 shadow-2xl p-4 text-sm space-y-2.5">
+						<p class="font-semibold text-xs uppercase tracking-wider text-orange-400 mb-1">Expense Status</p>
 						{#each [
 							{ label: 'Paid', count: metrics.expenses.paid, color: 'bg-emerald-500' },
 							{ label: 'Approved', count: metrics.expenses.approved, color: 'bg-blue-500' },
@@ -238,19 +235,19 @@
 							<div class="flex items-center justify-between gap-2">
 								<div class="flex items-center gap-2">
 									<span class="size-2 rounded-full {row.color} shrink-0"></span>
-									<span class="text-muted-foreground">{row.label}</span>
+									<span class="text-slate-400">{row.label}</span>
 								</div>
 								<span class="font-semibold tabular-nums">{row.count}</span>
 							</div>
 						{/each}
-						<div class="h-px bg-border my-1"></div>
+						<div class="h-px bg-slate-700 my-1"></div>
 						<div class="flex justify-between">
-							<span class="text-muted-foreground">Approved amount</span>
+							<span class="text-slate-400">Approved amount</span>
 							<span class="font-semibold text-emerald-600">{formatCurrency(metrics.expenses.approvedAmount)}</span>
 						</div>
 						<div class="flex justify-between">
-							<span class="text-muted-foreground">Pending amount</span>
-							<span class="font-semibold text-yellow-600">{formatCurrency(pendingExpenses)}</span>
+							<span class="text-slate-400">Pending amount</span>
+							<span class="font-semibold text-yellow-400">{formatCurrency(pendingExpenses)}</span>
 						</div>
 					</div>
 				</div>
@@ -273,36 +270,36 @@
 					</div>
 				</Card>
 				<div class="pointer-events-none absolute left-0 top-full mt-2 z-50 w-64 opacity-0 translate-y-1 group-hover/card:opacity-100 group-hover/card:translate-y-0 transition-all duration-200">
-					<div class="rounded-xl border bg-popover text-popover-foreground shadow-xl p-4 text-sm space-y-2.5">
-						<p class="font-semibold text-xs uppercase tracking-wider text-violet-600 dark:text-violet-400 mb-1">Spend Analysis</p>
+					<div class="rounded-xl border border-slate-700 bg-slate-900 text-slate-100 shadow-2xl p-4 text-sm space-y-2.5">
+						<p class="font-semibold text-xs uppercase tracking-wider text-violet-400 mb-1">Spend Analysis</p>
 						<div class="flex justify-between">
-							<span class="text-muted-foreground">Actual spent</span>
+							<span class="text-slate-400">Actual spent</span>
 							<span class="font-semibold">{formatCurrency(phaseFilteredMetrics.budget.actual)}</span>
 						</div>
 						<div class="flex justify-between">
-							<span class="text-muted-foreground">Forecasted</span>
-							<span class="font-semibold text-purple-600">{formatCurrency(phaseFilteredMetrics.budget.forecasted)}</span>
+							<span class="text-slate-400">Forecasted</span>
+							<span class="font-semibold text-purple-400">{formatCurrency(phaseFilteredMetrics.budget.forecasted)}</span>
 						</div>
 						<div class="flex justify-between">
-							<span class="text-muted-foreground">Budget</span>
+							<span class="text-slate-400">Budget</span>
 							<span class="font-semibold">{formatCurrency(phaseFilteredMetrics.budget.total)}</span>
 						</div>
-						<div class="h-px bg-border my-1"></div>
+						<div class="h-px bg-slate-700 my-1"></div>
 						<!-- Stacked bar: actual vs forecasted vs budget -->
 						<div>
-							<div class="flex h-2 w-full rounded-full overflow-hidden bg-muted gap-px">
+							<div class="flex h-2 w-full rounded-full overflow-hidden bg-slate-700 gap-px">
 								<div class="bg-violet-500 rounded-l-full" style="width: {Math.min(100, spendPct).toFixed(1)}%"></div>
 								<div class="bg-purple-300 dark:bg-purple-700"
 									style="width: {Math.min(100 - Math.min(100, spendPct), ((phaseFilteredMetrics.budget.forecasted - phaseFilteredMetrics.budget.actual) / Math.max(phaseFilteredMetrics.budget.total, 1)) * 100).toFixed(1)}%">
 								</div>
 							</div>
-							<div class="flex gap-3 mt-1.5 text-[10px] text-muted-foreground">
+							<div class="flex gap-3 mt-1.5 text-[10px] text-slate-400">
 								<span class="flex items-center gap-1"><span class="size-1.5 rounded-full bg-violet-500 inline-block"></span>Actual {spendPct.toFixed(0)}%</span>
 								<span class="flex items-center gap-1"><span class="size-1.5 rounded-full bg-purple-300 dark:bg-purple-700 inline-block"></span>Forecast</span>
 							</div>
 						</div>
 						<div class="flex justify-between pt-1">
-							<span class="text-muted-foreground">Variance</span>
+							<span class="text-slate-400">Variance</span>
 							<span class="font-bold {phaseFilteredMetrics.budget.forecasted <= phaseFilteredMetrics.budget.total ? 'text-emerald-600' : 'text-red-600'}">
 								{formatCurrency(phaseFilteredMetrics.budget.total - phaseFilteredMetrics.budget.forecasted)}
 							</span>
@@ -431,8 +428,8 @@
 							</tr>
 						</thead>
 						<tbody class="divide-y divide-border">
-							{#each phaseFilteredProjects as project}
-								<tr class="hover:bg-muted/50 transition-colors">
+							{#each phaseFilteredProjects as project, i}
+								<tr class="{i % 2 === 0 ? 'bg-background' : 'bg-muted/30'} hover:bg-primary/5 transition-colors">
 									<td class="px-6 py-4">
 										<a href="/dashboard/projects/{project.id}" class="font-medium hover:text-primary">
 											{project.name}
@@ -448,13 +445,13 @@
 										</span>
 									</td>
 									<td class="px-6 py-4 text-right font-medium">
-										{formatCurrency(project.project_budget || 0)}
+										{formatCurrency(project.budget || 0)}
 									</td>
-									<td class="px-6 py-4 text-right font-semibold {(project.project_actual_expenses || 0) > (project.project_budget || 0) ? 'text-red-500' : 'text-green-500'}">
-										{formatCurrency(project.project_actual_expenses || 0)}
+									<td class="px-6 py-4 text-right font-semibold {(project.actual || 0) > (project.budget || 0) ? 'text-red-500' : 'text-green-500'}">
+										{formatCurrency(project.actual || 0)}
 									</td>
 									<td class="px-6 py-4 text-right font-medium text-orange-500">
-										{formatCurrency(project.project_forecasted_expenses || 0)}
+										{formatCurrency(project.forecasted || 0)}
 									</td>
 									<td class="px-6 py-4 text-sm text-muted-foreground">
 										{#if project.startDate}

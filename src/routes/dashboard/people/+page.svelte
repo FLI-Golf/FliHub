@@ -364,9 +364,8 @@
 	{:else}
 		<div class="grid grid-cols-1 md:grid-cols-2 gap-6">
 			{#each filteredPersons as person, index}
-			<Card 
-				class="p-6 transition-all duration-200 hover:shadow-xl {index % 2 === 0 ? '!bg-background' : '!bg-muted/50'}"
-			>
+			<Card class="overflow-hidden transition-all duration-200 hover:shadow-xl hover:-translate-y-0.5">
+				<div class="p-6 h-full {index % 2 === 0 ? 'bg-slate-800' : 'bg-slate-700/60'}">
 				<div class="flex items-start justify-between mb-4">
 					<button 
 						type="button"
@@ -635,6 +634,7 @@
 						{/if}
 					</div>
 				{/if}
+				</div>
 			</Card>
 			{/each}
 		</div>
