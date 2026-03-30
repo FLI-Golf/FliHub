@@ -81,6 +81,51 @@
 		tier_3: { 2026: 1000000, 2027: 1000000, 2028: 2000000 },
 		tier_4: { 2026: 1000000, 2027: 1500000, 2028: 2000000 }
 	};
+
+	// Add sponsor modal
+	let showAddModal = $state(false);
+	let isSubmitting = $state(false);
+	let submitError = $state('');
+	let form = $state({
+		companyName: '',
+		type: 'corporate',
+		tier: 'tier_3',
+		status: 'prospect',
+		contactName: '',
+		contactEmail: '',
+		contactPhone: '',
+		location: '',
+		annualCommitment: '',
+		franchiseInterest: false,
+		notes: ''
+	});
+
+	async function handleAddSponsor(e: SubmitEvent) {
+		e.preventDefault();
+		isSubmitting = true;
+		submitError = '';
+		try {
+			const res = await fetch('/api/sponsors', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({
+					...form,
+					annualCommitment: form.annualCommitment ? Number(form.annualCommitment) : 0
+				})
+			});
+			if (!res.ok) {
+				const err = await res.json().catch(() => ({}));
+				throw new Error(err.message ?? `Error ${res.status}`);
+			}
+			showAddModal = false;
+			// Reload to reflect new sponsor
+			window.location.reload();
+		} catch (err: any) {
+			submitError = err.message ?? 'Failed to create sponsor';
+		} finally {
+			isSubmitting = false;
+		}
+	}
 </script>
 
 <svelte:head>
@@ -95,9 +140,9 @@
 			<p class="text-muted-foreground mt-1">Manage casino and corporate sponsorships</p>
 		</div>
 		<div class="flex gap-2">
-			<Button href="/dashboard/sponsors/new" class="gap-2">
+			<Button onclick={() => showAddModal = true} class="gap-2">
 				<Plus class="size-4" />
-				New Sponsor
+				Add Sponsor
 			</Button>
 		</div>
 	</div>
@@ -276,3 +321,127 @@
 		</div>
 	</Card>
 </div>
+
+<!-- Add Sponsor Modal -->
+{#if showAddModal}
+	<div class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+		<div class="bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl w-full max-w-xl max-h-[90vh] overflow-y-auto">
+			<div class="flex items-center justify-between p-6 border-b border-slate-700">
+				<h2 class="text-lg font-semibold text-slate-100">Add Sponsor</h2>
+				<button onclick={() => showAddModal = false} class="text-slate-400 hover:text-slate-100 transition-colors">
+					<svg class="size-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+				</button>
+			</div>
+
+			<form onsubmit={handleAddSponsor} class="p-6 space-y-4">
+				{#if submitError}
+					<p class="text-sm text-red-400 bg-red-900/30 border border-red-700 rounded-lg px-3 py-2">{submitError}</p>
+				{/if}
+
+				<!-- Company Name -->
+				<div>
+					<label class="block text-xs font-medium text-slate-400 mb-1">Company Name *</label>
+					<input bind:value={form.companyName} required
+						class="w-full rounded-lg border border-slate-600 bg-slate-800 text-slate-100 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
+						placeholder="Acme Corp" />
+				</div>
+
+				<!-- Type + Tier -->
+				<div class="grid grid-cols-2 gap-3">
+					<div>
+						<label class="block text-xs font-medium text-slate-400 mb-1">Type</label>
+						<select bind:value={form.type} class="w-full rounded-lg border border-slate-600 bg-slate-800 text-slate-100 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500">
+							<option value="corporate">Corporate</option>
+							<option value="casino">Casino</option>
+							<option value="resort">Resort</option>
+						</select>
+					</div>
+					<div>
+						<label class="block text-xs font-medium text-slate-400 mb-1">Tier</label>
+						<select bind:value={form.tier} class="w-full rounded-lg border border-slate-600 bg-slate-800 text-slate-100 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500">
+							<option value="tier_1">Tier 1 — Premium</option>
+							<option value="tier_2">Tier 2 — Elite</option>
+							<option value="tier_3">Tier 3 — Standard</option>
+							<option value="tier_4">Tier 4 — Growth</option>
+						</select>
+					</div>
+				</div>
+
+				<!-- Status + Annual Commitment -->
+				<div class="grid grid-cols-2 gap-3">
+					<div>
+						<label class="block text-xs font-medium text-slate-400 mb-1">Status</label>
+						<select bind:value={form.status} class="w-full rounded-lg border border-slate-600 bg-slate-800 text-slate-100 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500">
+							<option value="prospect">Prospect</option>
+							<option value="negotiating">Negotiating</option>
+							<option value="active">Active</option>
+							<option value="renewed">Renewed</option>
+							<option value="expired">Expired</option>
+							<option value="inactive">Inactive</option>
+						</select>
+					</div>
+					<div>
+						<label class="block text-xs font-medium text-slate-400 mb-1">Annual Commitment ($)</label>
+						<input bind:value={form.annualCommitment} type="number" min="0"
+							class="w-full rounded-lg border border-slate-600 bg-slate-800 text-slate-100 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
+							placeholder="0" />
+					</div>
+				</div>
+
+				<!-- Contact Name + Email -->
+				<div class="grid grid-cols-2 gap-3">
+					<div>
+						<label class="block text-xs font-medium text-slate-400 mb-1">Contact Name</label>
+						<input bind:value={form.contactName}
+							class="w-full rounded-lg border border-slate-600 bg-slate-800 text-slate-100 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
+							placeholder="Jane Smith" />
+					</div>
+					<div>
+						<label class="block text-xs font-medium text-slate-400 mb-1">Contact Email</label>
+						<input bind:value={form.contactEmail} type="email"
+							class="w-full rounded-lg border border-slate-600 bg-slate-800 text-slate-100 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
+							placeholder="jane@acme.com" />
+					</div>
+				</div>
+
+				<!-- Phone + Location -->
+				<div class="grid grid-cols-2 gap-3">
+					<div>
+						<label class="block text-xs font-medium text-slate-400 mb-1">Phone</label>
+						<input bind:value={form.contactPhone}
+							class="w-full rounded-lg border border-slate-600 bg-slate-800 text-slate-100 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
+							placeholder="+1 555 000 0000" />
+					</div>
+					<div>
+						<label class="block text-xs font-medium text-slate-400 mb-1">Location</label>
+						<input bind:value={form.location}
+							class="w-full rounded-lg border border-slate-600 bg-slate-800 text-slate-100 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
+							placeholder="Las Vegas, NV" />
+					</div>
+				</div>
+
+				<!-- Franchise Interest -->
+				<label class="flex items-center gap-3 cursor-pointer">
+					<input type="checkbox" bind:checked={form.franchiseInterest} class="size-4 rounded border-slate-600 bg-slate-800 accent-emerald-500" />
+					<span class="text-sm text-slate-300">Franchise interest</span>
+				</label>
+
+				<!-- Notes -->
+				<div>
+					<label class="block text-xs font-medium text-slate-400 mb-1">Notes</label>
+					<textarea bind:value={form.notes} rows="3"
+						class="w-full rounded-lg border border-slate-600 bg-slate-800 text-slate-100 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 resize-none"
+						placeholder="Additional context..."></textarea>
+				</div>
+
+				<div class="flex justify-end gap-3 pt-2">
+					<Button type="button" variant="outline" onclick={() => showAddModal = false}>Cancel</Button>
+					<Button type="submit" disabled={isSubmitting} class="gap-2">
+						<Plus class="size-4" />
+						{isSubmitting ? 'Saving…' : 'Add Sponsor'}
+					</Button>
+				</div>
+			</form>
+		</div>
+	</div>
+{/if}
