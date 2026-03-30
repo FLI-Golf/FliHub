@@ -1,6 +1,6 @@
 /**
  * Payout Calculator Service
- * 
+ *
  * Handles tournament payout calculations with:
  * - Progressive prize pools (last tournament worth most)
  * - Top-heavy distribution (top 3 get majority)
@@ -8,17 +8,37 @@
  * - Franchise-first distribution model
  */
 
+// ---------------------------------------------------------------------------
+// Types
+// ---------------------------------------------------------------------------
+
+export interface SeasonConfig {
+	year: number;
+	/** Total prize money allocated for the entire season */
+	totalSeasonBudget: number;
+	numberOfTournaments: number;
+	/** Percentage of each tournament purse that goes to franchises (default 20) */
+	franchiseCutPercentage: number;
+	/** Number of paid placements per division (default 20) */
+	numberOfPlacements: number;
+}
+
 export interface PayoutStructure {
 	totalPurse: number;
-	franchiseCut: number; // Percentage to franchises
-	proCut: number; // Percentage to pros
+	franchiseCut: number;
+	proCut: number;
 	placements: PlacementPayout[];
 }
 
 export interface PlacementPayout {
 	placement: number;
 	percentage: number;
+	/** Amount paid to the pro (after franchise cut) */
 	amount: number;
+	/** Franchise cut on this placement's earnings */
+	franchiseAmount: number;
+	/** Total payout (pro + franchise) for this placement */
+	totalAmount: number;
 }
 
 export interface TournamentPurse {
@@ -28,31 +48,30 @@ export interface TournamentPurse {
 	womensPurse: number;
 }
 
+// ---------------------------------------------------------------------------
+// Season purse distribution
+// ---------------------------------------------------------------------------
+
 /**
- * Calculate progressive tournament purses for a season
- * Last tournament is worth the most, scaling progressively
+ * Distribute a season budget across tournaments using arithmetic progression.
+ * Tournament #1 gets the smallest share; the final tournament gets the largest.
  */
 export function calculateSeasonPurses(
 	totalSeasonPurse: number,
 	numberOfTournaments: number
 ): TournamentPurse[] {
-	// Progressive multipliers - last tournament worth most
-	// Using arithmetic progression where last is ~1.5x first
-	const multipliers: number[] = [];
-	const step = 0.1; // Each tournament increases by 10%
+	const step = 0.1;
 	const baseMultiplier = 1.0 - (step * (numberOfTournaments - 1)) / 2;
 
+	const multipliers: number[] = [];
 	for (let i = 0; i < numberOfTournaments; i++) {
 		multipliers.push(baseMultiplier + step * i);
 	}
 
-	// Normalize multipliers to sum to totalSeasonPurse
 	const sum = multipliers.reduce((a, b) => a + b, 0);
-	const normalizedMultipliers = multipliers.map((m) => m / sum);
 
-	return normalizedMultipliers.map((multiplier, index) => {
-		const tournamentPurse = totalSeasonPurse * multiplier;
-		// Split equally between men and women
+	return multipliers.map((multiplier, index) => {
+		const tournamentPurse = totalSeasonPurse * (multiplier / sum);
 		return {
 			tournamentNumber: index + 1,
 			totalPurse: tournamentPurse,
@@ -62,68 +81,68 @@ export function calculateSeasonPurses(
 	});
 }
 
+// ---------------------------------------------------------------------------
+// Placement payout distribution
+// ---------------------------------------------------------------------------
+
 /**
- * Calculate placement payouts with top-heavy distribution
- * Top 3 get majority of purse, then spreads to remaining placements
+ * Calculate per-placement payouts for a single division purse.
+ * Top 3 receive 65% combined; the remaining 35% decays exponentially.
+ * Each placement includes both the pro amount and the franchise cut.
  */
 export function calculatePlacementPayouts(
 	divisionPurse: number,
-	numberOfPlacements: number = 20
+	numberOfPlacements: number = 20,
+	franchiseCutPercentage: number = 20
 ): PlacementPayout[] {
-	// Top-heavy percentage distribution
-	// 1st: 30%, 2nd: 20%, 3rd: 15%, then decreasing
 	const percentages: number[] = [];
 
-	// Top 3 get 65% total
-	percentages[0] = 30.0; // 1st place
-	percentages[1] = 20.0; // 2nd place
-	percentages[2] = 15.0; // 3rd place
+	percentages[0] = 30.0;
+	percentages[1] = 20.0;
+	percentages[2] = 15.0;
 
-	// Remaining 35% distributed across places 4-20
-	// Using exponential decay for remaining places
 	const remainingPercentage = 35.0;
 	const remainingPlaces = numberOfPlacements - 3;
 
-	// Calculate decay factor
 	let decaySum = 0;
 	for (let i = 0; i < remainingPlaces; i++) {
-		decaySum += Math.pow(0.85, i); // 15% decay per place
+		decaySum += Math.pow(0.85, i);
 	}
 
-	// Distribute remaining percentage
 	for (let i = 0; i < remainingPlaces; i++) {
-		const decayFactor = Math.pow(0.85, i);
-		percentages[i + 3] = (decayFactor / decaySum) * remainingPercentage;
+		percentages[i + 3] = (Math.pow(0.85, i) / decaySum) * remainingPercentage;
 	}
 
-	// Convert to amounts
-	return percentages.map((percentage, index) => ({
-		placement: index + 1,
-		percentage: percentage,
-		amount: (divisionPurse * percentage) / 100
-	}));
+	return percentages.map((percentage, index) => {
+		const totalAmount = (divisionPurse * percentage) / 100;
+		const franchiseAmount = totalAmount * (franchiseCutPercentage / 100);
+		const proAmount = totalAmount - franchiseAmount;
+		return {
+			placement: index + 1,
+			percentage,
+			amount: proAmount,
+			franchiseAmount,
+			totalAmount
+		};
+	});
 }
 
-/**
- * Calculate franchise payout based on pro performance
- * Franchises get a cut before distribution to pros
- */
+// ---------------------------------------------------------------------------
+// Franchise cut helper
+// ---------------------------------------------------------------------------
+
 export function calculateFranchisePayout(
 	totalPurse: number,
 	franchiseCutPercentage: number = 20
 ): { franchiseCut: number; proCut: number } {
 	const franchiseCut = totalPurse * (franchiseCutPercentage / 100);
-	const proCut = totalPurse - franchiseCut;
-
-	return {
-		franchiseCut,
-		proCut
-	};
+	return { franchiseCut, proCut: totalPurse - franchiseCut };
 }
 
-/**
- * Get complete payout structure for a tournament
- */
+// ---------------------------------------------------------------------------
+// Full tournament payout structure
+// ---------------------------------------------------------------------------
+
 export function getTournamentPayoutStructure(
 	tournamentPurse: number,
 	franchiseCutPercentage: number = 20,
@@ -134,10 +153,8 @@ export function getTournamentPayoutStructure(
 		franchiseCutPercentage
 	);
 
-	// Split pro cut equally between men and women
 	const divisionPurse = proCut / 2;
-
-	const placements = calculatePlacementPayouts(divisionPurse, numberOfPlacements);
+	const placements = calculatePlacementPayouts(divisionPurse, numberOfPlacements, franchiseCutPercentage);
 
 	return {
 		totalPurse: tournamentPurse,
@@ -147,31 +164,31 @@ export function getTournamentPayoutStructure(
 	};
 }
 
-/**
- * 2027 Season Configuration
- * $4M total purse across 6 tournaments
- */
-export const SEASON_2027_CONFIG = {
+// ---------------------------------------------------------------------------
+// Season configurations
+// ---------------------------------------------------------------------------
+
+/** 2027 Season — $4 M total across 6 tournaments */
+export const SEASON_2027_CONFIG: SeasonConfig = {
 	year: 2027,
-	totalPurse: 4_000_000,
+	totalSeasonBudget: 4_000_000,
 	numberOfTournaments: 6,
 	franchiseCutPercentage: 20,
 	numberOfPlacements: 20
 };
 
-/**
- * Get 2027 season tournament purses
- */
-export function get2027SeasonPurses(): TournamentPurse[] {
-	return calculateSeasonPurses(
-		SEASON_2027_CONFIG.totalPurse,
-		SEASON_2027_CONFIG.numberOfTournaments
-	);
+export function getSeasonPurses(config: SeasonConfig): TournamentPurse[] {
+	return calculateSeasonPurses(config.totalSeasonBudget, config.numberOfTournaments);
 }
 
-/**
- * Format currency for display
- */
+export function get2027SeasonPurses(): TournamentPurse[] {
+	return getSeasonPurses(SEASON_2027_CONFIG);
+}
+
+// ---------------------------------------------------------------------------
+// Formatting
+// ---------------------------------------------------------------------------
+
 export function formatCurrency(amount: number): string {
 	return new Intl.NumberFormat('en-US', {
 		style: 'currency',
@@ -181,9 +198,10 @@ export function formatCurrency(amount: number): string {
 	}).format(amount);
 }
 
-/**
- * Example usage and validation
- */
+// ---------------------------------------------------------------------------
+// Validation helper
+// ---------------------------------------------------------------------------
+
 export function validatePayoutStructure(): void {
 	const purses = get2027SeasonPurses();
 
@@ -201,7 +219,6 @@ export function validatePayoutStructure(): void {
 		const structure = getTournamentPayoutStructure(purse.totalPurse);
 		console.log(`  Franchise Cut (20%): ${formatCurrency(structure.franchiseCut)}`);
 		console.log(`  Pro Cut (80%): ${formatCurrency(structure.proCut)}`);
-		console.log(`  Top 3 Combined: ${formatCurrency(structure.placements.slice(0, 3).reduce((sum, p) => sum + p.amount, 0) * 2)}`);
 		console.log('');
 
 		totalValidation += purse.totalPurse;
@@ -209,6 +226,6 @@ export function validatePayoutStructure(): void {
 
 	console.log(`Total Season Purse: ${formatCurrency(totalValidation)}`);
 	console.log(
-		`Validation: ${totalValidation === SEASON_2027_CONFIG.totalPurse ? '✅ PASS' : '❌ FAIL'}`
+		`Validation: ${Math.round(totalValidation) === SEASON_2027_CONFIG.totalSeasonBudget ? 'PASS' : 'FAIL'}`
 	);
 }

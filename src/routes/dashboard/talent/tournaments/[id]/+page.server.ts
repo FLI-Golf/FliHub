@@ -32,7 +32,7 @@ export const load: PageServerLoad = async ({ locals, url, params }) => {
 			franchiseCutPercentage
 		);
 		const divisionPurse = proCut / 2;
-		const payoutStructure = calculatePlacementPayouts(divisionPurse);
+		const payoutStructure = calculatePlacementPayouts(divisionPurse, 20, franchiseCutPercentage);
 
 		return {
 			tournament,
