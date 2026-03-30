@@ -1,16 +1,11 @@
 import { RequestContext } from '$lib/infra/RequestContext';
 import type { PageServerLoad } from './$types';
 
-export const load: PageServerLoad = async ({ locals }) => {
+export const load: PageServerLoad = async ({ locals, url }) => {
 	const ctx = await RequestContext.from(locals, url);
-	const { pb, userId, profile: userProfile, role } = ctx;
-	
-
-	// Get user profile to check role
+	const pb = ctx.pb;
 
 	try {
-		const userProfile = await pb.collection('user_profiles').getFirstListItem(`userId="${userId}"`);
-		const role = userProfile.role || 'leader';
 
 		// Only admin can access franchise sales dashboard
 
@@ -113,8 +108,6 @@ export const load: PageServerLoad = async ({ locals }) => {
 		}, {} as Record<string, { count: number; value: number; paid: number }>);
 
 		return {
-			userProfile,
-			role,
 			leads,
 			opportunities,
 			deals,
@@ -126,5 +119,15 @@ export const load: PageServerLoad = async ({ locals }) => {
 		};
 	} catch (error: any) {
 		console.error('Error loading franchise sales dashboard:', error);
-		}
+		return {
+			leads: [],
+			opportunities: [],
+			deals: [],
+			territories: [],
+			sponsors: [],
+			pipelineMetrics: null,
+			revenueMetrics: null,
+			dealsByMonth: {}
+		};
+	}
 };

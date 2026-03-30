@@ -22,6 +22,20 @@
 
 	let { data }: { data: PageData } = $props();
 
+	const rollup = $derived(data.budgetRollup);
+
+	const categoryLabels: Record<string, string> = {
+		talent_payment: 'Talent Payments',
+		salary:         'Salaries',
+		equipment:      'Equipment',
+		travel:         'Travel',
+		marketing:      'Marketing',
+		operations:     'Operations',
+		venue:          'Venue',
+		technology:     'Technology',
+		other:          'Other'
+	};
+
 	// Initialise the provider — sets Svelte context so child components
 	// can call DepartmentProvider.inject() without prop drilling.
 	const dept = DepartmentProvider.provide(data.department);
@@ -310,6 +324,97 @@
 
 		</div>
 	</div>
+
+	<!-- Live Budget Rollup -->
+	{#if rollup}
+		<div>
+			<h2 class="text-2xl font-bold mb-4">Live Budget Tracker</h2>
+			<div class="space-y-4">
+
+				<!-- Summary row -->
+				<div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+					<div class="bg-slate-800 border border-slate-700 rounded-xl p-4 text-center">
+						<div class="text-xs text-slate-400 uppercase tracking-wide mb-1">Allocated</div>
+						<div class="text-2xl font-bold text-yellow-300">
+							{new Intl.NumberFormat('en-US',{style:'currency',currency:'USD',minimumFractionDigits:0,maximumFractionDigits:0}).format(rollup.allocated)}
+						</div>
+					</div>
+					<div class="bg-slate-800 border border-slate-700 rounded-xl p-4 text-center">
+						<div class="text-xs text-slate-400 uppercase tracking-wide mb-1">Actual Spend</div>
+						<div class="text-2xl font-bold {rollup.actual > rollup.allocated && rollup.allocated > 0 ? 'text-red-300' : 'text-emerald-300'}">
+							{new Intl.NumberFormat('en-US',{style:'currency',currency:'USD',minimumFractionDigits:0,maximumFractionDigits:0}).format(rollup.actual)}
+						</div>
+					</div>
+					<div class="bg-slate-800 border border-slate-700 rounded-xl p-4 text-center">
+						<div class="text-xs text-slate-400 uppercase tracking-wide mb-1">
+							{rollup.remaining < 0 ? 'Over Budget' : 'Remaining'}
+						</div>
+						<div class="text-2xl font-bold {rollup.remaining < 0 ? 'text-red-300' : 'text-cyan-300'}">
+							{new Intl.NumberFormat('en-US',{style:'currency',currency:'USD',minimumFractionDigits:0,maximumFractionDigits:0}).format(Math.abs(rollup.remaining))}
+						</div>
+					</div>
+					<div class="bg-slate-800 border border-slate-700 rounded-xl p-4 text-center">
+						<div class="text-xs text-slate-400 uppercase tracking-wide mb-1">Pending</div>
+						<div class="text-2xl font-bold text-yellow-300">
+							{new Intl.NumberFormat('en-US',{style:'currency',currency:'USD',minimumFractionDigits:0,maximumFractionDigits:0}).format(rollup.pending)}
+						</div>
+					</div>
+				</div>
+
+				<!-- Progress bar -->
+				{#if rollup.allocated > 0}
+					<div class="bg-slate-800 border border-slate-700 rounded-xl p-4">
+						<div class="flex justify-between text-xs text-slate-400 mb-2">
+							<span>Budget used</span>
+							<span class="{rollup.usedPct > 100 ? 'text-red-300' : rollup.usedPct > 80 ? 'text-yellow-300' : 'text-emerald-300'} font-semibold">
+								{rollup.usedPct.toFixed(1)}%
+							</span>
+						</div>
+						<div class="w-full bg-slate-700 rounded-full h-3 overflow-hidden">
+							<div
+								class="h-full rounded-full transition-all {rollup.usedPct > 100 ? 'bg-red-500' : rollup.usedPct > 80 ? 'bg-yellow-500' : 'bg-emerald-500'}"
+								style="width: {Math.min(100, rollup.usedPct)}%"
+							></div>
+						</div>
+						<div class="flex justify-between text-xs text-slate-500 mt-1">
+							<span>$0</span>
+							<span>{new Intl.NumberFormat('en-US',{style:'currency',currency:'USD',minimumFractionDigits:0,maximumFractionDigits:0}).format(rollup.allocated)}</span>
+						</div>
+					</div>
+				{/if}
+
+				<!-- Breakdown by category -->
+				{#if Object.keys(rollup.expensesByCategory).length > 0}
+					<div class="bg-slate-800 border border-slate-700 rounded-xl p-4">
+						<h3 class="text-sm font-semibold text-slate-300 uppercase tracking-wide mb-3">Spend by Category</h3>
+						<div class="space-y-2">
+							{#each Object.entries(rollup.expensesByCategory).sort((a, b) => b[1] - a[1]) as [cat, amt]}
+								{@const pct = rollup.actual > 0 ? (amt / rollup.actual) * 100 : 0}
+								<div class="flex items-center gap-3">
+									<div class="w-28 text-xs text-slate-400 shrink-0">{categoryLabels[cat] ?? cat}</div>
+									<div class="flex-1 bg-slate-700 rounded-full h-2 overflow-hidden">
+										<div class="h-full bg-violet-500 rounded-full" style="width: {pct}%"></div>
+									</div>
+									<div class="w-24 text-right text-xs font-medium text-slate-200">
+										{new Intl.NumberFormat('en-US',{style:'currency',currency:'USD',minimumFractionDigits:0,maximumFractionDigits:0}).format(amt)}
+									</div>
+									<div class="w-10 text-right text-xs text-slate-500">{pct.toFixed(0)}%</div>
+								</div>
+							{/each}
+						</div>
+						{#if rollup.talentPaymentTotal > 0}
+							<p class="text-xs text-slate-500 mt-3 pt-3 border-t border-slate-700">
+								Includes <span class="text-purple-300 font-medium">
+									{new Intl.NumberFormat('en-US',{style:'currency',currency:'USD',minimumFractionDigits:0,maximumFractionDigits:0}).format(rollup.talentPaymentTotal)}
+								</span> in talent payments auto-synced from pro payment records.
+							</p>
+						{/if}
+					</div>
+				{/if}
+
+			</div>
+		</div>
+	{/if}
 
 	<!-- Financial Overview -->
 	<div>

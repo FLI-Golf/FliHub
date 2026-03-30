@@ -5,7 +5,20 @@
 	import { Label } from '$lib/components/ui/label';
 	import { Edit, Save, X, Trash2 } from 'lucide-svelte';
 
-	let { open = $bindable(false), task } = $props();
+	let { open = $bindable(false), task, expenses = { total: 0, paid: 0 } }: {
+		open: boolean;
+		task: any;
+		expenses?: { total: number; paid: number };
+	} = $props();
+
+	const formatCurrency = (n: number) =>
+		new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(n);
+
+	const budgetUsedPct = $derived(() => {
+		const budget = parseFloat(formData.task_budget) || 0;
+		if (!budget) return 0;
+		return Math.min(100, (expenses.total / budget) * 100);
+	});
 
 	let formData = $state({
 		title: '',
@@ -306,6 +319,45 @@
 					class="bg-slate-800 border-slate-700 text-white placeholder:text-slate-400"
 				/>
 			</div>
+
+			<!-- Actual vs Budget panel -->
+			{#if parseFloat(formData.task_budget) > 0 || expenses.total > 0}
+				{@const budget = parseFloat(formData.task_budget) || 0}
+				{@const pct = budget > 0 ? Math.min(100, (expenses.total / budget) * 100) : 0}
+				{@const over = expenses.total > budget && budget > 0}
+				<div class="rounded-lg border {over ? 'border-red-700/50 bg-red-900/20' : 'border-slate-700 bg-slate-800/50'} p-3 space-y-2">
+					<div class="text-xs font-semibold text-slate-400 uppercase tracking-wide">Budget Tracker</div>
+					<div class="grid grid-cols-3 gap-2 text-center text-xs">
+						<div>
+							<div class="text-slate-400">Budgeted</div>
+							<div class="font-bold text-slate-100">{formatCurrency(budget)}</div>
+						</div>
+						<div>
+							<div class="text-slate-400">Actual Spend</div>
+							<div class="font-bold {over ? 'text-red-300' : 'text-emerald-300'}">{formatCurrency(expenses.total)}</div>
+						</div>
+						<div>
+							<div class="text-slate-400">{over ? 'Over by' : 'Remaining'}</div>
+							<div class="font-bold {over ? 'text-red-300' : 'text-cyan-300'}">{formatCurrency(Math.abs(budget - expenses.total))}</div>
+						</div>
+					</div>
+					{#if budget > 0}
+						<div class="w-full bg-slate-700 rounded-full h-1.5 overflow-hidden">
+							<div
+								class="h-full rounded-full transition-all {over ? 'bg-red-500' : pct > 80 ? 'bg-yellow-500' : 'bg-emerald-500'}"
+								style="width: {pct}%"
+							></div>
+						</div>
+						<div class="text-right text-[10px] text-slate-500">{pct.toFixed(0)}% used</div>
+					{/if}
+					{#if expenses.paid > 0 && expenses.paid < expenses.total}
+						<div class="text-xs text-slate-400 pt-1 border-t border-slate-700">
+							Paid: <span class="text-emerald-300 font-medium">{formatCurrency(expenses.paid)}</span>
+							· Pending: <span class="text-yellow-300 font-medium">{formatCurrency(expenses.total - expenses.paid)}</span>
+						</div>
+					{/if}
+				</div>
+			{/if}
 
 			<div class="space-y-2">
 				<div class="flex items-center justify-between">

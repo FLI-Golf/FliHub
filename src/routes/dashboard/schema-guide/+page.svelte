@@ -155,48 +155,64 @@
 	const sponsorsRelationships = [
 		{
 			collection: 'sponsors',
-			description: 'Corporate sponsors with tier-based commitments and franchise conversion tracking',
+			description: 'A sponsor is a company or brand that pays FLI Golf for visibility, association, or activation rights. Sponsors can exist at the league level (visible across all broadcasts and events), at the franchise level (tied to a specific team), or at the individual pro level (personal endorsements). Every sponsor moves through a lifecycle: prospect → active → and optionally converted_to_franchise if they decide to buy a team.',
 			fields: [
-				{ name: 'companyName', type: 'text', description: 'Sponsor company name' },
-				{ name: 'type', type: 'select', description: 'casino, resort, hospitality, entertainment, corporate, other' },
-				{ name: 'tier', type: 'select', description: 'tier_1 (Premium) to tier_4 (Growth)' },
-				{ name: 'status', type: 'select', description: 'prospect → negotiating → active → renewed → converted_to_franchise' },
-				{ name: 'primaryContactName', type: 'text', description: 'Primary contact person' },
-				{ name: 'primaryContactEmail', type: 'email', description: 'Contact email' },
-				{ name: 'location', type: 'text', description: 'Sponsor location' },
-				{ name: 'territory', type: 'text', description: 'Geographic territory' },
-				{ name: 'contractStartDate', type: 'date', description: 'Contract start date' },
-				{ name: 'contractEndDate', type: 'date', description: 'Contract end date' },
-				{ name: 'currentYear', type: 'number', description: 'Current contract year (2026-2028)' },
-				{ name: 'annualCommitment', type: 'number', description: 'Annual sponsorship value' },
-				{ name: 'totalPaid', type: 'number', description: 'Total paid to date' },
-				{ name: 'franchiseInterest', type: 'boolean', description: 'Interested in franchise conversion' },
-				{ name: 'franchiseConversionDate', type: 'date', description: 'Date converted to franchise' },
-				{ name: 'franchiseDealId', type: 'relation', relatesTo: 'franchise_deals', description: 'Link to franchise deal' },
-				{ name: 'assignedTo', type: 'relation', relatesTo: 'user_profiles', description: 'Sales rep assigned' }
+				{ name: 'companyName', type: 'text', description: 'Legal or trading name of the sponsoring company. Used on contracts, invoices, and public-facing materials.' },
+				{ name: 'type', type: 'select', description: 'Industry category: corporate, local, media, equipment, apparel, technology, food_beverage, financial, healthcare, other. Helps segment the sponsor portfolio and identify gaps.' },
+				{ name: 'tier', type: 'select', description: 'Sponsorship tier determines visibility and benefits. title = naming rights (e.g. "FLI Golf presented by X"). platinum = premium placement. gold / silver / bronze = standard tiers. community = local/grassroots.' },
+				{ name: 'status', type: 'select', description: 'Lifecycle stage: prospect (in conversation), active (contract signed and paying), inactive (lapsed or paused), cancelled (terminated early).' },
+				{ name: 'primaryContactName', type: 'text', description: 'Name of the main decision-maker or account manager at the sponsor company.' },
+				{ name: 'primaryContactEmail', type: 'email', description: 'Direct email for the primary contact. Used for contract delivery and renewal outreach.' },
+				{ name: 'location', type: 'text', description: 'City and state of the sponsor\'s headquarters or relevant office.' },
+				{ name: 'territory', type: 'text', description: 'Geographic market the sponsor is associated with (e.g. "Southeast", "Texas"). Used to match sponsors to franchise territories.' },
+				{ name: 'contractStartDate', type: 'date', description: 'First day the sponsorship agreement is in effect.' },
+				{ name: 'contractEndDate', type: 'date', description: 'Last day of the current contract term. Triggers renewal workflow when approaching.' },
+				{ name: 'annualCommitment', type: 'number', description: 'Total dollar value the sponsor has committed to pay per contract year. This is the target — not what has been collected.' },
+				{ name: 'totalPaid', type: 'number', description: 'Running total of payments received from this sponsor. Balance due = annualCommitment − totalPaid.' },
+				{ name: 'franchiseInterest', type: 'boolean', description: 'Flag set when a sponsor has expressed interest in buying a franchise. Triggers the conversion pipeline and links to a franchise_deal.' },
+				{ name: 'franchiseConversionDate', type: 'date', description: 'Date the sponsor officially converted to a franchise owner. Populated automatically when franchiseDealId is set.' },
+				{ name: 'franchiseDealId', type: 'relation', relatesTo: 'franchise_deals', description: 'Links to the franchise_deals record created when this sponsor converted. Once set, the sponsor is tracked as a franchise owner.' },
+				{ name: 'assignedTo', type: 'relation', relatesTo: 'user_profiles', description: 'The sales rep or account manager responsible for this sponsor relationship.' },
+				{ name: 'notes', type: 'text', description: 'Free-form notes on the relationship, negotiation history, or activation preferences.' }
 			],
 			relationships: [
-				{ to: 'franchise_deals', type: 'one-to-one', description: 'Can convert to franchise owner' },
-				{ to: 'franchises', type: 'many-to-many', description: 'Sponsors franchises' },
-				{ to: 'pros', type: 'many-to-many', description: 'Sponsors individual players' },
-				{ to: 'league', type: 'many-to-one', description: 'League-level sponsorship' },
-				{ to: 'user_profiles', type: 'many-to-one', description: 'Managed by sales rep' }
+				{ to: 'franchise_deals', type: 'one-to-one', description: 'When franchiseInterest is true and a deal is created, this links the sponsor to their franchise purchase' },
+				{ to: 'sponsor_franchise_bridge', type: 'one-to-many', description: 'Each franchise the sponsor is actively supporting gets a bridge record with its own level and amount' },
+				{ to: 'sponsor_payments', type: 'one-to-many', description: 'Individual payment records tracking each instalment against the annual commitment' },
+				{ to: 'user_profiles', type: 'many-to-one', description: 'Assigned sales rep who owns the relationship' }
 			]
 		},
 		{
 			collection: 'sponsor_franchise_bridge',
-			description: 'Links sponsors to franchises they support',
+			description: 'A sponsor can support multiple franchises, and a franchise can have multiple sponsors. This bridge table holds the specific terms for each sponsor ↔ franchise pairing — level, dollar amount, and contract dates — independently of the top-level sponsor record. For example, a gold-tier league sponsor might also be the title sponsor of one specific franchise at a higher rate.',
 			fields: [
-				{ name: 'sponsorId', type: 'relation', relatesTo: 'sponsors', description: 'Sponsor' },
-				{ name: 'franchiseId', type: 'relation', relatesTo: 'franchises', description: 'Franchise' },
-				{ name: 'sponsorshipLevel', type: 'select', description: 'Title, Primary, Secondary, Supporting' },
-				{ name: 'annualAmount', type: 'number', description: 'Annual sponsorship amount' },
-				{ name: 'startDate', type: 'date', description: 'Sponsorship start' },
-				{ name: 'endDate', type: 'date', description: 'Sponsorship end' }
+				{ name: 'sponsorId', type: 'relation', relatesTo: 'sponsors', description: 'The sponsor company in this pairing.' },
+				{ name: 'franchiseId', type: 'relation', relatesTo: 'franchises', description: 'The franchise being sponsored in this pairing.' },
+				{ name: 'sponsorshipLevel', type: 'select', description: 'Level of sponsorship for this specific franchise: Title (naming rights for the team), Primary (jersey/helmet), Secondary, Supporting (digital/social only).' },
+				{ name: 'annualAmount', type: 'number', description: 'Dollar value of this specific franchise sponsorship per year. May differ from the sponsor\'s league-level commitment.' },
+				{ name: 'dealValue', type: 'number', description: 'Total contract value across all years for this pairing.' },
+				{ name: 'startDate', type: 'date', description: 'When this franchise sponsorship begins.' },
+				{ name: 'endDate', type: 'date', description: 'When this franchise sponsorship expires.' },
+				{ name: 'status', type: 'select', description: 'active, pending, expired, cancelled.' }
 			],
 			relationships: [
-				{ to: 'sponsors', type: 'many-to-one', description: 'Bridge to sponsor' },
-				{ to: 'franchises', type: 'many-to-one', description: 'Bridge to franchise' }
+				{ to: 'sponsors', type: 'many-to-one', description: 'The sponsor in this pairing' },
+				{ to: 'franchises', type: 'many-to-one', description: 'The franchise in this pairing' }
+			]
+		},
+		{
+			collection: 'sponsor_payments',
+			description: 'Tracks individual payment instalments from a sponsor against their annual commitment. A sponsor with a $120,000 annual commitment might pay in quarterly instalments of $30,000 each — each instalment is a separate record here. The sum of all paid records should equal totalPaid on the parent sponsor record.',
+			fields: [
+				{ name: 'sponsorId', type: 'relation', relatesTo: 'sponsors', description: 'The sponsor making the payment.' },
+				{ name: 'amount', type: 'number', description: 'Dollar amount of this specific payment.' },
+				{ name: 'paymentDate', type: 'date', description: 'Date the payment was received or is due.' },
+				{ name: 'paymentType', type: 'select', description: 'Type of payment: instalment, upfront, renewal, bonus.' },
+				{ name: 'status', type: 'select', description: 'pending (due but not yet received) or paid (confirmed received).' },
+				{ name: 'notes', type: 'text', description: 'Reference number, wire details, or any payment-specific notes.' }
+			],
+			relationships: [
+				{ to: 'sponsors', type: 'many-to-one', description: 'Payment belongs to a sponsor' }
 			]
 		}
 	];
@@ -205,157 +221,125 @@
 	const leagueRelationships = [
 		{
 			collection: 'league',
-			description: 'FLI Golf League configuration and settings',
+			description: 'The top-level configuration record for FLI Golf. There is one league record per season. It holds the season year, date range, prize budget, and status. Everything else — franchises, pros, tournaments — hangs off the league. Changing totalPrizePool here is the only number you need to touch to rescale all tournament purses for the season.',
 			fields: [
-				{ name: 'name', type: 'text', description: 'League name' },
-				{ name: 'season', type: 'text', description: 'Current season' },
-				{ name: 'startDate', type: 'date', description: 'Season start date' },
-				{ name: 'endDate', type: 'date', description: 'Season end date' },
-				{ name: 'status', type: 'select', description: 'Active, Upcoming, Completed' },
-				{ name: 'totalPrizePool', type: 'number', description: 'Total prize money' }
+				{ name: 'name', type: 'text', description: 'Display name of the league, e.g. "FLI Golf 2027".' },
+				{ name: 'season', type: 'text', description: 'Season year identifier (e.g. "2027"). Used to group tournaments and filter views across the app.' },
+				{ name: 'startDate', type: 'date', description: 'First day of the season. Used for scheduling and display.' },
+				{ name: 'endDate', type: 'date', description: 'Last day of the season. Triggers end-of-season payout summaries.' },
+				{ name: 'status', type: 'select', description: 'upcoming (pre-season), active (season in progress), completed (all tournaments done).' },
+				{ name: 'totalPrizePool', type: 'number', description: 'Total prize budget for the season (e.g. $4,000,000 for 2027). PayoutCalculator distributes this across all 6 tournaments automatically using arithmetic progression.' }
 			],
 			relationships: [
-				{ to: 'franchises', type: 'one-to-many', description: 'League contains franchises' },
-				{ to: 'pros', type: 'one-to-many', description: 'League has professional players' },
-				{ to: 'tournaments', type: 'one-to-many', description: 'League hosts tournaments' }
+				{ to: 'franchises', type: 'one-to-many', description: 'All franchises competing this season' },
+				{ to: 'talent', type: 'one-to-many', description: 'All pros registered for this season' },
+				{ to: 'tournaments', type: 'one-to-many', description: 'The 6 tournaments that make up the season' }
 			]
 		},
 		{
 			collection: 'franchises',
-			description: 'League franchises with ownership and territory',
+			description: 'A franchise is a team in the league. It is created when a franchise_deal reaches "active" status — the deal record is the source of truth for the purchase, and the franchise record is the operational entity used for rosters, payouts, and standings. Each franchise owns a geographic territory and fields both a men\'s and women\'s roster.',
 			fields: [
-				{ name: 'name', type: 'text', description: 'Franchise name' },
-				{ name: 'territory', type: 'text', description: 'Geographic territory' },
-				{ name: 'ownerId', type: 'relation', relatesTo: 'user_profiles', description: 'Franchise owner' },
-				{ name: 'dealId', type: 'relation', relatesTo: 'franchise_deals', description: 'Source deal' },
-				{ name: 'status', type: 'select', description: 'Active, Inactive, Pending' },
-				{ name: 'foundedDate', type: 'date', description: 'Franchise start date' },
-				{ name: 'logo', type: 'file', description: 'Franchise logo' }
+				{ name: 'name', type: 'text', description: 'Team name as displayed publicly (e.g. "Austin Aces").' },
+				{ name: 'territory', type: 'text', description: 'The geographic market this franchise represents (e.g. "Austin, TX"). Must match a franchise_territories record.' },
+				{ name: 'ownerId', type: 'relation', relatesTo: 'user_profiles', description: 'The franchise owner\'s user profile. Gives them access to their team dashboard and payout records.' },
+				{ name: 'dealId', type: 'relation', relatesTo: 'franchise_deals', description: 'The franchise_deals record this team was created from. Links back to the full purchase history and payment milestones.' },
+				{ name: 'status', type: 'select', description: 'active (competing), inactive (suspended or sold), pending (deal signed but onboarding not complete).' },
+				{ name: 'foundedDate', type: 'date', description: 'Date the franchise was officially activated. Usually the contractSignedDate from the deal.' },
+				{ name: 'logo', type: 'file', description: 'Team logo used in broadcasts, the app, and printed materials.' }
 			],
 			relationships: [
-				{ to: 'league', type: 'many-to-one', description: 'Belongs to league' },
-				{ to: 'franchise_deals', type: 'one-to-one', description: 'Created from deal' },
-				{ to: 'user_profiles', type: 'many-to-one', description: 'Owned by franchise owner' },
-				{ to: 'pros', type: 'many-to-many', description: 'Roster of players' },
-				{ to: 'sponsors', type: 'many-to-many', description: 'Franchise sponsors' }
+				{ to: 'league', type: 'many-to-one', description: 'Competes in a specific season' },
+				{ to: 'franchise_deals', type: 'one-to-one', description: 'Created from this deal' },
+				{ to: 'user_profiles', type: 'many-to-one', description: 'Owned and managed by this user' },
+				{ to: 'talent', type: 'many-to-many', description: 'Roster of pros (men\'s and women\'s divisions)' },
+				{ to: 'sponsors', type: 'many-to-many', description: 'Sponsors backing this team via sponsor_franchise_bridge' },
+				{ to: 'tournament_results', type: 'one-to-many', description: 'All placement results for pros on this team' }
 			]
 		},
 		{
-			collection: 'pros',
-			description: 'Professional disc golf players',
+			collection: 'talent',
+			description: 'A talent record represents any person contracted to FLI Golf — players, broadcasters, commentators, or analysts. Players compete in tournaments and earn placement-based prize money. Non-player talent are paid via pro_payments but do not appear in tournament_results. Each talent record can be linked to a user account so the pro can log in and view their own earnings and schedule.',
 			fields: [
-				{ name: 'name', type: 'text', description: 'Player name' },
-				{ name: 'worldRanking', type: 'number', description: 'Current world ranking' },
-				{ name: 'gender', type: 'select', description: 'male, female, other' },
-				{ name: 'status', type: 'select', description: 'active, inactive, retired' },
-				{ name: 'country', type: 'text', description: 'Country of origin' },
-				{ name: 'signedContract', type: 'file', description: 'Contract document' },
-				{ name: 'bio', type: 'text', description: 'Player biography' }
+				{ name: 'name', type: 'text', description: 'Full legal name used on contracts and payment records.' },
+				{ name: 'nickname', type: 'text', description: 'On-air or fan-facing name used in broadcasts and standings.' },
+				{ name: 'talentType', type: 'select', description: 'player, broadcaster, commentator, analyst. A person can hold multiple types (e.g. a player who also does commentary).' },
+				{ name: 'status', type: 'select', description: 'active (under contract), inactive (contract lapsed), retired (permanently done).' },
+				{ name: 'gender', type: 'select', description: 'male, female, other. Determines which division the player competes in and which purse they draw from.' },
+				{ name: 'worldRanking', type: 'number', description: 'Current world ranking. Used for seeding and marketing.' },
+				{ name: 'country', type: 'text', description: 'Country of origin. Used for broadcast graphics and international marketing.' },
+				{ name: 'yearTurnedPro', type: 'number', description: 'Year the talent turned professional. Context for career narrative.' },
+				{ name: 'primarySponsor', type: 'text', description: 'Name of the talent\'s primary personal sponsor outside of FLI Golf team sponsors.' },
+				{ name: 'avatar', type: 'file', description: 'Headshot used in the app, broadcast lower-thirds, and player cards.' },
+				{ name: 'signedContracts', type: 'file', description: 'Uploaded contract PDFs. Multiple files supported.' },
+				{ name: 'userId', type: 'relation', relatesTo: 'user_profiles', description: 'Optional link to a user account. When set, the talent can log in and view their own profile, schedule, and payment history.' },
+				{ name: 'bio', type: 'editor', description: 'Rich-text biography for public-facing profiles and broadcast use.' },
+				{ name: 'primaryAirport', type: 'text', description: 'Home airport code (e.g. "AUS"). Used for travel logistics and booking.' },
+				{ name: 'frequentFlyerNumbers', type: 'text', description: 'Airline loyalty numbers for travel booking.' }
 			],
 			relationships: [
-				{ to: 'franchises', type: 'many-to-many', description: 'Plays for franchises' },
-				{ to: 'pro_payments', type: 'one-to-many', description: 'Payment history' },
-				{ to: 'league', type: 'many-to-one', description: 'Competes in league' },
-				{ to: 'sponsors', type: 'many-to-many', description: 'Personal sponsors' }
-			]
-		},
-		{
-			collection: 'sponsors',
-			description: 'League and franchise sponsors with tier-based commitments',
-			fields: [
-				{ name: 'companyName', type: 'text', description: 'Sponsor company name' },
-				{ name: 'tier', type: 'select', description: 'tier_1 (Premium) to tier_4 (Growth)' },
-				{ name: 'status', type: 'select', description: 'prospect → negotiating → active → renewed' },
-				{ name: 'annualCommitment', type: 'number', description: 'Annual sponsorship value' },
-				{ name: 'totalPaid', type: 'number', description: 'Total paid to date' },
-				{ name: 'contractStartDate', type: 'date', description: 'Contract start' },
-				{ name: 'contractEndDate', type: 'date', description: 'Contract end' },
-				{ name: 'franchiseInterest', type: 'boolean', description: 'Interested in franchise conversion' }
-			],
-			relationships: [
-				{ to: 'franchises', type: 'many-to-many', description: 'Sponsors franchises' },
-				{ to: 'pros', type: 'many-to-many', description: 'Sponsors individual players' },
-				{ to: 'league', type: 'many-to-one', description: 'League-level sponsorship' },
-				{ to: 'franchise_deals', type: 'one-to-one', description: 'Can convert to franchise owner' }
+				{ to: 'franchises', type: 'many-to-many', description: 'The team(s) this talent is rostered on' },
+				{ to: 'pro_payments', type: 'one-to-many', description: 'All salary, bonus, and prize payment records' },
+				{ to: 'tournament_results', type: 'one-to-many', description: 'Placement records from each tournament entered' },
+				{ to: 'user_profiles', type: 'many-to-one', description: 'Optional user account for self-service access' }
 			]
 		},
 		{
 			collection: 'pro_payments',
-			description: 'Player compensation and payment tracking',
+			description: 'Every dollar paid to a talent is recorded here — prize money, salary, appearance fees, and bonuses. Prize payments are created automatically when tournament results are entered. Other payment types are created manually by admins. The sum of all paid records for a talent represents their total earnings from FLI Golf.',
 			fields: [
-				{ name: 'proId', type: 'relation', relatesTo: 'pros', description: 'Player receiving payment' },
-				{ name: 'amount', type: 'number', description: 'Payment amount' },
-				{ name: 'paymentDate', type: 'date', description: 'Date paid' },
-				{ name: 'paymentType', type: 'select', description: 'Salary, Bonus, Prize, Appearance Fee' },
-				{ name: 'status', type: 'select', description: 'Pending, Paid, Cancelled' },
-				{ name: 'notes', type: 'text', description: 'Payment notes' }
+				{ name: 'proId', type: 'relation', relatesTo: 'talent', description: 'The talent receiving this payment.' },
+				{ name: 'amount', type: 'number', description: 'Dollar amount of this payment.' },
+				{ name: 'paymentDate', type: 'date', description: 'Date the payment was made or is scheduled.' },
+				{ name: 'paymentType', type: 'select', description: 'Prize (from tournament placement), Salary (contracted base pay), Bonus (performance or signing), Appearance Fee (non-tournament events).' },
+				{ name: 'status', type: 'select', description: 'pending (approved but not yet sent), paid (confirmed transferred), cancelled (voided).' },
+				{ name: 'notes', type: 'text', description: 'Reference number, tournament name, or any context for this specific payment.' }
 			],
 			relationships: [
-				{ to: 'pros', type: 'many-to-one', description: 'Payment to player' },
-				{ to: 'expenses', type: 'one-to-one', description: 'Tracked as expense' }
+				{ to: 'talent', type: 'many-to-one', description: 'Payment belongs to this talent' },
+				{ to: 'tournament_results', type: 'one-to-one', description: 'For prize payments, links back to the placement record that generated it' }
 			]
 		},
 		{
 			collection: 'tournaments',
-			description: 'Individual competition events within a season. prizePool is derived from the season budget via progressive distribution — it is not entered manually.',
+			description: 'A tournament is one of the 6 competition events in a season. The prize pool is never entered manually — it is computed from the season totalPrizePool using arithmetic progression (later tournaments are worth more). The full purse is split 50/50 between Men\'s and Women\'s divisions, then distributed across 20 placements using a top-heavy decay curve.',
 			fields: [
-				{ name: 'name', type: 'text', description: 'Tournament name' },
-				{ name: 'season', type: 'number', description: 'Season year (e.g. 2027). Groups tournaments into a season.' },
-				{ name: 'tournamentNumber', type: 'number', description: 'Position in the season (1 = first, 6 = last). Controls prize weighting.' },
-				{ name: 'location', type: 'text', description: 'Event location' },
-				{ name: 'startDate', type: 'date', description: 'Tournament start' },
-				{ name: 'endDate', type: 'date', description: 'Tournament end' },
-				{ name: 'prizePool', type: 'number', description: 'Total prize money for this tournament. Computed from the season budget using arithmetic progression.' },
-	
-				{ name: 'status', type: 'select', description: 'scheduled, in_progress, completed, cancelled' }
+				{ name: 'name', type: 'text', description: 'Tournament name (e.g. "FLI Golf Season Opener").' },
+				{ name: 'season', type: 'number', description: 'Season year this tournament belongs to (e.g. 2027). Groups tournaments for filtering and budget calculations.' },
+				{ name: 'tournamentNumber', type: 'number', description: 'Position in the season schedule (1 = first, 6 = last/championship). Higher number = larger prize pool.' },
+				{ name: 'location', type: 'text', description: 'City and state where the tournament is held.' },
+				{ name: 'venue', type: 'text', description: 'Specific venue name (e.g. "Austin Disc Golf Complex").' },
+				{ name: 'startDate', type: 'date', description: 'First day of competition.' },
+				{ name: 'endDate', type: 'date', description: 'Last day of competition.' },
+				{ name: 'prizePool', type: 'number', description: 'Total prize money for this tournament. Derived from the season budget — do not edit manually. See PayoutCalculator.ts → SeasonConfig.' },
+				{ name: 'status', type: 'select', description: 'scheduled (upcoming), in_progress (currently running), completed (results entered), cancelled.' }
 			],
 			relationships: [
-				{ to: 'league', type: 'many-to-one', description: 'Part of league season' },
-				{ to: 'tournament_results', type: 'one-to-many', description: 'Per-pro placement and earnings records' },
-				{ to: 'franchise_payouts', type: 'one-to-many', description: 'Aggregated franchise earnings per tournament' },
-				{ to: 'franchises', type: 'many-to-many', description: 'Franchises competing' }
+				{ to: 'league', type: 'many-to-one', description: 'Part of this season\'s league' },
+				{ to: 'tournament_results', type: 'one-to-many', description: 'One result record per pro per division' },
+				{ to: 'franchises', type: 'many-to-many', description: 'Franchises whose pros competed' }
 			]
 		},
 		{
 			collection: 'tournament_results',
-			description: 'Per-pro placement record for a tournament division. Stores both the pro\'s take-home and the franchise cut so every team gets a traceable cheque.',
+			description: 'One record per pro per tournament division. Created when an admin enters results after a tournament completes. The placement field drives the earnings calculation — placement 1 earns 30% of the division purse, placement 2 earns 20%, and so on down to placement 20 via exponential decay. Every placement from 1–20 receives a cheque.',
 			fields: [
-				{ name: 'tournament', type: 'relation', relatesTo: 'tournaments', description: 'Tournament this result belongs to' },
-				{ name: 'pro', type: 'relation', relatesTo: 'talent', description: 'The pro player' },
-				{ name: 'franchise', type: 'relation', relatesTo: 'franchises', description: 'The pro\'s franchise (team)' },
-				{ name: 'division', type: 'select', description: 'mens or womens' },
-				{ name: 'placement', type: 'number', description: 'Finishing position (1–20). Determines payout percentage.' },
-				{ name: 'proEarnings', type: 'number', description: 'Pro\'s take-home after franchise cut' },
-				{ name: 'franchiseEarnings', type: 'number', description: 'Franchise\'s cut from this result' },
-				{ name: 'earnings', type: 'number', description: 'Total (proEarnings + franchiseEarnings)' },
-				{ name: 'score', type: 'text', description: 'Final score (e.g. -15)' },
-				{ name: 'rounds', type: 'number', description: 'Number of rounds played' }
+				{ name: 'tournament', type: 'relation', relatesTo: 'tournaments', description: 'The tournament this result is for.' },
+				{ name: 'pro', type: 'relation', relatesTo: 'talent', description: 'The pro who achieved this placement.' },
+				{ name: 'franchise', type: 'relation', relatesTo: 'franchises', description: 'The franchise this pro was rostered on at the time of the tournament.' },
+				{ name: 'division', type: 'select', description: 'mens or womens. Determines which half of the prize pool this result draws from.' },
+				{ name: 'placement', type: 'number', description: 'Finishing position (1–20). The single most important field — all earnings are derived from this.' },
+				{ name: 'earnings', type: 'number', description: 'Pro\'s prize money for this placement. Calculated as: division purse × placement percentage.' },
+				{ name: 'score', type: 'text', description: 'Final cumulative score (e.g. "-15"). Displayed on standings and broadcast graphics.' },
+				{ name: 'rounds', type: 'number', description: 'Number of rounds completed. Typically 3 for a standard FLI Golf tournament.' }
 			],
 			relationships: [
-				{ to: 'tournaments', type: 'many-to-one', description: 'Result belongs to a tournament' },
-				{ to: 'talent', type: 'many-to-one', description: 'Result belongs to a pro' },
-				{ to: 'franchises', type: 'many-to-one', description: 'Result credited to a franchise' }
-			]
-		},
-		{
-			collection: 'franchise_payouts',
-			description: 'Aggregated franchise earnings per tournament. Updated whenever a tournament_result is added or removed. Tracks paid/pending status.',
-			fields: [
-				{ name: 'franchise', type: 'relation', relatesTo: 'franchises', description: 'The franchise receiving the payout' },
-				{ name: 'tournament', type: 'relation', relatesTo: 'tournaments', description: 'The tournament this payout is for' },
-				{ name: 'totalEarnings', type: 'number', description: 'Sum of franchiseEarnings across all pros in this tournament' },
-				{ name: 'mensEarnings', type: 'number', description: 'Franchise cut from men\'s division results' },
-				{ name: 'womensEarnings', type: 'number', description: 'Franchise cut from women\'s division results' },
-				{ name: 'numberOfPros', type: 'number', description: 'How many pros contributed to this payout' },
-				{ name: 'status', type: 'select', description: 'pending or paid' }
-			],
-			relationships: [
-				{ to: 'franchises', type: 'many-to-one', description: 'Payout belongs to a franchise' },
-				{ to: 'tournaments', type: 'many-to-one', description: 'Payout is for a specific tournament' }
+				{ to: 'tournaments', type: 'many-to-one', description: 'Result belongs to this tournament' },
+				{ to: 'talent', type: 'many-to-one', description: 'Result belongs to this pro' },
+				{ to: 'franchises', type: 'many-to-one', description: 'Result is credited to this franchise for standings' }
 			]
 		}
 	];
-	
 	// Sales system relationships
 	const salesRelationships = [
 		{
@@ -1158,6 +1142,102 @@
 
 	{#if activeTab === 'league'}
 		<div class="space-y-6">
+
+			<!-- Overview -->
+			<Card class="p-6">
+				<div class="space-y-4">
+					<div>
+						<h2 class="text-xl font-bold">League System Overview</h2>
+						<p class="text-sm text-muted-foreground mt-1">
+							How the league, franchises, talent, tournaments, and payments all connect.
+						</p>
+					</div>
+					<div class="p-4 bg-violet-950/40 border border-violet-700/50 rounded-lg text-sm text-violet-200">
+						The league is the root of all competition data. One season = one league record. Everything else — franchises, rosters, tournaments, results, and payments — is a child of that record. The prize budget lives on the league and flows down automatically; you never set prize money on individual tournaments.
+					</div>
+				</div>
+			</Card>
+
+			<!-- Entity hierarchy -->
+			<Card class="p-6">
+				<h2 class="text-xl font-bold mb-6">Entity Hierarchy</h2>
+				<div class="space-y-3">
+					{#each [
+						{ label: 'league',              dot: 'bg-violet-400', color: 'bg-violet-900/40 border-violet-700/50 text-violet-200',   indent: 0, note: '1 record per season. Holds totalPrizePool.' },
+						{ label: 'franchises',          dot: 'bg-emerald-400', color: 'bg-emerald-900/40 border-emerald-700/50 text-emerald-200', indent: 1, note: 'Up to 6 teams per season. Each owns a territory.' },
+						{ label: 'talent',              dot: 'bg-cyan-400',    color: 'bg-cyan-900/40 border-cyan-700/50 text-cyan-200',          indent: 2, note: 'Players, broadcasters, commentators, analysts.' },
+						{ label: 'tournaments',         dot: 'bg-amber-400',   color: 'bg-amber-900/40 border-amber-700/50 text-amber-200',       indent: 1, note: '6 per season. Prize pool auto-calculated.' },
+						{ label: 'tournament_results',  dot: 'bg-orange-400',  color: 'bg-orange-900/40 border-orange-700/50 text-orange-200',    indent: 2, note: '1 per pro per division. Placement drives earnings.' },
+						{ label: 'pro_payments',        dot: 'bg-pink-400',    color: 'bg-pink-900/40 border-pink-700/50 text-pink-200',          indent: 2, note: 'Every dollar paid to talent — prize, salary, bonus.' }
+					] as row}
+						<div class="flex items-start gap-3" style="padding-left: {row.indent * 2}rem">
+							<div class="w-2 h-2 rounded-full mt-2 shrink-0 {row.dot}"></div>
+							<div class="flex-1 p-3 rounded-lg border {row.color}">
+								<div class="font-mono font-bold text-sm">{row.label}</div>
+								<div class="text-xs opacity-80 mt-0.5">{row.note}</div>
+							</div>
+						</div>
+					{/each}
+				</div>
+			</Card>
+
+			<!-- Season → Tournament prize flow -->
+			<Card class="p-6">
+				<h2 class="text-xl font-bold mb-4">Season → Tournament Prize Flow</h2>
+				<div class="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+					<div class="p-4 bg-slate-700/50 border border-slate-600 rounded-lg">
+						<div class="font-semibold text-slate-100 mb-2">1. Set the season budget</div>
+						<div class="text-slate-400">Set <code class="font-mono text-violet-300">totalPrizePool</code> on the league record (e.g. $4,000,000). That's the only number you touch.</div>
+					</div>
+					<div class="p-4 bg-slate-700/50 border border-slate-600 rounded-lg">
+						<div class="font-semibold text-slate-100 mb-2">2. Automatic distribution</div>
+						<div class="text-slate-400"><code class="font-mono text-amber-300">calculateSeasonPurses()</code> splits the budget across 6 tournaments using arithmetic progression. T#6 is worth the most.</div>
+					</div>
+					<div class="p-4 bg-slate-700/50 border border-slate-600 rounded-lg">
+						<div class="font-semibold text-slate-100 mb-2">3. Per-division payouts</div>
+						<div class="text-slate-400">Each tournament purse is split 50/50 between Men's and Women's. <code class="font-mono text-cyan-300">calculatePlacementPayouts()</code> assigns amounts to placements 1–20.</div>
+					</div>
+				</div>
+			</Card>
+
+			<!-- Talent types -->
+			<Card class="p-6">
+				<h2 class="text-xl font-bold mb-4">Talent Types</h2>
+				<div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+					{#each [
+						{ type: 'player', color: 'bg-cyan-900/40 border-cyan-700/50 text-cyan-200', desc: 'Competes in tournaments. Earns prize money based on placement. Rostered to a franchise.' },
+						{ type: 'broadcaster', color: 'bg-violet-900/40 border-violet-700/50 text-violet-200', desc: 'On-air talent for live coverage. Paid via pro_payments (salary or appearance fee). Not in tournament_results.' },
+						{ type: 'commentator', color: 'bg-emerald-900/40 border-emerald-700/50 text-emerald-200', desc: 'Play-by-play or colour commentary. Same payment model as broadcaster.' },
+						{ type: 'analyst', color: 'bg-amber-900/40 border-amber-700/50 text-amber-200', desc: 'Statistical or strategic analysis on-air. May also be a former player.' }
+					] as t}
+						<div class="p-3 rounded-lg border {t.color}">
+							<div class="font-mono font-bold text-sm mb-1">{t.type}</div>
+							<div class="text-[11px] opacity-80 leading-snug">{t.desc}</div>
+						</div>
+					{/each}
+				</div>
+				<p class="text-xs text-muted-foreground mt-3">A single talent record can hold multiple types — e.g. a retired player who now does commentary.</p>
+			</Card>
+
+			<!-- Collections map -->
+			<Card class="p-6">
+				<h2 class="text-xl font-bold mb-4">How the Collections Connect</h2>
+				<div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+					<div class="p-4 bg-slate-700/50 border border-slate-600 rounded-lg">
+						<div class="font-mono font-bold text-slate-100 mb-2">league → tournaments</div>
+						<div class="text-xs text-slate-400">The league's <code class="text-violet-300">totalPrizePool</code> is the input to PayoutCalculator. Each tournament gets a computed <code class="text-amber-300">prizePool</code> — never set manually.</div>
+					</div>
+					<div class="p-4 bg-slate-700/50 border border-slate-600 rounded-lg">
+						<div class="font-mono font-bold text-slate-100 mb-2">franchises → talent</div>
+						<div class="text-xs text-slate-400">Many-to-many. A pro can be on one franchise per season. The franchise record links to the deal that created it and the owner who manages it.</div>
+					</div>
+					<div class="p-4 bg-slate-700/50 border border-slate-600 rounded-lg">
+						<div class="font-mono font-bold text-slate-100 mb-2">tournament_results → pro_payments</div>
+						<div class="text-xs text-slate-400">When a result is entered, a <code class="text-pink-300">pro_payments</code> record is created automatically with <code class="text-pink-300">paymentType = "Prize"</code> and the computed earnings amount.</div>
+					</div>
+				</div>
+			</Card>
+
 			{#if viewMode === 'table'}
 				<div class="grid gap-6">
 					{#each leagueRelationships as collection}
@@ -1520,6 +1600,129 @@
 
 	{#if activeTab === 'sponsors'}
 		<div class="space-y-6">
+
+			<!-- Overview -->
+			<Card class="p-6">
+				<div class="space-y-4">
+					<div>
+						<h2 class="text-xl font-bold">Sponsor System Overview</h2>
+						<p class="text-sm text-muted-foreground mt-1">
+							How companies become sponsors, pay their commitments, and optionally convert into franchise owners.
+						</p>
+					</div>
+					<div class="p-4 bg-emerald-950/40 border border-emerald-700/50 rounded-lg text-sm text-emerald-200">
+						Sponsors are the primary revenue source outside of franchise fees. A single sponsor record can simultaneously represent a league-level partner, a franchise-level backer (via the bridge table), and a prospect for franchise ownership — all tracked in one place.
+					</div>
+				</div>
+			</Card>
+
+			<!-- Sponsor lifecycle -->
+			<Card class="p-6">
+				<h2 class="text-xl font-bold mb-6">Sponsor Lifecycle</h2>
+				<div class="space-y-4">
+					<!-- Status flow -->
+					<div>
+						<h3 class="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-3">Status Progression</h3>
+						<div class="flex flex-wrap items-center gap-2">
+							{#each [
+								{ label: 'Prospect', color: 'bg-blue-900/40 border-blue-700/50 text-blue-200', note: 'In conversation' },
+								{ label: '→', color: '', note: '' },
+								{ label: 'Active', color: 'bg-emerald-900/40 border-emerald-700/50 text-emerald-200', note: 'Contract signed, paying' },
+								{ label: '→', color: '', note: '' },
+								{ label: 'Inactive', color: 'bg-slate-700/50 border-slate-600 text-slate-300', note: 'Lapsed or paused' },
+								{ label: '→', color: '', note: '' },
+								{ label: 'Cancelled', color: 'bg-red-900/40 border-red-700/50 text-red-300', note: 'Terminated early' }
+							] as step}
+								{#if step.note}
+									<div class="flex flex-col items-center gap-1">
+										<div class="px-3 py-1.5 rounded-lg border text-xs font-semibold {step.color}">{step.label}</div>
+										<div class="text-[10px] text-muted-foreground">{step.note}</div>
+									</div>
+								{:else}
+									<div class="text-slate-500 text-lg font-light">{step.label}</div>
+								{/if}
+							{/each}
+						</div>
+					</div>
+
+					<!-- Franchise conversion path -->
+					<div class="border-t border-border pt-4">
+						<h3 class="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-3">Franchise Conversion Path</h3>
+						<div class="flex flex-wrap items-center gap-2">
+							{#each [
+								{ label: 'Active Sponsor', color: 'bg-emerald-900/40 border-emerald-700/50 text-emerald-200', note: 'franchiseInterest = false' },
+								{ label: '→', color: '', note: '' },
+								{ label: 'Interested', color: 'bg-yellow-900/40 border-yellow-700/50 text-yellow-200', note: 'franchiseInterest = true' },
+								{ label: '→', color: '', note: '' },
+								{ label: 'Deal Created', color: 'bg-violet-900/40 border-violet-700/50 text-violet-200', note: 'franchiseDealId set' },
+								{ label: '→', color: '', note: '' },
+								{ label: 'Franchise Owner', color: 'bg-amber-900/40 border-amber-700/50 text-amber-200', note: 'franchiseConversionDate set' }
+							] as step}
+								{#if step.note}
+									<div class="flex flex-col items-center gap-1">
+										<div class="px-3 py-1.5 rounded-lg border text-xs font-semibold {step.color}">{step.label}</div>
+										<div class="text-[10px] text-muted-foreground text-center">{step.note}</div>
+									</div>
+								{:else}
+									<div class="text-slate-500 text-lg font-light">{step.label}</div>
+								{/if}
+							{/each}
+						</div>
+					</div>
+				</div>
+			</Card>
+
+			<!-- Tier breakdown -->
+			<Card class="p-6">
+				<h2 class="text-xl font-bold mb-4">Sponsorship Tiers</h2>
+				<div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+					{#each [
+						{ tier: 'Title', color: 'bg-yellow-900/40 border-yellow-600/50 text-yellow-200', desc: 'Naming rights. "FLI Golf presented by X." Highest visibility across all broadcasts, events, and digital.' },
+						{ tier: 'Platinum', color: 'bg-slate-700/60 border-slate-500 text-slate-100', desc: 'Premium placement. Logo on all league materials, broadcast lower-thirds, and tournament signage.' },
+						{ tier: 'Gold', color: 'bg-amber-900/40 border-amber-600/50 text-amber-200', desc: 'Major placement. Tournament signage, digital ads, and select broadcast mentions.' },
+						{ tier: 'Silver', color: 'bg-gray-700/50 border-gray-500 text-gray-200', desc: 'Standard placement. Event signage and digital presence.' },
+						{ tier: 'Bronze', color: 'bg-orange-900/40 border-orange-700/50 text-orange-200', desc: 'Entry-level. Website listing and select event presence.' },
+						{ tier: 'Community', color: 'bg-emerald-900/40 border-emerald-700/50 text-emerald-200', desc: 'Local/grassroots partners. Minimal commitment, local activation only.' }
+					] as t}
+						<div class="p-3 rounded-lg border {t.color}">
+							<div class="font-bold text-sm mb-1">{t.tier}</div>
+							<div class="text-[11px] opacity-80 leading-snug">{t.desc}</div>
+						</div>
+					{/each}
+				</div>
+			</Card>
+
+			<!-- Collections map -->
+			<Card class="p-6">
+				<h2 class="text-xl font-bold mb-4">How the Collections Connect</h2>
+				<div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+					<div class="p-4 bg-slate-700/50 border border-slate-600 rounded-lg">
+						<div class="font-mono font-bold text-slate-100 mb-2">sponsors</div>
+						<div class="text-xs text-slate-400 space-y-1">
+							<div>One record per company.</div>
+							<div>Tracks the relationship, contract terms, and total financials.</div>
+							<div class="pt-1 text-emerald-300">annualCommitment − totalPaid = balance due</div>
+						</div>
+					</div>
+					<div class="p-4 bg-slate-700/50 border border-slate-600 rounded-lg">
+						<div class="font-mono font-bold text-slate-100 mb-2">sponsor_franchise_bridge</div>
+						<div class="text-xs text-slate-400 space-y-1">
+							<div>One record per sponsor ↔ franchise pairing.</div>
+							<div>Holds the level and amount specific to that team relationship.</div>
+							<div class="pt-1 text-violet-300">A league sponsor can also be a franchise title sponsor at a different rate.</div>
+						</div>
+					</div>
+					<div class="p-4 bg-slate-700/50 border border-slate-600 rounded-lg">
+						<div class="font-mono font-bold text-slate-100 mb-2">sponsor_payments</div>
+						<div class="text-xs text-slate-400 space-y-1">
+							<div>One record per payment instalment.</div>
+							<div>Sum of paid records = totalPaid on the sponsor.</div>
+							<div class="pt-1 text-cyan-300">Supports quarterly, monthly, or upfront payment schedules.</div>
+						</div>
+					</div>
+				</div>
+			</Card>
+
 			{#if viewMode === 'table'}
 				<div class="grid gap-6">
 					{#each sponsorsRelationships as collection}

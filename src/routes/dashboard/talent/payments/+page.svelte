@@ -216,9 +216,9 @@
 
 <!-- Create/Edit Modal -->
 {#if showCreateModal}
-	<div class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-		<div class="bg-white rounded-lg p-6 max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-			<h2 class="text-2xl font-bold mb-4">
+	<div class="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
+		<div class="bg-slate-900 border border-slate-700 rounded-xl p-6 max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+			<h2 class="text-2xl font-bold text-slate-100 mb-4">
 				{editingPayment ? 'Edit Payment' : 'Create Payment'}
 			</h2>
 			<form method="POST" action="?/{editingPayment ? 'update' : 'create'}" use:enhance>
@@ -227,181 +227,100 @@
 				{/if}
 				<div class="space-y-4">
 					<div>
-						<label class="block text-sm font-medium mb-1">Pro *</label>
-						<select
-							name="pro"
-							required
-							class="w-full rounded-md border border-gray-300 px-3 py-2"
-						>
+						<label class="block text-xs font-medium text-slate-400 mb-1">Pro *</label>
+						<select name="pro" required class="w-full rounded-md border border-slate-600 bg-slate-800 text-slate-100 px-3 py-2 text-sm">
 							<option value="">Select Pro</option>
 							{#each data.pros as pro}
-								<option value={pro.id} selected={editingPayment?.pro === pro.id}
-									>{pro.name}</option
-								>
+								<option value={pro.id} selected={editingPayment?.pro === pro.id}>{pro.name}</option>
 							{/each}
 						</select>
 					</div>
 					<div>
-						<label class="block text-sm font-medium mb-1">Payment Type *</label>
-						<select
-							name="paymentType"
-							required
-							class="w-full rounded-md border border-gray-300 px-3 py-2"
-						>
-							<option value="tournament" selected={editingPayment?.paymentType === 'tournament'}
-								>Tournament</option
-							>
-							<option
-								value="special_event"
-								selected={editingPayment?.paymentType === 'special_event'}
-								>Special Event</option
-							>
-							<option value="bonus" selected={editingPayment?.paymentType === 'bonus'}
-								>Bonus</option
-							>
-							<option value="other" selected={editingPayment?.paymentType === 'other'}
-								>Other</option
-							>
+						<label class="block text-xs font-medium text-slate-400 mb-1">Payment Type *</label>
+						<select name="paymentType" required class="w-full rounded-md border border-slate-600 bg-slate-800 text-slate-100 px-3 py-2 text-sm">
+							<option value="tournament"    selected={editingPayment?.paymentType === 'tournament'}>Tournament</option>
+							<option value="special_event" selected={editingPayment?.paymentType === 'special_event'}>Special Event</option>
+							<option value="bonus"         selected={editingPayment?.paymentType === 'bonus'}>Bonus</option>
+							<option value="other"         selected={editingPayment?.paymentType === 'other'}>Other</option>
 						</select>
 					</div>
 					<div>
-						<label class="block text-sm font-medium mb-1">Tournament (if applicable)</label>
-						<select name="tournament" class="w-full rounded-md border border-gray-300 px-3 py-2">
+						<label class="block text-xs font-medium text-slate-400 mb-1">Tournament (if applicable)</label>
+						<select name="tournament" class="w-full rounded-md border border-slate-600 bg-slate-800 text-slate-100 px-3 py-2 text-sm">
 							<option value="">None</option>
 							{#each data.tournaments as tournament}
-								<option value={tournament.id} selected={editingPayment?.tournament === tournament.id}
-									>{tournament.name} (Season {tournament.season})</option
-								>
+								<option value={tournament.id} selected={editingPayment?.tournament === tournament.id}>{tournament.name} (Season {tournament.season})</option>
 							{/each}
 						</select>
 					</div>
 					<div>
-						<label class="block text-sm font-medium mb-1">Special Event (if applicable)</label>
-						<select
-							name="specialEvent"
-							class="w-full rounded-md border border-gray-300 px-3 py-2"
-						>
+						<label class="block text-xs font-medium text-slate-400 mb-1">Special Event (if applicable)</label>
+						<select name="specialEvent" class="w-full rounded-md border border-slate-600 bg-slate-800 text-slate-100 px-3 py-2 text-sm">
 							<option value="">None</option>
 							{#each data.specialEvents as event}
-								<option value={event.id} selected={editingPayment?.specialEvent === event.id}
-									>{event.name}</option
-								>
+								<option value={event.id} selected={editingPayment?.specialEvent === event.id}>{event.name}</option>
 							{/each}
 						</select>
 					</div>
 					<div>
-						<label class="block text-sm font-medium mb-1">Amount *</label>
-						<input
-							type="number"
-							name="amount"
-							value={editingPayment?.amount || 0}
-							required
-							min="0"
-							step="0.01"
-							class="w-full rounded-md border border-gray-300 px-3 py-2"
-						/>
+						<label class="block text-xs font-medium text-slate-400 mb-1">Amount *</label>
+						<input type="number" name="amount" value={editingPayment?.amount || 0} required min="0" step="0.01"
+							class="w-full rounded-md border border-slate-600 bg-slate-800 text-slate-100 px-3 py-2 text-sm" />
 					</div>
 					<div class="grid grid-cols-2 gap-4">
 						<div>
-							<label class="block text-sm font-medium mb-1">Due Date</label>
-							<input
-								type="date"
-								name="dueDate"
-								value={editingPayment?.dueDate || ''}
-								class="w-full rounded-md border border-gray-300 px-3 py-2"
-							/>
+							<label class="block text-xs font-medium text-slate-400 mb-1">Due Date</label>
+							<input type="date" name="dueDate" value={editingPayment?.dueDate || ''}
+								class="w-full rounded-md border border-slate-600 bg-slate-800 text-slate-100 px-3 py-2 text-sm" />
 						</div>
 						<div>
-							<label class="block text-sm font-medium mb-1">Payment Date</label>
-							<input
-								type="date"
-								name="paymentDate"
-								value={editingPayment?.paymentDate || ''}
-								class="w-full rounded-md border border-gray-300 px-3 py-2"
-							/>
+							<label class="block text-xs font-medium text-slate-400 mb-1">Payment Date</label>
+							<input type="date" name="paymentDate" value={editingPayment?.paymentDate || ''}
+								class="w-full rounded-md border border-slate-600 bg-slate-800 text-slate-100 px-3 py-2 text-sm" />
 						</div>
 					</div>
 					<div class="grid grid-cols-2 gap-4">
 						<div>
-							<label class="block text-sm font-medium mb-1">Status *</label>
-							<select
-								name="status"
-								required
-								class="w-full rounded-md border border-gray-300 px-3 py-2"
-							>
-								<option value="pending" selected={editingPayment?.status === 'pending'}
-									>Pending</option
-								>
-								<option value="processing" selected={editingPayment?.status === 'processing'}
-									>Processing</option
-								>
-								<option value="paid" selected={editingPayment?.status === 'paid'}>Paid</option>
-								<option value="cancelled" selected={editingPayment?.status === 'cancelled'}
-									>Cancelled</option
-								>
+							<label class="block text-xs font-medium text-slate-400 mb-1">Status *</label>
+							<select name="status" required class="w-full rounded-md border border-slate-600 bg-slate-800 text-slate-100 px-3 py-2 text-sm">
+								<option value="pending"    selected={editingPayment?.status === 'pending'}>Pending</option>
+								<option value="processing" selected={editingPayment?.status === 'processing'}>Processing</option>
+								<option value="paid"       selected={editingPayment?.status === 'paid'}>Paid</option>
+								<option value="cancelled"  selected={editingPayment?.status === 'cancelled'}>Cancelled</option>
 							</select>
 						</div>
 						<div>
-							<label class="block text-sm font-medium mb-1">Payment Method</label>
-							<select
-								name="paymentMethod"
-								class="w-full rounded-md border border-gray-300 px-3 py-2"
-							>
+							<label class="block text-xs font-medium text-slate-400 mb-1">Payment Method</label>
+							<select name="paymentMethod" class="w-full rounded-md border border-slate-600 bg-slate-800 text-slate-100 px-3 py-2 text-sm">
 								<option value="">Select Method</option>
-								<option
-									value="bank_transfer"
-									selected={editingPayment?.paymentMethod === 'bank_transfer'}
-									>Bank Transfer</option
-								>
-								<option value="check" selected={editingPayment?.paymentMethod === 'check'}
-									>Check</option
-								>
-								<option value="paypal" selected={editingPayment?.paymentMethod === 'paypal'}
-									>PayPal</option
-								>
-								<option value="venmo" selected={editingPayment?.paymentMethod === 'venmo'}
-									>Venmo</option
-								>
-								<option value="zelle" selected={editingPayment?.paymentMethod === 'zelle'}
-									>Zelle</option
-								>
-								<option value="other" selected={editingPayment?.paymentMethod === 'other'}
-									>Other</option
-								>
+								<option value="bank_transfer" selected={editingPayment?.paymentMethod === 'bank_transfer'}>Bank Transfer</option>
+								<option value="check"         selected={editingPayment?.paymentMethod === 'check'}>Check</option>
+								<option value="paypal"        selected={editingPayment?.paymentMethod === 'paypal'}>PayPal</option>
+								<option value="venmo"         selected={editingPayment?.paymentMethod === 'venmo'}>Venmo</option>
+								<option value="zelle"         selected={editingPayment?.paymentMethod === 'zelle'}>Zelle</option>
+								<option value="other"         selected={editingPayment?.paymentMethod === 'other'}>Other</option>
 							</select>
 						</div>
 					</div>
 					<div>
-						<label class="block text-sm font-medium mb-1">Transaction ID</label>
-						<input
-							type="text"
-							name="transactionId"
-							value={editingPayment?.transactionId || ''}
-							class="w-full rounded-md border border-gray-300 px-3 py-2"
-						/>
+						<label class="block text-xs font-medium text-slate-400 mb-1">Transaction ID</label>
+						<input type="text" name="transactionId" value={editingPayment?.transactionId || ''}
+							class="w-full rounded-md border border-slate-600 bg-slate-800 text-slate-100 px-3 py-2 text-sm" />
 					</div>
 					<div>
-						<label class="block text-sm font-medium mb-1">Description</label>
-						<textarea
-							name="description"
-							value={editingPayment?.description || ''}
-							rows="2"
-							class="w-full rounded-md border border-gray-300 px-3 py-2"
-						></textarea>
+						<label class="block text-xs font-medium text-slate-400 mb-1">Description</label>
+						<textarea name="description" value={editingPayment?.description || ''} rows="2"
+							class="w-full rounded-md border border-slate-600 bg-slate-800 text-slate-100 px-3 py-2 text-sm"></textarea>
 					</div>
 					<div>
-						<label class="block text-sm font-medium mb-1">Notes</label>
-						<textarea
-							name="notes"
-							value={editingPayment?.notes || ''}
-							rows="3"
-							class="w-full rounded-md border border-gray-300 px-3 py-2"
-						></textarea>
+						<label class="block text-xs font-medium text-slate-400 mb-1">Notes</label>
+						<textarea name="notes" value={editingPayment?.notes || ''} rows="3"
+							class="w-full rounded-md border border-slate-600 bg-slate-800 text-slate-100 px-3 py-2 text-sm"></textarea>
 					</div>
 				</div>
 				<div class="flex justify-end gap-2 mt-6">
-					<Button type="button" variant="outline" onclick={closeModal}>Cancel</Button>
-					<Button type="submit">{editingPayment ? 'Update' : 'Create'}</Button>
+					<Button type="button" variant="outline" class="border-slate-600 text-slate-300 hover:bg-slate-700" onclick={closeModal}>Cancel</Button>
+					<Button type="submit" class="bg-emerald-600 hover:bg-emerald-700 text-white">{editingPayment ? 'Update' : 'Create'}</Button>
 				</div>
 			</form>
 		</div>

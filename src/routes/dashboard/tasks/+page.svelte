@@ -146,7 +146,7 @@
 	
 	<!-- Edit Task Modal -->
 	{#if selectedTask}
-		<EditTaskModal bind:open={showEditModal} task={selectedTask} />
+		<EditTaskModal bind:open={showEditModal} task={selectedTask} expenses={data.expensesByTask[selectedTask.id] ?? { total: 0, paid: 0 }} />
 	{/if}
 
 	<!-- Alerts -->
