@@ -2,6 +2,13 @@ import { RequestContext } from '$lib/infra/RequestContext';
 import type { PageServerLoad, Actions } from './$types';
 import { TournamentRepo } from '$lib/infra/pocketbase/repositories';
 import { fail, redirect } from '@sveltejs/kit';
+import {
+	calculateSeasonPurses,
+	calculateFranchisePayout,
+	calculatePlacementPayouts,
+	SEASON_2027_CONFIG,
+	type SeasonConfig
+} from '$lib/domain/services/PayoutCalculator';
 
 export const load: PageServerLoad = async ({ locals, url }) => {
 	const ctx = await RequestContext.from(locals, url);
@@ -31,13 +38,62 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 			fields: 'season',
 			sort: '-season'
 		});
-		const uniqueSeasons = [...new Set(seasons.map((t: any) => t.season))];
+		const uniqueSeasons = [...new Set(seasons.map((t: any) => t.season))] as number[];
+
+		// Build season budget map: use SEASON_2027_CONFIG for 2027, derive others from actual prize pools
+		const seasonBudgets: Record<number, { totalBudget: number; config: SeasonConfig }> = {};
+		for (const yr of uniqueSeasons) {
+			if (yr === 2027) {
+				seasonBudgets[yr] = {
+					totalBudget: SEASON_2027_CONFIG.totalSeasonBudget,
+					config: SEASON_2027_CONFIG
+				};
+			} else {
+				// Derive from actual tournament prize pools for other seasons
+				const seasonTournaments = await pb.collection('tournaments').getFullList({
+					filter: `season = ${yr}`,
+					fields: 'prizePool,tournamentNumber'
+				});
+				const total = seasonTournaments.reduce((s: number, t: any) => s + (t.prizePool || 0), 0);
+				seasonBudgets[yr] = {
+					totalBudget: total,
+					config: {
+						year: yr,
+						totalSeasonBudget: total,
+						numberOfTournaments: seasonTournaments.length,
+						franchiseCutPercentage: 20,
+						numberOfPlacements: 20
+					}
+				};
+			}
+		}
+
+		// For the active season filter (or default to most recent), compute progressive purse schedule
+		const activeSeason = season ? parseInt(season) : (uniqueSeasons[0] ?? null);
+		let seasonPurseSchedule: Array<{ tournamentNumber: number; totalPurse: number; mensPurse: number; womensPurse: number }> = [];
+		let seasonBudget = 0;
+		let seasonFranchiseCut = 0;
+		let seasonProCut = 0;
+
+		if (activeSeason && seasonBudgets[activeSeason]) {
+			const cfg = seasonBudgets[activeSeason].config;
+			seasonBudget = cfg.totalSeasonBudget;
+			seasonPurseSchedule = calculateSeasonPurses(cfg.totalSeasonBudget, cfg.numberOfTournaments);
+			seasonFranchiseCut = seasonBudget * (cfg.franchiseCutPercentage / 100);
+			seasonProCut = seasonBudget - seasonFranchiseCut;
+		}
 
 		return {
 			tournaments: tournaments.items,
 			seasons: uniqueSeasons,
 			currentSeason: season ? parseInt(season) : null,
-			currentStatus: status
+			currentStatus: status,
+			seasonBudgets,
+			activeSeason,
+			seasonBudget,
+			seasonFranchiseCut,
+			seasonProCut,
+			seasonPurseSchedule
 		};
 	} catch (error) {
 		console.error('Error loading tournaments:', error);

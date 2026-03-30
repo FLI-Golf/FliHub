@@ -297,19 +297,61 @@
 		},
 		{
 			collection: 'tournaments',
-			description: 'League tournaments and events',
+			description: 'Individual competition events within a season. prizePool is derived from the season budget via progressive distribution — it is not entered manually.',
 			fields: [
 				{ name: 'name', type: 'text', description: 'Tournament name' },
+				{ name: 'season', type: 'number', description: 'Season year (e.g. 2027). Groups tournaments into a season.' },
+				{ name: 'tournamentNumber', type: 'number', description: 'Position in the season (1 = first, 6 = last). Controls prize weighting.' },
 				{ name: 'location', type: 'text', description: 'Event location' },
 				{ name: 'startDate', type: 'date', description: 'Tournament start' },
 				{ name: 'endDate', type: 'date', description: 'Tournament end' },
-				{ name: 'prizePool', type: 'number', description: 'Total prize money' },
-				{ name: 'status', type: 'select', description: 'Upcoming, In Progress, Completed' }
+				{ name: 'prizePool', type: 'number', description: 'Total prize money for this tournament. Computed from the season budget using arithmetic progression.' },
+				{ name: 'franchiseCutPercentage', type: 'number', description: 'Franchise share of the prize pool (default 20%). Overrides the season default per-tournament.' },
+				{ name: 'status', type: 'select', description: 'scheduled, in_progress, completed, cancelled' }
 			],
 			relationships: [
 				{ to: 'league', type: 'many-to-one', description: 'Part of league season' },
-				{ to: 'franchises', type: 'many-to-many', description: 'Franchises competing' },
-				{ to: 'projects', type: 'one-to-one', description: 'Managed as project' }
+				{ to: 'tournament_results', type: 'one-to-many', description: 'Per-pro placement and earnings records' },
+				{ to: 'franchise_payouts', type: 'one-to-many', description: 'Aggregated franchise earnings per tournament' },
+				{ to: 'franchises', type: 'many-to-many', description: 'Franchises competing' }
+			]
+		},
+		{
+			collection: 'tournament_results',
+			description: 'Per-pro placement record for a tournament division. Stores both the pro\'s take-home and the franchise cut so every team gets a traceable cheque.',
+			fields: [
+				{ name: 'tournament', type: 'relation', relatesTo: 'tournaments', description: 'Tournament this result belongs to' },
+				{ name: 'pro', type: 'relation', relatesTo: 'talent', description: 'The pro player' },
+				{ name: 'franchise', type: 'relation', relatesTo: 'franchises', description: 'The pro\'s franchise (team)' },
+				{ name: 'division', type: 'select', description: 'mens or womens' },
+				{ name: 'placement', type: 'number', description: 'Finishing position (1–20). Determines payout percentage.' },
+				{ name: 'proEarnings', type: 'number', description: 'Pro\'s take-home after franchise cut' },
+				{ name: 'franchiseEarnings', type: 'number', description: 'Franchise\'s cut from this result' },
+				{ name: 'earnings', type: 'number', description: 'Total (proEarnings + franchiseEarnings)' },
+				{ name: 'score', type: 'text', description: 'Final score (e.g. -15)' },
+				{ name: 'rounds', type: 'number', description: 'Number of rounds played' }
+			],
+			relationships: [
+				{ to: 'tournaments', type: 'many-to-one', description: 'Result belongs to a tournament' },
+				{ to: 'talent', type: 'many-to-one', description: 'Result belongs to a pro' },
+				{ to: 'franchises', type: 'many-to-one', description: 'Result credited to a franchise' }
+			]
+		},
+		{
+			collection: 'franchise_payouts',
+			description: 'Aggregated franchise earnings per tournament. Updated whenever a tournament_result is added or removed. Tracks paid/pending status.',
+			fields: [
+				{ name: 'franchise', type: 'relation', relatesTo: 'franchises', description: 'The franchise receiving the payout' },
+				{ name: 'tournament', type: 'relation', relatesTo: 'tournaments', description: 'The tournament this payout is for' },
+				{ name: 'totalEarnings', type: 'number', description: 'Sum of franchiseEarnings across all pros in this tournament' },
+				{ name: 'mensEarnings', type: 'number', description: 'Franchise cut from men\'s division results' },
+				{ name: 'womensEarnings', type: 'number', description: 'Franchise cut from women\'s division results' },
+				{ name: 'numberOfPros', type: 'number', description: 'How many pros contributed to this payout' },
+				{ name: 'status', type: 'select', description: 'pending or paid' }
+			],
+			relationships: [
+				{ to: 'franchises', type: 'many-to-one', description: 'Payout belongs to a franchise' },
+				{ to: 'tournaments', type: 'many-to-one', description: 'Payout is for a specific tournament' }
 			]
 		}
 	];
@@ -593,6 +635,7 @@
 				{ id: 'operations', label: 'Operations' },
 				{ id: 'sales', label: 'Sales' },
 				{ id: 'league', label: 'League' },
+				{ id: 'prize-money', label: 'Prize Money' },
 				{ id: 'sponsors', label: 'Sponsors' },
 				{ id: 'franchises', label: 'Franchises' },
 				{ id: 'pros', label: 'Pros' },
@@ -1284,6 +1327,199 @@
 					</div>
 				</div>
 			</Card>
+		</div>
+	{/if}
+
+	{#if activeTab === 'prize-money'}
+		<div class="space-y-6">
+
+			<!-- Overview -->
+			<Card class="p-6">
+				<div class="space-y-4">
+					<div>
+						<h2 class="text-xl font-bold">Season Prize Money Model</h2>
+						<p class="text-sm text-muted-foreground mt-1">
+							How a single season budget flows from the league down to every pro and franchise.
+						</p>
+					</div>
+					<div class="p-4 bg-amber-950/40 border border-amber-700/50 rounded-lg text-sm text-amber-200 space-y-2">
+						<p><strong>Key principle:</strong> Prize money is never entered per-tournament manually. A season budget (e.g. $4 M for 2027) is set once in <code class="font-mono bg-black/30 px-1 rounded">PayoutCalculator.ts</code> as a <code class="font-mono bg-black/30 px-1 rounded">SeasonConfig</code>. The calculator distributes it across tournaments using arithmetic progression, then splits each tournament purse into franchise and pro cuts, then distributes the pro cut across 20 placements per division.</p>
+					</div>
+				</div>
+			</Card>
+
+			<!-- Money flow diagram -->
+			<Card class="p-6">
+				<h2 class="text-xl font-bold mb-6">Prize Money Flow</h2>
+				<div class="space-y-6">
+
+					<!-- Row 1: Season budget -->
+					<div class="flex justify-center">
+						<div class="px-8 py-4 bg-yellow-600 text-white rounded-xl border-2 border-yellow-500 shadow-lg text-center">
+							<div class="text-xs uppercase tracking-wide text-yellow-200 mb-1">SeasonConfig</div>
+							<div class="font-mono font-bold text-lg">totalSeasonBudget</div>
+							<div class="text-sm text-yellow-100 mt-1">e.g. $4,000,000 for 2027</div>
+						</div>
+					</div>
+
+					<div class="flex justify-center text-slate-400 text-2xl">↓ <span class="text-xs self-center ml-2">calculateSeasonPurses() — arithmetic progression</span></div>
+
+					<!-- Row 2: Per-tournament purses -->
+					<div>
+						<div class="text-xs text-muted-foreground uppercase tracking-wide mb-3 text-center">6 tournaments — later = larger</div>
+						<div class="grid grid-cols-6 gap-2">
+							{#each [
+								{ n: 1, pct: '13.3%', ex: '$533K' },
+								{ n: 2, pct: '14.7%', ex: '$587K' },
+								{ n: 3, pct: '16.0%', ex: '$640K' },
+								{ n: 4, pct: '17.3%', ex: '$693K' },
+								{ n: 5, pct: '18.7%', ex: '$747K' },
+								{ n: 6, pct: '20.0%', ex: '$800K' }
+							] as t}
+								<div class="p-3 bg-amber-900/40 border border-amber-700/50 rounded-lg text-center">
+									<div class="text-xs text-amber-300 font-semibold">T#{t.n}</div>
+									<div class="font-mono font-bold text-sm text-white mt-1">{t.ex}</div>
+									<div class="text-xs text-amber-400">{t.pct}</div>
+								</div>
+							{/each}
+						</div>
+					</div>
+
+					<div class="flex justify-center text-slate-400 text-2xl">↓ <span class="text-xs self-center ml-2">calculateFranchisePayout() — 20% franchise / 80% pro</span></div>
+
+					<!-- Row 3: Franchise vs Pro split -->
+					<div class="grid grid-cols-2 gap-4">
+						<div class="p-4 bg-purple-900/40 border border-purple-700/50 rounded-lg text-center">
+							<div class="text-xs text-purple-300 uppercase tracking-wide mb-1">Franchise Cut (20%)</div>
+							<div class="font-mono font-bold text-white">franchiseCut</div>
+							<div class="text-xs text-purple-200 mt-2">Aggregated into <code class="bg-black/30 px-1 rounded">franchise_payouts</code> per tournament</div>
+						</div>
+						<div class="p-4 bg-emerald-900/40 border border-emerald-700/50 rounded-lg text-center">
+							<div class="text-xs text-emerald-300 uppercase tracking-wide mb-1">Pro Cut (80%)</div>
+							<div class="font-mono font-bold text-white">proCut</div>
+							<div class="text-xs text-emerald-200 mt-2">Split 50/50 → Men's purse + Women's purse</div>
+						</div>
+					</div>
+
+					<div class="flex justify-center text-slate-400 text-2xl">↓ <span class="text-xs self-center ml-2">calculatePlacementPayouts() — top-heavy decay</span></div>
+
+					<!-- Row 4: Placement distribution -->
+					<div>
+						<div class="text-xs text-muted-foreground uppercase tracking-wide mb-3 text-center">20 paid placements per division — same schedule for Men's and Women's</div>
+						<div class="grid grid-cols-4 gap-2 text-xs">
+							{#each [
+								{ place: '1st', pct: '30%', note: 'top-heavy' },
+								{ place: '2nd', pct: '20%', note: '' },
+								{ place: '3rd', pct: '15%', note: '' },
+								{ place: '4th–20th', pct: '35%', note: 'exponential decay (×0.85 per place)' }
+							] as row}
+								<div class="p-3 bg-slate-700/50 border border-slate-600 rounded-lg">
+									<div class="font-semibold text-slate-200">{row.place}</div>
+									<div class="text-emerald-300 font-mono font-bold">{row.pct}</div>
+									{#if row.note}<div class="text-slate-400 mt-1">{row.note}</div>{/if}
+								</div>
+							{/each}
+						</div>
+					</div>
+
+					<div class="flex justify-center text-slate-400 text-2xl">↓ <span class="text-xs self-center ml-2">written to DB when a result is added</span></div>
+
+					<!-- Row 5: DB records -->
+					<div class="grid grid-cols-2 gap-4">
+						<div class="p-4 bg-slate-700/50 border border-slate-600 rounded-lg">
+							<div class="font-mono font-bold text-slate-200 mb-2">tournament_results</div>
+							<div class="space-y-1 text-xs text-slate-400">
+								<div><code class="text-emerald-300">proEarnings</code> — pro's take-home</div>
+								<div><code class="text-purple-300">franchiseEarnings</code> — franchise's cut</div>
+								<div><code class="text-slate-300">earnings</code> — total (sum of both)</div>
+								<div><code class="text-slate-300">division</code> — mens / womens</div>
+								<div><code class="text-slate-300">placement</code> — 1–20</div>
+							</div>
+						</div>
+						<div class="p-4 bg-slate-700/50 border border-slate-600 rounded-lg">
+							<div class="font-mono font-bold text-slate-200 mb-2">franchise_payouts</div>
+							<div class="space-y-1 text-xs text-slate-400">
+								<div><code class="text-purple-300">totalEarnings</code> — sum across all pros</div>
+								<div><code class="text-cyan-300">mensEarnings</code> — from men's results</div>
+								<div><code class="text-pink-300">womensEarnings</code> — from women's results</div>
+								<div><code class="text-slate-300">numberOfPros</code> — contributing pros</div>
+								<div><code class="text-yellow-300">status</code> — pending / paid</div>
+							</div>
+						</div>
+					</div>
+				</div>
+			</Card>
+
+			<!-- SeasonConfig reference -->
+			<Card class="p-6">
+				<h2 class="text-xl font-bold mb-4">SeasonConfig — Where to Set the Budget</h2>
+				<p class="text-sm text-muted-foreground mb-4">
+					Defined in <code class="font-mono bg-muted px-1 rounded">src/lib/domain/services/PayoutCalculator.ts</code>. Add a new config object for each season.
+				</p>
+				<div class="bg-slate-900 rounded-lg p-4 font-mono text-sm overflow-x-auto">
+					<pre class="text-slate-300">{`export const SEASON_2027_CONFIG: SeasonConfig = {
+  year: 2027,
+  totalSeasonBudget: 4_000_000,   // ← change this to adjust the whole season
+  numberOfTournaments: 6,
+  franchiseCutPercentage: 20,     // % that goes to franchises
+  numberOfPlacements: 20          // paid placements per division
+};`}</pre>
+				</div>
+				<div class="mt-4 grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+					<div class="p-3 bg-muted/30 rounded-lg border">
+						<div class="font-semibold mb-1">totalSeasonBudget</div>
+						<div class="text-muted-foreground">The only number you need to change to rescale all 6 tournament purses. Everything else is derived.</div>
+					</div>
+					<div class="p-3 bg-muted/30 rounded-lg border">
+						<div class="font-semibold mb-1">franchiseCutPercentage</div>
+						<div class="text-muted-foreground">Applied per-tournament. Can be overridden on individual tournament records via <code class="font-mono">franchiseCutPercentage</code>.</div>
+					</div>
+					<div class="p-3 bg-muted/30 rounded-lg border">
+						<div class="font-semibold mb-1">numberOfPlacements</div>
+						<div class="text-muted-foreground">Every placement from 1 to this number receives a cheque. Positions beyond this get $0.</div>
+					</div>
+				</div>
+			</Card>
+
+			<!-- Where it shows in the UI -->
+			<Card class="p-6">
+				<h2 class="text-xl font-bold mb-4">Where This Appears in the UI</h2>
+				<div class="space-y-3">
+					{#each [
+						{
+							route: '/dashboard/talent/tournaments?season=2027',
+							label: 'Tournaments list — Season Budget panel',
+							desc: 'Shows total season budget, franchise cut, pro cut, and a 6-card progressive distribution grid. Each tournament card also shows its franchise / men\'s / women\'s breakdown.'
+						},
+						{
+							route: '/dashboard/talent/tournaments/[id]',
+							label: 'Tournament detail — Payout Structure table',
+							desc: 'Full 20-row table: Place, Pro Earnings, Franchise Cut, Total Payout. Every team can see their cheque before results are entered.'
+						},
+						{
+							route: '/dashboard/talent/tournaments/[id]',
+							label: 'Tournament detail — Results tabs',
+							desc: 'Once results are added, each row shows proEarnings, franchiseEarnings, and total side-by-side.'
+						},
+						{
+							route: '/dashboard/talent/franchise-payouts',
+							label: 'Franchise Payouts page',
+							desc: 'Aggregated view of franchise_payouts records. Mark individual payouts as paid.'
+						}
+					] as item}
+						<div class="flex gap-4 p-3 bg-muted/30 rounded-lg border">
+							<div class="flex-1">
+								<div class="font-semibold text-sm">{item.label}</div>
+								<div class="text-xs text-muted-foreground mt-1">{item.desc}</div>
+							</div>
+							<div class="shrink-0">
+								<a href={item.route} class="text-xs font-mono text-blue-400 hover:underline">{item.route}</a>
+							</div>
+						</div>
+					{/each}
+				</div>
+			</Card>
+
 		</div>
 	{/if}
 
