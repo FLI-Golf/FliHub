@@ -44,9 +44,6 @@
 			(data.seasonPurseSchedule ?? []).map((p: any) => [p.tournamentNumber, p])
 		)
 	);
-
-	// Franchise cut % (default 20)
-	const franchisePct = 20;
 </script>
 
 <div class="container mx-auto p-6 space-y-6">
@@ -113,17 +110,17 @@
 					<div class="text-xs text-slate-400 uppercase tracking-wide mb-1">Total Season Budget</div>
 					<div class="text-2xl font-bold text-yellow-300">{formatCurrency(data.seasonBudget)}</div>
 				</div>
-				<div class="text-center p-4 bg-purple-900/30 border border-purple-700/40 rounded-lg">
-					<div class="text-xs text-slate-400 uppercase tracking-wide mb-1">Franchise Cut (20%)</div>
-					<div class="text-2xl font-bold text-purple-300">{formatCurrency(data.seasonFranchiseCut)}</div>
-				</div>
-				<div class="text-center p-4 bg-emerald-900/30 border border-emerald-700/40 rounded-lg">
-					<div class="text-xs text-slate-400 uppercase tracking-wide mb-1">Pro Cut (80%)</div>
-					<div class="text-2xl font-bold text-emerald-300">{formatCurrency(data.seasonProCut)}</div>
-				</div>
 				<div class="text-center p-4 bg-cyan-900/30 border border-cyan-700/40 rounded-lg">
+					<div class="text-xs text-slate-400 uppercase tracking-wide mb-1">Men's Total</div>
+					<div class="text-2xl font-bold text-cyan-300">{formatCurrency(data.seasonBudget / 2)}</div>
+				</div>
+				<div class="text-center p-4 bg-pink-900/30 border border-pink-700/40 rounded-lg">
+					<div class="text-xs text-slate-400 uppercase tracking-wide mb-1">Women's Total</div>
+					<div class="text-2xl font-bold text-pink-300">{formatCurrency(data.seasonBudget / 2)}</div>
+				</div>
+				<div class="text-center p-4 bg-slate-700/50 border border-slate-600 rounded-lg">
 					<div class="text-xs text-slate-400 uppercase tracking-wide mb-1">Tournaments</div>
-					<div class="text-2xl font-bold text-cyan-300">{data.seasonPurseSchedule?.length ?? 0}</div>
+					<div class="text-2xl font-bold text-slate-100">{data.seasonPurseSchedule?.length ?? 0}</div>
 				</div>
 			</div>
 
@@ -135,17 +132,11 @@
 					</h3>
 					<div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
 						{#each data.seasonPurseSchedule as purse}
-							{@const franchiseCut = purse.totalPurse * (franchisePct / 100)}
-							{@const proCut = purse.totalPurse - franchiseCut}
-							{@const divisionPurse = proCut / 2}
+							{@const divisionPurse = purse.totalPurse / 2}
 							<div class="bg-slate-700/50 border border-slate-600 rounded-lg p-3 text-center">
 								<div class="text-xs text-slate-400 mb-1">Tournament #{purse.tournamentNumber}</div>
 								<div class="text-lg font-bold text-slate-100">{formatCurrency(purse.totalPurse)}</div>
 								<div class="mt-2 space-y-1 text-xs text-slate-400">
-									<div class="flex justify-between">
-										<span>Franchise</span>
-										<span class="text-purple-300">{formatCurrency(franchiseCut)}</span>
-									</div>
 									<div class="flex justify-between">
 										<span>Men's</span>
 										<span class="text-cyan-300">{formatCurrency(divisionPurse)}</span>
@@ -169,9 +160,7 @@
 			{#each data.tournaments as tournament, i}
 				{@const scheduledPurse = purseByNumber[tournament.tournamentNumber]}
 				{@const displayPurse = tournament.prizePool || scheduledPurse?.totalPurse || 0}
-				{@const franchiseCut = displayPurse * (franchisePct / 100)}
-				{@const proCut = displayPurse - franchiseCut}
-				{@const divisionPurse = proCut / 2}
+				{@const divisionPurse = displayPurse / 2}
 				<div class="p-4 {i % 2 === 0 ? 'bg-slate-800' : 'bg-slate-700/60'} hover:bg-slate-600/50 transition-colors">
 					<div class="flex items-start justify-between">
 						<div class="flex-1">
@@ -205,10 +194,6 @@
 
 							<!-- Payout breakdown -->
 							<div class="bg-slate-900/50 border border-slate-600 rounded-lg p-2 text-xs space-y-1">
-								<div class="flex justify-between text-slate-400">
-									<span>Franchise (20%)</span>
-									<span class="text-purple-300 font-medium">{formatCurrency(franchiseCut)}</span>
-								</div>
 								<div class="flex justify-between text-slate-400">
 									<span>Men's purse</span>
 									<span class="text-cyan-300 font-medium">{formatCurrency(divisionPurse)}</span>
