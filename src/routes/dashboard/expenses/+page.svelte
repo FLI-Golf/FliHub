@@ -28,6 +28,7 @@
 		MoreHorizontal
 	} from 'lucide-svelte';
 	import EditExpenseModal from '$lib/components/expenses/edit-expense-modal.svelte';
+	import ExpensePieChart from '$lib/components/charts/ExpensePieChart.svelte';
 	
 	let { data }: { data: PageData } = $props();
 	
@@ -43,6 +44,11 @@
 
 	function handleRowClick(expense: any) {
 		selectedExpense = expense;
+		showEditModal = true;
+	}
+
+	function handleAddExpense() {
+		selectedExpense = null;
 		showEditModal = true;
 	}
 
@@ -158,7 +164,7 @@
 			<h1 class="text-3xl font-bold mb-2">Expenses</h1>
 			<p class="text-muted-foreground">Track and manage financial transactions</p>
 		</div>
-		<Button class="gap-2">
+		<Button class="gap-2" onclick={handleAddExpense}>
 			<Plus class="size-4" />
 			Add Expense
 		</Button>
@@ -166,141 +172,115 @@
 
 	<!-- Pending Approvals Alert -->
 	{#if pendingApprovals.length > 0}
-		<Card class="p-4 border-blue-500 bg-blue-50 dark:bg-blue-900/20">
-			<div class="flex items-center justify-between">
-				<div class="flex items-center gap-3">
-					<AlertCircle class="size-5 text-blue-600 dark:text-blue-400" />
-					<div>
-						<p class="font-semibold text-blue-900 dark:text-blue-100">
-							{pendingApprovals.length} {pendingApprovals.length === 1 ? 'expense' : 'expenses'} pending approval
-						</p>
-						<p class="text-sm text-blue-700 dark:text-blue-300">
-							Total amount: {formatCurrency(pendingApprovals.reduce((sum, e) => sum + (e.amount || 0), 0))}
-						</p>
-					</div>
+		<div class="flex items-center justify-between rounded-xl border border-yellow-600/40 bg-slate-900 px-4 py-3">
+			<div class="flex items-center gap-3">
+				<div class="flex size-8 items-center justify-center rounded-lg bg-yellow-500/10 shrink-0">
+					<AlertCircle class="size-4 text-yellow-400" />
 				</div>
-				<Button variant="outline" size="sm">Review</Button>
+				<div>
+					<p class="text-sm font-semibold text-slate-100">
+						{pendingApprovals.length} {pendingApprovals.length === 1 ? 'expense' : 'expenses'} pending approval
+					</p>
+					<p class="text-xs text-slate-400">
+						Total amount: <span class="font-semibold text-yellow-400">{formatCurrency(pendingApprovals.reduce((sum, e) => sum + (e.amount || 0), 0))}</span>
+					</p>
+				</div>
 			</div>
-		</Card>
+			<Button variant="outline" size="sm" class="border-slate-600 text-slate-300 hover:bg-slate-700">Review</Button>
+		</div>
 	{/if}
 
-	<!-- Statistics -->
-	<div>
-		<h2 class="text-xl font-semibold mb-4">Overview</h2>
-		<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-			<MetricCard
-				title="Total Expenses"
-				value={stats.total}
-				subtitle="All transactions"
-				icon={Receipt}
-			/>
-			
-			<MetricCard
-				title="Total Amount"
-				value={formatCurrency(stats.amounts.total)}
-				subtitle="Across all expenses"
-				icon={DollarSign}
-			/>
-			
-			<MetricCard
-				title="Paid Out"
-				value={formatCurrency(stats.amounts.paid)}
-				subtitle="{stats.byStatus.paid} transactions"
-				icon={CheckCircle2}
-				variant="success"
-			/>
-			
-			<MetricCard
-				title="Pending"
-				value={formatCurrency(stats.amounts.submitted)}
-				subtitle="{stats.byStatus.submitted} awaiting approval"
-				icon={Clock}
-				variant="warning"
-			/>
-		</div>
-	</div>
-
-	<!-- Status Breakdown -->
-	<div>
-		<h2 class="text-xl font-semibold mb-4">Expense Status</h2>
-		<div class="grid grid-cols-2 md:grid-cols-5 gap-4">
-			<Card class="p-4">
-				<div class="flex items-center gap-2 mb-2">
-					<FileText class="size-4 text-slate-500" />
-					<p class="text-sm text-muted-foreground">Draft</p>
+	<!-- Overview + Status combined compact row -->
+	<Card class="p-4">
+		<div class="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-9 divide-y sm:divide-y-0 sm:divide-x divide-border">
+			<!-- KPI: Total -->
+			<div class="px-3 py-2 flex flex-col gap-0.5">
+				<div class="flex items-center gap-1.5 text-muted-foreground">
+					<Receipt class="size-3.5 shrink-0" />
+					<span class="text-xs">Total</span>
 				</div>
-				<p class="text-2xl font-bold mb-1">{stats.byStatus.draft}</p>
+				<p class="text-xl font-bold">{stats.total}</p>
+				<p class="text-xs text-muted-foreground">{formatCurrency(stats.amounts.total)}</p>
+			</div>
+			<!-- KPI: Paid Out -->
+			<div class="px-3 py-2 flex flex-col gap-0.5">
+				<div class="flex items-center gap-1.5 text-emerald-600 dark:text-emerald-400">
+					<CheckCircle2 class="size-3.5 shrink-0" />
+					<span class="text-xs">Paid Out</span>
+				</div>
+				<p class="text-xl font-bold text-emerald-600 dark:text-emerald-400">{formatCurrency(stats.amounts.paid)}</p>
+				<p class="text-xs text-muted-foreground">{stats.byStatus.paid} transactions</p>
+			</div>
+			<!-- KPI: Pending -->
+			<div class="px-3 py-2 flex flex-col gap-0.5">
+				<div class="flex items-center gap-1.5 text-yellow-600 dark:text-yellow-400">
+					<Clock class="size-3.5 shrink-0" />
+					<span class="text-xs">Pending</span>
+				</div>
+				<p class="text-xl font-bold text-yellow-600 dark:text-yellow-400">{formatCurrency(stats.amounts.submitted)}</p>
+				<p class="text-xs text-muted-foreground">{stats.byStatus.submitted} awaiting</p>
+			</div>
+			<!-- Divider label -->
+			<div class="px-3 py-2 hidden lg:flex items-center justify-center">
+				<span class="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Status</span>
+			</div>
+			<!-- Status: Draft -->
+			<div class="px-3 py-2 flex flex-col gap-0.5">
+				<div class="flex items-center gap-1.5 text-muted-foreground">
+					<FileText class="size-3.5 shrink-0" />
+					<span class="text-xs">Draft</span>
+				</div>
+				<p class="text-xl font-bold">{stats.byStatus.draft}</p>
 				<p class="text-xs text-muted-foreground">{formatCurrency(stats.amounts.draft)}</p>
-			</Card>
-			<Card class="p-4">
-				<div class="flex items-center gap-2 mb-2">
-					<Clock class="size-4 text-blue-500" />
-					<p class="text-sm text-muted-foreground">Submitted</p>
+			</div>
+			<!-- Status: Submitted -->
+			<div class="px-3 py-2 flex flex-col gap-0.5">
+				<div class="flex items-center gap-1.5 text-blue-500">
+					<Clock class="size-3.5 shrink-0" />
+					<span class="text-xs">Submitted</span>
 				</div>
-				<p class="text-2xl font-bold mb-1">{stats.byStatus.submitted}</p>
+				<p class="text-xl font-bold">{stats.byStatus.submitted}</p>
 				<p class="text-xs text-muted-foreground">{formatCurrency(stats.amounts.submitted)}</p>
-			</Card>
-			<Card class="p-4">
-				<div class="flex items-center gap-2 mb-2">
-					<CheckCircle2 class="size-4 text-green-500" />
-					<p class="text-sm text-muted-foreground">Approved</p>
+			</div>
+			<!-- Status: Approved -->
+			<div class="px-3 py-2 flex flex-col gap-0.5">
+				<div class="flex items-center gap-1.5 text-green-500">
+					<CheckCircle2 class="size-3.5 shrink-0" />
+					<span class="text-xs">Approved</span>
 				</div>
-				<p class="text-2xl font-bold mb-1">{stats.byStatus.approved}</p>
+				<p class="text-xl font-bold">{stats.byStatus.approved}</p>
 				<p class="text-xs text-muted-foreground">{formatCurrency(stats.amounts.approved)}</p>
-			</Card>
-			<Card class="p-4">
-				<div class="flex items-center gap-2 mb-2">
-					<DollarSign class="size-4 text-green-600" />
-					<p class="text-sm text-muted-foreground">Paid</p>
+			</div>
+			<!-- Status: Paid -->
+			<div class="px-3 py-2 flex flex-col gap-0.5">
+				<div class="flex items-center gap-1.5 text-emerald-600">
+					<DollarSign class="size-3.5 shrink-0" />
+					<span class="text-xs">Paid</span>
 				</div>
-				<p class="text-2xl font-bold mb-1">{stats.byStatus.paid}</p>
+				<p class="text-xl font-bold">{stats.byStatus.paid}</p>
 				<p class="text-xs text-muted-foreground">{formatCurrency(stats.amounts.paid)}</p>
-			</Card>
-			<Card class="p-4">
-				<div class="flex items-center gap-2 mb-2">
-					<AlertCircle class="size-4 text-red-500" />
-					<p class="text-sm text-muted-foreground">Rejected</p>
+			</div>
+			<!-- Status: Rejected -->
+			<div class="px-3 py-2 flex flex-col gap-0.5">
+				<div class="flex items-center gap-1.5 text-red-500">
+					<AlertCircle class="size-3.5 shrink-0" />
+					<span class="text-xs">Rejected</span>
 				</div>
-				<p class="text-2xl font-bold mb-1">{stats.byStatus.rejected}</p>
-			</Card>
+				<p class="text-xl font-bold">{stats.byStatus.rejected}</p>
+				<p class="text-xs text-muted-foreground">{formatCurrency(stats.amounts.rejected ?? 0)}</p>
+			</div>
 		</div>
-	</div>
+	</Card>
 
-	<!-- Top Categories -->
+	<!-- Top Categories Pie Chart -->
 	{#if topCategories.length > 0}
-		{@const maxAmount = Math.max(...topCategories.map(([, d]) => d.amount))}
-		{@const barColors = [
-			'bg-blue-500', 'bg-violet-500', 'bg-emerald-500', 'bg-amber-500',
-			'bg-rose-500', 'bg-cyan-500', 'bg-orange-500', 'bg-pink-500',
-			'bg-teal-500', 'bg-indigo-500'
-		]}
-		<Card class="p-4">
-			<h2 class="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-3">Top Expense Categories</h2>
-			<div class="space-y-2">
-				{#each topCategories as [category, catData], i}
-					{@const pct = maxAmount > 0 ? (catData.amount / maxAmount * 100) : 0}
-					{@const totalPct = stats.amounts.total > 0 ? (catData.amount / stats.amounts.total * 100) : 0}
-					{@const color = barColors[i % barColors.length]}
-					<div class="flex items-center gap-3 min-w-0">
-						<!-- Color dot -->
-						<div class="size-2 rounded-full {color} shrink-0"></div>
-						<!-- Category name -->
-						<span class="text-xs truncate w-40 shrink-0" title={category}>{category}</span>
-						<!-- Bar -->
-						<div class="flex-1 bg-slate-200 dark:bg-slate-800 rounded-full h-2 overflow-hidden">
-							<div class="{color} h-2 rounded-full transition-all duration-500" style="width: {pct.toFixed(1)}%"></div>
-						</div>
-						<!-- % -->
-						<span class="text-xs text-muted-foreground w-8 text-right shrink-0">{totalPct.toFixed(0)}%</span>
-						<!-- Amount -->
-						<span class="text-xs font-semibold w-20 text-right shrink-0">{formatCurrency(catData.amount)}</span>
-					</div>
-				{/each}
+		{@const pieSlices = topCategories.map(([category, d]) => ({ category, amount: d.amount, count: d.count }))}
+		<Card class="p-5 bg-slate-900 border-slate-700">
+			<div class="flex items-center justify-between mb-4">
+				<h2 class="text-sm font-semibold text-slate-400 uppercase tracking-wide">Top Expense Categories</h2>
+				<span class="text-xs text-slate-500">{topCategories.reduce((s, [, d]) => s + d.count, 0)} expenses</span>
 			</div>
-			<div class="mt-3 pt-3 border-t border-slate-200 dark:border-slate-700 flex justify-between">
-				<span class="text-xs text-muted-foreground">{topCategories.reduce((s, [, d]) => s + d.count, 0)} expenses</span>
-				<span class="text-xs font-semibold">{formatCurrency(stats.amounts.total)}</span>
-			</div>
+			<ExpensePieChart slices={pieSlices} total={stats.amounts.total} />
 		</Card>
 	{/if}
 
@@ -316,26 +296,30 @@
 			{/if}
 		</div>
 		
-		<!-- Status Filter Tabs -->
-		<div class="mb-4">
-			<h3 class="text-sm font-medium text-muted-foreground mb-3">Filter by Status</h3>
-			<VisualTabs
-				tabs={statusTabs}
-				activeTab={statusFilter}
-				onTabChange={(v) => statusFilter = v}
-				variant="button"
-			/>
-		</div>
-
-		<!-- Category Filter Tabs -->
-		<div class="mb-4">
-			<h3 class="text-sm font-medium text-muted-foreground mb-3">Filter by Category</h3>
-			<VisualTabs
-				tabs={categoryTabs}
-				activeTab={categoryFilter}
-				onTabChange={(v) => categoryFilter = v}
-				variant="folder"
-			/>
+		<!-- Filters row -->
+		<div class="flex flex-wrap items-end gap-4 mb-4">
+			<div class="flex-1 min-w-0">
+				<h3 class="text-xs font-medium text-muted-foreground mb-2">Status</h3>
+				<VisualTabs
+					tabs={statusTabs}
+					activeTab={statusFilter}
+					onTabChange={(v) => statusFilter = v}
+					variant="button"
+				/>
+			</div>
+			<div class="shrink-0">
+				<h3 class="text-xs font-medium text-muted-foreground mb-2">Category</h3>
+				<select
+					value={categoryFilter}
+					onchange={(e) => categoryFilter = e.currentTarget.value}
+					class="rounded-lg border border-slate-600 bg-slate-800 text-slate-100 px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+				>
+					<option value="all">All Categories ({expenses.length})</option>
+					{#each uniqueCategories as cat}
+						<option value={cat}>{formatCategory(cat)} ({getExpenseCountByCategory(cat)})</option>
+					{/each}
+				</select>
+			</div>
 		</div>
 
 		<Card class="overflow-hidden">
@@ -417,10 +401,10 @@
 	</div>
 </div>
 
-{#if selectedExpense}
-	<EditExpenseModal
-		bind:open={showEditModal}
-		expense={selectedExpense}
-		onUpdated={handleExpenseUpdated}
-	/>
-{/if}
+<EditExpenseModal
+	bind:open={showEditModal}
+	expense={selectedExpense}
+	vendors={data.vendors ?? []}
+	projects={data.projects ?? []}
+	onUpdated={handleExpenseUpdated}
+/>

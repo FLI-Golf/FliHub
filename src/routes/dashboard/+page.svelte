@@ -5,6 +5,8 @@
 	import {
 		DollarSign, Users, FolderKanban, Receipt,
 		Trophy, Star, Building2, TrendingUp, ArrowRight,
+		Video, Wrench, Megaphone, Cpu, Scale, Wallet, ShieldCheck, Globe, Handshake,
+		Landmark, Briefcase, Film,
 		CheckCircle2, Clock, AlertCircle
 	} from 'lucide-svelte';
 
@@ -24,6 +26,29 @@
 	}
 	function pct(a: number, b: number) {
 		return b === 0 ? 0 : Math.min(100, (a / b) * 100);
+	}
+
+	// Maps department name keywords → { icon, colors }
+	const DEPT_ICONS: Array<{ keywords: string[]; icon: any; bg: string; fg: string }> = [
+		{ keywords: ['content', 'media'],            icon: Video,      bg: 'bg-pink-100 dark:bg-pink-900/30',    fg: 'text-pink-600 dark:text-pink-400' },
+		{ keywords: ['operations', 'ops'],            icon: Wrench,     bg: 'bg-blue-100 dark:bg-blue-900/30',    fg: 'text-blue-600 dark:text-blue-400' },
+		{ keywords: ['marketing'],                    icon: Megaphone,  bg: 'bg-orange-100 dark:bg-orange-900/30', fg: 'text-orange-600 dark:text-orange-400' },
+		{ keywords: ['technology', 'tech', 'it'],     icon: Cpu,        bg: 'bg-cyan-100 dark:bg-cyan-900/30',    fg: 'text-cyan-600 dark:text-cyan-400' },
+		{ keywords: ['player', 'development', 'talent'], icon: Trophy,  bg: 'bg-emerald-100 dark:bg-emerald-900/30', fg: 'text-emerald-600 dark:text-emerald-400' },
+		{ keywords: ['executive', 'leadership'],      icon: Briefcase,  bg: 'bg-violet-100 dark:bg-violet-900/30', fg: 'text-violet-600 dark:text-violet-400' },
+		{ keywords: ['legal', 'compliance'],          icon: Scale,      bg: 'bg-red-100 dark:bg-red-900/30',      fg: 'text-red-600 dark:text-red-400' },
+		{ keywords: ['finance', 'financial'],         icon: Wallet,     bg: 'bg-green-100 dark:bg-green-900/30',  fg: 'text-green-600 dark:text-green-400' },
+		{ keywords: ['sales'],                        icon: Handshake,  bg: 'bg-yellow-100 dark:bg-yellow-900/30', fg: 'text-yellow-600 dark:text-yellow-400' },
+		{ keywords: ['people', 'hr', 'human'],        icon: Users,      bg: 'bg-indigo-100 dark:bg-indigo-900/30', fg: 'text-indigo-600 dark:text-indigo-400' },
+		{ keywords: ['league'],                       icon: Globe,      bg: 'bg-teal-100 dark:bg-teal-900/30',    fg: 'text-teal-600 dark:text-teal-400' },
+		{ keywords: ['sponsor'],                      icon: Star,       bg: 'bg-amber-100 dark:bg-amber-900/30',  fg: 'text-amber-600 dark:text-amber-400' },
+		{ keywords: ['film', 'documentary'],          icon: Film,       bg: 'bg-rose-100 dark:bg-rose-900/30',    fg: 'text-rose-600 dark:text-rose-400' },
+	];
+
+	function getDeptIcon(name: string) {
+		const lower = name.toLowerCase();
+		const match = DEPT_ICONS.find(d => d.keywords.some(k => lower.includes(k)));
+		return match ?? { icon: Building2, bg: 'bg-slate-100 dark:bg-slate-800', fg: 'text-slate-600 dark:text-slate-400' };
 	}
 </script>
 
@@ -57,11 +82,11 @@
 			</Card>
 			<!-- Hover tooltip -->
 			<div class="pointer-events-none absolute left-0 top-full mt-2 z-50 w-56 opacity-0 translate-y-1 group-hover/card:opacity-100 group-hover/card:translate-y-0 transition-all duration-200">
-				<div class="rounded-xl border bg-popover shadow-xl p-3 text-sm space-y-1.5">
-					<p class="font-semibold text-xs uppercase tracking-wider text-blue-600 mb-2">Budget Detail</p>
-					<div class="flex justify-between"><span class="text-muted-foreground">Actual</span><span class="font-medium">{fmt(budget.actual)}</span></div>
-					<div class="flex justify-between"><span class="text-muted-foreground">Forecasted</span><span class="font-medium">{fmt(budget.forecasted)}</span></div>
-					<div class="flex justify-between"><span class="text-muted-foreground">Remaining</span><span class="font-medium text-emerald-600">{fmt(budget.remaining)}</span></div>
+				<div class="rounded-xl border border-slate-700 bg-slate-900 text-slate-100 shadow-2xl p-3 text-sm space-y-1.5">
+					<p class="font-semibold text-xs uppercase tracking-wider text-blue-400 mb-2">Budget Detail</p>
+					<div class="flex justify-between"><span class="text-slate-400">Actual</span><span class="font-medium">{fmt(budget.actual)}</span></div>
+					<div class="flex justify-between"><span class="text-slate-400">Forecasted</span><span class="font-medium">{fmt(budget.forecasted)}</span></div>
+					<div class="flex justify-between"><span class="text-slate-400">Remaining</span><span class="font-medium text-emerald-600">{fmt(budget.remaining)}</span></div>
 				</div>
 			</div>
 		</div>
@@ -79,11 +104,11 @@
 				<p class="text-xs text-muted-foreground mt-1">{projects.in_progress} active · {projects.planned} planned · {projects.completed} done</p>
 			</Card>
 			<div class="pointer-events-none absolute left-0 top-full mt-2 z-50 w-56 opacity-0 translate-y-1 group-hover/card:opacity-100 group-hover/card:translate-y-0 transition-all duration-200">
-				<div class="rounded-xl border bg-popover shadow-xl p-3 text-sm space-y-1.5">
-					<p class="font-semibold text-xs uppercase tracking-wider text-emerald-600 mb-2">By Status</p>
+				<div class="rounded-xl border border-slate-700 bg-slate-900 text-slate-100 shadow-2xl p-3 text-sm space-y-1.5">
+					<p class="font-semibold text-xs uppercase tracking-wider text-emerald-400 mb-2">By Status</p>
 					{#each [['In Progress', projects.in_progress, 'bg-blue-500'], ['Planned', projects.planned, 'bg-yellow-500'], ['Completed', projects.completed, 'bg-emerald-500']] as [label, count, color]}
 						<div class="flex items-center justify-between gap-2">
-							<div class="flex items-center gap-2"><span class="size-2 rounded-full {color}"></span><span class="text-muted-foreground">{label}</span></div>
+							<div class="flex items-center gap-2"><span class="size-2 rounded-full {color}"></span><span class="text-slate-400">{label}</span></div>
 							<span class="font-medium tabular-nums">{count}</span>
 						</div>
 					{/each}
@@ -104,10 +129,10 @@
 				<p class="text-xs text-muted-foreground mt-1">{fmt(sponsors.totalCommitted)} committed · {fmt(sponsors.totalPaid)} paid</p>
 			</Card>
 			<div class="pointer-events-none absolute left-0 top-full mt-2 z-50 w-56 opacity-0 translate-y-1 group-hover/card:opacity-100 group-hover/card:translate-y-0 transition-all duration-200">
-				<div class="rounded-xl border bg-popover shadow-xl p-3 text-sm space-y-1.5">
-					<p class="font-semibold text-xs uppercase tracking-wider text-orange-600 mb-2">By Tier</p>
+				<div class="rounded-xl border border-slate-700 bg-slate-900 text-slate-100 shadow-2xl p-3 text-sm space-y-1.5">
+					<p class="font-semibold text-xs uppercase tracking-wider text-orange-400 mb-2">By Tier</p>
 					{#each Object.entries(sponsors.byTier ?? {}) as [tier, count]}
-						<div class="flex justify-between"><span class="text-muted-foreground capitalize">{tier.replace('_', ' ')}</span><span class="font-medium">{count}</span></div>
+						<div class="flex justify-between"><span class="text-slate-400 capitalize">{tier.replace('_', ' ')}</span><span class="font-medium">{count}</span></div>
 					{/each}
 				</div>
 			</div>
@@ -126,11 +151,11 @@
 				<p class="text-xs text-muted-foreground mt-1">{franchise.pipeline.leads} leads · {franchise.pipeline.opportunities} opps · {franchise.pipeline.deals} deals</p>
 			</Card>
 			<div class="pointer-events-none absolute left-0 top-full mt-2 z-50 w-56 opacity-0 translate-y-1 group-hover/card:opacity-100 group-hover/card:translate-y-0 transition-all duration-200">
-				<div class="rounded-xl border bg-popover shadow-xl p-3 text-sm space-y-1.5">
-					<p class="font-semibold text-xs uppercase tracking-wider text-violet-600 mb-2">Pipeline Stages</p>
-					<div class="flex justify-between"><span class="text-muted-foreground">Leads</span><span class="font-medium">{franchise.pipeline.leads}</span></div>
-					<div class="flex justify-between"><span class="text-muted-foreground">Opportunities</span><span class="font-medium">{franchise.pipeline.opportunities}</span></div>
-					<div class="flex justify-between"><span class="text-muted-foreground">Deals</span><span class="font-medium">{franchise.pipeline.deals}</span></div>
+				<div class="rounded-xl border border-slate-700 bg-slate-900 text-slate-100 shadow-2xl p-3 text-sm space-y-1.5">
+					<p class="font-semibold text-xs uppercase tracking-wider text-violet-400 mb-2">Pipeline Stages</p>
+					<div class="flex justify-between"><span class="text-slate-400">Leads</span><span class="font-medium">{franchise.pipeline.leads}</span></div>
+					<div class="flex justify-between"><span class="text-slate-400">Opportunities</span><span class="font-medium">{franchise.pipeline.opportunities}</span></div>
+					<div class="flex justify-between"><span class="text-slate-400">Deals</span><span class="font-medium">{franchise.pipeline.deals}</span></div>
 				</div>
 			</div>
 		</div>
@@ -150,10 +175,11 @@
 			<Card class="divide-y">
 				{#each deptBudgets.slice(0, 8) as dept}
 					{@const used = pct(dept.actual ?? 0, dept.budget ?? 1)}
+					{@const deptIcon = getDeptIcon(dept.name)}
 					<a href="/dashboard/departments/{dept.id}"
 						class="flex items-center gap-4 px-4 py-3 hover:bg-muted/50 transition-colors group">
-						<div class="flex size-8 items-center justify-center rounded-lg bg-blue-100 dark:bg-blue-900/30 shrink-0">
-							<Building2 class="size-4 text-blue-600 dark:text-blue-400" />
+						<div class="flex size-8 items-center justify-center rounded-lg {deptIcon.bg} shrink-0">
+							<deptIcon.icon class="size-4 {deptIcon.fg}" />
 						</div>
 						<div class="flex-1 min-w-0">
 							<div class="flex items-center justify-between mb-1">

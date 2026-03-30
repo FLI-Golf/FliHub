@@ -6,11 +6,15 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 	const { pb, userId, profile: userProfile, role } = ctx;
 	
 	try {
-		// Fetch all expenses with expanded relations
-		const expenses = await pb.collection('expenses').getFullList({
-			sort: '-date',
-			expand: 'projectId,submittedBy,approvedBy,vendor'
-		});
+		// Fetch all expenses with expanded relations, plus vendors and projects for form dropdowns
+		const [expenses, vendors, projects] = await Promise.all([
+			pb.collection('expenses').getFullList({
+				sort: '-date',
+				expand: 'projectId,submittedBy,approvedBy,vendor'
+			}),
+			pb.collection('vendors').getFullList({ sort: 'name', fields: 'id,name' }).catch(() => []),
+			pb.collection('projects').getFullList({ sort: 'name', fields: 'id,name' }).catch(() => [])
+		]);
 
 		// Calculate expense statistics
 		const stats = {
@@ -54,7 +58,9 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 			expenses,
 			stats,
 			topCategories: sortedCategories,
-			pendingApprovals
+			pendingApprovals,
+			vendors,
+			projects
 		};
 	} catch (error) {
 		console.error('Error loading expenses:', error);
