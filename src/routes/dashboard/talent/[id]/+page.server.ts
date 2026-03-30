@@ -1,9 +1,11 @@
 import { RequestContext } from '$lib/infra/RequestContext';
 import type { PageServerLoad } from './$types';
 import { TournamentResultRepo, ProPaymentRepo } from '$lib/infra/pocketbase/repositories';
-import { error } from '@sveltejs/kit';
+import { error, redirect } from '@sveltejs/kit';
 
 export const load: PageServerLoad = async ({ locals, url, params }) => {
+	if (params.id === 'new')    throw redirect(303, '/dashboard/talent/new');
+	if (params.id === 'import') throw redirect(303, '/dashboard/talent/import');
 	const ctx = await RequestContext.from(locals, url);
 	const { pb, userId, profile: userProfile, role } = ctx;
 		const resultRepo = new TournamentResultRepo(pb);

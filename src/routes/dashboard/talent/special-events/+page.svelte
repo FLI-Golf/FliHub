@@ -20,13 +20,13 @@
 	const getStatusColor = (status: string) => {
 		switch (status) {
 			case 'completed':
-				return 'bg-green-100 text-green-800';
+				return 'bg-emerald-900/50 text-emerald-300 border border-emerald-700';
 			case 'scheduled':
-				return 'bg-blue-100 text-blue-800';
+				return 'bg-blue-900/50 text-blue-300 border border-blue-700';
 			case 'cancelled':
-				return 'bg-red-100 text-red-800';
+				return 'bg-red-900/50 text-red-300 border border-red-700';
 			default:
-				return 'bg-gray-100 text-gray-800';
+				return 'bg-slate-700 text-slate-300 border border-slate-600';
 		}
 	};
 
@@ -73,7 +73,7 @@
 <div class="container mx-auto p-6 space-y-6">
 	<div class="flex items-center justify-between">
 		<div>
-			<h1 class="text-3xl font-bold">Special Events</h1>
+			<h1 class="text-3xl font-bold text-slate-100">Special Events</h1>
 			<p class="text-muted-foreground">
 				Manage special events like appearances, clinics, and promotional activities
 			</p>
@@ -86,31 +86,31 @@
 
 	<!-- Stats -->
 	<div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-		<div class="bg-white p-6 rounded-lg border">
-			<div class="text-sm text-muted-foreground">Upcoming Events</div>
-			<div class="text-3xl font-bold">
+		<div class="bg-slate-800 border border-slate-700 p-6 rounded-lg">
+			<div class="text-sm text-slate-400">Upcoming Events</div>
+			<div class="text-3xl font-bold text-slate-100">
 				{data.events.filter((e) => e.status === 'scheduled').length}
 			</div>
 		</div>
-		<div class="bg-white p-6 rounded-lg border">
-			<div class="text-sm text-muted-foreground">Completed Events</div>
-			<div class="text-3xl font-bold">
+		<div class="bg-slate-800 border border-slate-700 p-6 rounded-lg">
+			<div class="text-sm text-slate-400">Completed Events</div>
+			<div class="text-3xl font-bold text-slate-100">
 				{data.events.filter((e) => e.status === 'completed').length}
 			</div>
 		</div>
-		<div class="bg-white p-6 rounded-lg border">
-			<div class="text-sm text-muted-foreground">Total Events</div>
-			<div class="text-3xl font-bold">{data.events.length}</div>
+		<div class="bg-slate-800 border border-slate-700 p-6 rounded-lg">
+			<div class="text-sm text-slate-400">Total Events</div>
+			<div class="text-3xl font-bold text-slate-100">{data.events.length}</div>
 		</div>
 	</div>
 
 	<!-- Filters -->
-	<div class="bg-white rounded-lg border p-4">
+	<div class="bg-slate-800 border border-slate-700 rounded-lg p-4">
 		<div class="flex gap-4">
 			<div>
-				<label class="text-sm font-medium">Status</label>
+				<label class="text-sm font-medium text-slate-300">Status</label>
 				<select
-					class="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2"
+					class="mt-1 block w-full rounded-md border border-slate-600 bg-slate-700 text-slate-100 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-500"
 					onchange={(e) => {
 						const status = e.currentTarget.value;
 						window.location.href = status
@@ -125,9 +125,9 @@
 				</select>
 			</div>
 			<div>
-				<label class="text-sm font-medium">Event Type</label>
+				<label class="text-sm font-medium text-slate-300">Event Type</label>
 				<select
-					class="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2"
+					class="mt-1 block w-full rounded-md border border-slate-600 bg-slate-700 text-slate-100 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-500"
 					onchange={(e) => {
 						const type = e.currentTarget.value;
 						window.location.href = type
@@ -151,69 +151,64 @@
 		</div>
 	</div>
 
-	<!-- Events List -->
-	<div class="bg-white rounded-lg border">
-		<div class="divide-y">
-			{#each data.events as event}
-				<div class="p-4 hover:bg-gray-50">
-					<div class="flex items-start justify-between">
-						<div class="flex-1">
-							<div class="flex items-center gap-3">
-								<span class="text-2xl">{getEventTypeIcon(event.eventType)}</span>
-								<div>
-									<h3 class="text-lg font-semibold">{event.name}</h3>
-									<div class="flex items-center gap-2 mt-1">
-										<Badge class={getStatusColor(event.status)}>{event.status}</Badge>
-										<span class="text-sm text-muted-foreground">
-											{getEventTypeLabel(event.eventType)}
-										</span>
-									</div>
-								</div>
+	<!-- Events Grid -->
+	{#if data.events.length === 0}
+		<div class="p-8 text-center text-slate-400 bg-slate-800 border border-slate-700 rounded-xl">
+			No special events found. Create your first event to get started.
+		</div>
+	{:else}
+		<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+			{#each data.events as event, i}
+				<div class="flex flex-col rounded-xl border border-slate-700 {i % 2 === 0 ? 'bg-slate-800' : 'bg-slate-700/60'} hover:bg-slate-600/50 hover:-translate-y-0.5 transition-all duration-150 shadow-sm">
+					<!-- Card header -->
+					<div class="flex items-start justify-between p-4 border-b border-slate-700">
+						<div class="flex items-center gap-3">
+							<div class="flex size-10 items-center justify-center rounded-lg bg-slate-700 text-xl shrink-0">
+								{getEventTypeIcon(event.eventType)}
 							</div>
-							<div class="mt-2 space-y-1 text-sm text-muted-foreground">
-								<div>📅 {formatDate(event.eventDate)}</div>
-								{#if event.location}
-									<div>📍 {event.location}</div>
-								{/if}
-								{#if event.description}
-									<div class="mt-2">{@html event.description}</div>
-								{/if}
+							<div>
+								<h3 class="font-semibold text-slate-100 leading-tight">{event.name}</h3>
+								<span class="text-xs text-slate-400">{getEventTypeLabel(event.eventType)}</span>
 							</div>
 						</div>
-						<div class="flex gap-2">
-							<Button onclick={() => openEditModal(event)} variant="outline" size="sm"
-								>Edit</Button
-							>
-							<form method="POST" action="?/delete" use:enhance>
-								<input type="hidden" name="id" value={event.id} />
-								<Button
-									type="submit"
-									variant="outline"
-									size="sm"
-									onclick={(e) => {
-										if (!confirm('Are you sure you want to delete this event?')) {
-											e.preventDefault();
-										}
-									}}>Delete</Button
-								>
-							</form>
-						</div>
+						<Badge class={getStatusColor(event.status)}>{event.status}</Badge>
 					</div>
-				</div>
-			{:else}
-				<div class="p-8 text-center text-muted-foreground">
-					No special events found. Create your first event to get started.
+					<!-- Card body -->
+					<div class="flex-1 p-4 space-y-1.5 text-sm text-slate-400">
+						<div>📅 {formatDate(event.eventDate)}</div>
+						{#if event.location}
+							<div>📍 {event.location}</div>
+						{/if}
+						{#if event.description}
+							<div class="mt-2 text-slate-300 line-clamp-2">{@html event.description}</div>
+						{/if}
+					</div>
+					<!-- Card footer -->
+					<div class="flex gap-2 p-4 pt-0">
+						<Button onclick={() => openEditModal(event)} variant="outline" size="sm" class="flex-1 border-slate-600 text-slate-300 hover:bg-slate-700">Edit</Button>
+						<form method="POST" action="?/delete" use:enhance class="flex-1">
+							<input type="hidden" name="id" value={event.id} />
+							<Button
+								type="submit"
+								variant="outline"
+								size="sm"
+								class="w-full border-red-800 text-red-400 hover:bg-red-900/30"
+								onclick={(e) => {
+									if (!confirm('Are you sure you want to delete this event?')) e.preventDefault();
+								}}>Delete</Button>
+						</form>
+					</div>
 				</div>
 			{/each}
 		</div>
-	</div>
+	{/if}
 </div>
 
 <!-- Create/Edit Modal -->
 {#if showCreateModal}
 	<div class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-		<div class="bg-white rounded-lg p-6 max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-			<h2 class="text-2xl font-bold mb-4">
+		<div class="bg-slate-900 border border-slate-700 rounded-xl p-6 max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+			<h2 class="text-2xl font-bold mb-4 text-slate-100">
 				{editingEvent ? 'Edit Special Event' : 'Create Special Event'}
 			</h2>
 			<form method="POST" action="?/{editingEvent ? 'update' : 'create'}" use:enhance>
@@ -222,22 +217,22 @@
 				{/if}
 				<div class="space-y-4">
 					<div>
-						<label class="block text-sm font-medium mb-1">Event Name *</label>
+						<label class="block text-xs font-medium mb-1 text-slate-400">Event Name *</label>
 						<input
 							type="text"
 							name="name"
 							value={editingEvent?.name || ''}
 							required
-							class="w-full rounded-md border border-gray-300 px-3 py-2"
+							class="w-full rounded-md border border-slate-600 bg-slate-800 text-slate-100 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-500"
 						/>
 					</div>
 					<div class="grid grid-cols-2 gap-4">
 						<div>
-							<label class="block text-sm font-medium mb-1">Event Type *</label>
+							<label class="block text-xs font-medium mb-1 text-slate-400">Event Type *</label>
 							<select
 								name="eventType"
 								required
-								class="w-full rounded-md border border-gray-300 px-3 py-2"
+								class="w-full rounded-md border border-slate-600 bg-slate-800 text-slate-100 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-500"
 							>
 								<option value="appearance" selected={editingEvent?.eventType === 'appearance'}
 									>Appearance</option
@@ -258,32 +253,32 @@
 							</select>
 						</div>
 						<div>
-							<label class="block text-sm font-medium mb-1">Event Date *</label>
+							<label class="block text-xs font-medium mb-1 text-slate-400">Event Date *</label>
 							<input
 								type="date"
 								name="eventDate"
 								value={editingEvent?.eventDate || ''}
 								required
-								class="w-full rounded-md border border-gray-300 px-3 py-2"
+								class="w-full rounded-md border border-slate-600 bg-slate-800 text-slate-100 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-500"
 							/>
 						</div>
 					</div>
 					<div class="grid grid-cols-2 gap-4">
 						<div>
-							<label class="block text-sm font-medium mb-1">Location</label>
+							<label class="block text-xs font-medium mb-1 text-slate-400">Location</label>
 							<input
 								type="text"
 								name="location"
 								value={editingEvent?.location || ''}
-								class="w-full rounded-md border border-gray-300 px-3 py-2"
+								class="w-full rounded-md border border-slate-600 bg-slate-800 text-slate-100 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-500"
 							/>
 						</div>
 						<div>
-							<label class="block text-sm font-medium mb-1">Status *</label>
+							<label class="block text-xs font-medium mb-1 text-slate-400">Status *</label>
 							<select
 								name="status"
 								required
-								class="w-full rounded-md border border-gray-300 px-3 py-2"
+								class="w-full rounded-md border border-slate-600 bg-slate-800 text-slate-100 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-500"
 							>
 								<option value="scheduled" selected={editingEvent?.status === 'scheduled'}
 									>Scheduled</option
@@ -298,21 +293,21 @@
 						</div>
 					</div>
 					<div>
-						<label class="block text-sm font-medium mb-1">Description</label>
+						<label class="block text-xs font-medium mb-1 text-slate-400">Description</label>
 						<textarea
 							name="description"
 							value={editingEvent?.description || ''}
 							rows="3"
-							class="w-full rounded-md border border-gray-300 px-3 py-2"
+							class="w-full rounded-md border border-slate-600 bg-slate-800 text-slate-100 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-500"
 						></textarea>
 					</div>
 					<div>
-						<label class="block text-sm font-medium mb-1">Notes</label>
+						<label class="block text-xs font-medium mb-1 text-slate-400">Notes</label>
 						<textarea
 							name="notes"
 							value={editingEvent?.notes || ''}
 							rows="3"
-							class="w-full rounded-md border border-gray-300 px-3 py-2"
+							class="w-full rounded-md border border-slate-600 bg-slate-800 text-slate-100 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-500"
 						></textarea>
 					</div>
 				</div>

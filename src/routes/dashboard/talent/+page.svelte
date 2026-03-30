@@ -3,7 +3,7 @@
 	import { Badge } from '$lib/components/ui/badge';
 	import type { PageData } from './$types';
 	import { goto } from '$app/navigation';
-	import { ChevronDown, ChevronUp, ArrowUp, ArrowDown, ArrowUpDown } from 'lucide-svelte';
+	import { ChevronDown, ChevronUp, ArrowUp, ArrowDown, ArrowUpDown, Upload, UserPlus } from 'lucide-svelte';
 
 	let { data }: { data: PageData } = $props();
 
@@ -349,7 +349,12 @@
 				<h2 class="text-xl font-semibold text-white">
 					Talent ({filteredAndSortedTalent.length}{searchInput.trim() ? ` of ${data.talent.length}` : ''})
 				</h2>
-				<Button href="/dashboard/talent/new" variant="outline">Add Talent</Button>
+				<Button href="/dashboard/talent/import" variant="outline" class="gap-1.5">
+					<Upload class="size-4" /> Import CSV
+				</Button>
+				<Button href="/dashboard/talent/new" class="gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white">
+					<UserPlus class="size-4" /> Add Talent
+				</Button>
 			</div>
 		</div>
 		<div class="overflow-x-auto">
