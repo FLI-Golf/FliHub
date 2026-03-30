@@ -73,7 +73,7 @@
 				{ title: 'Franchise Forecast', url: '/dashboard/franchise-sales', icon: BarChart3, roles: ['sales', 'admin'] },
 				{ title: 'Franchises', url: '/dashboard/franchises', icon: Trophy },
 				{ title: 'Sponsors', url: '/dashboard/sponsors', icon: Star, roles: ['sales', 'admin'] },
-				{ title: 'Territories', url: '/dashboard/sales', icon: MapPin, roles: ['sales', 'admin'] }
+				{ title: 'Territories', url: '/dashboard/territories', icon: MapPin, roles: ['sales', 'admin'] }
 			]
 		},
 		{
@@ -122,7 +122,7 @@
 			iconActiveClass: 'text-orange-600 dark:text-orange-400',
 			items: [
 				{ title: 'Marketing Goals', url: '/dashboard/marketing-goals', icon: Target },
-				{ title: 'Campaigns', url: '/dashboard/marketing-goals', icon: Megaphone },
+				{ title: 'Campaigns', url: '/dashboard/campaigns', icon: Megaphone },
 				{ title: 'Manager Dashboard', url: '/dashboard/managers', icon: Users, roles: ['admin'] }
 			]
 		},
@@ -150,8 +150,7 @@
 
 	let { ref = $bindable(null), ...restProps }: ComponentProps<typeof Sidebar.Root> = $props();
 
-	const isActive = (url: string) =>
-		$page.url.pathname === url || ($page.url.pathname.startsWith(url + '/') && url !== '/dashboard');
+	const isActive = (url: string) => $page.url.pathname === url;
 
 	const userRole = $derived($page.data?.userProfile?.role || 'admin');
 
@@ -234,7 +233,7 @@
 								>
 									<Icon
 										class="size-4 shrink-0 transition-colors duration-150
-											{active ? group.iconActiveClass : 'text-muted-foreground/70 group-hover/item:text-foreground/80'}"
+											{active ? group.iconActiveClass : `${group.iconActiveClass} opacity-50 group-hover/item:opacity-100`}"
 									/>
 									<span class="truncate leading-none">{item.title}</span>
 

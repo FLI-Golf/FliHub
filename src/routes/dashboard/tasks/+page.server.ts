@@ -11,6 +11,21 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 	try {
 		const tasks = await pb.collection('tasks').getFullList({ sort: '-id' }).catch(() => []);
 
+		// Load expenses linked to tasks so the detail modal can show actual vs budget
+		const taskExpenses = await pb.collection('expenses').getFullList({
+			filter: 'taskId != ""',
+			fields: 'id,taskId,amount,status'
+		}).catch(() => []);
+
+		// Build a map: taskId → { total, paid }
+		const expensesByTask: Record<string, { total: number; paid: number }> = {};
+		for (const exp of taskExpenses) {
+			if (!exp.taskId) continue;
+			if (!expensesByTask[exp.taskId]) expensesByTask[exp.taskId] = { total: 0, paid: 0 };
+			expensesByTask[exp.taskId].total += exp.amount || 0;
+			if (exp.status === 'paid') expensesByTask[exp.taskId].paid += exp.amount || 0;
+		}
+
 		// Calculate task statistics
 		const stats = {
 			total: tasks.length,
@@ -52,6 +67,7 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 
 		return {
 			tasks,
+			expensesByTask,
 			stats,
 			subtaskStats: { total: 0, completed: 0 },
 			alerts: {
@@ -70,6 +86,7 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 		}
 		return {
 			tasks: [],
+			expensesByTask: {},
 			stats: {
 				total: 0,
 				byStatus: { todo: 0, in_progress: 0, blocked: 0, completed: 0, cancelled: 0 },

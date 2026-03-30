@@ -3,7 +3,7 @@
 	import { Badge } from '$lib/components/ui/badge';
 	import type { PageData } from './$types';
 
-	export let data: PageData;
+	let { data }: { data: PageData } = $props();
 
 	const pbUrl = 'https://pocketbase-production-6ab5.up.railway.app';
 
@@ -20,6 +20,25 @@
 				filename,
 				ext: filename.split('.').pop()?.toUpperCase() || ''
 			}));
+	}
+
+	// Lightbox state
+	let lightboxUrl = $state<string | null>(null);
+	let lightboxAlt = $state('');
+
+	function openLightbox(e: MouseEvent, url: string, alt: string) {
+		e.preventDefault();
+		e.stopPropagation();
+		lightboxUrl = url;
+		lightboxAlt = alt;
+	}
+
+	function closeLightbox() {
+		lightboxUrl = null;
+	}
+
+	function onKeydown(e: KeyboardEvent) {
+		if (e.key === 'Escape') closeLightbox();
 	}
 
 	function formatCurrency(value: number | null | undefined): string {
@@ -77,7 +96,11 @@
 							<h4 class="text-sm font-medium text-blue-400 mb-3">Men's Logos (Red-White-Blue)</h4>
 							<div class="grid grid-cols-2 md:grid-cols-4 gap-3">
 								{#each getAllLogoUrls(league, 'logoMens') as logo}
-									<div class="bg-white rounded-lg p-3 flex flex-col items-center">
+									<button
+										type="button"
+										onclick={(e) => openLightbox(e, logo.url, league.name + " Men's Logo")}
+										class="bg-white rounded-lg p-3 flex flex-col items-center cursor-zoom-in hover:ring-2 hover:ring-blue-400 transition-all w-full"
+									>
 										<div class="h-24 w-full flex items-center justify-center mb-2">
 											<img
 												src={logo.url}
@@ -86,7 +109,7 @@
 											/>
 										</div>
 										<span class="text-xs text-gray-500 font-medium">{logo.ext}</span>
-									</div>
+									</button>
 								{/each}
 							</div>
 						</div>
@@ -98,7 +121,11 @@
 							<h4 class="text-sm font-medium text-pink-400 mb-3">Women's Logos (Pink-White-Blue)</h4>
 							<div class="grid grid-cols-2 md:grid-cols-4 gap-3">
 								{#each getAllLogoUrls(league, 'logoWomens') as logo}
-									<div class="bg-white rounded-lg p-3 flex flex-col items-center">
+									<button
+										type="button"
+										onclick={(e) => openLightbox(e, logo.url, league.name + " Women's Logo")}
+										class="bg-white rounded-lg p-3 flex flex-col items-center cursor-zoom-in hover:ring-2 hover:ring-pink-400 transition-all w-full"
+									>
 										<div class="h-24 w-full flex items-center justify-center mb-2">
 											<img
 												src={logo.url}
@@ -107,7 +134,7 @@
 											/>
 										</div>
 										<span class="text-xs text-gray-500 font-medium">{logo.ext}</span>
-									</div>
+									</button>
 								{/each}
 							</div>
 						</div>
@@ -119,7 +146,11 @@
 							<h4 class="text-sm font-medium text-gray-400 mb-3">Monochrome Logos (Black-White)</h4>
 							<div class="grid grid-cols-2 md:grid-cols-4 gap-3">
 								{#each getAllLogoUrls(league, 'logoMonochrome') as logo}
-									<div class="bg-white rounded-lg p-3 flex flex-col items-center">
+									<button
+										type="button"
+										onclick={(e) => openLightbox(e, logo.url, league.name + " Monochrome Logo")}
+										class="bg-white rounded-lg p-3 flex flex-col items-center cursor-zoom-in hover:ring-2 hover:ring-gray-400 transition-all w-full"
+									>
 										<div class="h-24 w-full flex items-center justify-center mb-2">
 											<img
 												src={logo.url}
@@ -128,7 +159,7 @@
 											/>
 										</div>
 										<span class="text-xs text-gray-500 font-medium">{logo.ext}</span>
-									</div>
+									</button>
 								{/each}
 							</div>
 						</div>
@@ -175,3 +206,35 @@
 		</div>
 	{/if}
 </div>
+
+<!-- Lightbox -->
+<svelte:window onkeydown={onKeydown} />
+
+{#if lightboxUrl}
+	<!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
+	<div
+		class="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm"
+		onclick={closeLightbox}
+	>
+		<div
+			class="relative max-w-4xl max-h-[90vh] w-full mx-4"
+			onclick={(e) => e.stopPropagation()}
+		>
+			<button
+				type="button"
+				onclick={closeLightbox}
+				class="absolute -top-10 right-0 text-white/70 hover:text-white text-sm font-medium flex items-center gap-1"
+			>
+				✕ Close
+			</button>
+			<div class="bg-white rounded-xl p-6 flex items-center justify-center min-h-64">
+				<img
+					src={lightboxUrl}
+					alt={lightboxAlt}
+					class="max-h-[75vh] max-w-full object-contain"
+				/>
+			</div>
+			<p class="text-center text-white/60 text-sm mt-3">{lightboxAlt}</p>
+		</div>
+	</div>
+{/if}

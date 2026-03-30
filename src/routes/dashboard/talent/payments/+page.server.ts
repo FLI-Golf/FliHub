@@ -2,6 +2,59 @@ import { RequestContext } from '$lib/infra/RequestContext';
 import type { PageServerLoad, Actions } from './$types';
 import { ProPaymentRepo } from '$lib/infra/pocketbase/repositories';
 import { fail } from '@sveltejs/kit';
+import type PocketBase from 'pocketbase';
+
+/**
+ * Mirror a pro payment as an expense record so it appears in the finance
+ * dashboard and rolls up into department/project budgets.
+ * Safe to call multiple times — checks for an existing linked expense first.
+ */
+async function syncExpenseForPayment(pb: PocketBase, paymentId: string): Promise<void> {
+	try {
+		const payment = await pb.collection('pro_payments').getOne(paymentId, {
+			expand: 'pro'
+		});
+
+		// Only sync paid or pending payments (skip cancelled)
+		if (payment.status === 'cancelled') return;
+
+		// Check if an expense already exists for this payment
+		const existing = await pb.collection('expenses').getFullList({
+			filter: `proPaymentId = "${paymentId}"`,
+			fields: 'id'
+		}).catch(() => []);
+
+		const proName = payment.expand?.pro?.name ?? 'Unknown Pro';
+		const paymentTypeLabel: Record<string, string> = {
+			tournament:    'Tournament Prize',
+			special_event: 'Special Event Payment',
+			bonus:         'Bonus',
+			salary:        'Salary',
+			appearance_fee:'Appearance Fee',
+			other:         'Payment'
+		};
+		const label = paymentTypeLabel[payment.paymentType] ?? 'Pro Payment';
+
+		const expenseData = {
+			amount:       payment.amount,
+			category:     'talent_payment',
+			status:       payment.status === 'paid' ? 'paid' : 'submitted',
+			date:         payment.paymentDate || payment.dueDate || new Date().toISOString().split('T')[0],
+			description:  `${label} — ${proName}`,
+			notes:        payment.notes || '',
+			proPaymentId: paymentId
+		};
+
+		if (existing.length > 0) {
+			await pb.collection('expenses').update(existing[0].id, expenseData);
+		} else {
+			await pb.collection('expenses').create(expenseData);
+		}
+	} catch (err) {
+		// Non-fatal — log but don't block the payment action
+		console.error('syncExpenseForPayment failed:', err);
+	}
+}
 
 export const load: PageServerLoad = async ({ locals, url }) => {
 	const ctx = await RequestContext.from(locals, url);
@@ -73,6 +126,7 @@ export const actions: Actions = {
 
 		try {
 			const payment = await pb.collection('pro_payments').create(data);
+			await syncExpenseForPayment(pb, payment.id);
 			return { success: true, payment };
 		} catch (error: any) {
 			console.error('Error creating payment:', error);
@@ -102,6 +156,7 @@ export const actions: Actions = {
 
 		try {
 			const payment = await pb.collection('pro_payments').update(id, data);
+			await syncExpenseForPayment(pb, payment.id);
 			return { success: true, payment };
 		} catch (error: any) {
 			console.error('Error updating payment:', error);
@@ -119,6 +174,7 @@ export const actions: Actions = {
 				status: 'paid',
 				paymentDate: new Date().toISOString().split('T')[0]
 			});
+			await syncExpenseForPayment(pb, payment.id);
 			return { success: true, payment };
 		} catch (error: any) {
 			console.error('Error marking payment as paid:', error);
