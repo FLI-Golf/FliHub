@@ -10,11 +10,6 @@
 
 	const phases = [
 		{ 
-			value: 'all', 
-			label: 'All Phases',
-			dateRange: '2026 - 2027'
-		},
-		{ 
 			value: 'phase1', 
 			label: 'Phase 1',
 			dateRange: 'Jan - Sep 2026'
@@ -28,6 +23,11 @@
 			value: 'phase3', 
 			label: 'Phase 3',
 			dateRange: 'Apr - Dec 2027'
+		},
+		{ 
+			value: 'all', 
+			label: 'All Phases',
+			dateRange: '2026 - 2027'
 		}
 	];
 </script>
