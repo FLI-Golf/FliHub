@@ -23,7 +23,8 @@
 		BarChart3,
 		Network,
 		ShieldCheck,
-		ChevronRight
+		ChevronRight,
+		Landmark
 	} from 'lucide-svelte';
 
 	type NavItem = {
@@ -127,6 +128,19 @@
 			]
 		},
 		{
+			id: 'finance',
+			title: 'Finance',
+			labelClass: 'text-amber-600 dark:text-amber-400',
+			activeClass: 'bg-amber-50 dark:bg-amber-950/60 text-amber-900 dark:text-amber-100',
+			hoverClass: 'hover:bg-amber-50 dark:hover:bg-amber-950/40 hover:text-amber-900 dark:hover:text-amber-100',
+			borderClass: 'border-amber-500',
+			iconActiveClass: 'text-amber-600 dark:text-amber-400',
+			roles: ['admin'],
+			items: [
+				{ title: 'Funding Model', url: '/dashboard/funding-model', icon: Landmark, roles: ['admin'] }
+			]
+		},
+		{
 			id: 'system',
 			title: 'System',
 			labelClass: 'text-rose-600 dark:text-rose-400',
@@ -160,6 +174,7 @@
 		operations: true,
 		league: true,
 		marketing: true,
+		finance: true,
 		system: true
 	});
 

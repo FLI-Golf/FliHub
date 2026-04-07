@@ -38,7 +38,8 @@
 		'/dashboard/marketing-goals': 'Marketing Goals',
 		'/dashboard/managers': 'Manager Dashboard',
 		'/dashboard/schema-guide': 'Schema Guide',
-		'/dashboard/admin': 'Admin Panel'
+		'/dashboard/admin': 'Admin Panel',
+		'/dashboard/funding-model': 'Funding Model'
 	};
 
 	$: currentLabel = routeLabels[$page.url.pathname] ?? 'Dashboard';

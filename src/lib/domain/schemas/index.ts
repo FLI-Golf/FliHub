@@ -21,6 +21,9 @@ export * from './franchise-territory.schema';
 export * from './sponsor.schema';
 export * from './sponsor-franchise-bridge.schema';
 
+// Funding model
+export * from './funding-model.schema';
+
 // Business & Marketing schemas
 export * from './brand-positioning.schema';
 export * from './budget.schema';
