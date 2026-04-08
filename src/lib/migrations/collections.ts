@@ -885,5 +885,134 @@ export const collections = [
 		createRule: '@request.auth.id != ""',
 		updateRule: '@request.auth.id != ""',
 		deleteRule: '@request.auth.id != ""'
+	},
+
+	// ─── Onboarding: tracks per-user completion state ───────────────────────
+	{
+		name: 'onboarding_status',
+		type: 'base',
+		schema: [
+			{ name: 'userId', type: 'text', required: true, options: { max: 255 } },
+			{ name: 'welcomeSeen', type: 'bool', required: false },
+			{ name: 'documentsInitialed', type: 'bool', required: false },
+			{ name: 'contractSigned', type: 'bool', required: false },
+			{ name: 'profileCompleted', type: 'bool', required: false },
+			{ name: 'completedAt', type: 'date', required: false }
+		],
+		listRule: '@request.auth.id != ""',
+		viewRule: '@request.auth.id != ""',
+		createRule: '@request.auth.id != ""',
+		updateRule: '@request.auth.id != ""',
+		deleteRule: null
+	},
+
+	// ─── Document signatures: stores initials/signature per document per user ─
+	{
+		name: 'document_signatures',
+		type: 'base',
+		schema: [
+			{ name: 'userId', type: 'text', required: true, options: { max: 255 } },
+			{
+				name: 'documentType',
+				type: 'select',
+				required: true,
+				options: {
+					maxSelect: 1,
+					values: [
+						'player_information_packet',
+						'player_opportunity_packet',
+						'integrity_substance_policy',
+						'player_contract',
+						'legal_documents'
+					]
+				}
+			},
+			{ name: 'initials', type: 'text', required: false, options: { max: 10 } },
+			{ name: 'signatureDataUrl', type: 'text', required: false },
+			{ name: 'fullName', type: 'text', required: false, options: { max: 255 } },
+			{ name: 'signedAt', type: 'date', required: false },
+			{ name: 'ipAddress', type: 'text', required: false, options: { max: 100 } },
+			{ name: 'agreed', type: 'bool', required: false }
+		],
+		listRule: '@request.auth.id != ""',
+		viewRule: '@request.auth.id != ""',
+		createRule: '@request.auth.id != ""',
+		updateRule: '@request.auth.id != ""',
+		deleteRule: null
+	},
+
+	// ─── Player profiles: the detailed onboarding questionnaire ─────────────
+	{
+		name: 'player_profiles',
+		type: 'base',
+		schema: [
+			// Personal Information
+			{ name: 'userId', type: 'text', required: true, options: { max: 255 } },
+			{ name: 'fullName', type: 'text', required: false, options: { max: 255 } },
+			{ name: 'dateOfBirth', type: 'date', required: false },
+			{ name: 'nationality', type: 'text', required: false, options: { max: 255 } },
+			{ name: 'countryOfResidence', type: 'text', required: false, options: { max: 255 } },
+			{ name: 'primaryLanguages', type: 'text', required: false, options: { max: 255 } },
+			{ name: 'phone', type: 'text', required: false, options: { max: 50 } },
+			{ name: 'email', type: 'email', required: false },
+			{ name: 'mailingAddress', type: 'text', required: false, options: { max: 500 } },
+			{ name: 'emergencyContactName', type: 'text', required: false, options: { max: 255 } },
+			{ name: 'emergencyContactRelationship', type: 'text', required: false, options: { max: 100 } },
+			{ name: 'emergencyContactPhone', type: 'text', required: false, options: { max: 50 } },
+			{ name: 'emergencyContactEmail', type: 'email', required: false },
+			// Competitive Background
+			{ name: 'worldRanking', type: 'number', required: false },
+			{ name: 'yearsCompeting', type: 'number', required: false },
+			{ name: 'majorTournamentWins', type: 'text', required: false },
+			{ name: 'notableAchievements', type: 'text', required: false },
+			{ name: 'otherLeagues', type: 'text', required: false, options: { max: 500 } },
+			{ name: 'playingStyle', type: 'text', required: false, options: { max: 255 } },
+			{ name: 'strongestSkills', type: 'text', required: false, options: { max: 500 } },
+			{ name: 'knownInjuries', type: 'text', required: false, options: { max: 500 } },
+			// Branding & Media
+			{ name: 'broadcastNickname', type: 'text', required: false, options: { max: 100 } },
+			{ name: 'instagram', type: 'text', required: false, options: { max: 255 } },
+			{ name: 'twitter', type: 'text', required: false, options: { max: 255 } },
+			{ name: 'youtube', type: 'text', required: false, options: { max: 255 } },
+			{ name: 'otherSocialMedia', type: 'text', required: false, options: { max: 500 } },
+			{ name: 'personalWebsite', type: 'url', required: false },
+			{ name: 'mediaFeatures', type: 'text', required: false },
+			{ name: 'comfortableWithInterviews', type: 'bool', required: false },
+			{ name: 'openToBehindScenes', type: 'bool', required: false },
+			// Sponsorship
+			{ name: 'currentSponsorships', type: 'text', required: false },
+			{ name: 'openToNewSponsors', type: 'bool', required: false },
+			{ name: 'wantsLeagueSponsorHelp', type: 'bool', required: false },
+			{ name: 'personalBrandingGoals', type: 'text', required: false },
+			// Management / Representation
+			{ name: 'hasAgent', type: 'bool', required: false },
+			{ name: 'repName', type: 'text', required: false, options: { max: 255 } },
+			{ name: 'repAgency', type: 'text', required: false, options: { max: 255 } },
+			{ name: 'repPosition', type: 'text', required: false, options: { max: 100 } },
+			{ name: 'repPhone', type: 'text', required: false, options: { max: 50 } },
+			{ name: 'repEmail', type: 'email', required: false },
+			// Betting & Integrity
+			{ name: 'participatedInBetting', type: 'bool', required: false },
+			{ name: 'understandsIntegrityPolicy', type: 'bool', required: false },
+			{ name: 'priorIntegrityViolations', type: 'bool', required: false },
+			{ name: 'integrityViolationDetails', type: 'text', required: false },
+			// Additional
+			{ name: 'excitementAboutLeague', type: 'text', required: false },
+			{ name: 'careerGoals', type: 'text', required: false },
+			{ name: 'additionalInfo', type: 'text', required: false },
+			// Status
+			{
+				name: 'status',
+				type: 'select',
+				required: false,
+				options: { maxSelect: 1, values: ['draft', 'submitted', 'approved'] }
+			},
+			{ name: 'submittedAt', type: 'date', required: false }
+		],
+		listRule: '@request.auth.id != ""',
+		viewRule: '@request.auth.id != ""',
+		createRule: '@request.auth.id != ""',
+		updateRule: '@request.auth.id != ""',
+		deleteRule: null
 	}
 ];

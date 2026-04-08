@@ -25,7 +25,7 @@ import type PocketBase from 'pocketbase';
 import { redirect } from '@sveltejs/kit';
 import { getAdminPocketBase } from './pocketbase/pbClient';
 
-export type UserRole = 'admin' | 'sales' | 'leader' | 'vendor' | 'pro' | 'franchise_owner';
+export type UserRole = 'admin' | 'sales' | 'leader' | 'vendor' | 'pro' | 'franchise_owner' | 'broadcaster' | 'manager' | 'league_owner';
 
 export interface UserProfile {
 	id: string;
@@ -61,7 +61,7 @@ export class RequestContext {
 	}
 
 	get role(): UserRole {
-		return this.profile?.role ?? 'leader';
+		return (this.profile?.role as UserRole) ?? 'leader';
 	}
 
 	get isAdmin(): boolean {
