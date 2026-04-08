@@ -1,4 +1,4 @@
-import { redirect, fail } from '@sveltejs/kit';
+import { redirect, fail, isRedirect } from '@sveltejs/kit';
 import type { Actions, PageServerLoad } from './$types';
 
 export const load: PageServerLoad = async ({ locals }) => {
@@ -25,6 +25,10 @@ export const load: PageServerLoad = async ({ locals }) => {
 					throw redirect(303, '/dashboard/departments');
 				}
 				throw redirect(303, `/dashboard/department/${userProfile.departmentId}`);
+			}
+
+			if (['pro', 'manager', 'broadcaster'].includes(userProfile?.role)) {
+				throw redirect(303, '/dashboard/welcome');
 			}
 		}
 		
@@ -84,12 +88,29 @@ export const actions: Actions = {
 					// Redirect to department-specific dashboard
 					throw redirect(303, `/dashboard/department/${userProfile.departmentId}`);
 				}
+
+				// Pro, manager, broadcaster — send to welcome/onboarding flow
+				if (['pro', 'manager', 'broadcaster'].includes(userProfile.role)) {
+					// Check if they've already seen the welcome page
+					try {
+						const pb = locals.pb;
+						const onboardingRecords = await pb.collection('onboarding_status').getFullList({
+							filter: `userId = "${userId}"`
+						});
+						const onboarding = onboardingRecords[0];
+						if (onboarding?.welcomeSeen) {
+							throw redirect(303, '/dashboard/onboarding');
+						}
+					} catch (redirectErr) {
+						if (isRedirect(redirectErr)) throw redirectErr;
+						// Collection doesn't exist yet — send to welcome
+					}
+					throw redirect(303, '/dashboard/welcome');
+				}
 			}
 		} catch (error) {
-			// If it's a redirect, re-throw it
-			if (error instanceof Response && error.status === 303) {
-				throw error;
-			}
+			// Re-throw SvelteKit redirects — must not be swallowed
+			if (isRedirect(error)) throw error;
 			console.error('Error checking user profile:', error);
 			// Continue to default dashboard if there's an error
 		}

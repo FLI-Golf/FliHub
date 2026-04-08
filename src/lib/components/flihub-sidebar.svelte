@@ -24,7 +24,11 @@
 		Network,
 		ShieldCheck,
 		ChevronRight,
-		Landmark
+		Landmark,
+		PartyPopper,
+		FileText,
+		PenLine,
+		ClipboardList
 	} from 'lucide-svelte';
 
 	type NavItem = {
@@ -48,6 +52,22 @@
 	};
 
 	const navGroups: NavGroup[] = [
+		// ── Onboarding group — only visible to pro, manager, broadcaster ──
+		{
+			id: 'onboarding',
+			title: 'My Onboarding',
+			labelClass: 'text-emerald-600 dark:text-emerald-400',
+			activeClass: 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-900 dark:text-emerald-100',
+			hoverClass: 'hover:bg-emerald-50 dark:hover:bg-emerald-950/40 hover:text-emerald-900 dark:hover:text-emerald-100',
+			borderClass: 'border-emerald-500',
+			iconActiveClass: 'text-emerald-600 dark:text-emerald-400',
+			roles: ['pro', 'manager', 'broadcaster'],
+			items: [
+				{ title: 'Welcome', url: '/dashboard/welcome', icon: PartyPopper, roles: ['pro', 'manager', 'broadcaster'] },
+				{ title: 'Documents & Signing', url: '/dashboard/onboarding', icon: FileText, roles: ['pro', 'manager', 'broadcaster'] },
+				{ title: 'Player Profile', url: '/dashboard/player-profile', icon: ClipboardList, roles: ['pro', 'manager', 'broadcaster'] }
+			]
+		},
 		{
 			id: 'overview',
 			title: 'Overview',

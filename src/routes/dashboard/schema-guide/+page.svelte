@@ -2939,18 +2939,76 @@
 					<div>
 						<h2 class="text-xl font-bold">Talent System Overview</h2>
 						<p class="text-sm text-muted-foreground mt-1">
-							How players and on-air talent are contracted, rostered, compete, and get paid.
+							How players, managers, and broadcasters are onboarded, contracted, rostered, compete, and get paid.
 						</p>
 					</div>
 					<div class="p-4 bg-cyan-950/40 border border-cyan-700/50 rounded-lg text-sm text-cyan-200">
 						The <code class="font-mono bg-black/30 px-1 rounded">talent</code> collection covers everyone contracted to FLI Golf — not just players. A single record can hold multiple types (e.g. a player who also does commentary). Only talent with <code class="font-mono bg-black/30 px-1 rounded">talentType = player</code> appear in tournament standings and earn placement-based prize money. All talent types receive payments via <code class="font-mono bg-black/30 px-1 rounded">pro_payments</code>. Prize payments are created automatically when tournament results are entered — no manual entry needed.
 					</div>
+
+					<!-- Role → onboarding flow summary -->
+					<div class="p-4 bg-emerald-950/40 border border-emerald-700/50 rounded-lg text-sm text-emerald-200 space-y-2">
+						<div class="font-semibold text-emerald-100">Onboarding Flow (Pros, Managers, Broadcasters)</div>
+						<div>When a user with role <code class="font-mono bg-black/30 px-1 rounded">pro</code>, <code class="font-mono bg-black/30 px-1 rounded">manager</code>, or <code class="font-mono bg-black/30 px-1 rounded">broadcaster</code> signs in, they are routed through a dedicated onboarding sequence before reaching the main dashboard. The sequence is tracked in <code class="font-mono bg-black/30 px-1 rounded">onboarding_status</code> and consists of four steps:</div>
+						<ol class="list-decimal list-inside space-y-1 pl-1 opacity-90">
+							<li><span class="font-semibold">Welcome</span> — league overview, format, benefits, and expectations at <code class="font-mono bg-black/30 px-1 rounded">/dashboard/welcome</code>.</li>
+							<li><span class="font-semibold">Documents</span> — four documents initialed + one contract with full drawn signature at <code class="font-mono bg-black/30 px-1 rounded">/dashboard/onboarding</code>. Each signature is stored in <code class="font-mono bg-black/30 px-1 rounded">document_signatures</code>.</li>
+							<li><span class="font-semibold">Player Profile</span> — 7-section questionnaire (personal info, competitive background, branding, sponsorship, management, integrity, additional) at <code class="font-mono bg-black/30 px-1 rounded">/dashboard/player-profile</code>. Stored in <code class="font-mono bg-black/30 px-1 rounded">player_profiles</code>.</li>
+							<li><span class="font-semibold">Complete</span> — all steps done; user proceeds to their role-specific dashboard.</li>
+						</ol>
+					</div>
+				</div>
+			</Card>
+
+			<!-- Roles that use the onboarding flow -->
+			<Card class="p-6">
+				<h2 class="text-xl font-bold mb-1">Onboarding Roles</h2>
+				<p class="text-sm text-muted-foreground mb-4">These three <code class="font-mono">user_profiles.role</code> values trigger the onboarding flow on login and have access to the My Onboarding sidebar group.</p>
+				<div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+					{#each [
+						{
+							role: 'pro',
+							color: 'bg-cyan-900/40 border-cyan-600/50 text-cyan-200',
+							badge: 'bg-cyan-800/60 text-cyan-100',
+							desc: 'A competing player. Appears in tournament standings and earns placement-based prize money. Rostered to a franchise. Must complete all onboarding documents and the full player profile.',
+							access: ['tournament_results (read own)', 'pro_payments (read own)', 'player_profiles (own)', 'document_signatures (own)']
+						},
+						{
+							role: 'manager',
+							color: 'bg-amber-900/40 border-amber-600/50 text-amber-200',
+							badge: 'bg-amber-800/60 text-amber-100',
+							desc: 'Represents one or more pros. Linked to talent records via pro_access with accessType = manager. Can view and manage their clients\' profiles, payments, and contracts. Must complete onboarding documents.',
+							access: ['talent (read managed)', 'pro_payments (read managed)', 'pro_access (own)', 'document_signatures (own)']
+						},
+						{
+							role: 'broadcaster',
+							color: 'bg-violet-900/40 border-violet-600/50 text-violet-200',
+							badge: 'bg-violet-800/60 text-violet-100',
+							desc: 'On-air talent covering events. Paid via pro_payments (salary or appearance fee). Does not appear in tournament_results. Linked to talent records via pro_access with accessType = broadcaster. Must complete onboarding documents.',
+							access: ['tournaments (read)', 'talent (read)', 'pro_payments (read own)', 'document_signatures (own)']
+						}
+					] as r}
+						<div class="p-4 rounded-lg border {r.color} space-y-2">
+							<div class="flex items-center gap-2">
+								<span class="font-mono font-bold text-sm">{r.role}</span>
+								<span class="text-[10px] px-1.5 py-0.5 rounded font-semibold {r.badge}">onboarding required</span>
+							</div>
+							<div class="text-[11px] opacity-80 leading-snug">{r.desc}</div>
+							<div class="pt-1 border-t border-white/10">
+								<div class="text-[10px] font-semibold opacity-60 uppercase tracking-wide mb-1">Key access</div>
+								{#each r.access as a}
+									<div class="text-[10px] font-mono opacity-70">• {a}</div>
+								{/each}
+							</div>
+						</div>
+					{/each}
 				</div>
 			</Card>
 
 			<!-- Talent types -->
 			<Card class="p-6">
-				<h2 class="text-xl font-bold mb-4">Talent Types</h2>
+				<h2 class="text-xl font-bold mb-1">Talent Types</h2>
+				<p class="text-sm text-muted-foreground mb-4">The <code class="font-mono">talentType</code> field on a <code class="font-mono">talent</code> record is separate from the user account role. A broadcaster user account can be linked to a talent record with <code class="font-mono">talentType = broadcaster</code>.</p>
 				<div class="grid grid-cols-2 md:grid-cols-4 gap-3">
 					{#each [
 						{ type: 'player', color: 'bg-cyan-900/40 border-cyan-600/50 text-cyan-200', desc: 'Competes in tournaments. Appears in standings. Earns placement-based prize money from the division purse. Rostered to a franchise.' },
@@ -3043,6 +3101,7 @@
 					</div>
 				</div>
 			</Card>
+
 
 			{#if viewMode === 'table'}
 				<div class="grid gap-6">
