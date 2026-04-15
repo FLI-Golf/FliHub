@@ -196,6 +196,8 @@
 				{#each years as yr}
 					{@const isSelected = yr === selectedYear}
 					{@const hasGlobal = totals[yr] >= 3_000_000}
+					{@const domTotal = domesticChannelKeys.reduce((s, k) => s + (channels.find(c=>c.key===k)?.values[yr] ?? 0), 0)}
+					{@const glbTotal = globalChannelKeys.reduce((s, k) => s + (channels.find(c=>c.key===k)?.values[yr] ?? 0), 0)}
 					<button class="w-full text-left group" onclick={() => selectedYear = yr}>
 						<div class="flex items-center gap-3 mb-1">
 							<span class="text-sm font-semibold w-10 shrink-0 {isSelected ? 'text-foreground' : 'text-muted-foreground'}">{yr}</span>
@@ -205,8 +207,6 @@
 							{/if}
 							<span class="ml-auto text-sm font-bold {isSelected ? 'text-foreground' : 'text-muted-foreground'}">{fmtM(totals[yr])}</span>
 						</div>
-						{@const domTotal = domesticChannelKeys.reduce((s, k) => s + (channels.find(c=>c.key===k)?.values[yr] ?? 0), 0)}
-						{@const glbTotal = globalChannelKeys.reduce((s, k) => s + (channels.find(c=>c.key===k)?.values[yr] ?? 0), 0)}
 						<div class="flex h-6 rounded-md overflow-hidden gap-px {isSelected ? 'ring-2 ring-primary/40' : 'opacity-70 group-hover:opacity-90 transition-opacity'}">
 							<div class="bg-gradient-to-r from-blue-600 to-emerald-500 transition-all" style="width: {pct(domTotal, maxTotal)}"></div>
 							{#if glbTotal > 0}
