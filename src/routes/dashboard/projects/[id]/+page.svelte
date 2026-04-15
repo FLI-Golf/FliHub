@@ -194,6 +194,7 @@
 		bind:open={showAddVendorModal} 
 		projectId={project.id}
 		existingVendors={data.allVendors}
+		currentVendorIds={project.vendors || []}
 	/>
 
 	<!-- Add Expense Modal -->
