@@ -8,7 +8,8 @@
 	let { 
 		open = $bindable(false),
 		projectId,
-		existingVendors = []
+		existingVendors = [],
+		currentVendorIds = [] as string[]
 	} = $props();
 
 	// State
@@ -51,13 +52,16 @@
 		error = '';
 
 		try {
+			// Merge new selections with already-assigned vendors to avoid overwriting
+			const mergedVendorIds = [...new Set([...currentVendorIds, ...selectedVendorIds])];
+
 			const response = await fetch(`/api/projects/${projectId}`, {
 				method: 'PATCH',
 				headers: {
 					'Content-Type': 'application/json'
 				},
 				body: JSON.stringify({
-					vendors: selectedVendorIds
+					vendors: mergedVendorIds
 				})
 			});
 
@@ -97,14 +101,14 @@
 
 			const newVendor = await response.json();
 
-			// Assign the new vendor to the project
+			// Assign the new vendor to the project, preserving existing assignments
 			await fetch(`/api/projects/${projectId}`, {
 				method: 'PATCH',
 				headers: {
 					'Content-Type': 'application/json'
 				},
 				body: JSON.stringify({
-					vendors: [newVendor.id]
+					vendors: [...new Set([...currentVendorIds, newVendor.id])]
 				})
 			});
 

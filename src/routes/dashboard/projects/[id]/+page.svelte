@@ -194,6 +194,7 @@
 		bind:open={showAddVendorModal} 
 		projectId={project.id}
 		existingVendors={data.allVendors}
+		currentVendorIds={project.vendors || []}
 	/>
 
 	<!-- Add Expense Modal -->
@@ -264,7 +265,13 @@
 	<!-- Project Details -->
 	<div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
 		<!-- Info Card — click anywhere to edit -->
-		<Card class="p-6 cursor-pointer hover:ring-2 hover:ring-blue-500/50 transition-all" onclick={() => showEditModal = true}>
+		<Card class="p-6 relative hover:ring-2 hover:ring-blue-500/50 transition-all">
+			<button
+				onclick={() => showEditModal = true}
+				class="absolute inset-0 w-full h-full cursor-pointer rounded-lg"
+				aria-label="Edit project details"
+			></button>
+			<div class="relative pointer-events-none">
 			<h2 class="text-xl font-semibold mb-4 flex items-center gap-2">
 				<FileText class="size-5" />
 				Project Details
@@ -308,6 +315,7 @@
 					</div>
 				{/if}
 				<p class="text-xs text-muted-foreground pt-2 border-t">Click to edit details</p>
+			</div>
 			</div>
 		</Card>
 

@@ -224,7 +224,7 @@
 
 					<!-- Sponsorship block -->
 					<div class="space-y-1.5">
-						<p class="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+						<p class="text-[10px] font-bold uppercase tracking-widest text-emerald-800 dark:text-emerald-200">
 							Sponsorship Revenue — {fmtM(c.sponsorshipRevenue)}
 						</p>
 						{#each [
@@ -234,14 +234,14 @@
 							{ label: 'Fan Interaction / Grab Bag', val: model.rev_fan_interaction, icon: Users }
 						] as item}
 							<div
-								class="flex items-center justify-between py-2 px-3 rounded-lg bg-emerald-50/60 dark:bg-emerald-950/20"
+								class="flex items-center justify-between py-2 px-3 rounded-lg bg-emerald-200 dark:bg-emerald-900/60"
 							>
 								<div class="flex items-center gap-2">
-									<ArrowDown class="size-3 text-emerald-500 shrink-0" />
-									<item.icon class="size-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
-									<p class="text-sm">{item.label}</p>
+									<ArrowDown class="size-3 text-emerald-700 dark:text-emerald-300 shrink-0" />
+									<item.icon class="size-4 text-emerald-700 dark:text-emerald-300 shrink-0" />
+									<p class="text-sm font-bold text-emerald-900 dark:text-emerald-100">{item.label}</p>
 								</div>
-								<p class="text-sm font-semibold text-emerald-700 dark:text-emerald-300">
+								<p class="text-sm font-bold text-emerald-900 dark:text-emerald-100">
 									-{fmtM(item.val)}
 								</p>
 							</div>
@@ -250,7 +250,7 @@
 
 					<!-- Other revenue -->
 					<div class="space-y-1.5">
-						<p class="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+						<p class="text-[10px] font-bold uppercase tracking-widest text-emerald-800 dark:text-emerald-200">
 							Other Pre-Season Revenue
 						</p>
 						{#each [
@@ -263,11 +263,11 @@
 								class="flex items-center justify-between py-2 px-3 rounded-lg bg-emerald-50/60 dark:bg-emerald-950/20"
 							>
 								<div class="flex items-center gap-2">
-									<ArrowDown class="size-3 text-emerald-500 shrink-0" />
-									<item.icon class="size-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
-									<p class="text-sm">{item.label}</p>
+									<ArrowDown class="size-3 text-emerald-700 dark:text-emerald-300 shrink-0" />
+									<item.icon class="size-4 text-emerald-700 dark:text-emerald-300 shrink-0" />
+									<p class="text-sm font-bold text-emerald-900 dark:text-emerald-100">{item.label}</p>
 								</div>
-								<p class="text-sm font-semibold text-emerald-700 dark:text-emerald-300">
+								<p class="text-sm font-bold text-emerald-900 dark:text-emerald-100">
 									-{fmtM(item.val)}
 								</p>
 							</div>

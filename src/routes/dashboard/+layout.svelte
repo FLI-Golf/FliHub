@@ -124,12 +124,18 @@
 							<Settings class="size-4 text-muted-foreground" />
 							<span>Settings</span>
 						</DropdownMenu.Item>
-						<DropdownMenu.Item class="gap-2 cursor-pointer text-destructive focus:text-destructive focus:bg-destructive/10">
-							<LogOut class="size-4" />
-							<form method="POST" action="/auth/logout" class="w-full">
-								<button type="submit" class="w-full text-left">Logout</button>
+						<DropdownMenu.Separator />
+						<div class="px-1 pb-1">
+							<form method="POST" action="/auth/logout">
+								<button
+									type="submit"
+									class="flex w-full items-center gap-2 rounded-md bg-red-600 hover:bg-red-700 active:bg-red-800 px-3 py-2 text-sm font-semibold text-white transition-colors"
+								>
+									<LogOut class="size-4 shrink-0" />
+									Logout
+								</button>
 							</form>
-						</DropdownMenu.Item>
+						</div>
 					</DropdownMenu.Content>
 				</DropdownMenu.Root>
 			</div>
