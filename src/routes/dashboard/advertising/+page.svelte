@@ -205,10 +205,9 @@
 							{/if}
 							<span class="ml-auto text-sm font-bold {isSelected ? 'text-foreground' : 'text-muted-foreground'}">{fmtM(totals[yr])}</span>
 						</div>
+						{@const domTotal = domesticChannelKeys.reduce((s, k) => s + (channels.find(c=>c.key===k)?.values[yr] ?? 0), 0)}
+						{@const glbTotal = globalChannelKeys.reduce((s, k) => s + (channels.find(c=>c.key===k)?.values[yr] ?? 0), 0)}
 						<div class="flex h-6 rounded-md overflow-hidden gap-px {isSelected ? 'ring-2 ring-primary/40' : 'opacity-70 group-hover:opacity-90 transition-opacity'}">
-							<!-- Domestic channels portion -->
-							{@const domTotal = domesticChannelKeys.reduce((s, k) => s + (channels.find(c=>c.key===k)?.values[yr] ?? 0), 0)}
-							{@const glbTotal = globalChannelKeys.reduce((s, k) => s + (channels.find(c=>c.key===k)?.values[yr] ?? 0), 0)}
 							<div class="bg-gradient-to-r from-blue-600 to-emerald-500 transition-all" style="width: {pct(domTotal, maxTotal)}"></div>
 							{#if glbTotal > 0}
 								<div class="bg-gradient-to-r from-violet-600 to-pink-500 transition-all" style="width: {pct(glbTotal, maxTotal)}"></div>
