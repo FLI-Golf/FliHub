@@ -20,7 +20,7 @@ export type PhaseFilter = 'all' | 'phase1' | 'phase2' | 'phase3';
 export class DepartmentProvider {
 	// Reactive state via Svelte 5 runes
 	readonly department = $state<DepartmentDetailDTO | null>(null);
-	selectedPhase = $state<PhaseFilter>('all');
+	selectedPhase = $state<PhaseFilter>('phase1');
 	activeTab = $state<string>('overview');
 	isLoading = $state(false);
 	error = $state<string | null>(null);

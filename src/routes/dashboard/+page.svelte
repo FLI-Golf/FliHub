@@ -173,11 +173,11 @@
 				</Button>
 			</div>
 			<Card class="divide-y">
-				{#each deptBudgets.slice(0, 8) as dept}
+				{#each deptBudgets.slice(0, 8) as dept, i}
 					{@const used = pct(dept.actual ?? 0, dept.budget ?? 1)}
 					{@const deptIcon = getDeptIcon(dept.name)}
 					<a href="/dashboard/departments/{dept.id}"
-						class="flex items-center gap-4 px-4 py-3 hover:bg-muted/50 transition-colors group">
+						class="flex items-center gap-4 px-4 py-3 hover:bg-muted/50 transition-colors group {i % 2 === 1 ? 'bg-muted/30' : ''}">
 						<div class="flex size-8 items-center justify-center rounded-lg {deptIcon.bg} shrink-0">
 							<deptIcon.icon class="size-4 {deptIcon.fg}" />
 						</div>
