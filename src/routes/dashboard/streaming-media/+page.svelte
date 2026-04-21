@@ -22,15 +22,15 @@
 			dealType: 'Free / minimal cost to partners'
 		},
 		{
-			year: 2027, revenue: 0, phase: 'Audience Expansion', phaseNum: 1,
-			focus: 'Continued distribution growth',
-			actions: ['Improved broadcast production', 'Expanded international reach', 'Stronger social media engagement', 'Growth in fantasy & betting ecosystems'],
-			dealType: 'Free / minimal cost to partners'
+			year: 2027, revenue: 500_000, phase: 'Early Monetization', phaseNum: 2,
+			focus: 'Initial streaming rights monetization',
+			actions: ['Digital sports networks', 'International streaming platforms', 'Sports betting media partners'],
+			dealType: 'Non-exclusive licensing'
 		},
 		{
 			year: 2028, revenue: 1_000_000, phase: 'Early Monetization', phaseNum: 2,
-			focus: 'Initial streaming rights monetization',
-			actions: ['Digital sports networks', 'International streaming platforms', 'Sports betting media partners'],
+			focus: 'Growing streaming rights revenue',
+			actions: ['Expanded digital sports network deals', 'International streaming platforms', 'Sports betting media partners'],
 			dealType: 'Non-exclusive licensing'
 		},
 		{
@@ -97,8 +97,8 @@
 		<h2 class="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-4">Strategy Phases</h2>
 		<div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
 			{#each [
-				{ num: 1, label: 'Audience Expansion', years: '2026–2027', revenue: '$0', color: 'border-blue-500/40 bg-blue-500/5', textColor: 'text-blue-400', desc: 'Maximum distribution, free to partners, build viewership metrics' },
-				{ num: 2, label: 'Early Monetization', years: '2028–2029', revenue: '$1M–$3M', color: 'border-amber-500/40 bg-amber-500/5', textColor: 'text-amber-400', desc: 'Non-exclusive licensing, hybrid regional/international deals' },
+				{ num: 1, label: 'Audience Expansion', years: '2026', revenue: '$0', color: 'border-blue-500/40 bg-blue-500/5', textColor: 'text-blue-400', desc: 'Maximum distribution, free to partners, build viewership metrics' },
+				{ num: 2, label: 'Early Monetization', years: '2027–2029', revenue: '$500K–$3M', color: 'border-amber-500/40 bg-amber-500/5', textColor: 'text-amber-400', desc: 'Non-exclusive licensing, hybrid regional/international deals' },
 				{ num: 3, label: 'Exclusive Rights', years: '2030–2031', revenue: '$10M–$25M', color: 'border-emerald-500/40 bg-emerald-500/5', textColor: 'text-emerald-400', desc: 'Exclusive broadcast partnerships, production funding, global distribution' }
 			] as phase}
 				<div class="rounded-xl border {phase.color} p-4 flex flex-col gap-2">

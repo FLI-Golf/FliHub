@@ -30,7 +30,7 @@
 			drivers: ['Early brand validation', 'Low-risk partner entry']
 		},
 		{
-			year: 2028, licensees: 5, avgGuarantee: 140_000, guarantees: 700_000, royalties: 300_000, total: 1_000_000,
+			year: 2028, licensees: 5, avgGuarantee: 140_000, guarantees: 900_000, royalties: 300_000, total: 1_200_000,
 			phase: 'Early Expansion',
 			categories: ['Disc golf accessories', 'Training equipment', 'Youth products', 'Crossover golf products'],
 			drivers: ['Validation + controlled expansion', 'Proven audience metrics']

@@ -21,20 +21,20 @@
 
 	const rows: YearRow[] = [
 		{
-			year: 2027, fantasyUsers: 25_000,  premiumSubs: 6_250,   premiumRevenue: 156_250,   microTxSpend: 8,  microTxRevenue: 200_000,    totalFantasy: 356_250,
-			viewers: 0,          bettors: 0,       gamblingRevenue: 0,          total: 356_250,    phase: 'Launch'
+			year: 2027, fantasyUsers: 25_000,  premiumSubs: 6_250,   premiumRevenue: 156_250,   microTxSpend: 8,  microTxRevenue: 200_000,    totalFantasy: 356_000,
+			viewers: 500_000,    bettors: 200_000, gamblingRevenue: 2_000_000,  total: 2_356_000,  phase: 'Launch'
 		},
 		{
-			year: 2028, fantasyUsers: 60_000,  premiumSubs: 15_000,  premiumRevenue: 375_000,   microTxSpend: 12, microTxRevenue: 720_000,    totalFantasy: 1_095_000,
-			viewers: 1_200_000,  bettors: 96_000,  gamblingRevenue: 3_456_000,  total: 4_551_000,  phase: 'Betting Begins'
+			year: 2028, fantasyUsers: 60_000,  premiumSubs: 15_000,  premiumRevenue: 375_000,   microTxSpend: 12, microTxRevenue: 720_000,    totalFantasy: 1_100_000,
+			viewers: 1_200_000,  bettors: 96_000,  gamblingRevenue: 3_460_000,  total: 4_560_000,  phase: 'Betting Begins'
 		},
 		{
-			year: 2029, fantasyUsers: 150_000, premiumSubs: 37_500,  premiumRevenue: 937_500,   microTxSpend: 18, microTxRevenue: 2_700_000,  totalFantasy: 3_637_500,
-			viewers: 3_000_000,  bettors: 240_000, gamblingRevenue: 8_640_000,  total: 12_277_500, phase: 'Scale'
+			year: 2029, fantasyUsers: 150_000, premiumSubs: 37_500,  premiumRevenue: 937_500,   microTxSpend: 18, microTxRevenue: 2_700_000,  totalFantasy: 3_640_000,
+			viewers: 3_000_000,  bettors: 240_000, gamblingRevenue: 8_640_000,  total: 12_280_000, phase: 'Scale'
 		},
 		{
-			year: 2030, fantasyUsers: 300_000, premiumSubs: 75_000,  premiumRevenue: 1_875_000, microTxSpend: 25, microTxRevenue: 7_500_000,  totalFantasy: 9_375_000,
-			viewers: 6_000_000,  bettors: 480_000, gamblingRevenue: 17_280_000, total: 26_655_000, phase: 'International'
+			year: 2030, fantasyUsers: 300_000, premiumSubs: 75_000,  premiumRevenue: 1_875_000, microTxSpend: 25, microTxRevenue: 7_500_000,  totalFantasy: 9_380_000,
+			viewers: 6_000_000,  bettors: 480_000, gamblingRevenue: 17_280_000, total: 26_660_000, phase: 'International'
 		},
 		{
 			year: 2031, fantasyUsers: 500_000, premiumSubs: 125_000, premiumRevenue: 3_125_000, microTxSpend: 32, microTxRevenue: 16_000_000, totalFantasy: 19_125_000,

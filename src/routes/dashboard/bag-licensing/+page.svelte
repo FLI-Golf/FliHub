@@ -31,7 +31,7 @@
 
 	const rows: YearRow[] = [
 		{ year: 2026, usUnits: 2_000, intlUnits: 0,     totalUnits: 2_000,  licenseFee: 100_000,   fglSharePct: 40, profitPool: 130_000, fglProfit: 52_000,   totalFglRevenue: 152_000,   phase: 'Recovery' },
-		{ year: 2027, usUnits: 3_000, intlUnits: 1_000, totalUnits: 4_000,  licenseFee: 350_000,   fglSharePct: 40, profitPool: 260_000, fglProfit: 104_000,  totalFglRevenue: 454_000,   phase: 'Recovery' },
+		{ year: 2027, usUnits: 2_000, intlUnits: 0,     totalUnits: 2_000,  licenseFee: 104_000,   fglSharePct: 40, profitPool: 130_000, fglProfit: 52_000,   totalFglRevenue: 156_000,   phase: 'Recovery' },
 		{ year: 2028, usUnits: 4_000, intlUnits: 2_000, totalUnits: 6_000,  licenseFee: 600_000,   fglSharePct: 40, profitPool: 390_000, fglProfit: 156_000,  totalFglRevenue: 756_000,   phase: 'Recovery' },
 		{ year: 2029, usUnits: 5_000, intlUnits: 3_000, totalUnits: 8_000,  licenseFee: 800_000,   fglSharePct: 50, profitPool: 520_000, fglProfit: 260_000,  totalFglRevenue: 1_060_000, phase: 'Mature' },
 		{ year: 2030, usUnits: 6_500, intlUnits: 3_500, totalUnits: 10_000, licenseFee: 1_000_000, fglSharePct: 50, profitPool: 650_000, fglProfit: 325_000,  totalFglRevenue: 1_325_000, phase: 'Mature' },

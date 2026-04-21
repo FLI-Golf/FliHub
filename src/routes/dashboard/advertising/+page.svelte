@@ -84,13 +84,13 @@
 			key: 'european', label: 'European Markets', icon: Globe,
 			color: 'bg-indigo-500', textColor: 'text-indigo-400',
 			purpose: 'Broader European expansion',
-			values: { 2026: 0, 2027: 0, 2028: 0, 2029: 0, 2030: 1_000_000, 2031: 1_250_000 }
+			values: { 2026: 0, 2027: 0, 2028: 0, 2029: 0, 2030: 1_000_000, 2031: 1_500_000 }
 		},
 		{
 			key: 'globalOther', label: 'Additional Global Markets', icon: Globe,
 			color: 'bg-fuchsia-500', textColor: 'text-fuchsia-400',
 			purpose: 'Emerging global markets with streaming adoption',
-			values: { 2026: 0, 2027: 0, 2028: 0, 2029: 0, 2030: 750_000, 2031: 1_000_000 }
+			values: { 2026: 0, 2027: 0, 2028: 0, 2029: 0, 2030: 750_000, 2031: 1_250_000 }
 		},
 		{
 			key: 'broadcastPromo', label: 'Global Broadcast Promo', icon: Tv,
@@ -103,7 +103,7 @@
 	const years = [2026, 2027, 2028, 2029, 2030, 2031];
 	const totals: Record<number, number> = {
 		2026: 100_000, 2027: 100_000, 2028: 250_000,
-		2029: 300_000, 2030: 3_100_000, 2031: 5_260_000
+		2029: 300_000, 2030: 3_100_000, 2031: 5_760_000
 	};
 
 	const phases: Record<number, { label: string; color: string }> = {

@@ -167,6 +167,7 @@
 			iconActiveClass: 'text-amber-600 dark:text-amber-400',
 			roles: ['admin'],
 			items: [
+				{ title: 'Financial Projections', url: '/dashboard/financial-projections', icon: BarChart3, roles: ['admin'] },
 				{ title: 'Funding Model', url: '/dashboard/funding-model', icon: Landmark, roles: ['admin'] },
 				{ title: 'Travel Budget', url: '/dashboard/travel-budget', icon: Plane, roles: ['admin'] },
 				{ title: 'Prize Purse', url: '/dashboard/prize-purse', icon: Trophy, roles: ['admin'] },
