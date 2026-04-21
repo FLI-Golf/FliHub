@@ -2,41 +2,44 @@
 	import Card from '$lib/components/ui/card.svelte';
 	import { Star, TrendingUp, Users, DollarSign, ChevronRight, Info, Award, ShoppingBag, Tv } from 'lucide-svelte';
 
-	// ── Total revenue by year ─────────────────────────────────────────────────
-	const years = [2027, 2028, 2029, 2030, 2031];
-
-	const totalRevenue: Record<number, number> = {
-		2027: 6_050_000,
-		2028: 6_960_000,
-		2029: 10_590_000,
-		2030: 18_500_000,
-		2031: 31_090_000
-	};
+	// ── Total revenue by year (from financial projections spreadsheet) ────────
+	const years = [2026, 2027, 2028, 2029, 2030, 2031];
 
 	// ── Tier 1: Tournament Naming Rights ─────────────────────────────────────
 	const tier1: Record<number, number> = {
-		2027: 1_600_000, 2028: 1_840_000, 2029: 2_080_000, 2030: 2_400_000, 2031: 2_750_000
+		2026: 0, 2027: 1_600_000, 2028: 1_840_000, 2029: 2_080_000, 2030: 2_400_000, 2031: 2_750_000
 	};
 
 	// ── Tier 2: Official League Partners ─────────────────────────────────────
-	const tier2Categories: Record<number, number> = { 2027: 10, 2028: 10, 2029: 12, 2030: 15, 2031: 18 };
-	const tier2Price: Record<number, number> = { 2027: 300_000, 2028: 345_000, 2029: 390_000, 2030: 450_000, 2031: 525_000 };
-	const tier2Revenue = (yr: number) => tier2Categories[yr] * tier2Price[yr];
+	const tier2: Record<number, number> = {
+		2026: 0, 2027: 3_000_000, 2028: 3_450_000, 2029: 4_680_000, 2030: 6_750_000, 2031: 9_450_000
+	};
+	const tier2Revenue = (yr: number) => tier2[yr];
 
 	// ── Tier 3: Live Event Vendors ────────────────────────────────────────────
-	const tier3Vendors: Record<number, number> = { 2027: 10, 2028: 10, 2029: 15, 2030: 20, 2031: 25 };
-	const tier3StdPrice: Record<number, number> = { 2027: 20_000, 2028: 23_000, 2029: 26_000, 2030: 30_000, 2031: 35_000 };
-	const tier3ChampPrice: Record<number, number> = { 2027: 30_000, 2028: 34_500, 2029: 39_000, 2030: 45_000, 2031: 52_000 };
-	const tier3Revenue = (yr: number) => tier3Vendors[yr] * (5 * tier3StdPrice[yr] + tier3ChampPrice[yr]);
+	const tier3: Record<number, number> = {
+		2026: 0, 2027: 1_400_000, 2028: 1_610_000, 2029: 2_730_000, 2030: 4_200_000, 2031: 525_000
+	};
+	const tier3Revenue = (yr: number) => tier3[yr];
 
 	// ── Tier 4: Fan Grab Bag Sponsors ─────────────────────────────────────────
-	const tier4Sponsors: Record<number, number> = { 2027: 20, 2028: 25, 2029: 30, 2030: 40, 2031: 50 };
-	const tier4Price: Record<number, number> = { 2027: 7_500, 2028: 8_625, 2029: 9_750, 2030: 11_250, 2031: 12_750 };
-	const tier4Revenue = (yr: number) => tier4Sponsors[yr] * tier4Price[yr];
+	const tier4: Record<number, number> = {
+		2026: 0, 2027: 150_000, 2028: 172_500, 2029: 292_500, 2030: 450_000, 2031: 637_500
+	};
+	const tier4Revenue = (yr: number) => tier4[yr];
 
 	// ── Presenting Partner ────────────────────────────────────────────────────
 	const presenting: Record<number, number> = {
 		2026: 0, 2027: 125_000, 2028: 500_000, 2029: 1_000_000, 2030: 5_000_000, 2031: 10_000_000
+	};
+
+	const totalRevenue: Record<number, number> = {
+		2026: 0,
+		2027: 6_275_000,
+		2028: 7_572_500,
+		2029: 10_782_500,
+		2030: 18_800_000,
+		2031: 23_362_500
 	};
 
 	// ── Advertising recognition schedule (2027 Tier 1 example) ───────────────
@@ -68,7 +71,7 @@
 	}
 	function pct(v: number, max: number) { return `${Math.round((v / max) * 100)}%`; }
 
-	let selectedYear = $state(2027);
+	let selectedYear = $state(2028);
 	const sel = $derived(selectedYear);
 </script>
 
@@ -84,11 +87,11 @@
 
 	<!-- Total revenue KPI strip -->
 	<Card class="p-4">
-		<div class="grid grid-cols-3 sm:grid-cols-5 divide-y sm:divide-y-0 sm:divide-x divide-border">
+		<div class="grid grid-cols-3 sm:grid-cols-6 divide-y sm:divide-y-0 sm:divide-x divide-border">
 			{#each years as yr}
 				<button class="px-3 py-2 flex flex-col gap-0.5 text-left hover:bg-muted/30 transition-colors {sel === yr ? 'bg-muted/40' : ''}" onclick={() => selectedYear = yr}>
 					<span class="text-xs text-muted-foreground">{yr}</span>
-					<p class="text-lg font-bold {yr >= 2030 ? 'text-violet-400' : yr >= 2029 ? 'text-amber-400' : 'text-foreground'}">{fmtM(totalRevenue[yr])}</p>
+					<p class="text-lg font-bold {yr >= 2030 ? 'text-violet-400' : yr >= 2029 ? 'text-amber-400' : yr === 2026 ? 'text-muted-foreground' : 'text-foreground'}">{fmtM(totalRevenue[yr])}</p>
 				</button>
 			{/each}
 		</div>
@@ -186,12 +189,11 @@
 				<div class="flex size-7 items-center justify-center rounded-lg bg-emerald-500/20"><Users class="size-4 text-emerald-400" /></div>
 				<h2 class="text-sm font-semibold">Tier 2 — League Partners</h2>
 			</div>
-			<p class="text-xs text-muted-foreground mb-3">Category exclusivity · season-long</p>
+			<p class="text-xs text-muted-foreground mb-3">Category exclusivity · season-long · SCCG sells (5% commission)</p>
 			<div class="space-y-1.5 text-xs">
 				{#each years as yr}
 					<div class="flex justify-between items-center">
 						<span class="text-muted-foreground">{yr}</span>
-						<span class="text-muted-foreground">{tier2Categories[yr]} partners × {fmtM(tier2Price[yr])}</span>
 						<span class="font-semibold {yr === sel ? 'text-emerald-400' : ''}">{fmtM(tier2Revenue(yr))}</span>
 					</div>
 				{/each}
@@ -204,12 +206,11 @@
 				<div class="flex size-7 items-center justify-center rounded-lg bg-amber-500/20"><ShoppingBag class="size-4 text-amber-400" /></div>
 				<h2 class="text-sm font-semibold">Tier 3 — Event Vendors</h2>
 			</div>
-			<p class="text-xs text-muted-foreground mb-3">Experiential activations in-stadium</p>
+			<p class="text-xs text-muted-foreground mb-3">Experiential activations in-stadium · Sales Team (7% commission)</p>
 			<div class="space-y-1.5 text-xs">
 				{#each years as yr}
 					<div class="flex justify-between items-center">
 						<span class="text-muted-foreground">{yr}</span>
-						<span class="text-muted-foreground">{tier3Vendors[yr]} vendors</span>
 						<span class="font-semibold {yr === sel ? 'text-amber-400' : ''}">{fmtM(tier3Revenue(yr))}</span>
 					</div>
 				{/each}
@@ -222,18 +223,18 @@
 				<div class="flex size-7 items-center justify-center rounded-lg bg-violet-500/20"><Star class="size-4 text-violet-400" /></div>
 				<h2 class="text-sm font-semibold">Tier 4 &amp; Presenting</h2>
 			</div>
-			<p class="text-xs font-semibold text-muted-foreground mb-1">Grab Bag Sponsors</p>
+			<p class="text-xs font-semibold text-muted-foreground mb-1">Tier 4 — Sales Team (7% commission)</p>
 			<div class="space-y-1 text-xs mb-3">
 				{#each years as yr}
 					<div class="flex justify-between">
-						<span class="text-muted-foreground">{yr} · {tier4Sponsors[yr]} sponsors</span>
+						<span class="text-muted-foreground">{yr}</span>
 						<span class="font-semibold {yr === sel ? 'text-violet-400' : ''}">{fmtM(tier4Revenue(yr))}</span>
 					</div>
 				{/each}
 			</div>
-			<p class="text-xs font-semibold text-muted-foreground mb-1">Presenting Partner</p>
+			<p class="text-xs font-semibold text-muted-foreground mb-1">Presenting Partner (7% commission)</p>
 			<div class="space-y-1 text-xs">
-				{#each [2027,2028,2029,2030,2031] as yr}
+				{#each years as yr}
 					<div class="flex justify-between">
 						<span class="text-muted-foreground">{yr}</span>
 						<span class="font-semibold {yr === sel ? 'text-rose-400' : ''}">{fmtM(presenting[yr])}</span>
