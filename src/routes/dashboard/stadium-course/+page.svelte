@@ -50,7 +50,7 @@
 			color: 'bg-lime-500',
 			textColor: 'text-lime-400',
 			perObstacle: null,
-			notes: ['18 tee boxes × 72 sq ft = 1,296 sq ft', 'Sports-grade turf + shock pad + adhesive', 'Includes spares & warmup pads']
+			notes: ['9 tee boxes × 72 sq ft = 648 sq ft', 'Sports-grade turf + shock pad + adhesive', 'Includes spares & warmup pads — course plays twice per tournament with basket repositioning at intermission']
 		},
 		{
 			label: 'Reinforcement & Anchoring',
@@ -176,6 +176,9 @@
 		<p class="text-muted-foreground">
 			Combined budget with expansion reserve · FY 2026 · 15 obstacles · 9 holes
 		</p>
+		<p class="text-xs text-amber-500 dark:text-amber-400 mt-1">
+			9-hole layout plays twice per tournament — baskets repositioned at intermission for a fresh second round
+		</p>
 	</div>
 
 	<!-- Top-level budget split -->
@@ -217,9 +220,9 @@
 	<!-- Course scope -->
 	<div class="grid grid-cols-2 sm:grid-cols-4 gap-4">
 		{#each [
+			{ label: 'Holes', value: '9', note: 'Plays twice per tournament' },
 			{ label: 'Obstacles', value: '15', note: 'Base build' },
 			{ label: 'Avg Height', value: '15 ft', note: 'Per obstacle' },
-			{ label: 'Avg Width', value: '10 ft', note: 'Per obstacle' },
 			{ label: 'Total Surface Area', value: '4,500 sq ft', note: '2 faces × 15 obstacles' }
 		] as stat}
 			<Card class="p-4 flex flex-col gap-1">
@@ -349,7 +352,7 @@
 			</div>
 			<div class="mt-3 rounded-lg bg-amber-500/5 border border-amber-500/30 p-3 text-xs text-amber-300">
 				<Info class="size-3.5 inline mr-1" />
-				Also supports themed features, sponsor builds, or a signature finish-hole structure
+				Also supports themed features, sponsor builds, or a signature hole-9 finish structure
 			</div>
 		</Card>
 
