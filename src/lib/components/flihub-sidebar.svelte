@@ -169,6 +169,7 @@
 			items: [
 				{ title: 'Financial Projections', url: '/dashboard/financial-projections', icon: BarChart3, roles: ['admin'] },
 				{ title: 'Funding Model', url: '/dashboard/funding-model', icon: Landmark, roles: ['admin'] },
+				{ title: 'Use of Proceeds', url: '/dashboard/use-of-proceeds', icon: DollarSign, roles: ['admin'] },
 				{ title: 'Travel Budget', url: '/dashboard/travel-budget', icon: Plane, roles: ['admin'] },
 				{ title: 'Prize Purse', url: '/dashboard/prize-purse', icon: Trophy, roles: ['admin'] },
 				{ title: 'Entertainment', url: '/dashboard/entertainment', icon: Music, roles: ['admin'] },

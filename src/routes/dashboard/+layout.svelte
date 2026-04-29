@@ -40,6 +40,7 @@
 		'/dashboard/schema-guide': 'Schema Guide',
 		'/dashboard/admin': 'Admin Panel',
 		'/dashboard/funding-model': 'Funding Model',
+		'/dashboard/use-of-proceeds': 'Use of Proceeds',
 		'/dashboard/travel-budget': 'Travel Budget',
 		'/dashboard/prize-purse': 'Prize Purse',
 		'/dashboard/entertainment': 'Entertainment',
