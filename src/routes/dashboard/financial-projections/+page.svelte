@@ -83,7 +83,7 @@
 	<!-- Header -->
 	<div>
 		<h1 class="text-3xl font-bold mb-1">Financial Projections</h1>
-		<p class="text-muted-foreground">FLI Golf P&amp;L · FY 2026–2031</p>
+		<p class="text-muted-foreground">FLI Golf P&amp;L · FY 2026–2031 · Funded June 15, 2026</p>
 	</div>
 
 	<!-- Year selector KPI strip -->
