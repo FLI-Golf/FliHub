@@ -178,7 +178,7 @@
 					{@const forecasted = pct(dept.forecasted ?? 0, dept.budget ?? 1)}
 					{@const deptIcon   = getDeptIcon(dept.name)}
 					<a href="/dashboard/departments/{dept.id}"
-						class="flex items-start gap-4 px-4 py-4 transition-colors group {i % 2 === 0 ? 'bg-background hover:bg-muted/40' : 'bg-muted/30 hover:bg-muted/50'}">
+						class="flex items-start gap-4 px-4 py-4 transition-colors group {i % 2 === 0 ? 'bg-slate-900 hover:bg-slate-800' : 'bg-slate-800/70 hover:bg-slate-700/70'}">
 
 						<!-- Icon -->
 						<div class="flex size-9 items-center justify-center rounded-lg {deptIcon.bg} shrink-0 mt-0.5 transition-transform group-hover:scale-105">
