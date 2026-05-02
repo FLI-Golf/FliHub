@@ -11,7 +11,7 @@ export const GET: RequestHandler = async ({ locals, url }) => {
 		const filter = franchiseId ? `franchiseId="${franchiseId}"` : '';
 		const filings = await ctx.pb.collection('trademark_filings').getFullList({
 			filter,
-			sort: 'franchiseId,markType,logoVariant',
+			sort: 'markType,logoVariant',
 			expand: 'franchiseId'
 		});
 		return json(filings);

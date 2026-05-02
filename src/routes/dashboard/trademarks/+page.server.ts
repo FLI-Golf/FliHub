@@ -13,7 +13,7 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 				fields: 'id,name,slug,primaryColor,secondaryColor,logoMini,logoFull,collectionId'
 			}),
 			pb.collection('trademark_filings').getFullList({
-				sort: 'franchiseId,markType,logoVariant'
+				sort: 'markType,logoVariant'
 			})
 		]);
 
