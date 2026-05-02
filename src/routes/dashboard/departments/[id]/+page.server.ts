@@ -67,8 +67,14 @@ export const load: PageServerLoad = async ({ locals, url, params }) => {
 	const remaining = allocatedBudget - liveActual;
 	const usedPct = allocatedBudget > 0 ? Math.min(100, (liveActual / allocatedBudget) * 100) : 0;
 
+	const userProfiles = await pb
+		.collection('user_profiles')
+		.getFullList({ filter: 'role = "leader"', sort: 'firstName,lastName' })
+		.catch(() => []);
+
 	return {
 		department,
+		userProfiles,
 		budgetRollup: {
 			allocated: allocatedBudget,
 			actual: liveActual,

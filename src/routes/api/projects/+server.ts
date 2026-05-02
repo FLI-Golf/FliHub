@@ -20,7 +20,6 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 			department: data.department,
 			startDate: data.startDate || null,
 			endDate: data.endDate || null,
-			project_budget_mode: data.project_budget_mode || 'auto',
 			project_budget: data.project_budget || null,
 			project_forecasted_expenses: data.project_forecasted_expenses || null,
 			project_actual_expenses: 0,

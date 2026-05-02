@@ -1,7 +1,6 @@
 import type { ProjectStatus } from '../schemas';
 
 export type DepartmentStatus = 'active' | 'inactive';
-export type BudgetMode = 'auto' | 'annual_cap' | 'allocated';
 
 export interface DepartmentProps {
 	id: string;
@@ -9,11 +8,8 @@ export interface DepartmentProps {
 	code?: string;
 	description?: string;
 	status: DepartmentStatus;
-	budgetMode: BudgetMode;
 	annualBudget: number;
 	actualExpenses: number;
-	manualBudgetOverride?: number;
-	budgetCap?: number;
 	headOfDepartmentId?: string;
 	headOfDepartmentName?: string;
 	created?: Date;
@@ -94,10 +90,7 @@ export class Department {
 	get name() { return this.props.name; }
 	get isActive() { return this.props.status === 'active'; }
 
-	/** Effective budget: manual override > cap > annual budget */
 	get effectiveBudget(): number {
-		if (this.props.manualBudgetOverride) return this.props.manualBudgetOverride;
-		if (this.props.budgetCap) return Math.min(this.props.annualBudget, this.props.budgetCap);
 		return this.props.annualBudget;
 	}
 
@@ -222,11 +215,9 @@ export class Department {
 				code: record.code,
 				description: record.description,
 				status: record.status ?? 'active',
-				budgetMode: record.department_budget_mode ?? 'auto',
+	
 				annualBudget: record.department_annual_budget ?? 0,
 				actualExpenses: record.department_actual_expenses ?? 0,
-				manualBudgetOverride: record.department_manual_budget_override,
-				budgetCap: record.department_budget_cap,
 				headOfDepartmentId: record.headOfDepartment,
 				headOfDepartmentName: record.expand?.headOfDepartment
 					? `${record.expand.headOfDepartment.firstName ?? ''} ${record.expand.headOfDepartment.lastName ?? ''}`.trim()

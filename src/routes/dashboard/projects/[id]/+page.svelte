@@ -10,6 +10,7 @@
 	import TaskDetailModal from '$lib/components/tasks/task-detail-modal.svelte';
 	import SelectOrAddVendorModal from '$lib/components/vendors/select-or-add-vendor-modal.svelte';
 	import AddExpenseModal from '$lib/components/expenses/add-expense-modal.svelte';
+	import TaskExpenseModal from '$lib/components/expenses/task-expense-modal.svelte';
 	import { 
 		ArrowLeft,
 		DollarSign,
@@ -21,7 +22,8 @@
 		Package,
 		Edit,
 		Plus,
-		X
+		X,
+		Receipt
 	} from 'lucide-svelte';
 	
 	let { data }: { data: PageData } = $props();
@@ -29,6 +31,7 @@
 	let showEditModal = $state(false);
 	let showAddTaskModal = $state(false);
 	let showTaskDetailModal = $state(false);
+	let showExpenseModal    = $state(false);
 	let showAddVendorModal = $state(false);
 	let showAddExpenseModal = $state(false);
 	let selectedTask = $state<any>(null);
@@ -200,6 +203,16 @@
 	<!-- Add Expense Modal -->
 	<AddExpenseModal bind:open={showAddExpenseModal} projectTasks={tasks} />
 
+	{#if selectedTask}
+		<TaskExpenseModal
+			bind:open={showExpenseModal}
+			task={selectedTask}
+			project={project}
+			departmentName={project?.expand?.department?.name ?? ''}
+			vendors={data.allVendors ?? []}
+		/>
+	{/if}
+
 	<!-- Key Metrics -->
 	<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
 		<MetricCard
@@ -298,10 +311,7 @@
 					<span class="text-muted-foreground">Fiscal Year</span>
 					<span class="font-medium">{project.fiscalYear || '-'}</span>
 				</div>
-				<div class="flex justify-between">
-					<span class="text-muted-foreground">Budget Mode</span>
-					<span class="font-medium capitalize">{project.project_budget_mode || '-'}</span>
-				</div>
+
 				{#if project.expand?.department}
 					<div class="flex justify-between">
 						<span class="text-muted-foreground">Department</span>
@@ -470,6 +480,7 @@
 						<th class="px-6 py-3 text-left text-xs font-semibold text-slate-900 dark:text-slate-100 uppercase tracking-wider">
 							Due Date
 						</th>
+						<th class="px-6 py-3"></th>
 					</tr>
 				</thead>
 				<tbody class="divide-y divide-slate-200 dark:divide-slate-800">
@@ -539,6 +550,14 @@
 								</td>
 								<td class="px-6 py-4 text-sm text-muted-foreground">
 									{formatDate(task.dueDate)}
+								</td>
+								<td class="px-6 py-4" onclick={(e) => e.stopPropagation()}>
+									<button
+										onclick={(e) => { e.stopPropagation(); selectedTask = task; showExpenseModal = true; }}
+										class="flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-lg border border-emerald-700/60 bg-emerald-950/40 text-emerald-400 hover:bg-emerald-900/60 hover:text-emerald-300 hover:border-emerald-600 transition-all whitespace-nowrap"
+									>
+										<Receipt class="size-3.5" /> Log Expense
+									</button>
 								</td>
 							</tr>
 						{/each}

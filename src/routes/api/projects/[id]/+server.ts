@@ -21,10 +21,6 @@ export const PATCH: RequestHandler = async ({ request, locals, params }) => {
 		if (data.endDate !== undefined) updateData.endDate = data.endDate || null;
 		if (data.project_budget !== undefined) updateData.project_budget = data.project_budget ?? null;
 		if (data.project_forecasted_expenses !== undefined) updateData.project_forecasted_expenses = data.project_forecasted_expenses ?? null;
-		if (data.project_budget_mode !== undefined) updateData.project_budget_mode = data.project_budget_mode;
-		if (data.project_budget_buffer !== undefined) updateData.project_budget_buffer = data.project_budget_buffer ?? null;
-		if (data.project_budget_cap !== undefined) updateData.project_budget_cap = data.project_budget_cap ?? null;
-		if (data.project_manual_budget_override !== undefined) updateData.project_manual_budget_override = data.project_manual_budget_override ?? null;
 		if (data.fiscalYear !== undefined) updateData.fiscalYear = data.fiscalYear || null;
 		if (data.notes !== undefined) updateData.notes = data.notes || '';
 		if (data.vendors !== undefined) updateData.vendors = data.vendors;

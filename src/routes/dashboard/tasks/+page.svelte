@@ -8,6 +8,7 @@
 	import StatusBadge from '$lib/components/metrics/status-badge.svelte';
 	import AddTaskModal from '$lib/components/tasks/add-task-modal.svelte';
 	import EditTaskModal from '$lib/components/tasks/edit-task-modal.svelte';
+	import TaskExpenseModal from '$lib/components/expenses/task-expense-modal.svelte';
 	import { 
 		ListTodo, 
 		CheckCircle2, 
@@ -23,18 +24,26 @@
 		AlertCircle,
 		ArrowUp,
 		ArrowDown,
-		Minus
+		Minus,
+		Receipt
 	} from 'lucide-svelte';
 	
 	let { data }: { data: PageData } = $props();
 	
-	let showAddModal = $state(false);
-	let showEditModal = $state(false);
-	let selectedTask = $state<any>(null);
+	let showAddModal     = $state(false);
+	let showEditModal    = $state(false);
+	let showExpenseModal = $state(false);
+	let selectedTask     = $state<any>(null);
 	
 	function handleRowClick(task: any) {
 		selectedTask = task;
 		showEditModal = true;
+	}
+
+	function handleLogExpense(e: MouseEvent, task: any) {
+		e.stopPropagation(); // don't open edit modal
+		selectedTask = task;
+		showExpenseModal = true;
 	}
 	
 	let tasks = $derived(data.tasks || []);
@@ -146,7 +155,18 @@
 	
 	<!-- Edit Task Modal -->
 	{#if selectedTask}
-		<EditTaskModal bind:open={showEditModal} task={selectedTask} expenses={data.expensesByTask[selectedTask.id] ?? { total: 0, paid: 0 }} />
+		<EditTaskModal bind:open={showEditModal} task={selectedTask} expenses={(data.expensesByTask as Record<string,{total:number;paid:number}>)[selectedTask.id] ?? { total: 0, paid: 0 }} />
+	{/if}
+
+	<!-- Log Expense from Task Modal -->
+	{#if selectedTask}
+		<TaskExpenseModal
+			bind:open={showExpenseModal}
+			task={selectedTask}
+			project={selectedTask?.expand?.projectId ?? null}
+			departmentName={selectedTask?.expand?.projectId?.expand?.department?.name ?? ''}
+			vendors={data.vendors ?? []}
+		/>
 	{/if}
 
 	<!-- Alerts -->
@@ -373,6 +393,9 @@
 							<th class="px-6 py-3 text-left text-xs font-medium text-black dark:text-black uppercase tracking-wider">
 								Due Date
 							</th>
+							<th class="px-6 py-3 text-left text-xs font-medium text-black dark:text-black uppercase tracking-wider">
+								
+							</th>
 						</tr>
 					</thead>
 					<tbody class="divide-y divide-slate-200 dark:divide-slate-800">
@@ -434,6 +457,14 @@
 									</td>
 									<td class="px-6 py-4 text-sm text-muted-foreground">
 										{formatDate(task.dueDate)}
+									</td>
+									<td class="px-6 py-4" onclick={(e) => e.stopPropagation()}>
+										<button
+											onclick={(e) => handleLogExpense(e, task)}
+											class="flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-lg border border-emerald-700/60 bg-emerald-950/40 text-emerald-400 hover:bg-emerald-900/60 hover:text-emerald-300 hover:border-emerald-600 transition-all whitespace-nowrap"
+										>
+											<Receipt class="size-3.5" /> Log Expense
+										</button>
 									</td>
 								</tr>
 							{/each}

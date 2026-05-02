@@ -6,53 +6,55 @@ export const load: PageServerLoad = async ({ locals, url, params }) => {
 	const ctx = await RequestContext.from(locals, url);
 	const pb = ctx.pb;
 
-	const sponsor = await pb
-		.collection('sponsors')
-		.getOne(params.id, { expand: 'assignedTo,franchiseDealId' })
+	const sponsor = await pb.collection('sponsors')
+		.getOne(params.id, { expand: 'assignedTo' })
 		.catch(() => null);
 
 	if (!sponsor) throw error(404, 'Sponsor not found');
 
-	const [bridgeRecords, payments] = await Promise.all([
-		pb
-			.collection('sponsor_franchise_bridge')
+	const [payments, bridgeRecords, userProfiles] = await Promise.all([
+		pb.collection('sponsor_payments')
+			.getFullList({ filter: `sponsor = "${params.id}"`, sort: '-dueDate' })
+			.catch(() => []),
+		pb.collection('sponsor_franchise_bridge')
 			.getFullList({ filter: `sponsorId = "${params.id}"`, expand: 'franchiseId', sort: '-created' })
 			.catch(() => []),
-		pb
-			.collection('sponsor_payments')
-			.getFullList({ filter: `sponsorId = "${params.id}"`, sort: '-paymentDate' })
+		pb.collection('user_profiles')
+			.getFullList({ filter: 'role = "leader" || role = "sales"', sort: 'firstName,lastName', fields: 'id,firstName,lastName,email' })
 			.catch(() => [])
 	]);
 
-	return { sponsor, bridgeRecords, payments };
+	return { sponsor, payments, bridgeRecords, userProfiles };
 };
 
 export const actions: Actions = {
 	update: async ({ locals, url, params, request }) => {
 		const ctx = await RequestContext.from(locals, url);
 		const data = await request.formData();
-
 		try {
 			await ctx.pb.collection('sponsors').update(params.id, {
-				companyName:          data.get('companyName')          || '',
-				type:                 data.get('type')                 || '',
-				tier:                 data.get('tier')                 || '',
-				status:               data.get('status')               || '',
-				primaryContactName:   data.get('primaryContactName')   || '',
-				primaryContactEmail:  data.get('primaryContactEmail')  || '',
-				location:             data.get('location')             || '',
-				territory:            data.get('territory')            || '',
-				contractStartDate:    data.get('contractStartDate')    || null,
-				contractEndDate:      data.get('contractEndDate')      || null,
-				annualCommitment:     data.get('annualCommitment')     ? Number(data.get('annualCommitment'))  : null,
-				totalPaid:            data.get('totalPaid')            ? Number(data.get('totalPaid'))         : null,
-				franchiseInterest:    data.get('franchiseInterest') === 'true',
-				notes:                data.get('notes')                || ''
+				companyName:         data.get('companyName')         || '',
+				type:                data.get('type')                || '',
+				tier:                data.get('tier')                || '',
+				status:              data.get('status')              || '',
+				primaryContactName:  data.get('primaryContactName')  || '',
+				primaryContactEmail: data.get('primaryContactEmail') || '',
+				primaryContactPhone: data.get('primaryContactPhone') || '',
+				location:            data.get('location')            || '',
+				territory:           data.get('territory')           || '',
+				contractStartDate:   data.get('contractStartDate')   || null,
+				contractEndDate:     data.get('contractEndDate')     || null,
+				annualCommitment:    data.get('annualCommitment')    ? Number(data.get('annualCommitment'))   : null,
+				dealProbability:     data.get('dealProbability')     ? Number(data.get('dealProbability'))    : null,
+				lastContactDate:     data.get('lastContactDate')     || null,
+				nextFollowUpDate:    data.get('nextFollowUpDate')    || null,
+				franchiseInterest:   data.get('franchiseInterest') === 'true',
+				assignedTo:          data.get('assignedTo')          || null,
+				notes:               data.get('notes')               || ''
 			});
 		} catch (err: any) {
 			return fail(500, { error: err?.message ?? 'Failed to update sponsor' });
 		}
-
 		throw redirect(303, `/dashboard/sponsors/${params.id}`);
 	},
 
