@@ -124,6 +124,17 @@
 
 <div class="space-y-6 max-w-7xl">
 
+	<!-- Collection missing warning -->
+	{#if data.collectionMissing}
+		<div class="flex items-start gap-3 rounded-xl border border-yellow-700 bg-yellow-950/40 px-4 py-3 text-sm text-yellow-300">
+			<AlertCircle class="size-4 shrink-0 mt-0.5 text-yellow-400" />
+			<div>
+				<p class="font-semibold">PocketBase collection not set up yet</p>
+				<p class="text-yellow-400/80 mt-0.5">Create a <code class="font-mono bg-yellow-900/40 px-1 rounded">trademark_filings</code> collection in PocketBase to start tracking filings. Fields are defined in <code class="font-mono bg-yellow-900/40 px-1 rounded">src/lib/domain/schemas/trademark.schema.ts</code>.</p>
+			</div>
+		</div>
+	{/if}
+
 	<!-- Header -->
 	<div class="flex items-start justify-between gap-4">
 		<div>
