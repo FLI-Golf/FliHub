@@ -37,8 +37,11 @@
 		Tv,
 		PartyPopper,
 		FileText,
+		Wallet,
+		Upload,
 		PenLine,
-		ClipboardList
+		ClipboardList,
+		BadgeCheck
 	} from 'lucide-svelte';
 
 	type NavItem = {
@@ -123,6 +126,7 @@
 				{ title: 'Expenses', url: '/dashboard/expenses', icon: Receipt },
 				{ title: 'Vendors', url: '/dashboard/vendors', icon: Store },
 				{ title: 'Approvals', url: '/dashboard/approvals', icon: CheckSquare },
+				{ title: 'Reimbursements', url: '/dashboard/reimbursements', icon: Wallet },
 				{ title: 'Media', url: '/dashboard/media', icon: Images }
 			]
 		},
@@ -158,6 +162,20 @@
 			]
 		},
 		{
+			id: 'legal',
+			title: 'Legal & IP',
+			labelClass: 'text-violet-600 dark:text-violet-400',
+			activeClass: 'bg-violet-50 dark:bg-violet-950/60 text-violet-900 dark:text-violet-100',
+			hoverClass: 'hover:bg-violet-50 dark:hover:bg-violet-950/40 hover:text-violet-900 dark:hover:text-violet-100',
+			borderClass: 'border-violet-500',
+			iconActiveClass: 'text-violet-600 dark:text-violet-400',
+			roles: ['admin'],
+			items: [
+				{ title: 'Trademark Pipeline', url: '/dashboard/trademarks', icon: BadgeCheck, roles: ['admin'] },
+				{ title: 'Legal Budget',        url: '/dashboard/legal-budget', icon: Scale,      roles: ['admin'] }
+			]
+		},
+		{
 			id: 'finance',
 			title: 'Finance',
 			labelClass: 'text-amber-600 dark:text-amber-400',
@@ -176,7 +194,6 @@
 				{ title: 'Player Travel', url: '/dashboard/player-travel', icon: Luggage, roles: ['admin'] },
 				{ title: 'Stage Production', url: '/dashboard/stage-production', icon: Mic2, roles: ['admin'] },
 				{ title: 'On-Course Branding', url: '/dashboard/on-course-branding', icon: Flag, roles: ['admin'] },
-				{ title: 'Legal Budget', url: '/dashboard/legal-budget', icon: Scale, roles: ['admin'] },
 				{ title: 'Advertising', url: '/dashboard/advertising', icon: Megaphone, roles: ['admin'] },
 				{ title: 'Stadium Course #1', url: '/dashboard/stadium-course', icon: Hammer, roles: ['admin'] },
 				{ title: 'Sponsorship Revenue', url: '/dashboard/sponsorship-revenue', icon: Star, roles: ['admin'] },
@@ -197,6 +214,7 @@
 			iconActiveClass: 'text-rose-600 dark:text-rose-400',
 			roles: ['admin'],
 			items: [
+				{ title: 'Import Data', url: '/dashboard/import', icon: Upload, roles: ['admin'] },
 				{ title: 'Schema Guide', url: '/dashboard/schema-guide', icon: Network, roles: ['admin'] },
 				{ title: 'Admin Panel', url: '/dashboard/admin', icon: ShieldCheck, roles: ['admin'] }
 			]
@@ -221,6 +239,7 @@
 		operations: true,
 		league: true,
 		marketing: true,
+		legal: true,
 		finance: true,
 		system: true
 	});
@@ -247,7 +266,7 @@
 <Sidebar.Root {...restProps} bind:ref>
 	<!-- Brand header -->
 	<Sidebar.Header>
-		<div class="flex items-center gap-3 px-4 py-4 border-b border-sidebar-border">
+		<a href="/dashboard" class="flex items-center gap-3 px-4 py-4 border-b border-sidebar-border hover:opacity-80 transition-opacity">
 			<div class="flex size-10 items-center justify-center rounded-xl bg-gradient-to-br from-emerald-500 to-blue-600 text-white shadow-lg shrink-0">
 				<span class="text-lg font-black tracking-tighter">F</span>
 			</div>
@@ -255,7 +274,7 @@
 				<span class="text-base font-bold tracking-tight truncate">FliHub</span>
 				<span class="text-[10px] text-muted-foreground uppercase tracking-widest font-medium">Business OS</span>
 			</div>
-		</div>
+		</a>
 	</Sidebar.Header>
 
 	<Sidebar.Content class="px-2 py-2 gap-0">
