@@ -9,6 +9,7 @@
 	import BurnRateChart from '$lib/components/charts/BurnRateChart.svelte';
 	import FinancialHealthCard from '$lib/components/charts/FinancialHealthCard.svelte';
 	import { DepartmentProvider } from '$lib/domain/providers/DepartmentProvider.svelte';
+	import EditDepartmentModal from '$lib/components/departments/edit-department-modal.svelte';
 	import {
 		Building2,
 		Users,
@@ -17,7 +18,8 @@
 		Receipt,
 		ArrowLeft,
 		TrendingUp,
-		Calendar
+		Calendar,
+		Pencil
 	} from 'lucide-svelte';
 
 	let { data }: { data: PageData } = $props();
@@ -55,6 +57,8 @@
 	const pendingExpenses        = $derived(dept.pendingExpenseAmount);
 	const spendPct               = $derived(dept.spendPct);
 	const metrics                = $derived(dept.metrics!);
+
+	let showEditModal = $state(false);
 </script>
 
 <svelte:head>
@@ -87,11 +91,19 @@
 					{/if}
 				</div>
 			</div>
+			<Button
+				variant="outline"
+				class="gap-2 border-slate-600 bg-slate-800 text-slate-200 hover:bg-slate-700 hover:text-white"
+				onclick={() => (showEditModal = true)}
+			>
+				<Pencil class="size-4" />
+				Edit Department
+			</Button>
 		</div>
 
 		{#if dept.department?.description}
-			<Card class="mt-4 p-4">
-				<div class="prose dark:prose-invert max-w-none">
+			<Card class="mt-4 p-4 bg-slate-800/60 border-slate-700">
+				<div class="prose dark:prose-invert max-w-none text-slate-300">
 					{@html dept.department?.description}
 				</div>
 			</Card>
@@ -113,7 +125,7 @@
 
 			<!-- Annual Budget card -->
 			<div class="group/card relative">
-				<Card class="p-6 transition-all duration-200 group-hover/card:shadow-lg group-hover/card:-translate-y-0.5 border-l-4 border-l-blue-500 cursor-default">
+				<Card class="p-6 transition-all duration-200 group-hover/card:shadow-lg group-hover/card:-translate-y-0.5 border-l-4 border-l-blue-500 cursor-default bg-blue-950/40 border-blue-800/50">
 					<div class="flex items-center justify-between">
 						<div>
 							<p class="text-sm text-muted-foreground mb-1">Annual Budget</p>
@@ -172,7 +184,7 @@
 
 			<!-- Total Projects card -->
 			<div class="group/card relative">
-				<Card class="p-6 transition-all duration-200 group-hover/card:shadow-lg group-hover/card:-translate-y-0.5 border-l-4 border-l-emerald-500 cursor-default">
+				<Card class="p-6 transition-all duration-200 group-hover/card:shadow-lg group-hover/card:-translate-y-0.5 border-l-4 border-l-emerald-500 cursor-default bg-emerald-950/40 border-emerald-800/50">
 					<div class="flex items-center justify-between">
 						<div>
 							<p class="text-sm text-muted-foreground mb-1">Total Projects</p>
@@ -225,7 +237,7 @@
 
 			<!-- Total Expenses card -->
 			<div class="group/card relative">
-				<Card class="p-6 transition-all duration-200 group-hover/card:shadow-lg group-hover/card:-translate-y-0.5 border-l-4 border-l-orange-500 cursor-default">
+				<Card class="p-6 transition-all duration-200 group-hover/card:shadow-lg group-hover/card:-translate-y-0.5 border-l-4 border-l-orange-500 cursor-default bg-orange-950/40 border-orange-800/50">
 					<div class="flex items-center justify-between">
 						<div>
 							<p class="text-sm text-muted-foreground mb-1">Total Expenses</p>
@@ -269,7 +281,7 @@
 
 			<!-- Actual Spent card -->
 			<div class="group/card relative">
-				<Card class="p-6 transition-all duration-200 group-hover/card:shadow-lg group-hover/card:-translate-y-0.5 border-l-4 {spendPct > 90 ? 'border-l-red-500' : spendPct > 70 ? 'border-l-yellow-500' : 'border-l-violet-500'} cursor-default">
+				<Card class="p-6 transition-all duration-200 group-hover/card:shadow-lg group-hover/card:-translate-y-0.5 border-l-4 {spendPct > 90 ? 'border-l-red-500 bg-red-950/40 border-red-800/50' : spendPct > 70 ? 'border-l-yellow-500 bg-yellow-950/40 border-yellow-800/50' : 'border-l-violet-500 bg-violet-950/40 border-violet-800/50'} cursor-default">
 					<div class="flex items-center justify-between">
 						<div>
 							<p class="text-sm text-muted-foreground mb-1">Actual Spent</p>
@@ -437,10 +449,10 @@
 			/>
 
 			<!-- Burn Rate Analysis -->
-			<Card class="p-6">
+			<Card class="p-6 bg-slate-800/60 border-slate-700">
 				<div class="flex items-center justify-between mb-4">
-					<h3 class="text-lg font-semibold">Budget vs Spending</h3>
-					<TrendingUp class="size-5 text-muted-foreground" />
+					<h3 class="text-lg font-semibold text-slate-100">Budget vs Spending</h3>
+					<TrendingUp class="size-5 text-slate-400" />
 				</div>
 				<BurnRateChart 
 					totalBudget={phaseFilteredMetrics.budget.total}
@@ -455,10 +467,10 @@
 	<div>
 		<h2 class="text-2xl font-bold mb-4">Analytics</h2>
 		<div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
-			<Card class="p-6">
+			<Card class="p-6 bg-emerald-950/30 border-emerald-800/40">
 				<div class="flex items-center justify-between mb-4">
-					<h3 class="text-lg font-semibold">Project Status</h3>
-					<FolderKanban class="size-5 text-muted-foreground" />
+					<h3 class="text-lg font-semibold text-emerald-100">Project Status</h3>
+					<FolderKanban class="size-5 text-emerald-400" />
 				</div>
 				<ProjectStatusChart 
 					draft={metrics.projects.draft}
@@ -469,10 +481,10 @@
 				/>
 			</Card>
 
-			<Card class="p-6">
+			<Card class="p-6 bg-blue-950/30 border-blue-800/40">
 				<div class="flex items-center justify-between mb-4">
-					<h3 class="text-lg font-semibold">Budget Utilization</h3>
-					<DollarSign class="size-5 text-muted-foreground" />
+					<h3 class="text-lg font-semibold text-blue-100">Budget Utilization</h3>
+					<DollarSign class="size-5 text-blue-400" />
 				</div>
 				<BudgetDonutChart 
 					actual={phaseFilteredMetrics.budget.actual}
@@ -481,10 +493,10 @@
 				/>
 			</Card>
 
-			<Card class="p-6">
+			<Card class="p-6 bg-orange-950/30 border-orange-800/40">
 				<div class="flex items-center justify-between mb-4">
-					<h3 class="text-lg font-semibold">Expense Status</h3>
-					<Receipt class="size-5 text-muted-foreground" />
+					<h3 class="text-lg font-semibold text-orange-100">Expense Status</h3>
+					<Receipt class="size-5 text-orange-400" />
 				</div>
 				<ExpenseBarChart 
 					draft={metrics.expenses.draft}
@@ -507,58 +519,58 @@
 			{/if}
 		</h2>
 		{#if phaseFilteredProjects.length > 0}
-			<Card class="overflow-hidden">
+			<Card class="overflow-hidden bg-slate-900/60 border-slate-700">
 				<div class="overflow-x-auto">
 					<table class="w-full">
-						<thead class="bg-muted border-b">
+						<thead class="bg-slate-800 border-b border-slate-700">
 							<tr>
-								<th class="px-6 py-3 text-left text-xs font-medium text-foreground uppercase tracking-wider">
+								<th class="px-6 py-3 text-left text-xs font-semibold text-slate-300 uppercase tracking-wider">
 									Project Name
 								</th>
-								<th class="px-6 py-3 text-left text-xs font-medium text-foreground uppercase tracking-wider">
+								<th class="px-6 py-3 text-left text-xs font-semibold text-slate-300 uppercase tracking-wider">
 									Status
 								</th>
-								<th class="px-6 py-3 text-right text-xs font-medium text-foreground uppercase tracking-wider">
+								<th class="px-6 py-3 text-right text-xs font-semibold text-slate-300 uppercase tracking-wider">
 									Budget
 								</th>
-								<th class="px-6 py-3 text-right text-xs font-medium text-foreground uppercase tracking-wider">
+								<th class="px-6 py-3 text-right text-xs font-semibold text-slate-300 uppercase tracking-wider">
 									Actual
 								</th>
-								<th class="px-6 py-3 text-right text-xs font-medium text-foreground uppercase tracking-wider">
+								<th class="px-6 py-3 text-right text-xs font-semibold text-slate-300 uppercase tracking-wider">
 									Forecasted
 								</th>
-								<th class="px-6 py-3 text-left text-xs font-medium text-foreground uppercase tracking-wider">
+								<th class="px-6 py-3 text-left text-xs font-semibold text-slate-300 uppercase tracking-wider">
 									Dates
 								</th>
 							</tr>
 						</thead>
-						<tbody class="divide-y divide-border">
+						<tbody class="divide-y divide-slate-700/60">
 							{#each phaseFilteredProjects as project, i}
-								<tr class="{i % 2 === 0 ? 'bg-background' : 'bg-muted/30'} hover:bg-primary/5 transition-colors">
+								<tr class="{i % 2 === 0 ? 'bg-slate-900/40' : 'bg-slate-800/40'} hover:bg-slate-700/50 transition-colors">
 									<td class="px-6 py-4">
-										<a href="/dashboard/projects/{project.id}" class="font-medium hover:text-primary">
+										<a href="/dashboard/projects/{project.id}" class="font-medium text-slate-100 hover:text-blue-400 transition-colors">
 											{project.name}
 										</a>
 									</td>
 									<td class="px-6 py-4">
 										<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium capitalize
-											{project.status === 'in_progress' ? 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400' :
-											project.status === 'completed' ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400' :
-											project.status === 'planned' ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400' :
-											'bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-400'}">
+											{project.status === 'in_progress' ? 'bg-blue-900/50 text-blue-300 border border-blue-700/50' :
+											project.status === 'completed' ? 'bg-emerald-900/50 text-emerald-300 border border-emerald-700/50' :
+											project.status === 'planned' ? 'bg-yellow-900/50 text-yellow-300 border border-yellow-700/50' :
+											'bg-slate-700/50 text-slate-400 border border-slate-600/50'}">
 											{project.status.replace('_', ' ')}
 										</span>
 									</td>
-									<td class="px-6 py-4 text-right font-medium">
+									<td class="px-6 py-4 text-right font-medium text-slate-200">
 										{formatCurrency(project.budget || 0)}
 									</td>
-									<td class="px-6 py-4 text-right font-semibold {(project.actual || 0) > (project.budget || 0) ? 'text-red-500' : 'text-green-500'}">
+									<td class="px-6 py-4 text-right font-semibold {(project.actual || 0) > (project.budget || 0) ? 'text-red-400' : 'text-emerald-400'}">
 										{formatCurrency(project.actual || 0)}
 									</td>
-									<td class="px-6 py-4 text-right font-medium text-orange-500">
+									<td class="px-6 py-4 text-right font-medium text-violet-400">
 										{formatCurrency(project.forecasted || 0)}
 									</td>
-									<td class="px-6 py-4 text-sm text-muted-foreground">
+									<td class="px-6 py-4 text-sm text-slate-400">
 										{#if project.startDate}
 											{new Date(project.startDate).toLocaleDateString()}
 										{/if}
@@ -573,9 +585,15 @@
 				</div>
 			</Card>
 		{:else}
-			<Card class="p-8 text-center text-muted-foreground">
+			<Card class="p-8 text-center text-slate-400 bg-slate-800/40 border-slate-700">
 				No projects found for this {dept.selectedPhase === 'all' ? 'department' : 'phase'}
 			</Card>
 		{/if}
 	</div>
 </div>
+
+<EditDepartmentModal
+	bind:open={showEditModal}
+	department={dept.department}
+	allUserProfiles={data.userProfiles}
+/>

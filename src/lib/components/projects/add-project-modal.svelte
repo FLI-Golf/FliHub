@@ -28,7 +28,6 @@
 		department: '',
 		startDate: '',
 		endDate: '',
-		project_budget_mode: 'auto',
 		project_budget: '',
 		project_forecasted_expenses: '',
 		fiscalYear: '2026',
@@ -98,7 +97,6 @@
 			department: '',
 			startDate: '',
 			endDate: '',
-			project_budget_mode: 'auto',
 			project_budget: '',
 			project_forecasted_expenses: '',
 			fiscalYear: '2026',
@@ -229,22 +227,6 @@
 						class="bg-slate-800 border-slate-700 text-white"
 					/>
 				</div>
-			</div>
-
-			<!-- Budget Mode -->
-			<div class="space-y-2">
-				<Label for="budget-mode" class="text-slate-200">Budget Mode *</Label>
-				<select
-					id="budget-mode"
-					bind:value={formData.project_budget_mode}
-					required
-					class="flex h-10 w-full rounded-md border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-500 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-900"
-				>
-					<option value="auto">Auto (from tasks)</option>
-					<option value="fixed">Fixed Budget</option>
-					<option value="hybrid">Hybrid (tasks + buffer)</option>
-					<option value="capped">Capped (max limit)</option>
-				</select>
 			</div>
 
 			<!-- Budget and Forecasted -->

@@ -9,7 +9,13 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 		}
 	
 	try {
-		const tasks = await pb.collection('tasks').getFullList({ sort: '-id' }).catch(() => []);
+		const [tasks, vendors] = await Promise.all([
+			pb.collection('tasks').getFullList({
+				sort: '-id',
+				expand: 'projectId,projectId.department'
+			}).catch(() => []),
+			pb.collection('vendors').getFullList({ sort: 'name', fields: 'id,name' }).catch(() => [])
+		]);
 
 		// Load expenses linked to tasks so the detail modal can show actual vs budget
 		const taskExpenses = await pb.collection('expenses').getFullList({
@@ -67,6 +73,7 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 
 		return {
 			tasks,
+			vendors,
 			expensesByTask,
 			stats,
 			subtaskStats: { total: 0, completed: 0 },
@@ -86,6 +93,7 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 		}
 		return {
 			tasks: [],
+			vendors: [],
 			expensesByTask: {},
 			stats: {
 				total: 0,

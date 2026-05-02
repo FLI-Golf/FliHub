@@ -3,7 +3,6 @@ import { z } from 'zod';
 export const ProjectTypeEnum = z.enum(['tournament', 'activation', 'event', 'campaign']);
 export const ProjectStatusEnum = z.enum(['draft', 'planned', 'in_progress', 'completed', 'cancelled']);
 export const ApprovalStatusEnum = z.enum(['pending', 'approved', 'rejected', 'revision_requested']);
-export const ProjectBudgetModeEnum = z.enum(['auto', 'fixed', 'hybrid', 'capped']);
 
 export const ExpenseCategoriesSchema = z.record(z.string(), z.number().nonnegative());
 
@@ -15,15 +14,14 @@ export const ProjectSchema = z.object({
 	status: ProjectStatusEnum,
 	startDate: z.date().optional(),
 	endDate: z.date().optional(),
+	// Budget: set by user (sum of task budgets, or manually entered)
 	project_budget: z.number().min(0).optional(),
-	project_forecasted_expenses: z.number().min(0).optional(),
+	// Actuals: sum of approved expenses — written by the system
 	project_actual_expenses: z.number().min(0).optional(),
-	project_manual_budget_override: z.number().min(0).optional(),
-	project_budget_mode: ProjectBudgetModeEnum.optional(),
-	project_budget_buffer: z.number().min(0).optional(),
-	project_budget_cap: z.number().min(0).optional(),
+	// Forecast: optional manual override of expected spend
+	project_forecasted_expenses: z.number().min(0).optional(),
 	notes: z.string().optional(),
-	expenseCategories: z.any().optional(), // JSON field
+	expenseCategories: z.any().optional(),
 	fiscalYear: z.string().max(10).optional(),
 	approvedBy: z.string().optional(),
 	department: z.string().optional(),

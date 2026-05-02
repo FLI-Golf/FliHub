@@ -500,16 +500,13 @@
 	const operationsRelationships = [
 		{
 			collection: 'departments',
-			description: 'The top-level organizational unit. Every project belongs to a department, and every department has its own budget envelope. The budget system supports three modes: auto (budget is the sum of all child project budgets), annual_cap (a hard ceiling — spend cannot exceed this), and allocated (a fixed amount set manually). department_actual_expenses is updated in real time as expenses are approved. The department detail page shows a three-layer budget bar: actual spent, forecasted remaining, and unallocated headroom.',
+			description: 'The top-level organizational unit. Every project belongs to a department, and every department has its own budget envelope. department_annual_budget is the sum of all child project budgets and updates automatically. department_actual_expenses is updated in real time as expenses are approved. The department detail page shows a budget bar: actual spent vs. the annual budget envelope.',
 			fields: [
 				{ name: 'name', type: 'text', description: 'Department display name (e.g. "Marketing", "Operations", "Technology").' },
 				{ name: 'code', type: 'text', description: 'Short identifier used in reports and budget exports (e.g. "MKT", "OPS"). Max 10 characters.' },
 				{ name: 'description', type: 'text', description: 'What this department is responsible for. Shown on the department detail page.' },
-				{ name: 'department_annual_budget', type: 'number', description: 'The total budget envelope for this department for the fiscal year. In auto mode this is derived from project budgets; in annual_cap or allocated mode it is set directly.' },
-				{ name: 'department_actual_expenses', type: 'number', description: 'Running total of all approved and paid expenses charged to projects in this department. Updated automatically — do not edit manually.' },
-				{ name: 'department_manual_budget_override', type: 'number', description: 'Overrides the calculated budget when set. Used when the department needs a budget that differs from the sum of its projects.' },
-				{ name: 'department_budget_mode', type: 'select', description: 'Controls how the budget is calculated: auto (sum of project budgets), annual_cap (hard ceiling), allocated (fixed manual amount).' },
-				{ name: 'department_budget_cap', type: 'number', description: 'Maximum spend allowed in annual_cap mode. Expenses that would push actual spend past this cap are flagged.' },
+				{ name: 'department_annual_budget', type: 'number', description: 'Sum of all project budgets in this department. Updated automatically when projects change; can be manually overridden.' },
+				{ name: 'department_actual_expenses', type: 'number', description: 'Sum of all approved and paid expenses across this department\'s projects. Written by the system — do not edit manually.' },
 				{ name: 'status', type: 'select', description: 'active (operating normally) or inactive (archived — projects still visible but no new spend allowed).' },
 				{ name: 'headOfDepartment', type: 'relation', relatesTo: 'user_profiles', description: 'The user profile of the department head. Shown on the department card and used for approval routing.' }
 			],
@@ -530,13 +527,9 @@
 				{ name: 'startDate', type: 'date', description: 'First day of the project. Used for phase filtering (Phase 1: Jan–Sep 2026, Phase 2: Oct 2026–Mar 2027, Phase 3: Apr–Dec 2027).' },
 				{ name: 'endDate', type: 'date', description: 'Last day of the project. Must be on or after startDate.' },
 				{ name: 'fiscalYear', type: 'text', description: 'Fiscal year this project belongs to (e.g. "2026"). Used to group projects in budget reports.' },
-				{ name: 'project_budget', type: 'number', description: 'Approved budget for this project. In auto mode, derived from the sum of task budgets. In fixed or capped mode, set directly.' },
-				{ name: 'project_forecasted_expenses', type: 'number', description: 'Expected total spend based on task estimates and pending expenses. Shown as the purple segment on the budget bar — the gap between actual and forecasted.' },
-				{ name: 'project_actual_expenses', type: 'number', description: 'Sum of all approved and paid expenses linked to this project. Updated automatically as expenses move to approved or paid status.' },
-				{ name: 'project_budget_mode', type: 'select', description: 'auto (budget = sum of task budgets), fixed (manually set, no cap enforcement), hybrid (auto-calculated with manual override), capped (auto-calculated but cannot exceed project_budget_cap).' },
-				{ name: 'project_budget_buffer', type: 'number', description: 'Optional contingency amount added on top of the calculated budget. Useful for projects with uncertain scope.' },
-				{ name: 'project_budget_cap', type: 'number', description: 'Hard ceiling in capped mode. Expenses that would push actual spend past this value are flagged for review.' },
-				{ name: 'project_manual_budget_override', type: 'number', description: 'Overrides the auto-calculated budget when set. Used when the project needs a budget that differs from the sum of its tasks.' },
+				{ name: 'project_budget', type: 'number', description: 'Approved budget for this project — sum of task budgets, or set manually. This is the authoritative planned spend number.' },
+				{ name: 'project_actual_expenses', type: 'number', description: 'Sum of all approved and paid expenses on this project. Written by the system as expenses are approved.' },
+				{ name: 'project_forecasted_expenses', type: 'number', description: 'Optional manual forecast of expected total spend. Useful when actual tasks are not yet fully defined.' },
 				{ name: 'department', type: 'relation', relatesTo: 'departments', description: 'The department that owns this project. The project budget rolls up to the department total.' },
 				{ name: 'vendors', type: 'relation', relatesTo: 'vendors', description: 'Vendors engaged on this project. Multiple vendors can be linked; each can also be referenced on individual expense records.' },
 				{ name: 'approvedBy', type: 'relation', relatesTo: 'user_profiles', description: 'The user who approved this project and its budget. Required before status can move past planned.' },
@@ -1127,15 +1120,109 @@
 
 			<!-- Overview -->
 			<Card class="p-6">
-				<div class="space-y-4">
+				<div class="space-y-5">
 					<div>
 						<h2 class="text-xl font-bold">Operations System Overview</h2>
 						<p class="text-sm text-muted-foreground mt-1">
-							How work is organized from department down to individual tasks, and how spend is tracked at every level.
+							How FLI Golf's $5.6M investment plan is organized, tracked, and executed from department down to individual tasks.
 						</p>
 					</div>
-					<div class="p-4 bg-emerald-950/40 border border-emerald-700/50 rounded-lg text-sm text-emerald-200">
-						Operations is a four-layer hierarchy: <code class="font-mono bg-black/30 px-1 rounded">departments</code> own <code class="font-mono bg-black/30 px-1 rounded">projects</code>, projects contain <code class="font-mono bg-black/30 px-1 rounded">tasks</code>, and <code class="font-mono bg-black/30 px-1 rounded">vendors</code> are engaged across projects. Budget tracking runs at every layer — department annual budget → project budget → task budget — and actual spend flows upward automatically as <code class="font-mono bg-black/30 px-1 rounded">expenses</code> are approved. The three-number pattern (<code class="font-mono bg-black/30 px-1 rounded">budget</code> / <code class="font-mono bg-black/30 px-1 rounded">forecasted</code> / <code class="font-mono bg-black/30 px-1 rounded">actual</code>) appears at both the department and project level, powering the budget bar visualisation.
+
+					<!-- The hierarchy -->
+					<div class="p-4 bg-emerald-950/40 border border-emerald-700/50 rounded-lg text-sm text-emerald-200 space-y-2">
+						<p class="font-semibold text-emerald-300">Four-layer hierarchy — budget flows down, actuals flow up</p>
+						<div class="flex flex-wrap items-center gap-2 font-mono text-xs">
+							{#each [
+								{ label: 'Department', sub: 'annual envelope', color: 'bg-emerald-900/60 border-emerald-600' },
+								{ label: '→', color: '' },
+								{ label: 'Project', sub: 'work stream', color: 'bg-blue-900/60 border-blue-600' },
+								{ label: '→', color: '' },
+								{ label: 'Task', sub: 'line item', color: 'bg-violet-900/60 border-violet-600' },
+								{ label: '→', color: '' },
+								{ label: 'Expense', sub: 'actual spend', color: 'bg-amber-900/60 border-amber-600' },
+							] as h}
+								{#if h.sub}
+									<div class="flex flex-col items-center gap-0.5 px-3 py-1.5 rounded-lg border {h.color}">
+										<span class="font-bold">{h.label}</span>
+										<span class="text-[10px] opacity-70">{h.sub}</span>
+									</div>
+								{:else}
+									<span class="text-emerald-500 text-base">{h.label}</span>
+								{/if}
+							{/each}
+						</div>
+						<p class="text-xs text-emerald-300/80 pt-1">
+							When an expense is <strong>approved</strong>, it increments <code class="font-mono bg-black/30 px-1 rounded">project_actual_expenses</code> and <code class="font-mono bg-black/30 px-1 rounded">department_actual_expenses</code> automatically. Nothing else moves actuals.
+						</p>
+					</div>
+
+					<!-- Phase timeline -->
+					<div>
+						<h3 class="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-3">Execution Phases — Funding Date: June 15, 2026</h3>
+						<div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+							{#each [
+								{
+									phase: 'Phase 1', dates: 'Jun 15 – Sep 30, 2026', budget: '$2,800,000',
+									color: 'bg-blue-950/50 border-blue-700/50 text-blue-200',
+									accent: 'text-blue-300',
+									focus: 'Foundation',
+									items: ['Executive & office staff hired', 'San Diego + Scottsdale offices open', 'App development begun', 'Player contracts signed', 'Gaming licenses secured', 'Documentary filming started', 'Marketing & PR launched']
+								},
+								{
+									phase: 'Phase 2', dates: 'Oct 1, 2026 – Jan 31, 2027', budget: '$1,473,300',
+									color: 'bg-violet-950/50 border-violet-700/50 text-violet-200',
+									accent: 'text-violet-300',
+									focus: 'Launch',
+									items: ['Mini FLO Golf event at Turf Paradise', 'Broadcasting staff trained', 'Pure Mobile deposit paid', '50% of Tier 1–2 sponsors secured', 'First apparel drop', 'Teams & partners announced', 'Documentary production continues']
+								},
+								{
+									phase: 'Phase 3', dates: 'Feb 1, 2027 – Jan 1, 2028', budget: '$1,315,000',
+									color: 'bg-emerald-950/50 border-emerald-700/50 text-emerald-200',
+									accent: 'text-emerald-300',
+									focus: 'Scale',
+									items: ['Season 1 sponsors 100% sold', 'Season 1 tickets 100% sold', 'Season 2 pre-sales begin', 'Documentary completed', 'Multiple apparel drops', 'Pure Mobile production complete', 'Subscription target reached']
+								}
+							] as p}
+								<div class="p-4 rounded-lg border {p.color} space-y-2">
+									<div class="flex items-baseline justify-between">
+										<span class="font-bold {p.accent}">{p.phase} — {p.focus}</span>
+										<span class="font-mono text-xs font-bold">{p.budget}</span>
+									</div>
+									<div class="text-[11px] opacity-70">{p.dates}</div>
+									<ul class="space-y-0.5 pt-1">
+										{#each p.items as item}
+											<li class="text-[11px] opacity-80 flex gap-1.5"><span class="opacity-50 shrink-0">·</span>{item}</li>
+										{/each}
+									</ul>
+								</div>
+							{/each}
+						</div>
+					</div>
+
+					<!-- Department summary -->
+					<div>
+						<h3 class="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-3">8 Departments — Total Planned: $6.1M across phases</h3>
+						<div class="grid grid-cols-2 md:grid-cols-4 gap-2">
+							{#each [
+								{ name: 'Executive',              code: 'EXEC',   budget: '$1,200,000', head: 'Dustin Dinsmore',   color: 'border-violet-700/50 bg-violet-950/30' },
+								{ name: 'Operations',             code: 'OPS',    budget: '$762,000',   head: 'Andrew Panza',     color: 'border-blue-700/50 bg-blue-950/30' },
+								{ name: 'Marketing',              code: 'MKT',    budget: '$1,941,600', head: 'Corey La Russo',   color: 'border-orange-700/50 bg-orange-950/30' },
+								{ name: 'Technology',             code: 'TECH',   budget: '$1,368,000', head: 'Nate Panza',       color: 'border-cyan-700/50 bg-cyan-950/30' },
+								{ name: 'Legal & Compliance',     code: 'LEGAL',  budget: '$200,000',   head: 'Andrew Panza',     color: 'border-red-700/50 bg-red-950/30' },
+								{ name: 'Player Development',     code: 'PLAYER', budget: '$600,000',   head: 'Gary Santos',      color: 'border-emerald-700/50 bg-emerald-950/30' },
+								{ name: 'Content & Media',        code: 'MEDIA',  budget: '$735,000',   head: 'Mark Coleman',     color: 'border-pink-700/50 bg-pink-950/30' },
+								{ name: 'Finance & Admin',        code: 'FIN',    budget: '$331,700',   head: 'Kimberly Martinez', color: 'border-yellow-700/50 bg-yellow-950/30' },
+							] as d}
+								<div class="p-3 rounded-lg border {d.color} space-y-1">
+									<div class="flex items-center justify-between">
+										<span class="font-mono text-xs font-bold text-muted-foreground">{d.code}</span>
+										<span class="font-mono text-xs font-bold">{d.budget}</span>
+									</div>
+									<div class="text-sm font-semibold leading-tight">{d.name}</div>
+									<div class="text-[11px] text-muted-foreground">{d.head}</div>
+								</div>
+							{/each}
+						</div>
 					</div>
 				</div>
 			</Card>
@@ -1236,41 +1323,114 @@
 				</div>
 			</Card>
 
-			<!-- Budget modes -->
+			<!-- Budget model -->
 			<Card class="p-6">
-				<h2 class="text-xl font-bold mb-4">Budget Modes</h2>
-				<p class="text-sm text-muted-foreground mb-4">Both departments and projects support multiple budget calculation modes. The mode controls how the budget number is derived and whether overspend is enforced.</p>
-				<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+				<h2 class="text-xl font-bold mb-1">Budget Model</h2>
+				<p class="text-sm text-muted-foreground mb-5">One source of truth per concept at every level. Approved expenses are the only thing that moves actuals.</p>
+
+				<!-- The three fields at each level -->
+				<div class="space-y-6">
+
+					<!-- Task level -->
 					<div>
-						<h3 class="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-3">Project Budget Modes</h3>
-						<div class="space-y-2">
+						<h3 class="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">Task Level — the atomic unit</h3>
+						<div class="grid grid-cols-1 md:grid-cols-2 gap-2">
 							{#each [
-								{ mode: 'auto', color: 'bg-emerald-900/40 border-emerald-700/50 text-emerald-200', desc: 'Budget = sum of all task budgets. Updates automatically as tasks are added or changed.' },
-								{ mode: 'fixed', color: 'bg-blue-900/40 border-blue-700/50 text-blue-200', desc: 'Manually set budget. No cap enforcement — overspend is flagged but not blocked.' },
-								{ mode: 'hybrid', color: 'bg-violet-900/40 border-violet-700/50 text-violet-200', desc: 'Auto-calculated from tasks but can be overridden with project_manual_budget_override.' },
-								{ mode: 'capped', color: 'bg-amber-900/40 border-amber-700/50 text-amber-200', desc: 'Auto-calculated but cannot exceed project_budget_cap. Expenses past the cap are flagged for review.' }
-							] as bm}
-								<div class="flex items-start gap-3 p-3 rounded-lg border {bm.color}">
-									<div class="font-mono font-bold text-xs shrink-0 pt-0.5">{bm.mode}</div>
-									<div class="text-xs opacity-80">{bm.desc}</div>
+								{ field: 'task_budget', who: 'Set by user', color: 'bg-emerald-900/40 border-emerald-700/50 text-emerald-200', desc: 'The planned cost for this specific task. Set when the task is created. Sums up to project_budget.' },
+								{ field: 'task_actual_cost', who: 'Written by system', color: 'bg-blue-900/40 border-blue-700/50 text-blue-200', desc: 'Actual cost from approved expenses linked to this task. Never edit manually.' },
+							] as f}
+								<div class="flex items-start gap-3 p-3 rounded-lg border {f.color}">
+									<div class="shrink-0 pt-0.5 space-y-1">
+										<div class="font-mono font-bold text-xs">{f.field}</div>
+										<div class="text-[10px] opacity-60 italic">{f.who}</div>
+									</div>
+									<div class="text-xs opacity-80">{f.desc}</div>
 								</div>
 							{/each}
 						</div>
 					</div>
+
+					<!-- Project level -->
 					<div>
-						<h3 class="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-3">Department Budget Modes</h3>
-						<div class="space-y-2">
+						<h3 class="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">Project Level — the work stream</h3>
+						<div class="grid grid-cols-1 md:grid-cols-3 gap-2">
 							{#each [
-								{ mode: 'auto', color: 'bg-emerald-900/40 border-emerald-700/50 text-emerald-200', desc: 'Budget = sum of all child project budgets. Reflects the bottom-up plan.' },
-								{ mode: 'annual_cap', color: 'bg-red-900/40 border-red-700/50 text-red-200', desc: 'Hard ceiling set by finance. Expenses that push actual spend past this cap are flagged.' },
-								{ mode: 'allocated', color: 'bg-blue-900/40 border-blue-700/50 text-blue-200', desc: 'Fixed amount set manually during the planning cycle. Does not change with project additions.' }
-							] as bm}
-								<div class="flex items-start gap-3 p-3 rounded-lg border {bm.color}">
-									<div class="font-mono font-bold text-xs shrink-0 pt-0.5">{bm.mode}</div>
-									<div class="text-xs opacity-80">{bm.desc}</div>
+								{ field: 'project_budget', who: 'Sum of task_budget', color: 'bg-emerald-900/40 border-emerald-700/50 text-emerald-200', desc: 'The approved spend envelope. Equals the sum of all task budgets. Can be set manually if tasks are not yet defined.' },
+								{ field: 'project_actual_expenses', who: 'Written by system', color: 'bg-blue-900/40 border-blue-700/50 text-blue-200', desc: 'Sum of all approved and paid expenses on this project. Increments automatically on approval. Never edit manually.' },
+								{ field: 'project_forecasted_expenses', who: 'Optional — set by user', color: 'bg-violet-900/40 border-violet-700/50 text-violet-200', desc: 'Manual estimate of expected total spend. Useful early in a project before all tasks are defined. Shown as the faded bar segment.' },
+							] as f}
+								<div class="flex flex-col gap-1.5 p-3 rounded-lg border {f.color}">
+									<div class="font-mono font-bold text-xs">{f.field}</div>
+									<div class="text-[10px] opacity-60 italic">{f.who}</div>
+									<div class="text-xs opacity-80">{f.desc}</div>
 								</div>
 							{/each}
 						</div>
+					</div>
+
+					<!-- Department level -->
+					<div>
+						<h3 class="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">Department Level — the annual envelope</h3>
+						<div class="grid grid-cols-1 md:grid-cols-2 gap-2">
+							{#each [
+								{ field: 'department_annual_budget', who: 'Sum of project_budget', color: 'bg-emerald-900/40 border-emerald-700/50 text-emerald-200', desc: 'Total planned spend for this department — the sum of all project budgets it owns. Recalculated whenever a project budget changes.' },
+								{ field: 'department_actual_expenses', who: 'Written by system', color: 'bg-blue-900/40 border-blue-700/50 text-blue-200', desc: 'Sum of all project_actual_expenses across this department. The real money spent. Increments on every approved expense.' },
+							] as f}
+								<div class="flex items-start gap-3 p-3 rounded-lg border {f.color}">
+									<div class="shrink-0 pt-0.5 space-y-1">
+										<div class="font-mono font-bold text-xs">{f.field}</div>
+										<div class="text-[10px] opacity-60 italic">{f.who}</div>
+									</div>
+									<div class="text-xs opacity-80">{f.desc}</div>
+								</div>
+							{/each}
+						</div>
+					</div>
+
+					<!-- The money pulse — how to read the dashboard -->
+					<div class="p-4 bg-slate-800/60 border border-slate-600 rounded-lg space-y-3">
+						<p class="text-sm font-semibold text-slate-200">How to read the budget bar on the dashboard</p>
+						<div class="space-y-2">
+							{#each [
+								{ label: 'Solid green bar', meaning: 'Actual spend (approved expenses). This is real money out the door.' },
+								{ label: 'Faded bar behind it', meaning: 'Forecasted spend. Shows where you expect to land vs. the budget.' },
+								{ label: 'Bar width = 100%', meaning: 'The full budget envelope (department_annual_budget or project_budget).' },
+								{ label: 'Bar turns yellow at 70%', meaning: 'Warning — more than 70% of budget consumed.' },
+								{ label: 'Bar turns red at 90%', meaning: 'Critical — approaching or over budget.' },
+								{ label: '% spent · $X forecasted · N projects', meaning: 'The meta row below each bar. Only shows values that are non-zero.' },
+							] as row}
+								<div class="flex gap-3 text-xs">
+									<span class="font-mono font-semibold text-slate-300 shrink-0 w-44">{row.label}</span>
+									<span class="text-slate-400">{row.meaning}</span>
+								</div>
+							{/each}
+						</div>
+					</div>
+
+					<!-- Expense approval flow -->
+					<div class="p-4 bg-amber-950/30 border border-amber-700/40 rounded-lg space-y-2">
+						<p class="text-sm font-semibold text-amber-300">The expense approval loop — how actuals move</p>
+						<div class="flex flex-wrap items-center gap-2 text-xs font-mono">
+							{#each [
+								{ label: 'Expense created', note: 'draft', color: 'bg-slate-700/60 border-slate-600 text-slate-200' },
+								{ label: '→' },
+								{ label: 'Submitted for review', note: 'submitted', color: 'bg-blue-900/50 border-blue-700 text-blue-200' },
+								{ label: '→' },
+								{ label: 'Approved', note: 'approved → actuals update', color: 'bg-emerald-900/50 border-emerald-700 text-emerald-200' },
+								{ label: '→' },
+								{ label: 'Paid', note: 'paid → closed', color: 'bg-green-900/50 border-green-700 text-green-200' },
+							] as step}
+								{#if step.color}
+									<div class="flex flex-col items-center gap-0.5 px-2 py-1.5 rounded border {step.color}">
+										<span class="font-bold text-[10px]">{step.label}</span>
+										<span class="text-[9px] opacity-60">{step.note}</span>
+									</div>
+								{:else}
+									<span class="text-amber-600">{step.label}</span>
+								{/if}
+							{/each}
+						</div>
+						<p class="text-xs text-amber-200/70">Only the transition to <strong>approved</strong> increments actuals. Rejected expenses have no budget impact. Paid is a bookkeeping state — the budget impact already happened at approval.</p>
 					</div>
 				</div>
 			</Card>
@@ -1289,7 +1449,7 @@
 					<div class="p-4 bg-slate-700/50 border border-slate-600 rounded-lg">
 						<div class="font-mono font-bold text-slate-100 mb-2">projects → tasks</div>
 						<div class="text-xs text-slate-400 space-y-1">
-							<div>One-to-many. Tasks are the atomic unit of work within a project. In auto budget mode, task_budget values sum to the project budget.</div>
+							<div>One-to-many. Tasks are the atomic unit of work within a project. task_budget values sum to project_budget automatically.</div>
 							<div class="pt-1 text-blue-300">subTasksChecklist on each task allows granular progress tracking without creating child records.</div>
 						</div>
 					</div>

@@ -1,17 +1,14 @@
 import { z } from 'zod';
 
-export const DepartmentBudgetModeEnum = z.enum(['auto', 'annual_cap', 'allocated']);
-
 export const DepartmentSchema = z.object({
 	id: z.string().optional(),
 	name: z.string().min(1, 'Department name is required').max(255),
 	code: z.string().min(1).max(10).optional(),
 	description: z.string().optional(),
+	// Budget: sum of all project_budget values under this department
 	department_annual_budget: z.number().min(0).optional(),
+	// Actuals: sum of all approved expenses under this department — written by the system
 	department_actual_expenses: z.number().min(0).optional(),
-	department_manual_budget_override: z.number().min(0).optional(),
-	department_budget_mode: DepartmentBudgetModeEnum.optional(),
-	department_budget_cap: z.number().min(0).optional(),
 	status: z.enum(['active', 'inactive']).optional(),
 	headOfDepartment: z.string().optional(),
 	created: z.date().optional(),

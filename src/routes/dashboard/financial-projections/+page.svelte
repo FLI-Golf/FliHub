@@ -1,6 +1,10 @@
 <script lang="ts">
+	import type { PageData } from './$types';
 	import Card from '$lib/components/ui/card.svelte';
-	import { TrendingUp, TrendingDown, DollarSign, BarChart3, Info, ChevronRight } from 'lucide-svelte';
+	import { TrendingUp, TrendingDown, DollarSign, BarChart3, Info, ChevronRight, Activity, Target } from 'lucide-svelte';
+
+	let { data }: { data: PageData } = $props();
+	const live = $derived(data?.liveData ?? null);
 
 	// ── P&L data from financial projections spreadsheet ───────────────────────
 	const years = [2026, 2027, 2028, 2029, 2030, 2031];
@@ -317,5 +321,102 @@
 			</div>
 		</div>
 	</Card>
+
+	<!-- ── Live vs Plan ─────────────────────────────────────────────────────── -->
+	{#if live}
+	<div>
+		<div class="flex items-center gap-2 mb-4">
+			<Activity class="size-5 text-emerald-400" />
+			<h2 class="text-xl font-bold">Live Progress vs Plan</h2>
+			<span class="text-xs text-slate-400 bg-slate-800 border border-slate-700 rounded-full px-2 py-0.5 ml-1">Pulled from departments · projects · sponsors</span>
+		</div>
+
+		<!-- Revenue vs Expense KPIs -->
+		<div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
+			<Card class="p-4 bg-blue-950/40 border-blue-800/50">
+				<p class="text-xs text-blue-400 uppercase tracking-wide mb-1">Budgeted Spend</p>
+				<p class="text-xl font-bold text-blue-300">{fmtFull(live.totalBudgeted)}</p>
+				<p class="text-xs text-slate-400 mt-1">across {live.departments.length} departments</p>
+			</Card>
+
+			<Card class="p-4 bg-slate-800/40 border-slate-700">
+				<p class="text-xs text-slate-400 uppercase tracking-wide mb-1">Actual Spend</p>
+				<p class="text-xl font-bold text-slate-200">{fmtFull(live.totalActualExp)}</p>
+				<div class="mt-2 w-full bg-slate-700 rounded-full h-1.5 overflow-hidden">
+					<div class="h-full rounded-full bg-blue-500" style="width:{Math.min(100,(live.totalActualExp/2_813_129)*100).toFixed(1)}%"></div>
+				</div>
+				<p class="text-[10px] text-slate-500 mt-1">{Math.min(100,(live.totalActualExp/2_813_129)*100).toFixed(1)}% of 2026 plan</p>
+			</Card>
+
+			<Card class="p-4 bg-emerald-950/40 border-emerald-800/50">
+				<p class="text-xs text-emerald-400 uppercase tracking-wide mb-1">Sponsor Revenue Received</p>
+				<p class="text-xl font-bold text-emerald-300">{fmtFull(live.totalReceivedRevenue)}</p>
+				<div class="mt-2 w-full bg-slate-700 rounded-full h-1.5 overflow-hidden">
+					<div class="h-full rounded-full bg-emerald-500" style="width:{Math.min(100,(live.totalReceivedRevenue/2_824_000)*100).toFixed(1)}%"></div>
+				</div>
+				<p class="text-[10px] text-slate-500 mt-1">{Math.min(100,(live.totalReceivedRevenue/2_824_000)*100).toFixed(1)}% of 2026 plan</p>
+			</Card>
+
+			<Card class="p-4 bg-yellow-950/40 border-yellow-800/50">
+				<p class="text-xs text-yellow-400 uppercase tracking-wide mb-1">Contracted Revenue</p>
+				<p class="text-xl font-bold text-yellow-300">{fmtFull(live.totalContractedRevenue)}</p>
+				<p class="text-xs text-slate-400 mt-1">{live.sponsorCount} active sponsor{live.sponsorCount !== 1 ? 's' : ''}</p>
+			</Card>
+		</div>
+
+		<!-- Department spend vs budget bars -->
+		<Card class="p-5 bg-slate-800/50 border-slate-700 mb-4">
+			<h3 class="text-sm font-semibold text-slate-300 uppercase tracking-wide mb-4 flex items-center gap-2">
+				<Target class="size-4 text-slate-400" /> Department Spend vs Budget
+			</h3>
+			<div class="space-y-3">
+				{#each live.departments as dept}
+					{@const budget = dept.department_annual_budget || 0}
+					{@const actual = dept.department_actual_expenses || 0}
+					{@const pctUsed = budget > 0 ? Math.min(100, (actual / budget) * 100) : 0}
+					{@const barColor = pctUsed > 90 ? 'bg-red-500' : pctUsed > 70 ? 'bg-yellow-500' : 'bg-emerald-500'}
+					<div class="flex items-center gap-3">
+						<div class="w-8 text-[10px] font-mono text-slate-500 shrink-0 text-right">{dept.code || '—'}</div>
+						<div class="w-36 text-xs text-slate-300 shrink-0 truncate">{dept.name}</div>
+						<div class="flex-1 bg-slate-700 rounded-full h-2 overflow-hidden">
+							<div class="h-full rounded-full transition-all {barColor}" style="width:{pctUsed.toFixed(1)}%"></div>
+						</div>
+						<div class="w-28 text-right text-xs text-slate-400 shrink-0">
+							{fmtFull(actual)} <span class="text-slate-600">/ {fmtFull(budget)}</span>
+						</div>
+						<div class="w-10 text-right text-xs font-semibold shrink-0 {pctUsed > 90 ? 'text-red-400' : pctUsed > 70 ? 'text-yellow-400' : 'text-slate-400'}">
+							{pctUsed.toFixed(0)}%
+						</div>
+					</div>
+				{/each}
+				{#if live.departments.length === 0}
+					<p class="text-sm text-slate-500 text-center py-4">No department data yet — seed departments to see progress here.</p>
+				{/if}
+			</div>
+		</Card>
+
+		<!-- Project execution progress -->
+		<Card class="p-5 bg-slate-800/50 border-slate-700">
+			<h3 class="text-sm font-semibold text-slate-300 uppercase tracking-wide mb-4">Project Execution</h3>
+			{@const total = live.projectsByStatus.total || 1}
+			<div class="flex items-center gap-3 mb-3">
+				<div class="flex-1 flex h-4 rounded-full overflow-hidden bg-slate-700 gap-px">
+					<div class="bg-emerald-500 transition-all" style="width:{((live.projectsByStatus.completed / total) * 100).toFixed(1)}%" title="Completed"></div>
+					<div class="bg-blue-500 transition-all"    style="width:{((live.projectsByStatus.in_progress / total) * 100).toFixed(1)}%" title="In Progress"></div>
+					<div class="bg-slate-500 transition-all"   style="width:{((live.projectsByStatus.planned / total) * 100).toFixed(1)}%" title="Planned"></div>
+				</div>
+				<span class="text-sm font-bold text-slate-200 shrink-0">{live.projectsByStatus.total} total</span>
+			</div>
+			<div class="flex gap-4 text-xs text-slate-400">
+				<span class="flex items-center gap-1.5"><span class="size-2 rounded-full bg-emerald-500 inline-block"></span>Completed {live.projectsByStatus.completed}</span>
+				<span class="flex items-center gap-1.5"><span class="size-2 rounded-full bg-blue-500 inline-block"></span>In Progress {live.projectsByStatus.in_progress}</span>
+				<span class="flex items-center gap-1.5"><span class="size-2 rounded-full bg-slate-500 inline-block"></span>Planned {live.projectsByStatus.planned}</span>
+			</div>
+			<p class="text-xs text-slate-500 mt-3 pt-3 border-t border-slate-700">
+				Data flows from Departments → Projects → Tasks → Expenses. As your team logs expenses and marks tasks complete, this section updates automatically.
+			</p>
+		</Card>
+	</div>
+	{/if}
 
 </div>

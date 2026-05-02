@@ -10,7 +10,7 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 		// Fetch all core data in parallel — each wrapped so one failure doesn't kill the page
 		const [projects, departments, expenses, approvals, sponsors, franchiseLeads, franchiseOpps] = await Promise.all([
 			pb.collection('projects').getFullList({ fields: 'id,name,status,department,project_budget,project_actual_expenses,project_forecasted_expenses,fiscalYear' }).catch(() => []),
-			pb.collection('departments').getFullList({ fields: 'id,name,department_annual_budget,department_actual_expenses' }).catch(() => []),
+			pb.collection('departments').getFullList({ fields: 'id,name,description,status,department_annual_budget,department_actual_expenses' }).catch(() => []),
 			pb.collection('expenses').getFullList({ fields: 'id,amount,status,project' }).catch(() => []),
 			pb.collection('approvals').getFullList({ fields: 'id,status' }).catch(() => []),
 			pb.collection('sponsors').getFullList({ fields: 'id,status,tier,type,committed_amount,paid_amount' }).catch(() => []),
@@ -59,12 +59,28 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 		// Department budget list for the table
 		const departmentBudgets = (departments as any[]).map(d => {
 			const dProjects = (projects as any[]).filter(p => p.department === d.id);
+			const actual     = dProjects.reduce((s: number, p: any) => s + (p.project_actual_expenses ?? 0), 0);
+			const forecasted = dProjects.reduce((s: number, p: any) => s + (p.project_forecasted_expenses ?? 0), 0);
+			const budgeted   = dProjects.reduce((s: number, p: any) => s + (p.project_budget ?? 0), 0);
 			return {
 				id: d.id,
 				name: d.name,
+				description: d.description ?? '',
+				status: d.status ?? 'active',
+
 				budget: d.department_annual_budget ?? 0,
-				actual: dProjects.reduce((s: number, p: any) => s + (p.project_actual_expenses ?? 0), 0),
-				projectCount: dProjects.length
+				actual,
+				forecasted,
+				budgeted,
+				projectCount: dProjects.length,
+				projects: dProjects.map((p: any) => ({
+					id: p.id,
+					name: p.name,
+					status: p.status,
+					budget: p.project_budget ?? 0,
+					actual: p.project_actual_expenses ?? 0,
+					forecasted: p.project_forecasted_expenses ?? 0,
+				}))
 			};
 		}).sort((a, b) => b.budget - a.budget);
 	

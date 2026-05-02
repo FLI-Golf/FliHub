@@ -8,7 +8,6 @@ export interface DepartmentDetailDTO {
 	code?: string;
 	description?: string;
 	status: string;
-	budgetMode: string;
 	headOfDepartmentName?: string;
 	isOverBudget: boolean;
 	budgetHealthStatus: string;
@@ -74,7 +73,6 @@ export class DepartmentController {
 			code: dept.props.code,
 			description: dept.props.description,
 			status: dept.props.status,
-			budgetMode: dept.props.budgetMode,
 			headOfDepartmentName: dept.props.headOfDepartmentName,
 			isOverBudget: dept.isOverBudget,
 			budgetHealthStatus: dept.budgetHealthStatus,
