@@ -32,4 +32,7 @@ export * from './campaign.schema';
 export * from './continuous-improvement.schema';
 export * from './digital-marketing-strategy.schema';
 export * from './marketing-goal.schema';
-export * from './swot-analysis.schema';
+// swot_analysis collection removed
+
+// Trademark / IP
+export * from './trademark.schema';

@@ -172,26 +172,61 @@
 					View all <ArrowRight class="size-3" />
 				</Button>
 			</div>
-			<Card class="divide-y">
+			<Card class="overflow-hidden">
 				{#each deptBudgets.slice(0, 8) as dept, i}
-					{@const used = pct(dept.actual ?? 0, dept.budget ?? 1)}
-					{@const deptIcon = getDeptIcon(dept.name)}
+					{@const used       = pct(dept.actual ?? 0, dept.budget ?? 1)}
+					{@const forecasted = pct(dept.forecasted ?? 0, dept.budget ?? 1)}
+					{@const deptIcon   = getDeptIcon(dept.name)}
 					<a href="/dashboard/departments/{dept.id}"
-						class="flex items-center gap-4 px-4 py-3 hover:bg-muted/50 transition-colors group {i % 2 === 1 ? 'bg-muted/30' : ''}">
-						<div class="flex size-8 items-center justify-center rounded-lg {deptIcon.bg} shrink-0">
+						class="flex items-start gap-4 px-4 py-4 transition-colors group {i % 2 === 0 ? 'bg-background hover:bg-muted/40' : 'bg-muted/30 hover:bg-muted/50'}">
+
+						<!-- Icon -->
+						<div class="flex size-9 items-center justify-center rounded-lg {deptIcon.bg} shrink-0 mt-0.5 transition-transform group-hover:scale-105">
 							<deptIcon.icon class="size-4 {deptIcon.fg}" />
 						</div>
+
+						<!-- Body -->
 						<div class="flex-1 min-w-0">
-							<div class="flex items-center justify-between mb-1">
-								<span class="text-sm font-medium truncate group-hover:text-primary transition-colors">{dept.name}</span>
-								<span class="text-xs text-muted-foreground ml-2 shrink-0">{fmt(dept.actual ?? 0)} / {fmt(dept.budget ?? 0)}</span>
+							<!-- Name + budget numbers -->
+							<div class="flex items-start justify-between gap-2 mb-1">
+								<span class="text-sm font-semibold leading-tight group-hover:text-primary transition-colors">{dept.name}</span>
+								<div class="text-right shrink-0">
+									<span class="text-sm font-bold tabular-nums">{fmt(dept.actual ?? 0)}</span>
+									<span class="text-xs text-muted-foreground"> / {fmt(dept.budget ?? 0)}</span>
+								</div>
 							</div>
-							<div class="h-1.5 rounded-full bg-muted overflow-hidden">
-								<div class="h-full rounded-full transition-all {used > 90 ? 'bg-red-500' : used > 70 ? 'bg-yellow-500' : 'bg-emerald-500'}"
+
+							<!-- Description -->
+							{#if dept.description}
+								<p class="text-xs text-muted-foreground leading-snug mb-2 line-clamp-1">{dept.description}</p>
+							{/if}
+
+							<!-- Stacked progress: actual + forecasted -->
+							<div class="h-2 rounded-full bg-muted overflow-hidden mb-1.5 relative">
+								<!-- Forecasted (lighter, behind) -->
+								{#if forecasted > used}
+									<div class="absolute inset-y-0 left-0 rounded-full opacity-40 transition-all {used > 90 ? 'bg-red-500' : used > 70 ? 'bg-yellow-500' : 'bg-emerald-500'}"
+										style="width:{Math.min(forecasted, 100).toFixed(1)}%"></div>
+								{/if}
+								<!-- Actual (solid, on top) -->
+								<div class="absolute inset-y-0 left-0 rounded-full transition-all {used > 90 ? 'bg-red-500' : used > 70 ? 'bg-yellow-500' : 'bg-emerald-500'}"
 									style="width:{used.toFixed(1)}%"></div>
 							</div>
+
+							<!-- Meta row: % spent · forecasted · projects -->
+							<div class="flex items-center gap-3 text-xs text-muted-foreground">
+								<span class="font-medium {used > 90 ? 'text-red-500' : used > 70 ? 'text-yellow-500' : 'text-emerald-500'}">{used.toFixed(0)}% spent</span>
+								{#if (dept.forecasted ?? 0) > 0}
+									<span>·</span>
+									<span>{fmt(dept.forecasted)} forecasted</span>
+								{/if}
+								{#if dept.projectCount > 0}
+									<span>·</span>
+									<span>{dept.projectCount} project{dept.projectCount !== 1 ? 's' : ''}</span>
+								{/if}
+
+							</div>
 						</div>
-						<span class="text-xs font-medium tabular-nums shrink-0 {used > 90 ? 'text-red-600' : used > 70 ? 'text-yellow-600' : 'text-emerald-600'}">{used.toFixed(0)}%</span>
 					</a>
 				{/each}
 				{#if deptBudgets.length === 0}

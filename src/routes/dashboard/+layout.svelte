@@ -1,6 +1,7 @@
 <script lang="ts">
 	import type { LayoutData } from './$types';
 	import FliHubSidebar from '$lib/components/flihub-sidebar.svelte';
+	import ScrollToTop from '$lib/components/ui/scroll-to-top.svelte';
 	import * as Sidebar from '$lib/components/ui/sidebar/index.js';
 	import * as Breadcrumb from '$lib/components/ui/breadcrumb/index.js';
 	import { Separator } from '$lib/components/ui/separator/index.js';
@@ -37,6 +38,9 @@
 		'/dashboard/talent/payments': 'Pro Payments',
 		'/dashboard/marketing-goals': 'Marketing Goals',
 		'/dashboard/managers': 'Manager Dashboard',
+		'/dashboard/reimbursements': 'Reimbursements',
+		'/dashboard/trademarks': 'Trademark Pipeline',
+		'/dashboard/import': 'Import Data',
 		'/dashboard/schema-guide': 'Schema Guide',
 		'/dashboard/admin': 'Admin Panel',
 		'/dashboard/funding-model': 'Funding Model',
@@ -147,3 +151,5 @@
 		</div>
 	</Sidebar.Inset>
 </Sidebar.Provider>
+
+<ScrollToTop />
