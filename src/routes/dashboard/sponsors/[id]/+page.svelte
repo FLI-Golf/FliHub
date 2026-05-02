@@ -7,7 +7,8 @@
 	import { ArrowLeft, Pencil, Trash2, Plus, CheckCircle2, Clock, AlertCircle, DollarSign, Calendar, MapPin, Users, TrendingUp, X } from 'lucide-svelte';
 	import {
 		PIPELINE_STAGES, SPONSOR_STATUS_LABELS, SPONSOR_STATUS_COLORS,
-		SPONSOR_TIER_LABELS, SPONSOR_TIER_COLORS, SPONSOR_TIER_PRICING, isActivePayer
+		SPONSOR_TIER_LABELS, SPONSOR_TIER_COLORS, SPONSOR_TIER_PRICING, isActivePayer,
+		FRANCHISE_TRACK_STAGES, FRANCHISE_TRACK_LABELS, FRANCHISE_TRACK_COLORS
 	} from '$lib/domain/schemas/sponsor.schema';
 	import {
 		PAYMENT_TYPE_LABELS, PAYMENT_STATUS_LABELS, PAYMENT_STATUS_COLORS
@@ -113,6 +114,11 @@
 					</span>
 					{#if s?.franchiseInterest}
 						<span class="text-xs px-2 py-0.5 rounded border bg-violet-900/50 text-violet-300 border-violet-700 font-medium">Franchise Interest</span>
+						{#if s?.franchiseTrackStatus}
+							<span class="text-xs px-2 py-0.5 rounded border font-medium {FRANCHISE_TRACK_COLORS[s.franchiseTrackStatus]}">
+								{FRANCHISE_TRACK_LABELS[s.franchiseTrackStatus]}
+							</span>
+						{/if}
 					{/if}
 					{#if s?.type}
 						<span class="text-xs text-slate-400 capitalize">{s.type.replace('_', ' ')}</span>
@@ -357,6 +363,23 @@
 					<input type="checkbox" id="fi" name="franchiseInterest" value="true" checked={s?.franchiseInterest} class="size-4 rounded border-slate-600 bg-slate-700 accent-emerald-500" />
 					<label for="fi" class="text-sm text-slate-300">Franchise Interest</label>
 				</div>
+				{#if s?.franchiseInterest}
+				<div class="md:col-span-2 grid grid-cols-2 gap-3 p-3 rounded-xl border border-violet-800/50 bg-violet-950/20">
+					<div>
+						<label class={LABEL}>Franchise Track Stage</label>
+						<select name="franchiseTrackStatus" class={INPUT}>
+							<option value="">— Not started —</option>
+							{#each FRANCHISE_TRACK_STAGES as stage}
+								<option value={stage} selected={s?.franchiseTrackStatus === stage}>{FRANCHISE_TRACK_LABELS[stage]}</option>
+							{/each}
+						</select>
+					</div>
+					<div>
+						<label class={LABEL}>Stage Entry Date</label>
+						<input type="date" name="franchiseTrackDate" value={s?.franchiseTrackDate?.slice(0,10) || ''} class={INPUT} />
+					</div>
+				</div>
+				{/if}
 				<div class="md:col-span-2"><label class={LABEL}>Notes</label><textarea name="notes" rows="4" class="{INPUT} resize-none">{s?.notes || ''}</textarea></div>
 			</div>
 			<div class="flex justify-end gap-2 pt-2">
