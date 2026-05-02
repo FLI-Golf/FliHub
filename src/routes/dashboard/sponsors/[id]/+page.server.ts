@@ -48,8 +48,10 @@ export const actions: Actions = {
 				dealProbability:     data.get('dealProbability')     ? Number(data.get('dealProbability'))    : null,
 				lastContactDate:     data.get('lastContactDate')     || null,
 				nextFollowUpDate:    data.get('nextFollowUpDate')    || null,
-				franchiseInterest:   data.get('franchiseInterest') === 'true',
-				assignedTo:          data.get('assignedTo')          || null,
+				franchiseInterest:    data.get('franchiseInterest') === 'true',
+				franchiseTrackStatus: data.get('franchiseTrackStatus') || null,
+				franchiseTrackDate:   data.get('franchiseTrackDate')   || null,
+				assignedTo:           data.get('assignedTo')           || null,
 				notes:               data.get('notes')               || ''
 			});
 		} catch (err: any) {

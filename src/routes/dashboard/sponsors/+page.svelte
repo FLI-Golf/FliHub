@@ -7,7 +7,8 @@
 		PIPELINE_STAGES, CLOSED_STAGES,
 		SPONSOR_STATUS_LABELS, SPONSOR_STATUS_COLORS,
 		SPONSOR_TIER_LABELS, SPONSOR_TIER_COLORS,
-		SPONSOR_TIER_PRICING
+		SPONSOR_TIER_PRICING,
+		FRANCHISE_TRACK_STAGES, FRANCHISE_TRACK_LABELS, FRANCHISE_TRACK_COLORS
 	} from '$lib/domain/schemas/sponsor.schema';
 
 	let { data }: { data: PageData } = $props();
@@ -57,6 +58,21 @@
 		color: SPONSOR_STATUS_COLORS[s],
 		sponsors: byStatus[s] ?? []
 	})));
+
+	// Franchise track — sponsors with franchiseInterest=true, grouped by franchiseTrackStatus
+	const franchiseTrackSponsors = $derived(
+		(data.sponsors ?? []).filter((s: any) => s.franchiseInterest)
+	);
+	const franchiseTrackCols = $derived(
+		FRANCHISE_TRACK_STAGES.map(stage => ({
+			stage,
+			label: FRANCHISE_TRACK_LABELS[stage],
+			color: FRANCHISE_TRACK_COLORS[stage],
+			sponsors: franchiseTrackSponsors.filter(
+				(s: any) => (s.franchiseTrackStatus ?? 'franchise_interest') === stage
+			)
+		}))
+	);
 </script>
 
 <svelte:head><title>Sponsors — FliHub</title></svelte:head>
@@ -147,6 +163,68 @@
 				</div>
 			{/each}
 		</div>
+	</div>
+
+	<!-- Franchise Acquisition Track -->
+	<div>
+		<div class="flex items-center gap-3 mb-3">
+			<h2 class="text-lg font-semibold text-slate-200">Franchise Acquisition Track</h2>
+			<span class="text-xs font-bold px-2 py-0.5 rounded-full bg-violet-900/60 text-violet-300 border border-violet-700">
+				{franchiseTrackSponsors.length} sponsor{franchiseTrackSponsors.length !== 1 ? 's' : ''}
+			</span>
+			<p class="text-xs text-slate-500">Sponsors pursuing franchise ownership — runs in parallel with their sponsorship tier</p>
+		</div>
+
+		{#if franchiseTrackSponsors.length === 0}
+			<Card class="p-6 bg-slate-800/30 border-slate-700 border-dashed">
+				<p class="text-sm text-slate-500 text-center">No sponsors on the franchise track yet. Enable <span class="font-mono text-slate-400">Franchise Interest</span> on a sponsor record to add them here.</p>
+			</Card>
+		{:else}
+			<div class="flex gap-3 overflow-x-auto pb-3">
+				{#each franchiseTrackCols as col}
+					<div class="flex-shrink-0 w-60">
+						<div class="flex items-center justify-between mb-2 px-1">
+							<span class="text-xs font-semibold uppercase tracking-wide text-slate-400">{col.label}</span>
+							<span class="text-xs font-bold text-slate-300 bg-slate-700 rounded-full px-2 py-0.5">{col.sponsors.length}</span>
+						</div>
+						<div class="space-y-2 min-h-20">
+							{#each col.sponsors as sponsor}
+								<a href="/dashboard/sponsors/{sponsor.id}"
+									class="block p-3 rounded-xl border border-violet-800/50 bg-violet-950/30 hover:bg-violet-900/40 hover:border-violet-700 transition-all group">
+									<div class="flex items-start justify-between gap-2 mb-2">
+										<p class="text-sm font-semibold text-slate-100 leading-tight line-clamp-2">{sponsor.companyName}</p>
+										<ChevronRight class="size-3.5 text-slate-500 group-hover:text-violet-300 shrink-0 mt-0.5 transition-colors" />
+									</div>
+									<div class="flex flex-wrap gap-1 mb-1.5">
+										<span class="text-[10px] px-1.5 py-0.5 rounded border font-medium {SPONSOR_TIER_COLORS[sponsor.tier] ?? 'bg-slate-700 text-slate-300 border-slate-600'}">
+											{SPONSOR_TIER_LABELS[sponsor.tier] ?? sponsor.tier}
+										</span>
+										<span class="text-[10px] px-1.5 py-0.5 rounded border font-medium {SPONSOR_STATUS_COLORS[sponsor.status] ?? ''}">
+											{SPONSOR_STATUS_LABELS[sponsor.status] ?? sponsor.status}
+										</span>
+									</div>
+									{#if sponsor.annualCommitment}
+										<p class="text-xs font-bold text-emerald-400">{fmt(sponsor.annualCommitment)}/yr</p>
+									{/if}
+									{#if sponsor.location}
+										<p class="text-[10px] text-slate-500 flex items-center gap-1 mt-1">
+											<MapPin class="size-2.5" />{sponsor.location}
+										</p>
+									{/if}
+									{#if sponsor.franchiseTrackDate}
+										<p class="text-[10px] text-violet-400 flex items-center gap-1 mt-1">
+											<Clock class="size-2.5" />In stage since {fmtDate(sponsor.franchiseTrackDate)}
+										</p>
+									{/if}
+								</a>
+							{:else}
+								<div class="rounded-xl border border-dashed border-violet-900/50 p-4 text-center text-xs text-slate-600">Empty</div>
+							{/each}
+						</div>
+					</div>
+				{/each}
+			</div>
+		{/if}
 	</div>
 
 	<!-- Closed -->
