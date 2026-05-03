@@ -5,7 +5,8 @@
 	import {
 		Zap, FolderKanban, DollarSign, CheckCircle2, Clock,
 		ArrowRight, Users, Star, Trophy, Building2,
-		Film, Scale, Handshake, Cpu, TrendingUp, ExternalLink
+		Film, Scale, Handshake, Cpu, TrendingUp, ExternalLink,
+		ChevronDown
 	} from 'lucide-svelte';
 
 	let { data }: { data: PageData } = $props();
@@ -71,6 +72,8 @@
 	function getColor(name: string) {
 		return PROJECT_COLORS[name] ?? { border: 'border-l-slate-500', badge: 'bg-slate-500/15 text-slate-300', bar: 'bg-slate-500', icon: FolderKanban };
 	}
+
+	let expandedDesc = $state<Record<string, boolean>>({});
 
 	const totalBudget   = $derived(projects.reduce((s, p) => s + p.budget, 0));
 	const totalSpend    = $derived(projects.reduce((s, p) => s + p.actualSpend, 0));
@@ -242,7 +245,18 @@
 					</div>
 
 					{#if project.description}
-						<p class="text-xs text-muted-foreground leading-relaxed mb-3 line-clamp-2">{project.description}</p>
+						<button
+							onclick={() => expandedDesc[project.id] = !expandedDesc[project.id]}
+							class="w-full text-left group/desc mb-3"
+						>
+							<p class="text-xs text-muted-foreground leading-relaxed {expandedDesc[project.id] ? '' : 'line-clamp-2'}">
+								{project.description}
+							</p>
+							<span class="inline-flex items-center gap-0.5 text-[10px] text-slate-500 group-hover/desc:text-slate-300 transition-colors mt-0.5">
+								<ChevronDown class="size-3 transition-transform duration-200 {expandedDesc[project.id] ? 'rotate-180' : ''}" />
+								{expandedDesc[project.id] ? 'less' : 'more'}
+							</span>
+						</button>
 					{/if}
 
 					<!-- Budget bar -->
