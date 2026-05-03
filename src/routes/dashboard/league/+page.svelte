@@ -1,6 +1,9 @@
 <script lang="ts">
 	import Card from '$lib/components/ui/card.svelte';
 	import { Badge } from '$lib/components/ui/badge';
+	import { Button } from '$lib/components/ui/button/index.js';
+	import { invalidateAll } from '$app/navigation';
+	import { Upload, Loader, CheckCircle2, AlertCircle } from 'lucide-svelte';
 	import type { PageData } from './$types';
 
 	let { data }: { data: PageData } = $props();
@@ -39,6 +42,52 @@
 
 	function onKeydown(e: KeyboardEvent) {
 		if (e.key === 'Escape') closeLightbox();
+	}
+
+	// ── Logo upload ───────────────────────────────────────────────────────────
+	// key = `${leagueId}-${field}`, value = 'uploading' | 'done' | 'error'
+	let uploadState = $state<Record<string, 'uploading' | 'done' | 'error'>>({});
+	let uploadError = $state<Record<string, string>>({});
+
+	async function handleUpload(leagueId: string, field: string, input: HTMLInputElement) {
+		const files = input.files;
+		if (!files?.length) return;
+
+		const key = `${leagueId}-${field}`;
+		uploadState = { ...uploadState, [key]: 'uploading' };
+		uploadError = { ...uploadError, [key]: '' };
+
+		const form = new FormData();
+		form.append('field', field);
+		for (const file of Array.from(files)) {
+			form.append('files', file);
+		}
+
+		try {
+			const res = await fetch(`/api/league/${leagueId}/logos`, {
+				method: 'POST',
+				body: form
+			});
+			if (!res.ok) {
+				const d = await res.json().catch(() => ({}));
+				throw new Error(d.message ?? `Upload failed (${res.status})`);
+			}
+			uploadState = { ...uploadState, [key]: 'done' };
+			input.value = '';
+			await invalidateAll();
+			// Reset done state after 3s
+			setTimeout(() => {
+				uploadState = { ...uploadState, [key]: undefined as any };
+			}, 3000);
+		} catch (e: any) {
+			uploadState = { ...uploadState, [key]: 'error' };
+			uploadError = { ...uploadError, [key]: e.message ?? 'Upload failed' };
+		}
+	}
+
+	function triggerUpload(leagueId: string, field: string) {
+		const input = document.getElementById(`upload-${leagueId}-${field}`) as HTMLInputElement;
+		input?.click();
 	}
 
 	function formatCurrency(value: number | null | undefined): string {
@@ -90,80 +139,68 @@
 
 				<!-- All Logos Grid -->
 				<div class="space-y-6">
-					<!-- Men's Logos (Red-White-Blue) -->
-					{#if league.logoMens?.length > 0}
+					{#each [
+						{ field: 'logoMens',      label: "Men's Logos (Red-White-Blue)",    color: 'text-blue-400',  ring: 'hover:ring-blue-400',  btn: 'bg-blue-900/40 hover:bg-blue-800/60 text-blue-300 border-blue-800' },
+						{ field: 'logoWomens',    label: "Women's Logos (Pink-White-Blue)", color: 'text-pink-400',  ring: 'hover:ring-pink-400',  btn: 'bg-pink-900/40 hover:bg-pink-800/60 text-pink-300 border-pink-800' },
+						{ field: 'logoMonochrome',label: 'Monochrome Logos (Black-White)',  color: 'text-gray-400',  ring: 'hover:ring-gray-400',  btn: 'bg-slate-700/60 hover:bg-slate-600/60 text-slate-300 border-slate-600' }
+					] as section}
+						{@const logos = getAllLogoUrls(league, section.field)}
+						{@const uploadKey = `${league.id}-${section.field}`}
 						<div>
-							<h4 class="text-sm font-medium text-blue-400 mb-3">Men's Logos (Red-White-Blue)</h4>
-							<div class="grid grid-cols-2 md:grid-cols-4 gap-3">
-								{#each getAllLogoUrls(league, 'logoMens') as logo}
+							<!-- Section header with upload button -->
+							<div class="flex items-center justify-between mb-3">
+								<h4 class="text-sm font-medium {section.color}">{section.label}</h4>
+								<div class="flex items-center gap-2">
+									{#if uploadState[uploadKey] === 'uploading'}
+										<span class="text-xs text-slate-400 flex items-center gap-1"><Loader class="size-3 animate-spin" /> Uploading…</span>
+									{:else if uploadState[uploadKey] === 'done'}
+										<span class="text-xs text-emerald-400 flex items-center gap-1"><CheckCircle2 class="size-3" /> Uploaded</span>
+									{:else if uploadState[uploadKey] === 'error'}
+										<span class="text-xs text-red-400 flex items-center gap-1" title={uploadError[uploadKey]}><AlertCircle class="size-3" /> Failed</span>
+									{/if}
+									<!-- Hidden file input -->
+									<input
+										id="upload-{league.id}-{section.field}"
+										type="file"
+										accept="image/*,.svg,.pdf"
+										multiple
+										class="hidden"
+										onchange={(e) => { e.stopPropagation(); handleUpload(league.id, section.field, e.currentTarget as HTMLInputElement); }}
+									/>
 									<button
 										type="button"
-										onclick={(e) => openLightbox(e, logo.url, league.name + " Men's Logo")}
-										class="bg-white rounded-lg p-3 flex flex-col items-center cursor-zoom-in hover:ring-2 hover:ring-blue-400 transition-all w-full"
+										onclick={(e) => { e.preventDefault(); e.stopPropagation(); triggerUpload(league.id, section.field); }}
+										disabled={uploadState[uploadKey] === 'uploading'}
+										class="flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-lg border transition-colors disabled:opacity-40 {section.btn}"
 									>
-										<div class="h-24 w-full flex items-center justify-center mb-2">
-											<img
-												src={logo.url}
-												alt="{league.name} Men's Logo"
-												class="max-h-full max-w-full object-contain"
-											/>
-										</div>
-										<span class="text-xs text-gray-500 font-medium">{logo.ext}</span>
+										<Upload class="size-3" /> Upload
 									</button>
-								{/each}
+								</div>
 							</div>
-						</div>
-					{/if}
 
-					<!-- Women's Logos (Pink-White-Blue) -->
-					{#if league.logoWomens?.length > 0}
-						<div>
-							<h4 class="text-sm font-medium text-pink-400 mb-3">Women's Logos (Pink-White-Blue)</h4>
-							<div class="grid grid-cols-2 md:grid-cols-4 gap-3">
-								{#each getAllLogoUrls(league, 'logoWomens') as logo}
-									<button
-										type="button"
-										onclick={(e) => openLightbox(e, logo.url, league.name + " Women's Logo")}
-										class="bg-white rounded-lg p-3 flex flex-col items-center cursor-zoom-in hover:ring-2 hover:ring-pink-400 transition-all w-full"
-									>
-										<div class="h-24 w-full flex items-center justify-center mb-2">
-											<img
-												src={logo.url}
-												alt="{league.name} Women's Logo"
-												class="max-h-full max-w-full object-contain"
-											/>
-										</div>
-										<span class="text-xs text-gray-500 font-medium">{logo.ext}</span>
-									</button>
-								{/each}
-							</div>
+							<!-- Logo grid -->
+							{#if logos.length > 0}
+								<div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+									{#each logos as logo}
+										<button
+											type="button"
+											onclick={(e) => openLightbox(e, logo.url, league.name + ' ' + section.label)}
+											class="bg-white rounded-lg p-3 flex flex-col items-center cursor-zoom-in hover:ring-2 {section.ring} transition-all w-full"
+										>
+											<div class="h-24 w-full flex items-center justify-center mb-2">
+												<img src={logo.url} alt="{league.name} logo" class="max-h-full max-w-full object-contain" />
+											</div>
+											<span class="text-xs text-gray-500 font-medium">{logo.ext}</span>
+										</button>
+									{/each}
+								</div>
+							{:else}
+								<div class="rounded-lg border border-dashed border-slate-700 px-4 py-6 text-center text-xs text-slate-500">
+									No logos uploaded yet — use the Upload button to add files.
+								</div>
+							{/if}
 						</div>
-					{/if}
-
-					<!-- Monochrome Logos (Black-White) -->
-					{#if league.logoMonochrome?.length > 0}
-						<div>
-							<h4 class="text-sm font-medium text-gray-400 mb-3">Monochrome Logos (Black-White)</h4>
-							<div class="grid grid-cols-2 md:grid-cols-4 gap-3">
-								{#each getAllLogoUrls(league, 'logoMonochrome') as logo}
-									<button
-										type="button"
-										onclick={(e) => openLightbox(e, logo.url, league.name + " Monochrome Logo")}
-										class="bg-white rounded-lg p-3 flex flex-col items-center cursor-zoom-in hover:ring-2 hover:ring-gray-400 transition-all w-full"
-									>
-										<div class="h-24 w-full flex items-center justify-center mb-2">
-											<img
-												src={logo.url}
-												alt="{league.name} Monochrome Logo"
-												class="max-h-full max-w-full object-contain"
-											/>
-										</div>
-										<span class="text-xs text-gray-500 font-medium">{logo.ext}</span>
-									</button>
-								{/each}
-							</div>
-						</div>
-					{/if}
+					{/each}
 				</div>
 
 				<!-- League Info -->

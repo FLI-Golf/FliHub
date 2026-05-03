@@ -24,9 +24,19 @@
 	function fmt(n: number) {
 		return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(n);
 	}
+	function fmtM(n: number) {
+		return '$' + (n / 1_000_000).toFixed(1) + 'M';
+	}
 	function pct(a: number, b: number) {
 		return b === 0 ? 0 : Math.min(100, (a / b) * 100);
 	}
+
+	// Phase model constants
+	const TOTAL_BUDGET   = 14_638_300;
+	const SEED_RAISE     = 7_500_000;
+	const REVENUE_FUNDED = TOTAL_BUDGET - SEED_RAISE;
+	const PHASE1_PCT     = Math.round((SEED_RAISE / TOTAL_BUDGET) * 100);
+	const PHASE2_PCT     = 100 - PHASE1_PCT;
 
 	// Maps department name keywords → { icon, colors }
 	const DEPT_ICONS: Array<{ keywords: string[]; icon: any; bg: string; fg: string }> = [
@@ -60,6 +70,37 @@
 	<div>
 		<h1 class="text-3xl font-bold tracking-tight">Dashboard</h1>
 		<p class="text-muted-foreground mt-1">Welcome back, {data.userProfile?.firstName ?? data.user?.email}</p>
+	</div>
+
+	<!-- Phase context banner -->
+	<div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+		<!-- Phase 1: Seed Raise -->
+		<div class="rounded-xl border border-amber-500/30 bg-amber-500/10 p-4">
+			<p class="text-xs font-bold text-amber-400 uppercase tracking-wide mb-1">Phase 1 · 2026 — Seed Raise</p>
+			<p class="text-xl font-black text-white">{fmtM(SEED_RAISE)} raised</p>
+			<div class="mt-2 h-1.5 rounded-full bg-slate-700 overflow-hidden">
+				<div class="h-full rounded-full bg-amber-500" style="width:{PHASE1_PCT}%"></div>
+			</div>
+			<p class="text-xs text-amber-300/70 mt-1">{PHASE1_PCT}% of {fmtM(TOTAL_BUDGET)} total budget · investment year</p>
+		</div>
+		<!-- Phase 2: Revenue Positive -->
+		<div class="rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-4">
+			<p class="text-xs font-bold text-emerald-400 uppercase tracking-wide mb-1">Phase 2 · 2027 — Revenue Positive</p>
+			<p class="text-xl font-black text-white">No second raise</p>
+			<div class="mt-2 h-1.5 rounded-full bg-slate-700 overflow-hidden">
+				<div class="h-full rounded-full bg-emerald-500" style="width:100%"></div>
+			</div>
+			<p class="text-xs text-emerald-300/70 mt-1">Revenue covers operations from 2027 onward</p>
+		</div>
+		<!-- Phase 3: Scale -->
+		<div class="rounded-xl border border-violet-500/30 bg-violet-500/10 p-4">
+			<p class="text-xs font-bold text-violet-400 uppercase tracking-wide mb-1">Phase 3 · 2028–2031 — Scale</p>
+			<p class="text-xl font-black text-white">{fmtM(REVENUE_FUNDED)} revenue-funded</p>
+			<div class="mt-2 h-1.5 rounded-full bg-slate-700 overflow-hidden">
+				<div class="h-full rounded-full bg-violet-500" style="width:{PHASE2_PCT}%"></div>
+			</div>
+			<p class="text-xs text-violet-300/70 mt-1">{PHASE2_PCT}% of total budget · self-funded from operations</p>
+		</div>
 	</div>
 
 	<!-- Top KPI row -->

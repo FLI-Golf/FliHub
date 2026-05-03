@@ -90,6 +90,37 @@
 		<p class="text-muted-foreground">FLI Golf P&amp;L · FY 2026–2031 · Funded June 15, 2026</p>
 	</div>
 
+	<!-- Phase context banner -->
+	<div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+		<!-- Phase 1 -->
+		<div class="rounded-xl border border-amber-800/60 bg-amber-950/30 px-4 py-3 flex items-start gap-3">
+			<span class="size-6 rounded-full bg-amber-500 text-white text-xs font-black flex items-center justify-center shrink-0 mt-0.5">1</span>
+			<div>
+				<p class="text-xs font-bold text-amber-400 uppercase tracking-wide">2026 — Seed Raise</p>
+				<p class="text-lg font-black text-white">$7.5M raised</p>
+				<p class="text-xs text-slate-400 mt-0.5">Launch operations, infrastructure, first season. Investment year — net loss expected.</p>
+			</div>
+		</div>
+		<!-- Revenue bridge -->
+		<div class="rounded-xl border border-emerald-800/60 bg-emerald-950/30 px-4 py-3 flex items-start gap-3">
+			<span class="size-6 rounded-full bg-emerald-600 text-white text-xs font-black flex items-center justify-center shrink-0 mt-0.5">2</span>
+			<div>
+				<p class="text-xs font-bold text-emerald-400 uppercase tracking-wide">2027 — Revenue Positive</p>
+				<p class="text-lg font-black text-white">{fmt(netProfit[2027])} net</p>
+				<p class="text-xs text-slate-400 mt-0.5">League revenue covers operations. No second raise needed — growth self-funded from here.</p>
+			</div>
+		</div>
+		<!-- Long-term -->
+		<div class="rounded-xl border border-violet-800/60 bg-violet-950/30 px-4 py-3 flex items-start gap-3">
+			<span class="size-6 rounded-full bg-violet-600 text-white text-xs font-black flex items-center justify-center shrink-0 mt-0.5">3</span>
+			<div>
+				<p class="text-xs font-bold text-violet-400 uppercase tracking-wide">2028–2031 — Scale</p>
+				<p class="text-lg font-black text-white">{fmt(netProfit[2031])} net by '31</p>
+				<p class="text-xs text-slate-400 mt-0.5">Remaining {fmt(14_638_300 - 7_500_000)} operational budget funded entirely from league revenue.</p>
+			</div>
+		</div>
+	</div>
+
 	<!-- Year selector KPI strip -->
 	<Card class="p-4">
 		<div class="grid grid-cols-3 sm:grid-cols-6 divide-y sm:divide-y-0 sm:divide-x divide-border">

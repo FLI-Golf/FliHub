@@ -111,19 +111,126 @@ export const TrademarkFilingSchema = z.object({
 	logoVariant:      LogoVariantEnum.default('none'),
 	trademarkClass:   TrademarkClassEnum.default('ic_041'),
 	status:           TrademarkStatusEnum.default('not_filed'),
-	usptoAppNumber:   z.string().max(50).optional(),  // e.g. 98/123456
+	usptoAppNumber:   z.string().max(50).optional(),
 	usptoSerialNumber:z.string().max(50).optional(),
 	filedDate:        z.string().optional(),
 	publishedDate:    z.string().optional(),
 	approvedDate:     z.string().optional(),
 	rejectedDate:     z.string().optional(),
 	renewalDate:      z.string().optional(),
+	// ── Fees ──────────────────────────────────────────────────────────────────
+	usptoFee:         z.number().min(0).optional(), // USPTO government filing fee
+	attorneyFee:      z.number().min(0).optional(), // Attorney fee for this mark
+	otherFees:        z.number().min(0).optional(), // Search, office action responses, etc.
+	feeNotes:         z.string().max(1000).optional(),
+	billingGroupId:   z.string().optional(),        // relation → trademark_billing_groups
+	// ── Notes ─────────────────────────────────────────────────────────────────
 	attorneyNotes:    z.string().max(5000).optional(),
 	internalNotes:    z.string().max(5000).optional(),
 	oppositionDetail: z.string().max(2000).optional()
 });
 
-export type TrademarkStatus  = z.infer<typeof TrademarkStatusEnum>;
-export type MarkType         = z.infer<typeof MarkTypeEnum>;
-export type TrademarkFiling  = z.infer<typeof TrademarkFilingSchema>;
-export type LogoVariant      = z.infer<typeof LogoVariantEnum>;
+// ── Billing group ─────────────────────────────────────────────────────────────
+// Attorney may quote a flat fee covering N filings. The group holds the total
+// and each filing stores its share (totalFee / filingCount).
+
+export const BillingGroupStatusEnum = z.enum([
+	'quoted',    // Attorney has quoted, not yet invoiced
+	'invoiced',  // Invoice received
+	'paid',      // Paid in full
+	'disputed'   // Under dispute
+]);
+
+export const BILLING_GROUP_STATUS_LABELS: Record<string, string> = {
+	quoted:   'Quoted',
+	invoiced: 'Invoiced',
+	paid:     'Paid',
+	disputed: 'Disputed'
+};
+
+export const BILLING_GROUP_STATUS_COLORS: Record<string, string> = {
+	quoted:   'bg-slate-700/60 text-slate-300 border-slate-600',
+	invoiced: 'bg-yellow-900/50 text-yellow-300 border-yellow-700',
+	paid:     'bg-emerald-900/50 text-emerald-300 border-emerald-700',
+	disputed: 'bg-red-900/50 text-red-400 border-red-800'
+};
+
+export const TrademarkBillingGroupSchema = z.object({
+	id:            z.string().optional(),
+	name:          z.string().min(1).max(200),   // e.g. "Q1 2026 — Attorney Bundle"
+	description:   z.string().max(1000).optional(),
+	attorneyName:  z.string().max(200).optional(),
+	invoiceNumber: z.string().max(100).optional(),
+	invoiceDate:   z.string().optional(),
+	dueDate:       z.string().optional(),
+	paidDate:      z.string().optional(),
+	totalFee:      z.number().min(0),            // flat fee for the whole group
+	status:        BillingGroupStatusEnum.default('quoted'),
+	notes:         z.string().max(2000).optional()
+});
+
+// ── Trademark expense ─────────────────────────────────────────────────────────
+// One expense record per cost event (USPTO payment, attorney invoice, etc.)
+
+export const TrademarkExpenseTypeEnum = z.enum([
+	'uspto_filing',      // Government filing fee paid to USPTO
+	'attorney_filing',   // Attorney fee for preparing/filing
+	'search_fee',        // Clearance / conflict search
+	'office_action',     // Response to USPTO office action
+	'opposition_defense',// Defending against opposition
+	'renewal',           // Renewal fee
+	'bundle',            // Flat-fee bundle covering multiple filings
+	'other'
+]);
+
+export const TRADEMARK_EXPENSE_TYPE_LABELS: Record<string, string> = {
+	uspto_filing:       'USPTO Filing Fee',
+	attorney_filing:    'Attorney Filing Fee',
+	search_fee:         'Search / Clearance Fee',
+	office_action:      'Office Action Response',
+	opposition_defense: 'Opposition Defense',
+	renewal:            'Renewal Fee',
+	bundle:             'Bundle / Flat Fee',
+	other:              'Other'
+};
+
+export const TrademarkExpenseStatusEnum = z.enum([
+	'pending', 'approved', 'paid', 'disputed'
+]);
+
+export const TRADEMARK_EXPENSE_STATUS_LABELS: Record<string, string> = {
+	pending:  'Pending',
+	approved: 'Approved',
+	paid:     'Paid',
+	disputed: 'Disputed'
+};
+
+export const TRADEMARK_EXPENSE_STATUS_COLORS: Record<string, string> = {
+	pending:  'bg-yellow-900/50 text-yellow-300 border-yellow-700',
+	approved: 'bg-blue-900/50 text-blue-300 border-blue-700',
+	paid:     'bg-emerald-900/50 text-emerald-300 border-emerald-700',
+	disputed: 'bg-red-900/50 text-red-400 border-red-800'
+};
+
+export const TrademarkExpenseSchema = z.object({
+	id:             z.string().optional(),
+	filingId:       z.string().optional(),       // relation → trademark_filings (null for bundles)
+	billingGroupId: z.string().optional(),       // relation → trademark_billing_groups
+	expenseType:    TrademarkExpenseTypeEnum,
+	amount:         z.number().min(0),
+	status:         TrademarkExpenseStatusEnum.default('pending'),
+	description:    z.string().max(500).optional(),
+	invoiceNumber:  z.string().max(100).optional(),
+	invoiceDate:    z.string().optional(),
+	paidDate:       z.string().optional(),
+	notes:          z.string().max(2000).optional()
+});
+
+export type TrademarkStatus         = z.infer<typeof TrademarkStatusEnum>;
+export type MarkType                = z.infer<typeof MarkTypeEnum>;
+export type TrademarkFiling         = z.infer<typeof TrademarkFilingSchema>;
+export type LogoVariant             = z.infer<typeof LogoVariantEnum>;
+export type TrademarkBillingGroup   = z.infer<typeof TrademarkBillingGroupSchema>;
+export type TrademarkExpense        = z.infer<typeof TrademarkExpenseSchema>;
+export type TrademarkExpenseType    = z.infer<typeof TrademarkExpenseTypeEnum>;
+export type BillingGroupStatus      = z.infer<typeof BillingGroupStatusEnum>;
