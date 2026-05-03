@@ -7,20 +7,47 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 	const { pb } = ctx;
 
 	try {
-		const [franchises, filings] = await Promise.all([
-			pb.collection('franchises').getFullList({
-				sort: 'priority',
-				fields: 'id,name,slug,primaryColor,secondaryColor,logoMini,logoFull,collectionId'
-			}),
-			pb.collection('trademark_filings').getFullList({
+		// League — soft-fail if collection missing
+		let league: any = null;
+		try {
+			const leagues = await pb.collection('league').getFullList({
+				fields: 'id,collectionId,name,tagline,primaryColor,secondaryColor,logoMens,logoWomens,logoMonochrome,logoWordmark,logoHorizontal,logoVertical'
+			});
+			league = leagues[0] ?? null;
+		} catch { /* league collection not available */ }
+
+		const franchises = await pb.collection('franchises').getFullList({
+			sort: 'priority',
+			fields: 'id,name,slug,primaryColor,secondaryColor,logoMini,logoFull,collectionId'
+		});
+
+		// trademark_filings — degrade gracefully if collection not yet created
+		let allFilings: any[] = [];
+		let collectionMissing = false;
+		try {
+			allFilings = await pb.collection('trademark_filings').getFullList({
 				sort: 'markType,logoVariant'
-			})
-		]);
+			});
+		} catch (e: any) {
+			const msg: string = e?.response?.message ?? e?.message ?? '';
+			if (msg.toLowerCase().includes('not found') || msg.toLowerCase().includes("doesn't exist") || e?.status === 404) {
+				collectionMissing = true;
+			} else {
+				throw e;
+			}
+		}
+
+		// Split: league filings vs franchise filings
+		const leagueFilings    = league ? allFilings.filter((f: any) => f.franchiseId === league.id) : [];
+		const franchiseFilings = league ? allFilings.filter((f: any) => f.franchiseId !== league.id) : allFilings;
 
 		return {
 			franchises,
-			filings,
-			isAdmin: ctx.role === 'admin',
+			filings:       franchiseFilings,
+			league,
+			leagueFilings,
+			collectionMissing,
+			isAdmin:    ctx.role === 'admin',
 			isAttorney: ctx.role === 'admin' || (ctx.profile as any)?.role === 'attorney'
 		};
 	} catch (err: any) {

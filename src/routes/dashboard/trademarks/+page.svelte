@@ -2,7 +2,7 @@
 	import { invalidateAll } from '$app/navigation';
 	import Card from '$lib/components/ui/card.svelte';
 	import { Button } from '$lib/components/ui/button/index.js';
-	import { Plus, X, ChevronDown, Pencil, Shield, FileText, AlertCircle, CheckCircle2, Clock, Download, Loader } from 'lucide-svelte';
+	import { Plus, X, ChevronDown, Pencil, Shield, FileText, AlertCircle, CheckCircle2, Clock, Download, Loader, Trash2 } from 'lucide-svelte';
 	import type { PageData } from './$types';
 	import {
 		TRADEMARK_STATUS_LABELS, TRADEMARK_STATUS_COLORS, TRADEMARK_PIPELINE,
@@ -119,6 +119,25 @@
 	const SELECT = INPUT + ' cursor-pointer';
 	const LABEL  = 'block text-xs font-medium text-slate-400 mb-1';
 
+	// ── Delete filing ─────────────────────────────────────────────────────────
+	let confirmDelete = $state<any | null>(null); // filing to confirm deletion
+	let deleting      = $state(false);
+
+	async function deleteFiling() {
+		if (!confirmDelete) return;
+		deleting = true;
+		try {
+			const res = await fetch(`/api/trademarks/${confirmDelete.id}`, { method: 'DELETE' });
+			if (!res.ok) { const d = await res.json().catch(() => ({})); throw new Error(d.message ?? `Error ${res.status}`); }
+			confirmDelete = null;
+			await invalidateAll();
+		} catch (e: any) { alert(e.message ?? 'Delete failed'); }
+		finally { deleting = false; }
+	}
+
+	// ── Tab state ─────────────────────────────────────────────────────────────
+	let activeTab = $state<'franchises' | 'league'>('franchises');
+
 	// ── PDF generation ────────────────────────────────────────────────────────
 	let pdfLoading = $state<string | null>(null); // key of which button is loading
 
@@ -223,6 +242,25 @@
 		</Card>
 	</div>
 
+	<!-- Tab switcher -->
+	<div class="flex items-center gap-1 border-b border-slate-700">
+		<button
+			onclick={() => activeTab = 'franchises'}
+			class="px-4 py-2.5 text-sm font-medium transition-colors border-b-2 -mb-px {activeTab === 'franchises' ? 'border-violet-500 text-violet-300' : 'border-transparent text-slate-400 hover:text-slate-200'}"
+		>
+			Franchises
+			<span class="ml-1.5 text-xs px-1.5 py-0.5 rounded-full {activeTab === 'franchises' ? 'bg-violet-900/60 text-violet-300' : 'bg-slate-700 text-slate-400'}">{data.filings.length}</span>
+		</button>
+		<button
+			onclick={() => activeTab = 'league'}
+			class="px-4 py-2.5 text-sm font-medium transition-colors border-b-2 -mb-px {activeTab === 'league' ? 'border-violet-500 text-violet-300' : 'border-transparent text-slate-400 hover:text-slate-200'}"
+		>
+			League
+			<span class="ml-1.5 text-xs px-1.5 py-0.5 rounded-full {activeTab === 'league' ? 'bg-violet-900/60 text-violet-300' : 'bg-slate-700 text-slate-400'}">{data.leagueFilings?.length ?? 0}</span>
+		</button>
+	</div>
+
+	{#if activeTab === 'franchises'}
 	<!-- Filters -->
 	<div class="flex flex-wrap gap-3 items-center">
 		<select bind:value={filterStatus} class="text-sm rounded-lg border border-slate-600 bg-slate-800 text-slate-200 px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-violet-500">
@@ -363,12 +401,14 @@
 													</td>
 													{#if data.isAdmin}
 														<td class="px-4 py-2.5">
-															<button
-																onclick={() => openEdit(filing)}
-																class="opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded hover:bg-slate-600 text-slate-400 hover:text-slate-200"
-															>
-																<Pencil class="size-3.5" />
-															</button>
+															<div class="opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1">
+																<button onclick={() => openEdit(filing)} class="p-1 rounded hover:bg-slate-600 text-slate-400 hover:text-slate-200" title="Edit">
+																	<Pencil class="size-3.5" />
+																</button>
+																<button onclick={() => confirmDelete = filing} class="p-1 rounded hover:bg-red-900/50 text-slate-400 hover:text-red-400" title="Delete">
+																	<Trash2 class="size-3.5" />
+																</button>
+															</div>
 														</td>
 													{/if}
 												</tr>
@@ -409,6 +449,133 @@
 			{/if}
 		{/each}
 	</div>
+	{/if}<!-- end franchises tab -->
+
+	<!-- ── League Tab ────────────────────────────────────────────────────── -->
+	{#if activeTab === 'league'}
+		{#if !data.league}
+			<div class="flex items-center gap-3 rounded-xl border border-slate-700 bg-slate-800/40 px-4 py-6 text-sm text-slate-500 justify-center">
+				No league record found in PocketBase.
+			</div>
+		{:else}
+			{@const lg = data.league}
+			{@const lgFilings = data.leagueFilings ?? []}
+			{@const lgApproved = lgFilings.filter((f: any) => f.status === 'approved').length}
+
+			<Card class="bg-slate-800/50 border-slate-700 overflow-hidden">
+				<!-- League header -->
+				<div class="flex items-center gap-4 p-4 border-b border-slate-700">
+					<div class="size-10 rounded-lg shrink-0 flex items-center justify-center overflow-hidden bg-gradient-to-br from-violet-700 to-violet-900">
+						{#if lg.logoMens?.[0]}
+							<img src="{`https://pocketbase-production-6ab5.up.railway.app/api/files/${lg.collectionId}/${lg.id}/${lg.logoMens[0]}?thumb=80x80`}" alt="FLI Golf League" class="size-9 object-contain" />
+						{:else}
+							<span class="text-white font-bold text-sm">FLI</span>
+						{/if}
+					</div>
+					<div class="flex-1">
+						<p class="font-semibold text-slate-100">{lg.name ?? 'FLI Golf League'}</p>
+						<p class="text-xs text-slate-400 mt-0.5">{lgApproved}/{lgFilings.length} approved</p>
+					</div>
+					{#if data.isAdmin}
+						<button
+							onclick={() => { newForm.franchiseId = lg.id; showNew = true; err = ''; }}
+							class="text-xs text-violet-400 hover:text-violet-300 flex items-center gap-1.5 transition-colors"
+						>
+							<Plus class="size-3.5" /> Add filing
+						</button>
+					{/if}
+					{#if lgFilings.length > 0}
+						<button
+							onclick={() => generatePDF({ key: 'league-pdf', mode: 'combined', includeLeague: true, franchiseIds: [] })}
+							disabled={pdfLoading !== null}
+							class="text-xs text-slate-400 hover:text-slate-200 flex items-center gap-1.5 transition-colors disabled:opacity-40"
+						>
+							{#if pdfLoading === 'league-pdf'}<Loader class="size-3.5 animate-spin" />{:else}<Download class="size-3.5" />{/if}
+							Download PDF
+						</button>
+					{/if}
+				</div>
+
+				<!-- League logo variants as filing targets -->
+				<div class="p-4 border-b border-slate-700/60 bg-slate-900/20">
+					<p class="text-xs text-slate-500 uppercase tracking-wide mb-3">Available Logo Assets</p>
+					<div class="flex flex-wrap gap-2">
+						{#each [
+							{ label: "Men's Logo",   files: lg.logoMens },
+							{ label: "Women's Logo",  files: lg.logoWomens },
+							{ label: 'Monochrome',    files: lg.logoMonochrome },
+							{ label: 'Wordmark',      files: lg.logoWordmark },
+							{ label: 'Horizontal',    files: lg.logoHorizontal },
+							{ label: 'Vertical',      files: lg.logoVertical }
+						] as variant}
+							{#if variant.files?.length}
+								<div class="flex items-center gap-2 px-2.5 py-1.5 rounded-lg bg-slate-800 border border-slate-700">
+									<img
+										src="{`https://pocketbase-production-6ab5.up.railway.app/api/files/${lg.collectionId}/${lg.id}/${variant.files[0]}?thumb=48x48`}"
+										alt={variant.label}
+										class="size-6 object-contain"
+									/>
+									<span class="text-xs text-slate-300">{variant.label}</span>
+									<span class="text-[10px] text-slate-500">{variant.files.length} file{variant.files.length !== 1 ? 's' : ''}</span>
+								</div>
+							{/if}
+						{/each}
+					</div>
+				</div>
+
+				<!-- League filings table -->
+				{#if lgFilings.length === 0}
+					<p class="text-sm text-slate-500 px-4 py-6 text-center">No filings yet. Use "Add filing" to create the first league trademark filing.</p>
+				{:else}
+					<div class="overflow-x-auto">
+						<table class="w-full text-sm">
+							<thead>
+								<tr class="text-left text-xs text-slate-400 uppercase tracking-wide border-b border-slate-700/60 bg-slate-900/30">
+									<th class="px-4 py-2.5">Mark Type</th>
+									<th class="px-4 py-2.5">Logo Variant</th>
+									<th class="px-4 py-2.5">Class</th>
+									<th class="px-4 py-2.5">Status</th>
+									<th class="px-4 py-2.5">USPTO #</th>
+									<th class="px-4 py-2.5">Filed</th>
+									<th class="px-4 py-2.5">Approved</th>
+									<th class="px-4 py-2.5">Attorney Notes</th>
+									{#if data.isAdmin}<th class="px-4 py-2.5 w-16"></th>{/if}
+								</tr>
+							</thead>
+							<tbody class="divide-y divide-slate-700/40">
+								{#each lgFilings as filing}
+									<tr class="hover:bg-slate-700/20 group">
+										<td class="px-4 py-2.5 text-slate-200 font-medium whitespace-nowrap">{MARK_TYPE_LABELS[filing.markType] ?? filing.markType}</td>
+										<td class="px-4 py-2.5 text-slate-400 whitespace-nowrap text-xs">{LOGO_VARIANT_LABELS[filing.logoVariant] ?? filing.logoVariant}</td>
+										<td class="px-4 py-2.5 text-slate-400 whitespace-nowrap text-xs">{TRADEMARK_CLASS_LABELS[filing.trademarkClass] ?? filing.trademarkClass}</td>
+										<td class="px-4 py-2.5 whitespace-nowrap">
+											<span class="text-xs px-2 py-0.5 rounded-full border {TRADEMARK_STATUS_COLORS[filing.status]}">{TRADEMARK_STATUS_LABELS[filing.status]}</span>
+										</td>
+										<td class="px-4 py-2.5 font-mono text-xs text-slate-300 whitespace-nowrap">{filing.usptoAppNumber || '—'}</td>
+										<td class="px-4 py-2.5 text-slate-400 text-xs whitespace-nowrap">{fmtDate(filing.filedDate)}</td>
+										<td class="px-4 py-2.5 text-slate-400 text-xs whitespace-nowrap">{fmtDate(filing.approvedDate)}</td>
+										<td class="px-4 py-2.5 text-slate-500 text-xs max-w-48 truncate" title={filing.attorneyNotes}>{filing.attorneyNotes || '—'}</td>
+										{#if data.isAdmin}
+											<td class="px-4 py-2.5">
+												<div class="opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1">
+													<button onclick={() => openEdit(filing)} class="p-1 rounded hover:bg-slate-600 text-slate-400 hover:text-slate-200" title="Edit">
+														<Pencil class="size-3.5" />
+													</button>
+													<button onclick={() => confirmDelete = filing} class="p-1 rounded hover:bg-red-900/50 text-slate-400 hover:text-red-400" title="Delete">
+														<Trash2 class="size-3.5" />
+													</button>
+												</div>
+											</td>
+										{/if}
+									</tr>
+								{/each}
+							</tbody>
+						</table>
+					</div>
+				{/if}
+			</Card>
+		{/if}
+	{/if}<!-- end league tab -->
 
 	<!-- ── New Filing Modal ─────────────────────────────────────────────── -->
 	{#if showNew}
@@ -434,7 +601,10 @@
 					<div>
 						<label class={LABEL}>Franchise <span class="text-red-400">*</span></label>
 						<select bind:value={newForm.franchiseId} class={SELECT} required>
-							<option value="">Select franchise…</option>
+							<option value="">Select…</option>
+							{#if data.league}
+								<option value={data.league.id}>⭐ {data.league.name ?? 'FLI Golf League'} (League)</option>
+							{/if}
 							{#each data.franchises as f}
 								<option value={f.id}>{f.name}</option>
 							{/each}
@@ -640,6 +810,31 @@
 						</Button>
 					</div>
 				</form>
+			</div>
+		</div>
+	{/if}
+
+	<!-- ── Delete Confirm Modal ──────────────────────────────────────────── -->
+	{#if confirmDelete}
+		<div class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+			<div class="bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl w-full max-w-sm p-6 space-y-4">
+				<div class="flex items-center gap-3">
+					<div class="size-10 rounded-full bg-red-900/40 flex items-center justify-center shrink-0">
+						<Trash2 class="size-5 text-red-400" />
+					</div>
+					<div>
+						<p class="font-semibold text-slate-100">Delete filing?</p>
+						<p class="text-xs text-slate-400 mt-0.5">{MARK_TYPE_LABELS[confirmDelete.markType] ?? confirmDelete.markType} · {LOGO_VARIANT_LABELS[confirmDelete.logoVariant] ?? confirmDelete.logoVariant}</p>
+					</div>
+				</div>
+				<p class="text-sm text-slate-400">This cannot be undone.</p>
+				<div class="flex justify-end gap-3">
+					<Button variant="outline" onclick={() => confirmDelete = null} class="border-slate-600 text-slate-300 hover:bg-slate-700">Cancel</Button>
+					<Button onclick={deleteFiling} disabled={deleting} class="bg-red-700 hover:bg-red-600 text-white gap-2">
+						{#if deleting}<Loader class="size-4 animate-spin" />{/if}
+						{deleting ? 'Deleting…' : 'Delete'}
+					</Button>
+				</div>
 			</div>
 		</div>
 	{/if}
