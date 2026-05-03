@@ -41,7 +41,8 @@
 		Upload,
 		PenLine,
 		ClipboardList,
-		BadgeCheck
+		BadgeCheck,
+		Zap
 	} from 'lucide-svelte';
 
 	type NavItem = {
@@ -90,7 +91,8 @@
 			borderClass: 'border-slate-500',
 			iconActiveClass: 'text-slate-700 dark:text-slate-200',
 			items: [
-				{ title: 'Dashboard', url: '/dashboard', icon: LayoutDashboard }
+				{ title: 'Dashboard', url: '/dashboard', icon: LayoutDashboard },
+				{ title: 'Active Projects', url: '/dashboard/active-projects', icon: Zap }
 			]
 		},
 		{
