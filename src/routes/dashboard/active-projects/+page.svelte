@@ -6,7 +6,7 @@
 		Zap, FolderKanban, DollarSign, CheckCircle2, Clock,
 		ArrowRight, Users, Star, Trophy, Building2,
 		Film, Scale, Handshake, Cpu, TrendingUp, ExternalLink,
-		ChevronDown
+		ChevronDown, Info
 	} from 'lucide-svelte';
 
 	let { data }: { data: PageData } = $props();
@@ -95,27 +95,42 @@
 				</span>
 			</div>
 			<h1 class="text-2xl font-bold tracking-tight">Active Projects</h1>
-			<button
-				onclick={() => headerExpanded = !headerExpanded}
-				class="group/hdr text-left mt-1"
-			>
-				<p class="text-sm text-muted-foreground {headerExpanded ? '' : 'line-clamp-1'}">
-					{projects.length} projects in flight right now — everything else is planned for post-raise execution.
-					These represent the pre-raise workstreams: platform and app development, franchise and legal groundwork,
-					sponsor outreach, documentary content, and key media partnerships. Once the $7.5M seed round closes,
-					the remaining 22 planned projects activate across event production, player contracts, broadcast
-					infrastructure, and full marketing launch.
-				</p>
-				<span class="inline-flex items-center gap-0.5 text-[10px] text-slate-500 group-hover/hdr:text-slate-300 transition-colors mt-0.5">
-					<ChevronDown class="size-3 transition-transform duration-200 {headerExpanded ? 'rotate-180' : ''}" />
-					{headerExpanded ? 'less' : 'more'}
-				</span>
-			</button>
+			<p class="text-sm text-muted-foreground mt-1">
+				{projects.length} projects in flight right now — everything else is planned for post-raise execution.
+			</p>
 		</div>
 		<Button href="/dashboard/projects" variant="outline" size="sm" class="gap-1.5 shrink-0">
 			All Projects <ArrowRight class="size-3.5" />
 		</Button>
 	</div>
+
+	<!-- Info card -->
+	<button
+		onclick={() => headerExpanded = !headerExpanded}
+		class="w-full text-left group/info"
+	>
+		<div class="rounded-xl border border-slate-700/60 {headerExpanded ? 'bg-slate-800/80' : 'bg-slate-800/40'} hover:bg-slate-800/80 transition-colors px-4 py-3">
+			<div class="flex items-center justify-between gap-3">
+				<div class="flex items-center gap-2.5">
+					<div class="size-7 rounded-lg bg-blue-500/15 flex items-center justify-center shrink-0">
+						<Info class="size-3.5 text-blue-400" />
+					</div>
+					<p class="text-xs font-medium text-slate-300">
+						{headerExpanded ? 'About Active Projects' : 'What is this page?'}
+					</p>
+				</div>
+				<ChevronDown class="size-4 text-slate-500 group-hover/info:text-slate-300 transition-all duration-200 shrink-0 {headerExpanded ? 'rotate-180' : ''}" />
+			</div>
+			{#if headerExpanded}
+				<p class="text-xs text-muted-foreground leading-relaxed mt-3 pl-9">
+					These 7 projects represent the pre-raise workstreams actively in progress right now — platform and
+					app development, franchise and legal groundwork, sponsor outreach, documentary content, and key
+					media partnerships. Once the $7.5M seed round closes, the remaining 22 planned projects activate
+					across event production, player contracts, broadcast infrastructure, and full marketing launch.
+				</p>
+			{/if}
+		</div>
+	</button>
 
 	<!-- Summary strip -->
 	<div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
