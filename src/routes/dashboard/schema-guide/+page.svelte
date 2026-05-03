@@ -177,24 +177,6 @@
 				{ to: 'franchise_opportunities', type: 'one-to-many', description: 'Sales opportunities where prospects have expressed interest in this territory' }
 			]
 		},
-		{
-			collection: 'franchise_owners',
-			description: 'A dedicated profile for franchise owners, separate from their user_profile. While user_profiles handle authentication and role-based access, franchise_owners holds the owner-specific context: which franchise they own, their public bio, and their photo for use on the franchise detail page and broadcast graphics. The userId field links to their user_profile (which carries the franchise_owner role), and franchiseId links to the franchise they operate. This separation means an owner\'s public-facing profile can be updated independently of their login credentials.',
-			fields: [
-				{ name: 'name', type: 'text', description: 'Owner\'s full name as displayed publicly on the franchise page and in broadcast graphics.' },
-				{ name: 'email', type: 'email', description: 'Owner\'s contact email. Used for operational communications and contract delivery.' },
-				{ name: 'phone', type: 'text', description: 'Owner\'s contact phone number.' },
-				{ name: 'bio', type: 'text', description: 'Owner biography for public-facing profiles — background, business experience, and connection to disc golf.' },
-				{ name: 'photo', type: 'file', description: 'Owner headshot used on the franchise detail page and in broadcast lower-thirds.' },
-				{ name: 'userId', type: 'relation', relatesTo: 'user_profiles', description: 'Links to the owner\'s user_profile (role: franchise_owner). Grants access to the owner dashboard, roster management, and payout records.' },
-				{ name: 'franchiseId', type: 'relation', relatesTo: 'franchises', description: 'The franchise this owner operates. One owner per franchise.' }
-			],
-			relationships: [
-				{ to: 'franchises', type: 'one-to-one', description: 'The franchise this owner operates' },
-				{ to: 'user_profiles', type: 'one-to-one', description: 'The owner\'s login account and role assignment' },
-				{ to: 'franchise_deals', type: 'one-to-one', description: 'The purchase deal — links back to payment history and commission records' }
-			]
-		}
 	];
 	
 	// Sponsors system relationships
@@ -383,6 +365,50 @@
 				{ to: 'tournaments', type: 'many-to-one', description: 'Result belongs to this tournament' },
 				{ to: 'talent', type: 'many-to-one', description: 'Result belongs to this pro' },
 				{ to: 'franchises', type: 'many-to-one', description: 'Result is credited to this franchise for standings' }
+			]
+		},
+		{
+			collection: 'franchise_payouts',
+			description: 'Records the prize money distributed to a franchise after a tournament. Each payout splits earnings between the men\'s and women\'s divisions and tracks how many pros from that franchise competed. Status moves from pending → paid once the payment is processed. Payouts link to both the franchise and the tournament so earnings can be aggregated per team per season.',
+			fields: [
+				{ name: 'franchise', type: 'relation', relatesTo: 'franchises', description: 'The franchise receiving the payout.' },
+				{ name: 'tournament', type: 'relation', relatesTo: 'tournaments', description: 'The tournament this payout is for.' },
+				{ name: 'totalEarnings', type: 'number', description: 'Total prize money earned by this franchise in this tournament (mens + womens combined).' },
+				{ name: 'mensEarnings', type: 'number', description: 'Prize money earned by the franchise\'s men\'s division pros.' },
+				{ name: 'womensEarnings', type: 'number', description: 'Prize money earned by the franchise\'s women\'s division pros.' },
+				{ name: 'numberOfPros', type: 'number', description: 'Number of pros from this franchise who competed in the tournament.' },
+				{ name: 'status', type: 'select', description: 'pending (calculated, not yet paid) or paid (payment sent).' },
+				{ name: 'paymentDate', type: 'date', description: 'Date the payout was sent to the franchise.' },
+				{ name: 'notes', type: 'text', description: 'Notes on the payout — adjustments, disputes, or special circumstances.' }
+			],
+			relationships: [
+				{ to: 'franchises', type: 'many-to-one', description: 'Franchise receiving the payout' },
+				{ to: 'tournaments', type: 'many-to-one', description: 'Tournament this payout is derived from' }
+			]
+		},
+		{
+			collection: 'special_events',
+			description: 'Non-tournament league events — pro-ams, charity events, fan experiences, media days, and sponsor activations. Special events have their own lifecycle (planned → active → completed → cancelled) and can be linked to sponsors and franchises. Unlike tournaments, special events do not generate prize money or standings.',
+			fields: [
+				{ name: 'name', type: 'text', description: 'Event name as it appears publicly.' },
+				{ name: 'eventType', type: 'select', description: 'pro_am, charity, fan_experience, media_day, sponsor_activation, or other.' },
+				{ name: 'eventDate', type: 'date', description: 'Date the event takes place.' },
+				{ name: 'location', type: 'text', description: 'Venue or city where the event is held.' },
+				{ name: 'description', type: 'editor', description: 'Full description of the event — format, participants, and purpose.' },
+				{ name: 'status', type: 'select', description: 'planned, active, completed, or cancelled.' },
+				{ name: 'notes', type: 'editor', description: 'Internal notes — logistics, contacts, or post-event recap.' }
+			],
+			relationships: [
+				{ to: 'tournaments', type: 'none', description: 'Special events are independent of the tournament schedule' }
+			]
+		},
+		{
+			collection: 'player_profiles',
+			description: 'Extended profile data for pros beyond what is stored in talent. Holds onboarding status, personal details, and any player-specific configuration needed for the player portal. Links to the talent record via the pro\'s user account.',
+			fields: [],
+			relationships: [
+				{ to: 'talent', type: 'one-to-one', description: 'Extends the talent record with player portal data' },
+				{ to: 'user_profiles', type: 'one-to-one', description: 'Links to the pro\'s login account' }
 			]
 		}
 	];
@@ -589,9 +615,161 @@
 				{ to: 'projects', type: 'many-to-many', description: 'Projects this vendor is engaged on — a vendor can work across multiple projects simultaneously' },
 				{ to: 'expenses', type: 'one-to-many', description: 'Expense records where this vendor is the payee — used for spend-by-vendor reporting' }
 			]
+		},
+		{
+			collection: 'approvals',
+			description: 'Tracks approval requests for expenses, projects, and other entities that require sign-off before proceeding. An approval record links to the entity being approved (via entityType + entityId), the person who requested it, and the assigned approver. Status moves from pending → approved or rejected. Approved and rejected dates are recorded for audit purposes.',
+			fields: [
+				{ name: 'entityType', type: 'select', description: 'The type of record being approved: expense, project, reimbursement, or other.' },
+				{ name: 'entityId', type: 'text', description: 'The ID of the record being approved. Combined with entityType to look up the source record.' },
+				{ name: 'status', type: 'select', description: 'pending (awaiting review), approved (cleared), rejected (denied). Rejected records return to the submitter for revision.' },
+				{ name: 'requestedBy', type: 'relation', relatesTo: 'user_profiles', description: 'The team member who submitted the approval request.' },
+				{ name: 'approver', type: 'relation', relatesTo: 'user_profiles', description: 'The manager or admin assigned to review and approve this request.' },
+				{ name: 'requestedDate', type: 'date', description: 'Date the approval was requested.' },
+				{ name: 'reviewedDate', type: 'date', description: 'Date the approver acted on the request (approved or rejected).' },
+				{ name: 'comments', type: 'editor', description: 'Reviewer notes — reason for rejection, conditions of approval, or general feedback.' },
+				{ name: 'amount', type: 'number', description: 'Dollar amount associated with the approval request, if applicable.' },
+				{ name: 'projectId', type: 'relation', relatesTo: 'projects', description: 'The project this approval is associated with, if applicable.' },
+				{ name: 'expenseId', type: 'relation', relatesTo: 'expenses', description: 'The expense record being approved, if entityType is expense.' }
+			],
+			relationships: [
+				{ to: 'user_profiles', type: 'many-to-one', description: 'Requester and approver are both user_profiles records' },
+				{ to: 'projects', type: 'many-to-one', description: 'Optional link to the project this approval relates to' },
+				{ to: 'expenses', type: 'one-to-one', description: 'The expense record being approved' }
+			]
+		},
+		{
+			collection: 'reimbursement_claims',
+			description: 'A reimbursement claim groups one or more out-of-pocket expenses submitted by a team member for repayment. The claim moves through a review lifecycle (draft → submitted → approved → paid → rejected). Once approved, a paidDate and paymentMethod are recorded. Each claim links to one or more reimbursement_items which carry the individual line-item receipts and amounts.',
+			fields: [
+				{ name: 'title', type: 'text', description: 'Short description of the claim — e.g. "March travel expenses" or "Event supplies".' },
+				{ name: 'claimant', type: 'relation', relatesTo: 'user_profiles', description: 'The team member submitting the claim for reimbursement.' },
+				{ name: 'status', type: 'select', description: 'draft → submitted → approved → paid → rejected. Rejected claims return to draft for correction.' },
+				{ name: 'referenceNumber', type: 'text', description: 'Internal reference number for tracking and accounting reconciliation.' },
+				{ name: 'totalAmount', type: 'number', description: 'Sum of all reimbursement_items on this claim. Computed from line items.' },
+				{ name: 'paidDate', type: 'date', description: 'Date the reimbursement was paid to the claimant.' },
+				{ name: 'paidBy', type: 'relation', relatesTo: 'user_profiles', description: 'The admin who processed the payment.' },
+				{ name: 'paymentMethod', type: 'select', description: 'How the reimbursement was paid: check, ach, wire, cash, other.' },
+				{ name: 'notes', type: 'text', description: 'Submitter notes — context for the claim or special instructions.' },
+				{ name: 'reviewNotes', type: 'text', description: 'Reviewer notes — reason for rejection or conditions of approval.' }
+			],
+			relationships: [
+				{ to: 'reimbursement_items', type: 'one-to-many', description: 'Individual line items that make up this claim' },
+				{ to: 'user_profiles', type: 'many-to-one', description: 'Claimant and paidBy are both user_profiles records' }
+			]
+		},
+		{
+			collection: 'reimbursement_items',
+			description: 'A single line item within a reimbursement claim. Each item represents one receipt or expense — a meal, a flight, a supply purchase. Items carry the receipt file, category, vendor name, date, and amount. Multiple items roll up to the parent reimbursement_claims totalAmount.',
+			fields: [
+				{ name: 'claim', type: 'relation', relatesTo: 'reimbursement_claims', description: 'The parent claim this item belongs to.' },
+				{ name: 'description', type: 'text', description: 'What the expense was for — e.g. "Uber to airport", "Team dinner".' },
+				{ name: 'amount', type: 'number', description: 'Dollar amount of this line item.' },
+				{ name: 'date', type: 'date', description: 'Date the expense was incurred.' },
+				{ name: 'category', type: 'select', description: 'Expense category: meals, travel, supplies, accommodation, equipment, other.' },
+				{ name: 'vendor', type: 'text', description: 'Name of the vendor or merchant (free text for flexibility).' },
+				{ name: 'vendorId', type: 'relation', relatesTo: 'vendors', description: 'Optional link to a vendors record if the merchant is a known FLI Golf vendor.' },
+				{ name: 'receipts', type: 'file', description: 'Receipt image or PDF. Supports multiple files per item for multi-page receipts.' },
+				{ name: 'receiptUrl', type: 'text', description: 'External URL to a receipt if stored outside PocketBase (e.g. email link).' },
+				{ name: 'notes', type: 'text', description: 'Additional context for this line item.' }
+			],
+			relationships: [
+				{ to: 'reimbursement_claims', type: 'many-to-one', description: 'Parent claim this item belongs to — amount rolls up to claim totalAmount' },
+				{ to: 'vendors', type: 'many-to-one', description: 'Optional link to a known vendor record' }
+			]
+		},
+		{
+			collection: 'media_assets',
+			description: 'Stores uploaded media files — logos, photos, videos, documents — associated with franchises, projects, or campaigns. Each asset has a type (logo, photo, video, document, other) and can be tagged for filtering. Assets linked to a franchise appear on the franchise detail page; assets linked to a project appear in the project media gallery.',
+			fields: [
+				{ name: 'title', type: 'text', description: 'Display name for the asset.' },
+				{ name: 'asset_type', type: 'select', description: 'logo, photo, video, document, or other. Drives which gallery section the asset appears in.' },
+				{ name: 'file', type: 'file', description: 'The uploaded file. Supports images, PDFs, and video files.' },
+				{ name: 'franchise', type: 'relation', relatesTo: 'franchises', description: 'The franchise this asset belongs to, if applicable.' },
+				{ name: 'project', type: 'relation', relatesTo: 'projects', description: 'The project this asset is associated with, if applicable.' },
+				{ name: 'campaign', type: 'relation', relatesTo: 'campaigns', description: 'The marketing campaign this asset belongs to, if applicable.' },
+				{ name: 'tags', type: 'text', description: 'Comma-separated tags for filtering and search.' },
+				{ name: 'notes', type: 'editor', description: 'Notes about the asset — usage rights, context, or version history.' }
+			],
+			relationships: [
+				{ to: 'franchises', type: 'many-to-one', description: 'Franchise this asset is associated with' },
+				{ to: 'projects', type: 'many-to-one', description: 'Project this asset is associated with' }
+			]
 		}
 	];
 	
+	// Legal & IP system relationships
+	const legalRelationships = [
+		{
+			collection: 'trademark_filings',
+			description: 'Tracks every USPTO trademark filing for FLI Golf — league marks, franchise wordmarks, logo variants, and class registrations. Each filing moves through an 8-stage status pipeline: not_filed → filed → published → approved → registered → opposed → rejected → abandoned. Fee fields (usptoFee, attorneyFee, otherFees) record the cost of each filing. Filings can be grouped into a billing group for flat-fee attorney bundles. The franchiseId field links to either a franchise or the league record itself.',
+			fields: [
+				{ name: 'franchiseId', type: 'relation', relatesTo: 'franchises', description: 'The franchise (or league) this mark belongs to. League marks use the league record ID.' },
+				{ name: 'markType', type: 'select', description: 'wordmark (text only), logo (design mark), or combined (text + design).' },
+				{ name: 'logoVariant', type: 'select', description: 'For logo marks: primary, secondary, monochrome, or icon.' },
+				{ name: 'trademarkClass', type: 'select', description: 'USPTO international class — e.g. class 41 (entertainment services), class 25 (clothing), class 28 (sporting goods).' },
+				{ name: 'status', type: 'select', description: '8-stage pipeline: not_filed → filed → published → approved → registered → opposed → rejected → abandoned.' },
+				{ name: 'usptoAppNumber', type: 'text', description: 'USPTO application number assigned at filing.' },
+				{ name: 'usptoSerialNumber', type: 'text', description: 'USPTO serial number for tracking on TESS/TSDR.' },
+				{ name: 'filedDate', type: 'date', description: 'Date the application was submitted to the USPTO.' },
+				{ name: 'publishedDate', type: 'date', description: 'Date the mark was published for opposition in the Official Gazette.' },
+				{ name: 'approvedDate', type: 'date', description: 'Date the USPTO approved the mark for registration.' },
+				{ name: 'renewalDate', type: 'date', description: 'Date the registration must be renewed (typically 10 years from registration).' },
+				{ name: 'usptoFee', type: 'number', description: 'USPTO government filing fee for this application.' },
+				{ name: 'attorneyFee', type: 'number', description: 'Attorney fee for preparing and filing this application.' },
+				{ name: 'otherFees', type: 'number', description: 'Any additional fees — office action responses, extension requests, etc.' },
+				{ name: 'billingGroupId', type: 'relation', relatesTo: 'trademark_billing_groups', description: 'Links to a billing group if this filing is part of a flat-fee attorney bundle.' },
+				{ name: 'attorneyNotes', type: 'text', description: 'Attorney-facing notes — strategy, office action responses, or filing instructions.' },
+				{ name: 'internalNotes', type: 'text', description: 'Internal notes — context, decisions, or follow-up items.' }
+			],
+			relationships: [
+				{ to: 'franchises', type: 'many-to-one', description: 'The franchise or league entity this mark belongs to' },
+				{ to: 'trademark_billing_groups', type: 'many-to-one', description: 'Optional billing group for flat-fee bundles' },
+				{ to: 'trademark_expenses', type: 'one-to-many', description: 'Individual cost records for this filing' }
+			]
+		},
+		{
+			collection: 'trademark_billing_groups',
+			description: 'Groups multiple trademark filings under a single attorney invoice — useful when an attorney charges a flat fee to file a bundle of marks. The group tracks the invoice number, due date, paid date, and total fee. Individual filings link to the group via billingGroupId. Status moves from unpaid → paid once the invoice is settled.',
+			fields: [
+				{ name: 'name', type: 'text', description: 'Descriptive name for the billing group — e.g. "Q1 2026 Franchise Bundle".' },
+				{ name: 'description', type: 'text', description: 'What filings are included and any relevant context.' },
+				{ name: 'attorneyName', type: 'text', description: 'Name of the attorney or law firm handling this bundle.' },
+				{ name: 'invoiceNumber', type: 'text', description: 'Invoice number from the attorney for accounting reconciliation.' },
+				{ name: 'invoiceDate', type: 'date', description: 'Date the invoice was issued.' },
+				{ name: 'dueDate', type: 'date', description: 'Payment due date.' },
+				{ name: 'paidDate', type: 'date', description: 'Date the invoice was paid.' },
+				{ name: 'totalFee', type: 'number', description: 'Total dollar amount of the invoice.' },
+				{ name: 'status', type: 'select', description: 'unpaid, paid, or overdue.' },
+				{ name: 'notes', type: 'text', description: 'Additional notes on the billing group.' }
+			],
+			relationships: [
+				{ to: 'trademark_filings', type: 'one-to-many', description: 'Filings included in this billing bundle' },
+				{ to: 'trademark_expenses', type: 'one-to-many', description: 'Expense records associated with this group' }
+			]
+		},
+		{
+			collection: 'trademark_expenses',
+			description: 'Individual cost records for trademark activity — USPTO fees, attorney fees, office action responses, renewal fees, and other IP-related costs. Each expense links to either a specific filing, a billing group, or both. Status tracks whether the expense is pending, invoiced, or paid.',
+			fields: [
+				{ name: 'filingId', type: 'relation', relatesTo: 'trademark_filings', description: 'The filing this expense is associated with, if applicable.' },
+				{ name: 'billingGroupId', type: 'relation', relatesTo: 'trademark_billing_groups', description: 'The billing group this expense belongs to, if applicable.' },
+				{ name: 'expenseType', type: 'select', description: 'uspto_fee, attorney_fee, office_action, renewal, or other.' },
+				{ name: 'amount', type: 'number', description: 'Dollar amount of the expense.' },
+				{ name: 'status', type: 'select', description: 'pending, invoiced, or paid.' },
+				{ name: 'description', type: 'text', description: 'What the expense covers.' },
+				{ name: 'invoiceNumber', type: 'text', description: 'Invoice or reference number for accounting.' },
+				{ name: 'invoiceDate', type: 'date', description: 'Date the invoice was issued.' },
+				{ name: 'paidDate', type: 'date', description: 'Date the expense was paid.' },
+				{ name: 'notes', type: 'text', description: 'Additional context or notes.' }
+			],
+			relationships: [
+				{ to: 'trademark_filings', type: 'many-to-one', description: 'Filing this expense is associated with' },
+				{ to: 'trademark_billing_groups', type: 'many-to-one', description: 'Billing group this expense belongs to' }
+			]
+		}
+	];
+
 	// Financial system relationships
 	const financialRelationships = [
 		{
@@ -756,6 +934,7 @@
 				{ id: 'franchises', label: 'Franchises' },
 				{ id: 'pros', label: 'Pros' },
 				{ id: 'vendors', label: 'Vendors' },
+				{ id: 'legal', label: 'Legal & IP' },
 				{ id: 'overview', label: 'Overview' }
 			] as tab}
 				<button
@@ -2023,9 +2202,12 @@
 						{ label: 'league',              dot: 'bg-violet-400', color: 'bg-violet-900/40 border-violet-700/50 text-violet-200',   indent: 0, note: '1 record per season. Holds totalPrizePool.' },
 						{ label: 'franchises',          dot: 'bg-emerald-400', color: 'bg-emerald-900/40 border-emerald-700/50 text-emerald-200', indent: 1, note: 'Up to 6 teams per season. Each owns a territory.' },
 						{ label: 'talent',              dot: 'bg-cyan-400',    color: 'bg-cyan-900/40 border-cyan-700/50 text-cyan-200',          indent: 2, note: 'Players, broadcasters, commentators, analysts.' },
+						{ label: 'player_profiles',     dot: 'bg-teal-400',    color: 'bg-teal-900/40 border-teal-700/50 text-teal-200',          indent: 3, note: 'Extended portal data for pros. Extends talent.' },
 						{ label: 'tournaments',         dot: 'bg-amber-400',   color: 'bg-amber-900/40 border-amber-700/50 text-amber-200',       indent: 1, note: '6 per season. Prize pool auto-calculated.' },
 						{ label: 'tournament_results',  dot: 'bg-orange-400',  color: 'bg-orange-900/40 border-orange-700/50 text-orange-200',    indent: 2, note: '1 per pro per division. Placement drives earnings.' },
-						{ label: 'pro_payments',        dot: 'bg-pink-400',    color: 'bg-pink-900/40 border-pink-700/50 text-pink-200',          indent: 2, note: 'Every dollar paid to talent — prize, salary, bonus.' }
+						{ label: 'pro_payments',        dot: 'bg-pink-400',    color: 'bg-pink-900/40 border-pink-700/50 text-pink-200',          indent: 2, note: 'Every dollar paid to talent — prize, salary, bonus.' },
+						{ label: 'franchise_payouts',   dot: 'bg-rose-400',    color: 'bg-rose-900/40 border-rose-700/50 text-rose-200',          indent: 2, note: 'Prize money distributed to a franchise after a tournament.' },
+						{ label: 'special_events',      dot: 'bg-indigo-400',  color: 'bg-indigo-900/40 border-indigo-700/50 text-indigo-200',    indent: 1, note: 'Pro-ams, fan experiences, media days — no prize money.' }
 					] as row}
 						<div class="flex items-start gap-3" style="padding-left: {row.indent * 2}rem">
 							<div class="w-2 h-2 rounded-full mt-2 shrink-0 {row.dot}"></div>
@@ -2091,6 +2273,18 @@
 					<div class="p-4 bg-slate-700/50 border border-slate-600 rounded-lg">
 						<div class="font-mono font-bold text-slate-100 mb-2">tournament_results → pro_payments</div>
 						<div class="text-xs text-slate-400">When a result is entered, a <code class="text-pink-300">pro_payments</code> record is created automatically with <code class="text-pink-300">paymentType = "Prize"</code> and the computed earnings amount.</div>
+					</div>
+					<div class="p-4 bg-slate-700/50 border border-slate-600 rounded-lg">
+						<div class="font-mono font-bold text-slate-100 mb-2">tournaments → franchise_payouts</div>
+						<div class="text-xs text-slate-400">After each tournament, one <code class="text-rose-300">franchise_payouts</code> record is created per franchise — splitting earnings between men's and women's divisions.</div>
+					</div>
+					<div class="p-4 bg-slate-700/50 border border-slate-600 rounded-lg">
+						<div class="font-mono font-bold text-slate-100 mb-2">talent → player_profiles</div>
+						<div class="text-xs text-slate-400">One-to-one extension. <code class="text-teal-300">player_profiles</code> holds portal-specific data without cluttering the core talent record.</div>
+					</div>
+					<div class="p-4 bg-slate-700/50 border border-slate-600 rounded-lg">
+						<div class="font-mono font-bold text-slate-100 mb-2">special_events</div>
+						<div class="text-xs text-slate-400">Standalone events — pro-ams, fan experiences, media days. No prize money or standings. Tracked separately from the tournament schedule.</div>
 					</div>
 				</div>
 			</Card>
@@ -2962,14 +3156,7 @@
 							<div class="pt-1 text-emerald-300">primaryColor + secondaryColor drive the gradient header.</div>
 						</div>
 					</div>
-					<div class="p-4 bg-slate-700/50 border border-slate-600 rounded-lg">
-						<div class="font-mono font-bold text-slate-100 mb-2">franchise_owners</div>
-						<div class="text-xs text-slate-400 space-y-1">
-							<div>Public-facing owner profile — bio, photo, contact.</div>
-							<div>Separate from <code class="text-blue-300">user_profiles</code> so the public profile can be updated without touching login credentials.</div>
-							<div class="pt-1 text-violet-300">userId links to the auth record; franchiseId links to the team.</div>
-						</div>
-					</div>
+	
 				</div>
 			</Card>
 
@@ -3610,6 +3797,161 @@
 
 		</div>
 	{/if}
+	{#if activeTab === 'legal'}
+		<div class="space-y-6">
+
+			<!-- Overview -->
+			<Card class="p-6">
+				<div class="space-y-4">
+					<div>
+						<h2 class="text-xl font-bold">Legal & IP System Overview</h2>
+						<p class="text-sm text-muted-foreground mt-1">
+							Trademark filings, billing groups, and IP expense tracking for all FLI Golf marks.
+						</p>
+					</div>
+					<div class="p-4 bg-violet-950/40 border border-violet-700/50 rounded-lg text-sm text-violet-200">
+						Every trademark filing — league marks, franchise wordmarks, logo variants — is tracked through an 8-stage USPTO pipeline. Filings can be grouped into billing groups for flat-fee attorney bundles. Individual cost records (trademark_expenses) capture USPTO fees, attorney fees, and office action costs at the line-item level.
+					</div>
+				</div>
+			</Card>
+
+			<!-- Filing pipeline -->
+			<Card class="p-6">
+				<h2 class="text-xl font-bold mb-4">Filing Status Pipeline</h2>
+				<div class="flex flex-wrap gap-2 items-center">
+					{#each [
+						{ label: 'not_filed',  color: 'bg-slate-700 text-slate-300' },
+						{ label: 'filed',      color: 'bg-blue-900/60 text-blue-300' },
+						{ label: 'published',  color: 'bg-cyan-900/60 text-cyan-300' },
+						{ label: 'approved',   color: 'bg-emerald-900/60 text-emerald-300' },
+						{ label: 'registered', color: 'bg-green-900/60 text-green-300' },
+						{ label: 'opposed',    color: 'bg-amber-900/60 text-amber-300' },
+						{ label: 'rejected',   color: 'bg-red-900/60 text-red-300' },
+						{ label: 'abandoned',  color: 'bg-slate-800 text-slate-500' }
+					] as stage, i}
+						<div class="flex items-center gap-2">
+							<span class="px-3 py-1.5 rounded-lg font-mono text-xs font-bold {stage.color}">{stage.label}</span>
+							{#if i < 7}<span class="text-slate-600 text-xs">→</span>{/if}
+						</div>
+					{/each}
+				</div>
+				<p class="text-xs text-muted-foreground mt-3">opposed and rejected are terminal states that may branch back to not_filed for re-filing.</p>
+			</Card>
+
+			<!-- Collections map -->
+			<Card class="p-6">
+				<h2 class="text-xl font-bold mb-4">How the Collections Connect</h2>
+				<div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+					<div class="p-4 bg-slate-700/50 border border-slate-600 rounded-lg">
+						<div class="font-mono font-bold text-slate-100 mb-2">trademark_filings</div>
+						<div class="text-xs text-slate-400">One record per mark per class. Links to a franchise (or the league). Holds all USPTO dates, fees, and status. The core record of the IP pipeline.</div>
+					</div>
+					<div class="p-4 bg-slate-700/50 border border-slate-600 rounded-lg">
+						<div class="font-mono font-bold text-slate-100 mb-2">trademark_billing_groups</div>
+						<div class="text-xs text-slate-400">Groups multiple filings under one attorney invoice. Set <code class="text-violet-300">billingGroupId</code> on each filing to include it. Tracks invoice number, due date, and paid date.</div>
+					</div>
+					<div class="p-4 bg-slate-700/50 border border-slate-600 rounded-lg">
+						<div class="font-mono font-bold text-slate-100 mb-2">trademark_expenses</div>
+						<div class="text-xs text-slate-400">Line-item costs — USPTO fees, attorney fees, office action responses. Links to a filing, a billing group, or both. Status: pending → invoiced → paid.</div>
+					</div>
+				</div>
+			</Card>
+
+			{#if viewMode === 'table'}
+				<div class="grid gap-6">
+					{#each legalRelationships as collection}
+						<Card class="p-6">
+							<div class="space-y-6">
+								<div class="flex items-center justify-between">
+									<div>
+										<h2 class="text-xl font-mono font-bold">{collection.collection}</h2>
+										<p class="text-sm text-muted-foreground mt-1">{collection.description}</p>
+									</div>
+									<Badge variant="outline" class="font-mono text-xs">
+										{collection.fields.length} fields
+									</Badge>
+								</div>
+								<div>
+									<h3 class="text-sm font-semibold mb-3 text-muted-foreground uppercase tracking-wide">Fields</h3>
+									<div class="grid gap-2">
+										{#each collection.fields as field}
+											<div class="flex items-start gap-3 p-3 rounded-lg border bg-muted/30">
+												<Badge variant="secondary" class="font-mono text-xs shrink-0">{field.type}</Badge>
+												<div class="flex-1 min-w-0">
+													<div class="font-mono text-sm font-medium">{field.name}</div>
+													<div class="text-sm text-muted-foreground">{field.description}</div>
+													{#if field.relatesTo}
+														<div class="text-xs text-blue-600 dark:text-blue-400 mt-1">→ relates to: <span class="font-mono">{field.relatesTo}</span></div>
+													{/if}
+												</div>
+											</div>
+										{/each}
+									</div>
+								</div>
+								{#if collection.relationships && collection.relationships.length > 0}
+									<div>
+										<h3 class="text-sm font-semibold mb-3 text-muted-foreground uppercase tracking-wide">Relationships</h3>
+										<div class="grid gap-2">
+											{#each collection.relationships as rel}
+												<div class="flex items-start gap-3 p-3 rounded-lg border bg-violet-900 text-white">
+													<Badge variant="default" class="text-xs shrink-0">{rel.type}</Badge>
+													<div class="flex-1 min-w-0">
+														<div class="font-mono text-sm font-medium text-white">{collection.collection} → {rel.to}</div>
+														<div class="text-sm text-violet-100">{rel.description}</div>
+													</div>
+												</div>
+											{/each}
+										</div>
+									</div>
+								{/if}
+							</div>
+						</Card>
+					{/each}
+				</div>
+			{:else}
+				<div class="space-y-8">
+					{#each legalRelationships as collection}
+						<Card class="p-6">
+							<div class="space-y-6">
+								<div>
+									<h2 class="text-xl font-mono font-bold mb-2">{collection.collection}</h2>
+									<p class="text-sm text-muted-foreground">{collection.description}</p>
+								</div>
+								<div class="relative p-8 bg-muted/30 rounded-lg">
+									<div class="flex justify-center mb-8">
+										<div class="px-6 py-4 bg-violet-600 text-white rounded-lg border-2 border-violet-700 shadow-lg">
+											<div class="font-mono font-bold text-lg">{collection.collection}</div>
+											<div class="text-xs text-violet-100 mt-1">{collection.fields.length} fields</div>
+										</div>
+									</div>
+									{#if collection.relationships && collection.relationships.length > 0}
+										<div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+											{#each collection.relationships as rel, idx}
+												{@const bgColors = ['bg-violet-800', 'bg-violet-700', 'bg-violet-600']}
+												{@const bgColor = bgColors[Math.min(idx, bgColors.length - 1)]}
+												<div class="relative">
+													<div class="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-8 w-0.5 h-8 bg-violet-400"></div>
+													<div class="p-4 {bgColor} border-2 border-violet-900 rounded-lg shadow-lg">
+														<div class="flex items-center gap-2 mb-2">
+															<Badge variant="outline" class="text-xs bg-white/20 text-white border-white/30">{rel.type}</Badge>
+														</div>
+														<div class="font-mono font-bold text-white">{rel.to}</div>
+														<div class="text-xs text-violet-100 mt-2">{rel.description}</div>
+													</div>
+												</div>
+											{/each}
+										</div>
+									{/if}
+								</div>
+							</div>
+						</Card>
+					{/each}
+				</div>
+			{/if}
+
+		</div>
+	{/if}
+
 	{#if activeTab === 'overview'}
 		<div class="space-y-6">
 			<Card class="p-6">
