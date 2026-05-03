@@ -74,6 +74,7 @@
 	}
 
 	let expandedDesc = $state<Record<string, boolean>>({});
+	let headerExpanded = $state(false);
 
 	const totalBudget   = $derived(projects.reduce((s, p) => s + p.budget, 0));
 	const totalSpend    = $derived(projects.reduce((s, p) => s + p.actualSpend, 0));
@@ -94,9 +95,22 @@
 				</span>
 			</div>
 			<h1 class="text-2xl font-bold tracking-tight">Active Projects</h1>
-			<p class="text-sm text-muted-foreground mt-1">
-				{projects.length} projects in flight right now — everything else is planned for post-raise execution.
-			</p>
+			<button
+				onclick={() => headerExpanded = !headerExpanded}
+				class="group/hdr text-left mt-1"
+			>
+				<p class="text-sm text-muted-foreground {headerExpanded ? '' : 'line-clamp-1'}">
+					{projects.length} projects in flight right now — everything else is planned for post-raise execution.
+					These represent the pre-raise workstreams: platform and app development, franchise and legal groundwork,
+					sponsor outreach, documentary content, and key media partnerships. Once the $7.5M seed round closes,
+					the remaining 22 planned projects activate across event production, player contracts, broadcast
+					infrastructure, and full marketing launch.
+				</p>
+				<span class="inline-flex items-center gap-0.5 text-[10px] text-slate-500 group-hover/hdr:text-slate-300 transition-colors mt-0.5">
+					<ChevronDown class="size-3 transition-transform duration-200 {headerExpanded ? 'rotate-180' : ''}" />
+					{headerExpanded ? 'less' : 'more'}
+				</span>
+			</button>
 		</div>
 		<Button href="/dashboard/projects" variant="outline" size="sm" class="gap-1.5 shrink-0">
 			All Projects <ArrowRight class="size-3.5" />
