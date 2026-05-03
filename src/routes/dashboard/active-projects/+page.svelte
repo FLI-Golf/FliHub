@@ -214,16 +214,17 @@
 
 	<!-- Project cards -->
 	<div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
-		{#each projects as project (project.id)}
+		{#each projects as project, i (project.id)}
 			{@const color = getColor(project.name)}
 			{@const links = PROJECT_LINKS[project.name] ?? []}
 			{@const ProjectIcon = color.icon}
-			<Card class="p-0 overflow-hidden border-l-4 {color.border}">
+			{@const rowEven = Math.floor(i / 2) % 2 === 0}
+			<Card class="p-0 overflow-hidden border-l-4 {color.border} {rowEven ? 'bg-slate-900' : 'bg-slate-800/60'}">
 				<div class="p-5">
 					<!-- Title row -->
 					<div class="flex items-start justify-between gap-3 mb-3">
 						<div class="flex items-center gap-2.5 min-w-0">
-							<div class="size-9 rounded-lg bg-slate-800 flex items-center justify-center shrink-0">
+							<div class="size-9 rounded-lg {rowEven ? 'bg-slate-700' : 'bg-slate-700/80'} flex items-center justify-center shrink-0">
 								<ProjectIcon class="size-4 text-slate-300" />
 							</div>
 							<div class="min-w-0">
@@ -252,7 +253,7 @@
 								{fmt(project.actualSpend)} <span class="text-muted-foreground">/ {fmt(project.budget)}</span>
 							</span>
 						</div>
-						<div class="h-1.5 rounded-full bg-slate-700 overflow-hidden">
+						<div class="h-1.5 rounded-full overflow-hidden {rowEven ? 'bg-slate-700' : 'bg-slate-600/70'}">
 							<div class="h-full rounded-full transition-all {color.bar}"
 								style="width:{project.spendPct.toFixed(1)}%"></div>
 						</div>
@@ -271,7 +272,7 @@
 								<span>{project.tasks.open} open</span>
 							</div>
 							{#if project.tasks.total > 0}
-								<div class="flex-1 h-1 rounded-full bg-slate-700 overflow-hidden">
+								<div class="flex-1 h-1 rounded-full overflow-hidden {rowEven ? 'bg-slate-700' : 'bg-slate-600/70'}">
 									<div class="h-full rounded-full bg-emerald-500 transition-all"
 										style="width:{pct(project.tasks.done, project.tasks.total).toFixed(0)}%"></div>
 								</div>
@@ -281,12 +282,12 @@
 
 					<!-- Related links -->
 					{#if links.length > 0}
-						<div class="flex flex-wrap gap-1.5 pt-3 border-t border-slate-800">
+						<div class="flex flex-wrap gap-1.5 pt-3 border-t {rowEven ? 'border-slate-700/60' : 'border-slate-700/40'}">
 							{#each links as link}
 								{@const LinkIcon = link.icon}
 								<a href={link.href}
 									class="inline-flex items-center gap-1 text-[11px] font-medium px-2 py-1 rounded-md
-										bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition-colors">
+										{rowEven ? 'bg-slate-700 hover:bg-slate-600' : 'bg-slate-700/70 hover:bg-slate-600/80'} text-slate-300 hover:text-white transition-colors">
 									<LinkIcon class="size-3" />
 									{link.label}
 									<ExternalLink class="size-2.5 opacity-50" />
