@@ -122,12 +122,17 @@
 				<ChevronDown class="size-4 text-slate-500 group-hover/info:text-slate-300 transition-all duration-200 shrink-0 {headerExpanded ? 'rotate-180' : ''}" />
 			</div>
 			{#if headerExpanded}
-				<p class="text-xs text-yellow-200/70 leading-relaxed mt-3 pl-9">
-					These 7 projects represent the pre-raise workstreams actively in progress right now — platform and
-					app development, franchise and legal groundwork, sponsor outreach, documentary content, and key
-					media partnerships. Once the $7.5M seed round closes, the remaining 22 planned projects activate
-					across event production, player contracts, broadcast infrastructure, and full marketing launch.
-				</p>
+				<div class="text-xs text-yellow-200/70 leading-relaxed mt-3 pl-9 space-y-2">
+					<p>
+						This page shows only the projects currently marked <span class="font-semibold text-yellow-300">in progress</span> — the workstreams that matter right now on the path to getting FLI Golf off the ground. The <span class="font-semibold text-yellow-300">Combined Budget</span> card above reflects only these active projects, giving you a focused view of what capital is actually in motion today.
+					</p>
+					<p>
+						As the league progresses — franchise deals close, the raise advances, and new workstreams kick off — you can flip additional projects from <span class="font-semibold text-yellow-300">planned → in progress</span> on the Projects page. Each one you activate will automatically increase the Combined Budget shown here, so this page always reflects your current operational footprint.
+					</p>
+					<p>
+						The 22 projects still in <span class="font-semibold text-yellow-300">planned</span> status represent the full post-raise execution plan — venue builds, broadcast infrastructure, player contracts, marketing launch, and more. They're ready to activate the moment the $7.5M seed round closes and the real build begins.
+					</p>
+				</div>
 			{/if}
 		</div>
 	</button>
