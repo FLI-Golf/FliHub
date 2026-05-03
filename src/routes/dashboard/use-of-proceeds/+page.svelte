@@ -7,10 +7,14 @@
 		Film,
 		Megaphone,
 		Info,
-		ChevronRight
+		ChevronRight,
+		TrendingUp,
+		ArrowRight
 	} from 'lucide-svelte';
 
-	const totalRaise = 7_500_000;
+	const totalRaise        = 7_500_000;
+	const totalBudget       = 14_638_300;
+	const revenueFunded     = totalBudget - totalRaise; // ~7,138,300 — funded from operations
 
 	type LineItem = { label: string; amount: number };
 
@@ -132,28 +136,85 @@
 	<div class="flex items-start justify-between gap-4 flex-wrap">
 		<div>
 			<div class="flex items-center gap-2 mb-1">
-				<span
-					class="text-[10px] font-bold uppercase tracking-widest text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/40 px-2 py-0.5 rounded"
-				>
+				<span class="text-[10px] font-bold uppercase tracking-widest text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/40 px-2 py-0.5 rounded">
 					Funded June 15, 2026 · Seed Round
 				</span>
-				<span
-					class="text-[10px] font-bold uppercase tracking-widest text-muted-foreground bg-muted px-2 py-0.5 rounded"
-				>
+				<span class="text-[10px] font-bold uppercase tracking-widest text-muted-foreground bg-muted px-2 py-0.5 rounded">
 					Young America Capital, LLC
 				</span>
 			</div>
 			<h1 class="text-2xl font-bold tracking-tight">Use of Proceeds</h1>
 			<p class="text-sm text-muted-foreground mt-1">
-				How the $7.5M seed round is deployed across four operational pillars.
+				How the $7.5M seed round launches FLI Golf and generates the revenue to fund the rest.
 			</p>
 		</div>
 		<div class="text-right shrink-0">
-			<p class="text-xs text-muted-foreground">Total Raise</p>
+			<p class="text-xs text-muted-foreground">Seed Raise</p>
 			<p class="text-3xl font-black text-foreground">$7.5M</p>
 			<p class="text-xs text-muted-foreground mt-0.5">SEC Registered · FINRA, SIPC</p>
 		</div>
 	</div>
+
+	<!-- Phase bridge — the single most important context on this page -->
+	<Card class="p-0 overflow-hidden border-0 bg-gradient-to-r from-slate-900 to-slate-800">
+		<div class="grid grid-cols-1 md:grid-cols-3 divide-y md:divide-y-0 md:divide-x divide-slate-700">
+			<!-- Phase 1: The raise -->
+			<div class="p-5 space-y-2">
+				<div class="flex items-center gap-2">
+					<span class="size-6 rounded-full bg-amber-500 text-white text-xs font-black flex items-center justify-center shrink-0">1</span>
+					<span class="text-xs font-bold uppercase tracking-widest text-amber-400">Seed Raise</span>
+				</div>
+				<p class="text-3xl font-black text-white">$7.5M</p>
+				<p class="text-xs text-slate-400 leading-relaxed">
+					One-time investor raise. Funds launch operations, infrastructure, and the first full season. <span class="text-amber-400 font-medium">No second raise planned.</span>
+				</p>
+				<div class="pt-1">
+					<div class="h-2 w-full rounded-full bg-slate-700 overflow-hidden">
+						<div class="h-full rounded-full bg-amber-500" style="width: {((totalRaise / totalBudget) * 100).toFixed(1)}%"></div>
+					</div>
+					<p class="text-[10px] text-slate-500 mt-1">{((totalRaise / totalBudget) * 100).toFixed(0)}% of total operational budget</p>
+				</div>
+			</div>
+
+			<!-- Arrow -->
+			<div class="hidden md:flex items-center justify-center bg-slate-800/50 px-4">
+				<div class="flex flex-col items-center gap-2 text-center">
+					<TrendingUp class="size-8 text-emerald-400" />
+					<p class="text-xs font-bold text-emerald-400 uppercase tracking-wide">Generates Revenue</p>
+					<p class="text-[10px] text-slate-500 max-w-28 leading-relaxed">Ticket sales, sponsorships, media rights, licensing</p>
+					<ArrowRight class="size-4 text-slate-600" />
+				</div>
+			</div>
+
+			<!-- Revenue-funded operations -->
+			<div class="p-5 space-y-2">
+				<div class="flex items-center gap-2">
+					<span class="size-6 rounded-full bg-emerald-600 text-white text-xs font-black flex items-center justify-center shrink-0">2</span>
+					<span class="text-xs font-bold uppercase tracking-widest text-emerald-400">Revenue-Funded Growth</span>
+				</div>
+				<p class="text-3xl font-black text-white">{fmtM(revenueFunded)}</p>
+				<p class="text-xs text-slate-400 leading-relaxed">
+					Remaining operational budget funded from league revenue — not from investors. Covers scaling, expansion, and long-term operations.
+				</p>
+				<div class="pt-1">
+					<div class="h-2 w-full rounded-full bg-slate-700 overflow-hidden">
+						<div class="h-full rounded-full bg-emerald-600" style="width: {((revenueFunded / totalBudget) * 100).toFixed(1)}%"></div>
+					</div>
+					<p class="text-[10px] text-slate-500 mt-1">{((revenueFunded / totalBudget) * 100).toFixed(0)}% of total operational budget</p>
+				</div>
+			</div>
+		</div>
+
+		<!-- Total budget footnote -->
+		<div class="px-5 py-3 bg-slate-900/60 border-t border-slate-700 flex items-center justify-between flex-wrap gap-2">
+			<p class="text-xs text-slate-500">
+				Total operational budget across all phases: <span class="text-slate-300 font-semibold">{fmt(totalBudget)}</span>
+			</p>
+			<p class="text-xs text-slate-500">
+				Investor capital required: <span class="text-amber-400 font-semibold">{fmt(totalRaise)}</span> · Revenue self-funds the rest
+			</p>
+		</div>
+	</Card>
 
 	<!-- Allocation bar -->
 	<Card class="p-5">
