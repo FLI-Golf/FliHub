@@ -2,7 +2,7 @@
 	import { invalidateAll } from '$app/navigation';
 	import Card from '$lib/components/ui/card.svelte';
 	import { Button } from '$lib/components/ui/button/index.js';
-	import { Plus, X, ChevronDown, Pencil, Shield, FileText, AlertCircle, CheckCircle2, Clock } from 'lucide-svelte';
+	import { Plus, X, ChevronDown, Pencil, Shield, FileText, AlertCircle, CheckCircle2, Clock, Download, Loader } from 'lucide-svelte';
 	import type { PageData } from './$types';
 	import {
 		TRADEMARK_STATUS_LABELS, TRADEMARK_STATUS_COLORS, TRADEMARK_PIPELINE,
@@ -118,6 +118,49 @@
 	const INPUT  = 'w-full rounded-lg border border-slate-600 bg-slate-800 text-slate-100 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500 placeholder:text-slate-500';
 	const SELECT = INPUT + ' cursor-pointer';
 	const LABEL  = 'block text-xs font-medium text-slate-400 mb-1';
+
+	// ── PDF generation ────────────────────────────────────────────────────────
+	let pdfLoading = $state<string | null>(null); // key of which button is loading
+
+	async function generatePDF(opts: {
+		key: string;
+		mode: 'combined' | 'individual';
+		franchiseIds?: string[];
+		includeLeague?: boolean;
+		markIndex?: number;
+	}) {
+		pdfLoading = opts.key;
+		try {
+			const res = await fetch('/api/trademarks/pdf', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({
+					mode:         opts.mode,
+					franchiseIds: opts.franchiseIds,
+					includeLeague:opts.includeLeague ?? false,
+					markIndex:    opts.markIndex
+				})
+			});
+			if (!res.ok) {
+				const d = await res.json().catch(() => ({}));
+				alert(d.message ?? `PDF generation failed (${res.status})`);
+				return;
+			}
+			// Trigger browser download
+			const blob = await res.blob();
+			const url  = URL.createObjectURL(blob);
+			const a    = document.createElement('a');
+			a.href     = url;
+			a.download = res.headers.get('Content-Disposition')?.match(/filename="(.+)"/)?.[1]
+				?? 'FLI-Trademark.pdf';
+			a.click();
+			URL.revokeObjectURL(url);
+		} catch (e: any) {
+			alert(e.message ?? 'PDF generation failed');
+		} finally {
+			pdfLoading = null;
+		}
+	}
 </script>
 
 <svelte:head><title>Trademark Pipeline — FliHub</title></svelte:head>
@@ -130,11 +173,30 @@
 			<h1 class="text-3xl font-bold tracking-tight">Trademark Pipeline</h1>
 			<p class="text-muted-foreground mt-1">Track USPTO filings for all 12 franchise names and logos</p>
 		</div>
-		{#if data.isAdmin}
-			<Button onclick={() => { showNew = true; err = ''; }} class="gap-2 bg-violet-600 hover:bg-violet-700 text-white shrink-0">
-				<Plus class="size-4" /> New Filing
+
+		<div class="flex items-center gap-2 flex-wrap justify-end shrink-0">
+			<Button
+				onclick={() => generatePDF({ key: 'all', mode: 'combined' })}
+				disabled={pdfLoading !== null || totalFilings === 0}
+				class="gap-2 bg-slate-700 hover:bg-slate-600 text-slate-100 border border-slate-600"
+			>
+				{#if pdfLoading === 'all'}<Loader class="size-4 animate-spin" />{:else}<Download class="size-4" />{/if}
+				All Franchises
 			</Button>
-		{/if}
+			<Button
+				onclick={() => generatePDF({ key: 'all+league', mode: 'combined', includeLeague: true })}
+				disabled={pdfLoading !== null || totalFilings === 0}
+				class="gap-2 bg-violet-700 hover:bg-violet-600 text-white"
+			>
+				{#if pdfLoading === 'all+league'}<Loader class="size-4 animate-spin" />{:else}<Download class="size-4" />{/if}
+				All + League
+			</Button>
+			{#if data.isAdmin}
+				<Button onclick={() => { showNew = true; err = ''; }} class="gap-2 bg-violet-600 hover:bg-violet-700 text-white">
+					<Plus class="size-4" /> New Filing
+				</Button>
+			{/if}
+		</div>
 	</div>
 
 	<!-- Metrics row -->
@@ -316,17 +378,31 @@
 								</div>
 							{/if}
 
-							<!-- Add filing button for this franchise -->
-							{#if data.isAdmin}
-								<div class="px-4 py-3 border-t border-slate-700/60">
+							<!-- Per-franchise actions -->
+							<div class="px-4 py-3 border-t border-slate-700/60 flex items-center gap-4">
+								{#if data.isAdmin}
 									<button
 										onclick={() => { newForm.franchiseId = franchise.id; showNew = true; err = ''; }}
 										class="text-xs text-violet-400 hover:text-violet-300 flex items-center gap-1.5 transition-colors"
 									>
-										<Plus class="size-3.5" /> Add filing for {franchise.name}
+										<Plus class="size-3.5" /> Add filing
 									</button>
-								</div>
-							{/if}
+								{/if}
+								{#if fFilings.length > 0}
+									<button
+										onclick={() => generatePDF({ key: `pdf-${franchise.id}`, mode: 'combined', franchiseIds: [franchise.id] })}
+										disabled={pdfLoading !== null}
+										class="text-xs text-slate-400 hover:text-slate-200 flex items-center gap-1.5 transition-colors disabled:opacity-40"
+									>
+										{#if pdfLoading === `pdf-${franchise.id}`}
+											<Loader class="size-3.5 animate-spin" />
+										{:else}
+											<Download class="size-3.5" />
+										{/if}
+										Download PDF
+									</button>
+								{/if}
+							</div>
 						</div>
 					{/if}
 				</Card>
