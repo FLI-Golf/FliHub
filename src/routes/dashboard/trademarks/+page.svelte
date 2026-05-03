@@ -2,11 +2,13 @@
 	import { invalidateAll } from '$app/navigation';
 	import Card from '$lib/components/ui/card.svelte';
 	import { Button } from '$lib/components/ui/button/index.js';
-	import { Plus, X, ChevronDown, Pencil, Shield, FileText, AlertCircle, CheckCircle2, Clock, Download, Loader, Trash2 } from 'lucide-svelte';
+	import { Plus, X, ChevronDown, Pencil, Shield, FileText, AlertCircle, CheckCircle2, Clock, Download, Loader, Trash2, DollarSign, Receipt, Users } from 'lucide-svelte';
 	import type { PageData } from './$types';
 	import {
 		TRADEMARK_STATUS_LABELS, TRADEMARK_STATUS_COLORS, TRADEMARK_PIPELINE,
-		MARK_TYPE_LABELS, TRADEMARK_CLASS_LABELS, LOGO_VARIANT_LABELS
+		MARK_TYPE_LABELS, TRADEMARK_CLASS_LABELS, LOGO_VARIANT_LABELS,
+		TRADEMARK_EXPENSE_TYPE_LABELS, TRADEMARK_EXPENSE_STATUS_LABELS, TRADEMARK_EXPENSE_STATUS_COLORS,
+		BILLING_GROUP_STATUS_LABELS, BILLING_GROUP_STATUS_COLORS
 	} from '$lib/domain/schemas/trademark.schema';
 
 	let { data }: { data: PageData } = $props();
@@ -136,7 +138,90 @@
 	}
 
 	// ── Tab state ─────────────────────────────────────────────────────────────
-	let activeTab = $state<'franchises' | 'league'>('franchises');
+	let activeTab = $state<'franchises' | 'league' | 'fees'>('franchises');
+
+	// ── Fee helpers ───────────────────────────────────────────────────────────
+	const fmt = (n: number) => n.toLocaleString('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 0, maximumFractionDigits: 2 });
+
+	function filingTotal(f: any) {
+		return (f.usptoFee ?? 0) + (f.attorneyFee ?? 0) + (f.otherFees ?? 0);
+	}
+
+	const totalExpenses = $derived(
+		(data.expenses ?? []).reduce((s: number, e: any) => s + (e.amount ?? 0), 0)
+	);
+	const paidExpenses = $derived(
+		(data.expenses ?? []).filter((e: any) => e.status === 'paid').reduce((s: number, e: any) => s + (e.amount ?? 0), 0)
+	);
+
+	// ── Add Expense modal ─────────────────────────────────────────────────────
+	let showExpense   = $state(false);
+	let expSaving     = $state(false);
+	let expErr        = $state('');
+	let expForm       = $state({
+		filingId: '', billingGroupId: '', expenseType: 'attorney_filing',
+		amount: '', status: 'pending', description: '', invoiceNumber: '',
+		invoiceDate: '', paidDate: '', notes: ''
+	});
+
+	async function submitExpense(e: SubmitEvent) {
+		e.preventDefault();
+		expSaving = true; expErr = '';
+		try {
+			const res = await fetch('/api/trademark-expenses', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ ...expForm, amount: Number(expForm.amount) })
+			});
+			if (!res.ok) { const d = await res.json().catch(() => ({})); throw new Error(d.message ?? `Error ${res.status}`); }
+			showExpense = false;
+			expForm = { filingId: '', billingGroupId: '', expenseType: 'attorney_filing', amount: '', status: 'pending', description: '', invoiceNumber: '', invoiceDate: '', paidDate: '', notes: '' };
+			await invalidateAll();
+		} catch (e: any) { expErr = e.message ?? 'Failed'; }
+		finally { expSaving = false; }
+	}
+
+	// ── Billing Group modal ───────────────────────────────────────────────────
+	let showGroup    = $state(false);
+	let grpSaving    = $state(false);
+	let grpErr       = $state('');
+	let grpForm      = $state({
+		name: '', description: '', attorneyName: '', invoiceNumber: '',
+		invoiceDate: '', dueDate: '', totalFee: '', status: 'quoted', notes: ''
+	});
+	let grpFilingIds = $state<string[]>([]); // filings to include in bundle
+
+	async function submitGroup(e: SubmitEvent) {
+		e.preventDefault();
+		if (!grpForm.name.trim()) { grpErr = 'Name is required'; return; }
+		grpSaving = true; grpErr = '';
+		try {
+			const res = await fetch('/api/trademark-billing-groups', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ ...grpForm, totalFee: Number(grpForm.totalFee), filingIds: grpFilingIds })
+			});
+			if (!res.ok) { const d = await res.json().catch(() => ({})); throw new Error(d.message ?? `Error ${res.status}`); }
+			showGroup = false;
+			grpForm = { name: '', description: '', attorneyName: '', invoiceNumber: '', invoiceDate: '', dueDate: '', totalFee: '', status: 'quoted', notes: '' };
+			grpFilingIds = [];
+			await invalidateAll();
+		} catch (e: any) { grpErr = e.message ?? 'Failed'; }
+		finally { grpSaving = false; }
+	}
+
+	function toggleFilingInGroup(id: string) {
+		grpFilingIds = grpFilingIds.includes(id)
+			? grpFilingIds.filter(f => f !== id)
+			: [...grpFilingIds, id];
+	}
+
+	const allFilings = $derived([...data.filings, ...(data.leagueFilings ?? [])]);
+	const perFilingFee = $derived(
+		grpFilingIds.length > 0 && Number(grpForm.totalFee) > 0
+			? Number(grpForm.totalFee) / grpFilingIds.length
+			: 0
+	);
 
 	// ── PDF generation ────────────────────────────────────────────────────────
 	let pdfLoading = $state<string | null>(null); // key of which button is loading
@@ -244,20 +329,19 @@
 
 	<!-- Tab switcher -->
 	<div class="flex items-center gap-1 border-b border-slate-700">
-		<button
-			onclick={() => activeTab = 'franchises'}
-			class="px-4 py-2.5 text-sm font-medium transition-colors border-b-2 -mb-px {activeTab === 'franchises' ? 'border-violet-500 text-violet-300' : 'border-transparent text-slate-400 hover:text-slate-200'}"
-		>
-			Franchises
-			<span class="ml-1.5 text-xs px-1.5 py-0.5 rounded-full {activeTab === 'franchises' ? 'bg-violet-900/60 text-violet-300' : 'bg-slate-700 text-slate-400'}">{data.filings.length}</span>
-		</button>
-		<button
-			onclick={() => activeTab = 'league'}
-			class="px-4 py-2.5 text-sm font-medium transition-colors border-b-2 -mb-px {activeTab === 'league' ? 'border-violet-500 text-violet-300' : 'border-transparent text-slate-400 hover:text-slate-200'}"
-		>
-			League
-			<span class="ml-1.5 text-xs px-1.5 py-0.5 rounded-full {activeTab === 'league' ? 'bg-violet-900/60 text-violet-300' : 'bg-slate-700 text-slate-400'}">{data.leagueFilings?.length ?? 0}</span>
-		</button>
+		{#each [
+			{ id: 'franchises', label: 'Franchises', count: data.filings.length },
+			{ id: 'league',     label: 'League',     count: data.leagueFilings?.length ?? 0 },
+			{ id: 'fees',       label: 'Fees & Billing', count: (data.expenses ?? []).length }
+		] as tab}
+			<button
+				onclick={() => activeTab = tab.id as any}
+				class="px-4 py-2.5 text-sm font-medium transition-colors border-b-2 -mb-px {activeTab === tab.id ? 'border-violet-500 text-violet-300' : 'border-transparent text-slate-400 hover:text-slate-200'}"
+			>
+				{tab.label}
+				<span class="ml-1.5 text-xs px-1.5 py-0.5 rounded-full {activeTab === tab.id ? 'bg-violet-900/60 text-violet-300' : 'bg-slate-700 text-slate-400'}">{tab.count}</span>
+			</button>
+		{/each}
 	</div>
 
 	{#if activeTab === 'franchises'}
@@ -577,6 +661,127 @@
 		{/if}
 	{/if}<!-- end league tab -->
 
+	<!-- ── Fees & Billing Tab ────────────────────────────────────────────── -->
+	{#if activeTab === 'fees'}
+		<!-- Summary metrics -->
+		<div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+			<Card class="p-4 bg-slate-800/50 border-slate-700">
+				<p class="text-xs text-slate-400 uppercase tracking-wide">Total Expenses</p>
+				<p class="text-2xl font-bold text-slate-100 mt-1">{fmt(totalExpenses)}</p>
+				<p class="text-xs text-slate-500 mt-0.5">{(data.expenses ?? []).length} records</p>
+			</Card>
+			<Card class="p-4 bg-emerald-950/40 border-emerald-800">
+				<p class="text-xs text-emerald-400 uppercase tracking-wide">Paid</p>
+				<p class="text-2xl font-bold text-emerald-300 mt-1">{fmt(paidExpenses)}</p>
+			</Card>
+			<Card class="p-4 bg-yellow-950/40 border-yellow-800">
+				<p class="text-xs text-yellow-400 uppercase tracking-wide">Outstanding</p>
+				<p class="text-2xl font-bold text-yellow-300 mt-1">{fmt(totalExpenses - paidExpenses)}</p>
+			</Card>
+			<Card class="p-4 bg-violet-950/40 border-violet-800">
+				<p class="text-xs text-violet-400 uppercase tracking-wide">Billing Groups</p>
+				<p class="text-2xl font-bold text-violet-300 mt-1">{(data.billingGroups ?? []).length}</p>
+			</Card>
+		</div>
+
+		<!-- Actions -->
+		{#if data.isAdmin}
+			<div class="flex gap-3">
+				<Button onclick={() => { showExpense = true; expErr = ''; }} class="gap-2 bg-slate-700 hover:bg-slate-600 text-slate-100 border border-slate-600">
+					<Receipt class="size-4" /> Add Expense
+				</Button>
+				<Button onclick={() => { showGroup = true; grpErr = ''; }} class="gap-2 bg-violet-700 hover:bg-violet-600 text-white">
+					<Users class="size-4" /> Create Billing Group
+				</Button>
+			</div>
+		{/if}
+
+		<!-- Billing Groups -->
+		{#if (data.billingGroups ?? []).length > 0}
+			<div>
+				<h2 class="text-sm font-semibold text-slate-300 uppercase tracking-wide mb-3">Billing Groups</h2>
+				<div class="space-y-2">
+					{#each (data.billingGroups ?? []) as grp}
+						{@const grpExpenses = (data.expenses ?? []).filter((e: any) => e.billingGroupId === grp.id)}
+						{@const grpPaid = grpExpenses.filter((e: any) => e.status === 'paid').reduce((s: number, e: any) => s + e.amount, 0)}
+						<Card class="p-4 bg-slate-800/50 border-slate-700">
+							<div class="flex items-start justify-between gap-4">
+								<div class="flex-1 min-w-0">
+									<div class="flex items-center gap-2 flex-wrap">
+										<span class="font-semibold text-slate-100">{grp.name}</span>
+										<span class="text-xs px-2 py-0.5 rounded border {BILLING_GROUP_STATUS_COLORS[grp.status]}">{BILLING_GROUP_STATUS_LABELS[grp.status]}</span>
+									</div>
+									{#if grp.attorneyName}<p class="text-xs text-slate-400 mt-0.5">Attorney: {grp.attorneyName}</p>{/if}
+									{#if grp.invoiceNumber}<p class="text-xs text-slate-500">Invoice #{grp.invoiceNumber}</p>{/if}
+								</div>
+								<div class="text-right shrink-0">
+									<p class="text-lg font-bold text-slate-100">{fmt(grp.totalFee)}</p>
+									<p class="text-xs text-slate-500">{fmt(grpPaid)} paid</p>
+								</div>
+							</div>
+							{#if grp.notes}
+								<p class="text-xs text-slate-500 mt-2 border-t border-slate-700/60 pt-2">{grp.notes}</p>
+							{/if}
+						</Card>
+					{/each}
+				</div>
+			</div>
+		{/if}
+
+		<!-- Expense records -->
+		<div>
+			<h2 class="text-sm font-semibold text-slate-300 uppercase tracking-wide mb-3">All Expenses</h2>
+			{#if (data.expenses ?? []).length === 0}
+				<Card class="p-6 bg-slate-800/30 border-slate-700 border-dashed">
+					<p class="text-sm text-slate-500 text-center">No expenses recorded yet. Use "Add Expense" to log USPTO fees, attorney invoices, or other costs.</p>
+				</Card>
+			{:else}
+				<Card class="bg-slate-800/50 border-slate-700 overflow-hidden">
+					<div class="overflow-x-auto">
+						<table class="w-full text-sm">
+							<thead>
+								<tr class="text-left text-xs text-slate-400 uppercase tracking-wide border-b border-slate-700/60 bg-slate-900/30">
+									<th class="px-4 py-2.5">Type</th>
+									<th class="px-4 py-2.5">Description</th>
+									<th class="px-4 py-2.5">Filing / Group</th>
+									<th class="px-4 py-2.5">Amount</th>
+									<th class="px-4 py-2.5">Status</th>
+									<th class="px-4 py-2.5">Invoice #</th>
+									<th class="px-4 py-2.5">Paid</th>
+								</tr>
+							</thead>
+							<tbody class="divide-y divide-slate-700/40">
+								{#each (data.expenses ?? []) as exp, i}
+									{@const linkedFiling = allFilings.find((f: any) => f.id === exp.filingId)}
+									{@const linkedGroup  = (data.billingGroups ?? []).find((g: any) => g.id === exp.billingGroupId)}
+									<tr class="{i % 2 === 0 ? 'bg-slate-900' : 'bg-slate-800/60'} hover:bg-slate-700/50">
+										<td class="px-4 py-2.5 text-slate-200 whitespace-nowrap text-xs font-medium">
+											{TRADEMARK_EXPENSE_TYPE_LABELS[exp.expenseType] ?? exp.expenseType}
+										</td>
+										<td class="px-4 py-2.5 text-slate-400 text-xs max-w-48 truncate">{exp.description || '—'}</td>
+										<td class="px-4 py-2.5 text-xs text-slate-400 whitespace-nowrap">
+											{#if linkedFiling}
+												<span class="text-violet-400">{MARK_TYPE_LABELS[linkedFiling.markType] ?? linkedFiling.markType}</span>
+											{:else if linkedGroup}
+												<span class="text-blue-400">{linkedGroup.name}</span>
+											{:else}—{/if}
+										</td>
+										<td class="px-4 py-2.5 font-semibold text-slate-100 whitespace-nowrap">{fmt(exp.amount)}</td>
+										<td class="px-4 py-2.5 whitespace-nowrap">
+											<span class="text-xs px-2 py-0.5 rounded border {TRADEMARK_EXPENSE_STATUS_COLORS[exp.status]}">{TRADEMARK_EXPENSE_STATUS_LABELS[exp.status]}</span>
+										</td>
+										<td class="px-4 py-2.5 text-slate-400 text-xs">{exp.invoiceNumber || '—'}</td>
+										<td class="px-4 py-2.5 text-slate-400 text-xs whitespace-nowrap">{fmtDate(exp.paidDate)}</td>
+									</tr>
+								{/each}
+							</tbody>
+						</table>
+					</div>
+				</Card>
+			{/if}
+		</div>
+	{/if}<!-- end fees tab -->
+
 	<!-- ── New Filing Modal ─────────────────────────────────────────────── -->
 	{#if showNew}
 		<div class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
@@ -807,6 +1012,168 @@
 						<Button type="submit" disabled={editSaving} class="bg-violet-600 hover:bg-violet-700 text-white gap-2">
 							{#if editSaving}<Clock class="size-4 animate-spin" />{/if}
 							{editSaving ? 'Saving…' : 'Save Changes'}
+						</Button>
+					</div>
+				</form>
+			</div>
+		</div>
+	{/if}
+
+	<!-- ── Add Expense Modal ─────────────────────────────────────────────── -->
+	{#if showExpense}
+		<div class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+			<div class="bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
+				<div class="flex items-center justify-between px-6 py-4 border-b border-slate-700">
+					<div class="flex items-center gap-2"><Receipt class="size-5 text-violet-400" /><h2 class="text-lg font-semibold text-slate-100">Add Expense</h2></div>
+					<button onclick={() => showExpense = false} class="text-slate-400 hover:text-slate-200 p-1 rounded-lg hover:bg-slate-700"><X class="size-5" /></button>
+				</div>
+				<form onsubmit={submitExpense} class="px-6 py-5 space-y-4">
+					{#if expErr}<div class="flex items-center gap-2 text-sm text-red-400 bg-red-900/20 border border-red-800 rounded-lg px-3 py-2"><AlertCircle class="size-4 shrink-0" />{expErr}</div>{/if}
+					<div class="grid grid-cols-2 gap-3">
+						<div>
+							<label class={LABEL}>Expense Type <span class="text-red-400">*</span></label>
+							<select bind:value={expForm.expenseType} class={SELECT}>
+								{#each Object.entries(TRADEMARK_EXPENSE_TYPE_LABELS) as [val, label]}
+									<option value={val}>{label}</option>
+								{/each}
+							</select>
+						</div>
+						<div>
+							<label class={LABEL}>Amount ($) <span class="text-red-400">*</span></label>
+							<input type="number" bind:value={expForm.amount} min="0" step="0.01" class={INPUT} placeholder="350.00" required />
+						</div>
+					</div>
+					<div class="grid grid-cols-2 gap-3">
+						<div>
+							<label class={LABEL}>Link to Filing</label>
+							<select bind:value={expForm.filingId} class={SELECT}>
+								<option value="">— None —</option>
+								{#each allFilings as f}
+									<option value={f.id}>{MARK_TYPE_LABELS[f.markType] ?? f.markType} · {LOGO_VARIANT_LABELS[f.logoVariant] ?? f.logoVariant}</option>
+								{/each}
+							</select>
+						</div>
+						<div>
+							<label class={LABEL}>Link to Billing Group</label>
+							<select bind:value={expForm.billingGroupId} class={SELECT}>
+								<option value="">— None —</option>
+								{#each (data.billingGroups ?? []) as g}
+									<option value={g.id}>{g.name}</option>
+								{/each}
+							</select>
+						</div>
+					</div>
+					<div>
+						<label class={LABEL}>Description</label>
+						<input bind:value={expForm.description} class={INPUT} placeholder="USPTO filing fee for IC 041…" />
+					</div>
+					<div class="grid grid-cols-2 gap-3">
+						<div>
+							<label class={LABEL}>Status</label>
+							<select bind:value={expForm.status} class={SELECT}>
+								{#each Object.entries(TRADEMARK_EXPENSE_STATUS_LABELS) as [val, label]}
+									<option value={val}>{label}</option>
+								{/each}
+							</select>
+						</div>
+						<div>
+							<label class={LABEL}>Invoice #</label>
+							<input bind:value={expForm.invoiceNumber} class={INPUT} placeholder="INV-2026-001" />
+						</div>
+					</div>
+					<div class="grid grid-cols-2 gap-3">
+						<div><label class={LABEL}>Invoice Date</label><input type="date" bind:value={expForm.invoiceDate} class={INPUT} /></div>
+						<div><label class={LABEL}>Paid Date</label><input type="date" bind:value={expForm.paidDate} class={INPUT} /></div>
+					</div>
+					<div>
+						<label class={LABEL}>Notes</label>
+						<textarea bind:value={expForm.notes} rows="2" class="{INPUT} resize-none"></textarea>
+					</div>
+					<div class="flex justify-end gap-3 pt-2">
+						<Button type="button" variant="outline" onclick={() => showExpense = false} class="border-slate-600 text-slate-300 hover:bg-slate-700">Cancel</Button>
+						<Button type="submit" disabled={expSaving} class="bg-violet-600 hover:bg-violet-700 text-white gap-2">
+							{#if expSaving}<Loader class="size-4 animate-spin" />{/if}
+							{expSaving ? 'Saving…' : 'Add Expense'}
+						</Button>
+					</div>
+				</form>
+			</div>
+		</div>
+	{/if}
+
+	<!-- ── Billing Group Modal ────────────────────────────────────────────── -->
+	{#if showGroup}
+		<div class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+			<div class="bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+				<div class="flex items-center justify-between px-6 py-4 border-b border-slate-700">
+					<div class="flex items-center gap-2"><Users class="size-5 text-violet-400" /><h2 class="text-lg font-semibold text-slate-100">Create Billing Group</h2></div>
+					<button onclick={() => showGroup = false} class="text-slate-400 hover:text-slate-200 p-1 rounded-lg hover:bg-slate-700"><X class="size-5" /></button>
+				</div>
+				<form onsubmit={submitGroup} class="px-6 py-5 space-y-4">
+					{#if grpErr}<div class="flex items-center gap-2 text-sm text-red-400 bg-red-900/20 border border-red-800 rounded-lg px-3 py-2"><AlertCircle class="size-4 shrink-0" />{grpErr}</div>{/if}
+
+					<div>
+						<label class={LABEL}>Group Name <span class="text-red-400">*</span></label>
+						<input bind:value={grpForm.name} class={INPUT} placeholder="Q1 2026 — Attorney Bundle (30 marks)" required />
+					</div>
+					<div class="grid grid-cols-2 gap-3">
+						<div>
+							<label class={LABEL}>Attorney Name</label>
+							<input bind:value={grpForm.attorneyName} class={INPUT} placeholder="Jane Smith, Esq." />
+						</div>
+						<div>
+							<label class={LABEL}>Total Fee ($) <span class="text-red-400">*</span></label>
+							<input type="number" bind:value={grpForm.totalFee} min="0" step="0.01" class={INPUT} placeholder="15000.00" required />
+						</div>
+					</div>
+					<div class="grid grid-cols-2 gap-3">
+						<div><label class={LABEL}>Invoice #</label><input bind:value={grpForm.invoiceNumber} class={INPUT} placeholder="INV-2026-001" /></div>
+						<div>
+							<label class={LABEL}>Status</label>
+							<select bind:value={grpForm.status} class={SELECT}>
+								{#each Object.entries(BILLING_GROUP_STATUS_LABELS) as [val, label]}
+									<option value={val}>{label}</option>
+								{/each}
+							</select>
+						</div>
+					</div>
+					<div class="grid grid-cols-2 gap-3">
+						<div><label class={LABEL}>Invoice Date</label><input type="date" bind:value={grpForm.invoiceDate} class={INPUT} /></div>
+						<div><label class={LABEL}>Due Date</label><input type="date" bind:value={grpForm.dueDate} class={INPUT} /></div>
+					</div>
+
+					<!-- Filing selector -->
+					<div>
+						<label class={LABEL}>Include Filings in Bundle</label>
+						<p class="text-xs text-slate-500 mb-2">Select the filings covered by this flat fee. The attorney fee will be split evenly across them.</p>
+						<div class="max-h-48 overflow-y-auto rounded-lg border border-slate-700 divide-y divide-slate-700/60">
+							{#each allFilings as f}
+								{@const checked = grpFilingIds.includes(f.id)}
+								<label class="flex items-center gap-3 px-3 py-2 cursor-pointer hover:bg-slate-700/40 {checked ? 'bg-violet-950/30' : ''}">
+									<input type="checkbox" checked={checked} onchange={() => toggleFilingInGroup(f.id)} class="size-4 rounded border-slate-600 accent-violet-500" />
+									<span class="text-sm text-slate-200 flex-1">{MARK_TYPE_LABELS[f.markType] ?? f.markType} · {LOGO_VARIANT_LABELS[f.logoVariant] ?? f.logoVariant}</span>
+									{#if filingTotal(f) > 0}
+										<span class="text-xs text-slate-500">{fmt(filingTotal(f))}</span>
+									{/if}
+								</label>
+							{/each}
+						</div>
+						{#if grpFilingIds.length > 0 && perFilingFee > 0}
+							<p class="text-xs text-violet-400 mt-1.5">
+								{grpFilingIds.length} filing{grpFilingIds.length !== 1 ? 's' : ''} selected · {fmt(perFilingFee)} per filing
+							</p>
+						{/if}
+					</div>
+
+					<div>
+						<label class={LABEL}>Notes</label>
+						<textarea bind:value={grpForm.notes} rows="2" class="{INPUT} resize-none" placeholder="Covers all franchise word marks and primary logos…"></textarea>
+					</div>
+					<div class="flex justify-end gap-3 pt-2">
+						<Button type="button" variant="outline" onclick={() => showGroup = false} class="border-slate-600 text-slate-300 hover:bg-slate-700">Cancel</Button>
+						<Button type="submit" disabled={grpSaving} class="bg-violet-600 hover:bg-violet-700 text-white gap-2">
+							{#if grpSaving}<Loader class="size-4 animate-spin" />{/if}
+							{grpSaving ? 'Saving…' : 'Create Group'}
 						</Button>
 					</div>
 				</form>

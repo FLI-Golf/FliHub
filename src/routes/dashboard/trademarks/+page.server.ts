@@ -37,6 +37,16 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 			}
 		}
 
+		// Billing groups + expenses (soft-fail if not yet migrated)
+		let billingGroups: any[] = [];
+		let expenses: any[] = [];
+		try {
+			[billingGroups, expenses] = await Promise.all([
+				pb.collection('trademark_billing_groups').getFullList({ sort: '-created' }),
+				pb.collection('trademark_expenses').getFullList({ sort: '-created' })
+			]);
+		} catch { /* collections not yet created */ }
+
 		// Split: league filings vs franchise filings
 		const leagueFilings    = league ? allFilings.filter((f: any) => f.franchiseId === league.id) : [];
 		const franchiseFilings = league ? allFilings.filter((f: any) => f.franchiseId !== league.id) : allFilings;
@@ -46,6 +56,8 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 			filings:       franchiseFilings,
 			league,
 			leagueFilings,
+			billingGroups,
+			expenses,
 			collectionMissing,
 			isAdmin:    ctx.role === 'admin',
 			isAttorney: ctx.role === 'admin' || (ctx.profile as any)?.role === 'attorney'
