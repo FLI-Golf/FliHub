@@ -112,8 +112,8 @@
 		<div class="rounded-xl border border-slate-700/60 {headerExpanded ? 'bg-slate-800/80' : 'bg-slate-800/40'} hover:bg-slate-800/80 transition-colors px-4 py-3">
 			<div class="flex items-center justify-between gap-3">
 				<div class="flex items-center gap-2.5">
-					<div class="size-7 rounded-lg bg-blue-500/15 flex items-center justify-center shrink-0">
-						<Info class="size-3.5 text-blue-400" />
+					<div class="size-7 rounded-lg bg-yellow-500/15 flex items-center justify-center shrink-0">
+						<Info class="size-3.5 text-yellow-400" />
 					</div>
 					<p class="text-xs font-medium text-slate-300">
 						{headerExpanded ? 'About Active Projects' : 'What is this page?'}
