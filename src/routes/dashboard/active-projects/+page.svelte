@@ -102,26 +102,114 @@
 
 	<!-- Summary strip -->
 	<div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
-		<Card class="p-4 border-l-4 border-l-emerald-500">
-			<p class="text-xs text-muted-foreground mb-1">Active Projects</p>
-			<p class="text-2xl font-black text-white">{projects.length}</p>
-			<p class="text-xs text-muted-foreground mt-0.5">of 29 total</p>
-		</Card>
-		<Card class="p-4 border-l-4 border-l-blue-500">
-			<p class="text-xs text-muted-foreground mb-1">Combined Budget</p>
-			<p class="text-2xl font-black text-white">{fmt(totalBudget)}</p>
-			<p class="text-xs text-muted-foreground mt-0.5">{fmt(totalSpend)} spent</p>
-		</Card>
-		<Card class="p-4 border-l-4 border-l-violet-500">
-			<p class="text-xs text-muted-foreground mb-1">Tasks</p>
-			<p class="text-2xl font-black text-white">{totalTasks}</p>
-			<p class="text-xs text-muted-foreground mt-0.5">{totalDone} done · {totalTasks - totalDone} open</p>
-		</Card>
-		<Card class="p-4 border-l-4 border-l-amber-500">
-			<p class="text-xs text-muted-foreground mb-1">Sponsors in Pipeline</p>
-			<p class="text-2xl font-black text-white">{sponsorSummary.inPipeline}</p>
-			<p class="text-xs text-muted-foreground mt-0.5">{fmt(sponsorSummary.totalCommitted)} committed</p>
-		</Card>
+
+		<!-- Active Projects -->
+		<div class="group/card relative">
+			<Card class="p-4 border-l-4 border-l-emerald-500 bg-emerald-950/30 hover:bg-emerald-950/50 transition-colors cursor-default">
+				<div class="flex items-center justify-between mb-2">
+					<p class="text-xs text-emerald-300/70 font-medium">Active Projects</p>
+					<div class="size-7 rounded-lg bg-emerald-500/20 flex items-center justify-center">
+						<Zap class="size-3.5 text-emerald-400" />
+					</div>
+				</div>
+				<p class="text-2xl font-black text-white">{projects.length}</p>
+				<p class="text-xs text-emerald-300/60 mt-0.5">of 29 total</p>
+			</Card>
+			<div class="pointer-events-none absolute left-0 top-full mt-2 z-50 w-60 opacity-0 translate-y-1 group-hover/card:opacity-100 group-hover/card:translate-y-0 transition-all duration-200">
+				<div class="rounded-xl border border-slate-700 bg-slate-900 text-slate-100 shadow-2xl p-3 text-sm space-y-1.5">
+					<p class="font-semibold text-xs uppercase tracking-wider text-emerald-400 mb-2">Project Breakdown</p>
+					{#each projects as p}
+						{@const c = getColor(p.name)}
+						<div class="flex items-center justify-between gap-2">
+							<div class="flex items-center gap-1.5 min-w-0">
+								<span class="size-1.5 rounded-full shrink-0 {c.bar}"></span>
+								<span class="text-slate-300 truncate text-xs">{p.name}</span>
+							</div>
+							<span class="text-xs font-medium text-slate-400 shrink-0">{fmt(p.budget)}</span>
+						</div>
+					{/each}
+				</div>
+			</div>
+		</div>
+
+		<!-- Combined Budget -->
+		<div class="group/card relative">
+			<Card class="p-4 border-l-4 border-l-blue-500 bg-blue-950/30 hover:bg-blue-950/50 transition-colors cursor-default">
+				<div class="flex items-center justify-between mb-2">
+					<p class="text-xs text-blue-300/70 font-medium">Combined Budget</p>
+					<div class="size-7 rounded-lg bg-blue-500/20 flex items-center justify-center">
+						<DollarSign class="size-3.5 text-blue-400" />
+					</div>
+				</div>
+				<p class="text-2xl font-black text-white">{fmt(totalBudget)}</p>
+				<p class="text-xs text-blue-300/60 mt-0.5">{fmt(totalSpend)} spent</p>
+			</Card>
+			<div class="pointer-events-none absolute left-0 top-full mt-2 z-50 w-56 opacity-0 translate-y-1 group-hover/card:opacity-100 group-hover/card:translate-y-0 transition-all duration-200">
+				<div class="rounded-xl border border-slate-700 bg-slate-900 text-slate-100 shadow-2xl p-3 text-sm space-y-1.5">
+					<p class="font-semibold text-xs uppercase tracking-wider text-blue-400 mb-2">Budget Detail</p>
+					<div class="flex justify-between"><span class="text-slate-400">Total budget</span><span class="font-medium">{fmt(totalBudget)}</span></div>
+					<div class="flex justify-between"><span class="text-slate-400">Spent</span><span class="font-medium">{fmt(totalSpend)}</span></div>
+					<div class="flex justify-between"><span class="text-slate-400">Remaining</span><span class="font-medium text-emerald-400">{fmt(totalBudget - totalSpend)}</span></div>
+					<div class="h-px bg-slate-700 my-1"></div>
+					<div class="flex justify-between"><span class="text-slate-400">% of $7.5M raise</span><span class="font-medium text-blue-300">{pct(totalBudget, 7_500_000).toFixed(0)}%</span></div>
+				</div>
+			</div>
+		</div>
+
+		<!-- Tasks -->
+		<div class="group/card relative">
+			<Card class="p-4 border-l-4 border-l-violet-500 bg-violet-950/30 hover:bg-violet-950/50 transition-colors cursor-default">
+				<div class="flex items-center justify-between mb-2">
+					<p class="text-xs text-violet-300/70 font-medium">Tasks</p>
+					<div class="size-7 rounded-lg bg-violet-500/20 flex items-center justify-center">
+						<CheckCircle2 class="size-3.5 text-violet-400" />
+					</div>
+				</div>
+				<p class="text-2xl font-black text-white">{totalTasks}</p>
+				<p class="text-xs text-violet-300/60 mt-0.5">{totalDone} done · {totalTasks - totalDone} open</p>
+			</Card>
+			<div class="pointer-events-none absolute left-0 top-full mt-2 z-50 w-56 opacity-0 translate-y-1 group-hover/card:opacity-100 group-hover/card:translate-y-0 transition-all duration-200">
+				<div class="rounded-xl border border-slate-700 bg-slate-900 text-slate-100 shadow-2xl p-3 text-sm space-y-1.5">
+					<p class="font-semibold text-xs uppercase tracking-wider text-violet-400 mb-2">Task Status</p>
+					<div class="flex justify-between"><span class="text-slate-400">Total tasks</span><span class="font-medium">{totalTasks}</span></div>
+					<div class="flex justify-between"><span class="text-slate-400">Completed</span><span class="font-medium text-emerald-400">{totalDone}</span></div>
+					<div class="flex justify-between"><span class="text-slate-400">Open</span><span class="font-medium text-amber-400">{totalTasks - totalDone}</span></div>
+					{#if totalTasks > 0}
+						<div class="h-px bg-slate-700 my-1"></div>
+						<div class="h-1.5 rounded-full bg-slate-700 overflow-hidden">
+							<div class="h-full rounded-full bg-emerald-500" style="width:{pct(totalDone, totalTasks).toFixed(0)}%"></div>
+						</div>
+						<p class="text-xs text-slate-400">{pct(totalDone, totalTasks).toFixed(0)}% complete</p>
+					{/if}
+				</div>
+			</div>
+		</div>
+
+		<!-- Sponsors in Pipeline -->
+		<div class="group/card relative">
+			<Card class="p-4 border-l-4 border-l-amber-500 bg-amber-950/30 hover:bg-amber-950/50 transition-colors cursor-default">
+				<div class="flex items-center justify-between mb-2">
+					<p class="text-xs text-amber-300/70 font-medium">Sponsors in Pipeline</p>
+					<div class="size-7 rounded-lg bg-amber-500/20 flex items-center justify-center">
+						<Star class="size-3.5 text-amber-400" />
+					</div>
+				</div>
+				<p class="text-2xl font-black text-white">{sponsorSummary.inPipeline}</p>
+				<p class="text-xs text-amber-300/60 mt-0.5">{fmt(sponsorSummary.totalCommitted)} committed</p>
+			</Card>
+			<div class="pointer-events-none absolute left-0 top-full mt-2 z-50 w-56 opacity-0 translate-y-1 group-hover/card:opacity-100 group-hover/card:translate-y-0 transition-all duration-200">
+				<div class="rounded-xl border border-slate-700 bg-slate-900 text-slate-100 shadow-2xl p-3 text-sm space-y-1.5">
+					<p class="font-semibold text-xs uppercase tracking-wider text-amber-400 mb-2">Sponsor Summary</p>
+					<div class="flex justify-between"><span class="text-slate-400">Total sponsors</span><span class="font-medium">{sponsorSummary.total}</span></div>
+					<div class="flex justify-between"><span class="text-slate-400">In pipeline</span><span class="font-medium text-amber-400">{sponsorSummary.inPipeline}</span></div>
+					<div class="flex justify-between"><span class="text-slate-400">Committed</span><span class="font-medium text-emerald-400">{sponsorSummary.committed}</span></div>
+					<div class="h-px bg-slate-700 my-1"></div>
+					<div class="flex justify-between"><span class="text-slate-400">$ Committed</span><span class="font-medium">{fmt(sponsorSummary.totalCommitted)}</span></div>
+					<div class="flex justify-between"><span class="text-slate-400">$ Paid</span><span class="font-medium text-emerald-400">{fmt(sponsorSummary.totalPaid)}</span></div>
+				</div>
+			</div>
+		</div>
+
 	</div>
 
 	<!-- Project cards -->
