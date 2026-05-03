@@ -115,14 +115,14 @@
 					<div class="size-7 rounded-lg bg-yellow-500/15 flex items-center justify-center shrink-0">
 						<Info class="size-3.5 text-yellow-400" />
 					</div>
-					<p class="text-xs font-medium text-slate-300">
+					<p class="text-xs font-medium text-yellow-300">
 						{headerExpanded ? 'About Active Projects' : 'What is this page?'}
 					</p>
 				</div>
 				<ChevronDown class="size-4 text-slate-500 group-hover/info:text-slate-300 transition-all duration-200 shrink-0 {headerExpanded ? 'rotate-180' : ''}" />
 			</div>
 			{#if headerExpanded}
-				<p class="text-xs text-muted-foreground leading-relaxed mt-3 pl-9">
+				<p class="text-xs text-yellow-200/70 leading-relaxed mt-3 pl-9">
 					These 7 projects represent the pre-raise workstreams actively in progress right now — platform and
 					app development, franchise and legal groundwork, sponsor outreach, documentary content, and key
 					media partnerships. Once the $7.5M seed round closes, the remaining 22 planned projects activate
