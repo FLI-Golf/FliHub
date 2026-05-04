@@ -6,7 +6,7 @@
 		Zap, FolderKanban, DollarSign, CheckCircle2, Clock,
 		ArrowRight, Users, Star, Trophy, Building2,
 		Film, Scale, Handshake, Cpu, TrendingUp, ExternalLink,
-		ChevronDown, Info
+		ChevronDown, Info, Wallet
 	} from 'lucide-svelte';
 
 	let { data }: { data: PageData } = $props();
@@ -56,6 +56,10 @@
 			{ label: 'Sponsors', href: '/dashboard/sponsors', icon: Star },
 			{ label: 'Media', href: '/dashboard/media', icon: Film },
 		],
+		'Tax-Exempt Reimbursements': [
+			{ label: 'Reimbursements', href: '/dashboard/reimbursements', icon: Wallet },
+			{ label: 'Expenses', href: '/dashboard/expenses', icon: DollarSign },
+		],
 	};
 
 	// Color per project for visual distinction
@@ -66,7 +70,8 @@
 		'App & Platform Development': { border: 'border-l-blue-500',   badge: 'bg-blue-500/15 text-blue-300',    bar: 'bg-blue-500',   icon: Cpu },
 		'Legal Services':             { border: 'border-l-rose-500',   badge: 'bg-rose-500/15 text-rose-300',    bar: 'bg-rose-500',   icon: Scale },
 		'Documentary & Sizzle Reel':  { border: 'border-l-pink-500',   badge: 'bg-pink-500/15 text-pink-300',    bar: 'bg-pink-500',   icon: Film },
-		'Go Throw Media Partnership': { border: 'border-l-emerald-500',badge: 'bg-emerald-500/15 text-emerald-300', bar: 'bg-emerald-500', icon: Handshake },
+		'Go Throw Media Partnership':  { border: 'border-l-emerald-500', badge: 'bg-emerald-500/15 text-emerald-300', bar: 'bg-emerald-500', icon: Handshake },
+		'Tax-Exempt Reimbursements':   { border: 'border-l-teal-500',    badge: 'bg-teal-500/15 text-teal-300',       bar: 'bg-teal-500',    icon: Wallet },
 	};
 
 	function getColor(name: string) {
@@ -428,7 +433,7 @@
 
 	<!-- Footer note -->
 	<p class="text-xs text-muted-foreground text-center pb-2">
-		22 projects remain <span class="font-medium text-slate-400">planned</span> — they activate after the $7.5M seed raise closes.
+		21 projects remain <span class="font-medium text-slate-400">planned</span> — they activate after the $7.5M seed raise closes.
 		<a href="/dashboard/use-of-proceeds" class="text-primary hover:underline ml-1">View Use of Proceeds →</a>
 	</p>
 
