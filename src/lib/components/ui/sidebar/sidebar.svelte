@@ -43,7 +43,7 @@
 			data-slot="sidebar"
 			data-mobile="true"
 			class="bg-sidebar text-sidebar-foreground w-(--sidebar-width) p-0 [&>button]:hidden"
-			style="--sidebar-width: {SIDEBAR_WIDTH_MOBILE};"
+			style="--sidebar-width: {SIDEBAR_WIDTH_MOBILE}; background-color: hsl(222 47% 8%) !important;"
 			{side}
 		>
 			<Sheet.Header class="sr-only">
