@@ -13,6 +13,12 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 			sort: 'name', fields: 'id,name'
 		}).catch(() => []);
 
+		// Tax-Exempt Reimbursements department + Ina's profile
+		const reimbDept = await pb.collection('departments').getFirstListItem(
+			`name = "Tax-Exempt Reimbursements"`, { expand: 'headOfDepartment' }
+		).catch(() => null);
+		const cpa = (reimbDept as any)?.expand?.headOfDepartment ?? null;
+
 		// My claims — always load for the current user
 		const myClaims = await pb.collection('reimbursement_claims').getFullList({
 			filter:  `claimant = "${profile?.id}"`,
@@ -62,9 +68,11 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 			myItems,
 			allClaims,
 			allItems,
-			metrics: { pendingCount, approvedTotal, paidTotal, totalClaims: (allClaims as any[]).length }
+			metrics: { pendingCount, approvedTotal, paidTotal, totalClaims: (allClaims as any[]).length },
+			reimbDept,
+			cpa,
 		};
 	} catch {
-		return { profile, isAdmin, vendors: [], myClaims: [], myItems: [], allClaims: [], allItems: [], metrics: null };
+		return { profile, isAdmin, vendors: [], myClaims: [], myItems: [], allClaims: [], allItems: [], metrics: null, reimbDept: null, cpa: null };
 	}
 };

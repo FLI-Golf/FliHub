@@ -2,7 +2,7 @@
 	import { invalidateAll } from '$app/navigation';
 	import Card from '$lib/components/ui/card.svelte';
 	import { Button } from '$lib/components/ui/button/index.js';
-	import { Plus, X, Receipt, CheckCircle2, Clock, AlertCircle, ChevronDown, ChevronRight, Pencil, Trash2, Send, DollarSign, Hash } from 'lucide-svelte';
+	import { Plus, X, Receipt, CheckCircle2, Clock, AlertCircle, ChevronDown, ChevronRight, Pencil, Trash2, Send, DollarSign, Hash, UserCircle, Building2, ShieldCheck } from 'lucide-svelte';
 	import type { PageData } from './$types';
 	import {
 		CLAIM_STATUS_LABELS, CLAIM_STATUS_COLORS, CLAIMANT_PIPELINE,
@@ -158,6 +158,39 @@
 			<Plus class="size-4" /> New Claim
 		</Button>
 	</div>
+
+	<!-- Department info card -->
+	{#if data.reimbDept}
+	<div class="rounded-xl border border-emerald-500/20 bg-emerald-950/20 p-4">
+		<div class="flex items-start gap-4 flex-wrap">
+			<div class="flex items-center gap-3 min-w-0">
+				<div class="size-10 rounded-xl bg-emerald-500/15 flex items-center justify-center shrink-0">
+					<Building2 class="size-5 text-emerald-400" />
+				</div>
+				<div class="min-w-0">
+					<p class="text-xs font-bold uppercase tracking-wide text-emerald-400">Department</p>
+					<p class="text-sm font-bold text-white">{data.reimbDept.name}</p>
+					<p class="text-xs text-muted-foreground mt-0.5">{data.reimbDept.description}</p>
+				</div>
+			</div>
+			{#if data.cpa}
+			<div class="flex items-center gap-3 ml-auto shrink-0">
+				<div class="size-10 rounded-xl bg-violet-500/15 flex items-center justify-center shrink-0">
+					<UserCircle class="size-5 text-violet-400" />
+				</div>
+				<div>
+					<p class="text-xs font-bold uppercase tracking-wide text-violet-400">CPA / Department Head</p>
+					<p class="text-sm font-bold text-white">{data.cpa.firstName} {data.cpa.lastName}</p>
+					<div class="flex items-center gap-1.5 mt-0.5">
+						<ShieldCheck class="size-3 text-emerald-400" />
+						<a href="mailto:{data.cpa.email}" class="text-xs text-emerald-400 hover:underline">{data.cpa.email}</a>
+					</div>
+				</div>
+			</div>
+			{/if}
+		</div>
+	</div>
+	{/if}
 
 	<!-- Admin metrics -->
 	{#if data.isAdmin && data.metrics}
