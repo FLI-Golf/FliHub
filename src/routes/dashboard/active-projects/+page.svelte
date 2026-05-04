@@ -58,7 +58,12 @@
 		],
 		'Tax-Exempt Reimbursements': [
 			{ label: 'Reimbursements', href: '/dashboard/reimbursements', icon: Wallet },
-			{ label: 'Expenses', href: '/dashboard/expenses', icon: DollarSign },
+			{ label: 'Payments & Income', href: '/dashboard/payments', icon: DollarSign },
+		],
+		'Payments & Income': [
+			{ label: 'Payments & Income', href: '/dashboard/payments', icon: DollarSign },
+			{ label: 'Reimbursements', href: '/dashboard/reimbursements', icon: Wallet },
+			{ label: 'Expenses', href: '/dashboard/expenses', icon: TrendingUp },
 		],
 	};
 
@@ -72,6 +77,7 @@
 		'Documentary & Sizzle Reel':  { border: 'border-l-pink-500',   badge: 'bg-pink-500/15 text-pink-300',    bar: 'bg-pink-500',   icon: Film },
 		'Go Throw Media Partnership':  { border: 'border-l-emerald-500', badge: 'bg-emerald-500/15 text-emerald-300', bar: 'bg-emerald-500', icon: Handshake },
 		'Tax-Exempt Reimbursements':   { border: 'border-l-teal-500',    badge: 'bg-teal-500/15 text-teal-300',       bar: 'bg-teal-500',    icon: Wallet },
+		'Payments & Income':           { border: 'border-l-emerald-500', badge: 'bg-emerald-500/15 text-emerald-300',  bar: 'bg-emerald-500', icon: DollarSign },
 	};
 
 	function getColor(name: string) {
@@ -433,7 +439,7 @@
 
 	<!-- Footer note -->
 	<p class="text-xs text-muted-foreground text-center pb-2">
-		21 projects remain <span class="font-medium text-slate-400">planned</span> — they activate after the $7.5M seed raise closes.
+		20 projects remain <span class="font-medium text-slate-400">planned</span> — they activate after the $7.5M seed raise closes.
 		<a href="/dashboard/use-of-proceeds" class="text-primary hover:underline ml-1">View Use of Proceeds →</a>
 	</p>
 
