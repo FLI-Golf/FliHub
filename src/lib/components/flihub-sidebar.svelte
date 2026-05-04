@@ -42,7 +42,8 @@
 		PenLine,
 		ClipboardList,
 		BadgeCheck,
-		Zap
+		Zap,
+		Wallet
 	} from 'lucide-svelte';
 
 	type NavItem = {
@@ -188,6 +189,7 @@
 			iconActiveClass: 'text-amber-600 dark:text-amber-400',
 			roles: ['admin'],
 			items: [
+				{ title: 'Payments & Income', url: '/dashboard/payments', icon: Wallet, roles: ['admin'] },
 				{ title: 'Financial Projections', url: '/dashboard/financial-projections', icon: BarChart3, roles: ['admin'] },
 				{ title: 'Funding Model', url: '/dashboard/funding-model', icon: Landmark, roles: ['admin'] },
 				{ title: 'Use of Proceeds', url: '/dashboard/use-of-proceeds', icon: DollarSign, roles: ['admin'] },
