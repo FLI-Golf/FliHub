@@ -42,7 +42,8 @@
 		PenLine,
 		ClipboardList,
 		BadgeCheck,
-		Zap
+		Zap,
+		TrendingUp
 	} from 'lucide-svelte';
 
 	type NavItem = {
@@ -92,7 +93,8 @@
 			iconActiveClass: 'text-slate-700 dark:text-slate-200',
 			items: [
 				{ title: 'Dashboard', url: '/dashboard', icon: LayoutDashboard },
-				{ title: 'Active Projects', url: '/dashboard/active-projects', icon: Zap }
+				{ title: 'Active Projects', url: '/dashboard/active-projects', icon: Zap },
+				{ title: 'Active Income', url: '/dashboard/active-income', icon: TrendingUp }
 			]
 		},
 		{
