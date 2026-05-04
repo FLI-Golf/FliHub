@@ -242,7 +242,7 @@
 							</div>
 							<div class="flex items-center gap-3 shrink-0 ml-4">
 								{#if claim.referenceNumber}
-									<span class="text-xs font-mono text-slate-400 flex items-center gap-1"><Hash class="size-3" />{claim.referenceNumber}</span>
+									<span class="text-sm font-black font-mono text-emerald-400 bg-emerald-500/10 border border-emerald-500/30 px-2 py-0.5 rounded">{claim.referenceNumber}</span>
 								{/if}
 								<span class="font-bold text-emerald-400">{fmt(claim.totalAmount || 0)}</span>
 								<span class="text-[10px] px-2 py-0.5 rounded border font-medium {CLAIM_STATUS_COLORS[claim.status]}">{CLAIM_STATUS_LABELS[claim.status]}</span>
@@ -317,10 +317,12 @@
 								</div>
 							{/if}
 							{#if claim.referenceNumber}
-								<div class="p-3 rounded-lg bg-emerald-950/30 border border-emerald-800/40 text-xs text-emerald-300 flex items-center gap-2">
-									<Hash class="size-3.5" />
-									<span>Reference: <strong class="font-mono">{claim.referenceNumber}</strong></span>
-									{#if claim.paidDate}<span class="text-slate-400 ml-2">· Paid {fmtDate(claim.paidDate)}</span>{/if}
+								<div class="p-3 rounded-lg bg-emerald-950/30 border border-emerald-800/40 flex items-center gap-3">
+									<span class="text-lg font-black font-mono text-emerald-400">{claim.referenceNumber}</span>
+									<div class="text-xs text-emerald-300/70">
+										<p>QuickBooks reference — use this number when entering the payment in QB.</p>
+										{#if claim.paidDate}<p class="mt-0.5 text-slate-400">Paid {fmtDate(claim.paidDate)}</p>{/if}
+									</div>
 								</div>
 							{/if}
 
@@ -370,7 +372,7 @@
 						</div>
 						<div class="flex items-center gap-3 shrink-0 ml-4">
 							{#if claim.referenceNumber}
-								<span class="text-xs font-mono text-slate-400 flex items-center gap-1"><Hash class="size-3" />{claim.referenceNumber}</span>
+								<span class="text-sm font-black font-mono text-emerald-400 bg-emerald-500/10 border border-emerald-500/30 px-2 py-0.5 rounded">{claim.referenceNumber}</span>
 							{/if}
 							<span class="font-bold text-emerald-400">{fmt(claim.totalAmount || 0)}</span>
 							<span class="text-[10px] px-2 py-0.5 rounded border font-medium {CLAIM_STATUS_COLORS[claim.status]}">{CLAIM_STATUS_LABELS[claim.status]}</span>
