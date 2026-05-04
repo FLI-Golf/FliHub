@@ -92,7 +92,8 @@
 			iconActiveClass: 'text-slate-700 dark:text-slate-200',
 			items: [
 				{ title: 'Dashboard', url: '/dashboard', icon: LayoutDashboard },
-				{ title: 'Active Projects', url: '/dashboard/active-projects', icon: Zap }
+				{ title: 'Active Projects', url: '/dashboard/active-projects', icon: Zap },
+				{ title: 'Active Income', url: '/dashboard/active-income', icon: TrendingUp }
 			]
 		},
 		{
@@ -187,6 +188,7 @@
 			iconActiveClass: 'text-amber-600 dark:text-amber-400',
 			roles: ['admin'],
 			items: [
+				{ title: 'Payments & Income', url: '/dashboard/payments', icon: Wallet, roles: ['admin'] },
 				{ title: 'Financial Projections', url: '/dashboard/financial-projections', icon: BarChart3, roles: ['admin'] },
 				{ title: 'Funding Model', url: '/dashboard/funding-model', icon: Landmark, roles: ['admin'] },
 				{ title: 'Use of Proceeds', url: '/dashboard/use-of-proceeds', icon: DollarSign, roles: ['admin'] },

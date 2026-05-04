@@ -4,6 +4,7 @@
 	import { Button } from '$lib/components/ui/button';
 	import { ArrowLeft } from 'lucide-svelte';
 	import LeagueDashboard from '$lib/components/league/LeagueDashboard.svelte';
+	import TrademarkStatus from '$lib/components/trademarks/TrademarkStatus.svelte';
 	import type { PageData } from './$types';
 
 	export let data: PageData;
@@ -137,6 +138,11 @@
 				{/if}
 			</div>
 		</Card>
+
+		<!-- Trademark Protection -->
+		<div class="lg:col-span-2">
+			<TrademarkStatus filings={data.trademarkFilings ?? []} entityType="league" />
+		</div>
 
 		<!-- Financial Dashboard -->
 		<div class="lg:col-span-2">

@@ -2,7 +2,7 @@
 	import { invalidateAll } from '$app/navigation';
 	import Card from '$lib/components/ui/card.svelte';
 	import { Button } from '$lib/components/ui/button/index.js';
-	import { Plus, X, Receipt, CheckCircle2, Clock, AlertCircle, ChevronDown, ChevronRight, Pencil, Trash2, Send, DollarSign, Hash } from 'lucide-svelte';
+	import { Plus, X, Receipt, CheckCircle2, Clock, AlertCircle, ChevronDown, ChevronRight, Pencil, Trash2, Send, DollarSign, Hash, UserCircle, Building2, ShieldCheck } from 'lucide-svelte';
 	import type { PageData } from './$types';
 	import {
 		CLAIM_STATUS_LABELS, CLAIM_STATUS_COLORS, CLAIMANT_PIPELINE,
@@ -159,6 +159,39 @@
 		</Button>
 	</div>
 
+	<!-- Department info card -->
+	{#if data.reimbDept}
+	<div class="rounded-xl border border-emerald-500/20 bg-emerald-950/20 p-4">
+		<div class="flex items-start gap-4 flex-wrap">
+			<div class="flex items-center gap-3 min-w-0">
+				<div class="size-10 rounded-xl bg-emerald-500/15 flex items-center justify-center shrink-0">
+					<Building2 class="size-5 text-emerald-400" />
+				</div>
+				<div class="min-w-0">
+					<p class="text-xs font-bold uppercase tracking-wide text-emerald-400">Department</p>
+					<p class="text-sm font-bold text-white">{data.reimbDept.name}</p>
+					<p class="text-xs text-muted-foreground mt-0.5">{data.reimbDept.description}</p>
+				</div>
+			</div>
+			{#if data.cpa}
+			<div class="flex items-center gap-3 ml-auto shrink-0">
+				<div class="size-10 rounded-xl bg-violet-500/15 flex items-center justify-center shrink-0">
+					<UserCircle class="size-5 text-violet-400" />
+				</div>
+				<div>
+					<p class="text-xs font-bold uppercase tracking-wide text-violet-400">CPA / Department Head</p>
+					<p class="text-sm font-bold text-white">{data.cpa.firstName} {data.cpa.lastName}</p>
+					<div class="flex items-center gap-1.5 mt-0.5">
+						<ShieldCheck class="size-3 text-emerald-400" />
+						<a href="mailto:{data.cpa.email}" class="text-xs text-emerald-400 hover:underline">{data.cpa.email}</a>
+					</div>
+				</div>
+			</div>
+			{/if}
+		</div>
+	</div>
+	{/if}
+
 	<!-- Admin metrics -->
 	{#if data.isAdmin && data.metrics}
 	<div class="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -209,7 +242,7 @@
 							</div>
 							<div class="flex items-center gap-3 shrink-0 ml-4">
 								{#if claim.referenceNumber}
-									<span class="text-xs font-mono text-slate-400 flex items-center gap-1"><Hash class="size-3" />{claim.referenceNumber}</span>
+									<span class="text-sm font-black font-mono text-emerald-400 bg-emerald-500/10 border border-emerald-500/30 px-2 py-0.5 rounded">{claim.referenceNumber}</span>
 								{/if}
 								<span class="font-bold text-emerald-400">{fmt(claim.totalAmount || 0)}</span>
 								<span class="text-[10px] px-2 py-0.5 rounded border font-medium {CLAIM_STATUS_COLORS[claim.status]}">{CLAIM_STATUS_LABELS[claim.status]}</span>
@@ -284,10 +317,12 @@
 								</div>
 							{/if}
 							{#if claim.referenceNumber}
-								<div class="p-3 rounded-lg bg-emerald-950/30 border border-emerald-800/40 text-xs text-emerald-300 flex items-center gap-2">
-									<Hash class="size-3.5" />
-									<span>Reference: <strong class="font-mono">{claim.referenceNumber}</strong></span>
-									{#if claim.paidDate}<span class="text-slate-400 ml-2">· Paid {fmtDate(claim.paidDate)}</span>{/if}
+								<div class="p-3 rounded-lg bg-emerald-950/30 border border-emerald-800/40 flex items-center gap-3">
+									<span class="text-lg font-black font-mono text-emerald-400">{claim.referenceNumber}</span>
+									<div class="text-xs text-emerald-300/70">
+										<p>QuickBooks reference — use this number when entering the payment in QB.</p>
+										{#if claim.paidDate}<p class="mt-0.5 text-slate-400">Paid {fmtDate(claim.paidDate)}</p>{/if}
+									</div>
 								</div>
 							{/if}
 
@@ -337,7 +372,7 @@
 						</div>
 						<div class="flex items-center gap-3 shrink-0 ml-4">
 							{#if claim.referenceNumber}
-								<span class="text-xs font-mono text-slate-400 flex items-center gap-1"><Hash class="size-3" />{claim.referenceNumber}</span>
+								<span class="text-sm font-black font-mono text-emerald-400 bg-emerald-500/10 border border-emerald-500/30 px-2 py-0.5 rounded">{claim.referenceNumber}</span>
 							{/if}
 							<span class="font-bold text-emerald-400">{fmt(claim.totalAmount || 0)}</span>
 							<span class="text-[10px] px-2 py-0.5 rounded border font-medium {CLAIM_STATUS_COLORS[claim.status]}">{CLAIM_STATUS_LABELS[claim.status]}</span>

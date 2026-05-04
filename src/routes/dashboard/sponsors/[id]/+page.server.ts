@@ -12,7 +12,7 @@ export const load: PageServerLoad = async ({ locals, url, params }) => {
 
 	if (!sponsor) throw error(404, 'Sponsor not found');
 
-	const [payments, bridgeRecords, userProfiles] = await Promise.all([
+	const [payments, bridgeRecords, userProfiles, territories] = await Promise.all([
 		pb.collection('sponsor_payments')
 			.getFullList({ filter: `sponsor = "${params.id}"`, sort: '-dueDate' })
 			.catch(() => []),
@@ -21,10 +21,13 @@ export const load: PageServerLoad = async ({ locals, url, params }) => {
 			.catch(() => []),
 		pb.collection('user_profiles')
 			.getFullList({ filter: 'role = "leader" || role = "sales"', sort: 'firstName,lastName', fields: 'id,firstName,lastName,email' })
+			.catch(() => []),
+		pb.collection('franchise_territories')
+			.getFullList({ sort: 'name', fields: 'id,name,code,state,city,status' })
 			.catch(() => [])
 	]);
 
-	return { sponsor, payments, bridgeRecords, userProfiles };
+	return { sponsor, payments, bridgeRecords, userProfiles, territories };
 };
 
 export const actions: Actions = {
@@ -58,6 +61,34 @@ export const actions: Actions = {
 			return fail(500, { error: err?.message ?? 'Failed to update sponsor' });
 		}
 		throw redirect(303, `/dashboard/sponsors/${params.id}`);
+	},
+
+	assignTerritory: async ({ locals, url, params, request }) => {
+		const ctx = await RequestContext.from(locals, url);
+		const data = await request.formData();
+		const territory = (data.get('territory') as string | null)?.trim() || null;
+		try {
+			await ctx.pb.collection('sponsors').update(params.id, { territory: territory || '' });
+			return { success: true };
+		} catch (err: any) {
+			return fail(500, { error: err?.message ?? 'Failed to assign territory' });
+		}
+	},
+
+	assignRep: async ({ locals, url, params, request }) => {
+		const ctx = await RequestContext.from(locals, url);
+		const data = await request.formData();
+		const userId = data.get('userId') as string | null;
+		try {
+			const updated = await ctx.pb.collection('sponsors').update(
+				params.id,
+				{ assignedTo: userId || null },
+				{ expand: 'assignedTo' }
+			);
+			return { success: true, sponsor: updated };
+		} catch (err: any) {
+			return fail(500, { error: err?.message ?? 'Failed to assign rep' });
+		}
 	},
 
 	delete: async ({ locals, url, params }) => {

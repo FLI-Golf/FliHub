@@ -4,7 +4,7 @@
 	import { Button } from '$lib/components/ui/button';
 	import Card from '$lib/components/ui/card.svelte';
 	import type { PageData, ActionData } from './$types';
-	import { ArrowLeft, Pencil, Trash2, Plus, CheckCircle2, Clock, AlertCircle, DollarSign, Calendar, MapPin, Users, TrendingUp, X } from 'lucide-svelte';
+	import { ArrowLeft, Pencil, Trash2, Plus, CheckCircle2, Clock, AlertCircle, DollarSign, Calendar, MapPin, Users, TrendingUp, X, Upload, FileText, Image, Loader2 } from 'lucide-svelte';
 	import {
 		PIPELINE_STAGES, SPONSOR_STATUS_LABELS, SPONSOR_STATUS_COLORS,
 		SPONSOR_TIER_LABELS, SPONSOR_TIER_COLORS, SPONSOR_TIER_PRICING, isActivePayer,
@@ -28,12 +28,110 @@
 	const totalOverdue   = $derived(payments.filter((p: any) => p.status === 'overdue').reduce((sum: number, p: any) => sum + (p.amount || 0), 0));
 	const balance        = $derived((s?.annualCommitment || 0) - totalReceived);
 
+	// File uploads
+	let uploading = $state<'loiDocuments' | 'logo' | null>(null);
+	let uploadErr = $state('');
+
+	const PB_URL = 'https://pocketbase-production-6ab5.up.railway.app';
+
+	function fileUrl(filename: string) {
+		return `${PB_URL}/api/files/sponsors/${s?.id}/${filename}`;
+	}
+
+	async function handleUpload(field: 'loiDocuments' | 'logo', files: FileList | null) {
+		if (!files?.length || !s?.id) return;
+		uploading = field;
+		uploadErr = '';
+		try {
+			const fd = new FormData();
+			fd.append('field', field);
+			for (const f of Array.from(files)) fd.append('files', f);
+			const res = await fetch(`/api/sponsors/${s.id}/files`, { method: 'POST', body: fd });
+			if (!res.ok) { const d = await res.json(); throw new Error(d.message ?? 'Upload failed'); }
+			await invalidateAll();
+		} catch (e: any) {
+			uploadErr = e.message;
+		} finally {
+			uploading = null;
+		}
+	}
+
+	async function handleDelete(field: 'loiDocuments' | 'logo', filename: string) {
+		if (!s?.id) return;
+		const res = await fetch(`/api/sponsors/${s.id}/files?field=${field}&filename=${encodeURIComponent(filename)}`, { method: 'DELETE' });
+		if (res.ok) await invalidateAll();
+	}
+
+	function isImage(filename: string) {
+		return /\.(jpg|jpeg|png|webp|svg)$/i.test(filename);
+	}
+
 	// Pipeline stage index for progress bar
 	const stageIndex = $derived(PIPELINE_STAGES.indexOf(s?.status));
 
 	// UI state
-	let editing       = $state(false);
-	let showPayModal  = $state(false);
+	let editing          = $state(false);
+	let showPayModal     = $state(false);
+	let showRepModal     = $state(false);
+	let repSearch        = $state('');
+	let repLoading       = $state(false);
+	let repErr           = $state('');
+
+	const filteredReps = $derived(
+		(data.userProfiles ?? []).filter((u: any) => {
+			const q = repSearch.toLowerCase();
+			return !q || `${u.firstName} ${u.lastName} ${u.email}`.toLowerCase().includes(q);
+		})
+	);
+
+	// Territory modal
+	let showTerritoryModal = $state(false);
+	let territorySearch    = $state('');
+	let territoryLoading   = $state(false);
+	let territoryErr       = $state('');
+	let customTerritory    = $state('');
+
+	const filteredTerritories = $derived(
+		(data.territories ?? []).filter((t: any) => {
+			const q = territorySearch.toLowerCase();
+			return !q || `${t.name} ${t.code ?? ''} ${t.state ?? ''} ${t.city ?? ''}`.toLowerCase().includes(q);
+		})
+	);
+
+	async function assignTerritory(value: string | null) {
+		territoryLoading = true; territoryErr = '';
+		try {
+			const fd = new FormData();
+			if (value) fd.append('territory', value);
+			const res = await fetch('?/assignTerritory', { method: 'POST', body: fd });
+			if (!res.ok) throw new Error('Failed to assign territory');
+			await invalidateAll();
+			showTerritoryModal = false;
+			territorySearch = '';
+			customTerritory = '';
+		} catch (e: any) {
+			territoryErr = e.message;
+		} finally {
+			territoryLoading = false;
+		}
+	}
+
+	async function assignRep(userId: string | null) {
+		repLoading = true; repErr = '';
+		try {
+			const fd = new FormData();
+			if (userId) fd.append('userId', userId);
+			const res = await fetch('?/assignRep', { method: 'POST', body: fd });
+			if (!res.ok) throw new Error('Failed to assign rep');
+			await invalidateAll();
+			showRepModal = false;
+			repSearch = '';
+		} catch (e: any) {
+			repErr = e.message;
+		} finally {
+			repLoading = false;
+		}
+	}
 	let payErr        = $state('');
 	let payLoading    = $state(false);
 	let payForm = $state({ amount: '', paymentType: 'installment', status: 'scheduled', dueDate: '', receivedDate: '', year: '2026', invoiceNumber: '', notes: '' });
@@ -99,6 +197,107 @@
 	{#if form?.error}
 		<div class="rounded-lg border border-red-700 bg-red-900/30 px-4 py-3 text-sm text-red-300">{form.error}</div>
 	{/if}
+
+	<!-- Two-column layout when editing -->
+	<div class="{editing ? 'grid grid-cols-1 lg:grid-cols-[380px_1fr] gap-6 items-start' : 'space-y-6'}">
+
+	{#if editing}
+	<!-- Edit form — left column -->
+	<div class="lg:sticky lg:top-6">
+	<Card class="p-6 bg-slate-800/60 border-slate-700">
+		<h2 class="text-base font-semibold text-slate-100 mb-5 flex items-center gap-2"><Pencil class="size-4 text-slate-400" /> Edit Sponsor</h2>
+		<form method="POST" action="?/update" use:enhance class="space-y-4">
+			<div class="grid grid-cols-1 gap-3">
+				<div><label class={LABEL}>Company Name *</label><input name="companyName" required value={s?.companyName} class={INPUT} /></div>
+				<div class="grid grid-cols-2 gap-3">
+					<div><label class={LABEL}>Type</label>
+						<select name="type" class={INPUT}>
+							{#each ['corporate','casino','resort','hospitality','entertainment','media','technology','financial','other'] as t}
+								<option value={t} selected={s?.type === t}>{t.replace('_',' ')}</option>
+							{/each}
+						</select>
+					</div>
+					<div><label class={LABEL}>Tier</label>
+						<select name="tier" class={INPUT}>
+							{#each ['tier_1','tier_2','tier_3','tier_4'] as t}
+								<option value={t} selected={s?.tier === t}>{SPONSOR_TIER_LABELS[t]}</option>
+							{/each}
+						</select>
+					</div>
+				</div>
+				<div><label class={LABEL}>Pipeline Stage</label>
+					<select name="status" class={INPUT}>
+						{#each [...PIPELINE_STAGES, 'expired', 'converted_to_franchise', 'lost'] as st}
+							<option value={st} selected={s?.status === st}>{SPONSOR_STATUS_LABELS[st]}</option>
+						{/each}
+					</select>
+				</div>
+				<div><label class={LABEL}>Contact Name</label><input name="primaryContactName" value={s?.primaryContactName || ''} class={INPUT} /></div>
+				<div class="grid grid-cols-2 gap-3">
+					<div><label class={LABEL}>Email</label><input type="email" name="primaryContactEmail" value={s?.primaryContactEmail || ''} class={INPUT} /></div>
+					<div><label class={LABEL}>Phone</label><input name="primaryContactPhone" value={s?.primaryContactPhone || ''} class={INPUT} /></div>
+				</div>
+				<div class="grid grid-cols-2 gap-3">
+					<div><label class={LABEL}>Location</label><input name="location" value={s?.location || ''} class={INPUT} /></div>
+					<div><label class={LABEL}>Territory</label><input name="territory" value={s?.territory || ''} class={INPUT} /></div>
+				</div>
+				<div class="grid grid-cols-2 gap-3">
+					<div><label class={LABEL}>Annual Commitment ($)</label><input type="number" name="annualCommitment" value={s?.annualCommitment || ''} min="0" class={INPUT} /></div>
+					<div><label class={LABEL}>Close Probability (%)</label><input type="number" name="dealProbability" value={s?.dealProbability || ''} min="0" max="100" class={INPUT} /></div>
+				</div>
+				<div class="grid grid-cols-2 gap-3">
+					<div><label class={LABEL}>Contract Start</label><input type="date" name="contractStartDate" value={s?.contractStartDate?.slice(0,10) || ''} class={INPUT} /></div>
+					<div><label class={LABEL}>Contract End</label><input type="date" name="contractEndDate" value={s?.contractEndDate?.slice(0,10) || ''} class={INPUT} /></div>
+				</div>
+				<div class="grid grid-cols-2 gap-3">
+					<div><label class={LABEL}>Last Contact</label><input type="date" name="lastContactDate" value={s?.lastContactDate?.slice(0,10) || ''} class={INPUT} /></div>
+					<div><label class={LABEL}>Next Follow-Up</label><input type="date" name="nextFollowUpDate" value={s?.nextFollowUpDate?.slice(0,10) || ''} class={INPUT} /></div>
+				</div>
+				{#if data.userProfiles?.length}
+				<div><label class={LABEL}>Assigned Rep</label>
+					<select name="assignedTo" class={INPUT}>
+						<option value="">— Unassigned —</option>
+						{#each data.userProfiles as p}
+							<option value={p.id} selected={s?.assignedTo === p.id}>{p.firstName} {p.lastName}</option>
+						{/each}
+					</select>
+				</div>
+				{/if}
+				<div class="flex items-center gap-3 pt-1">
+					<input type="hidden" name="franchiseInterest" value="false" />
+					<input type="checkbox" id="fi" name="franchiseInterest" value="true" checked={s?.franchiseInterest} class="size-4 rounded border-slate-600 bg-slate-700 accent-emerald-500" />
+					<label for="fi" class="text-sm text-slate-300">Franchise Interest</label>
+				</div>
+				{#if s?.franchiseInterest}
+				<div class="grid grid-cols-2 gap-3 p-3 rounded-xl border border-violet-800/50 bg-violet-950/20">
+					<div>
+						<label class={LABEL}>Franchise Track Stage</label>
+						<select name="franchiseTrackStatus" class={INPUT}>
+							<option value="">— Not started —</option>
+							{#each FRANCHISE_TRACK_STAGES as stage}
+								<option value={stage} selected={s?.franchiseTrackStatus === stage}>{FRANCHISE_TRACK_LABELS[stage]}</option>
+							{/each}
+						</select>
+					</div>
+					<div>
+						<label class={LABEL}>Stage Entry Date</label>
+						<input type="date" name="franchiseTrackDate" value={s?.franchiseTrackDate?.slice(0,10) || ''} class={INPUT} />
+					</div>
+				</div>
+				{/if}
+				<div><label class={LABEL}>Notes</label><textarea name="notes" rows="4" class="{INPUT} resize-none">{s?.notes || ''}</textarea></div>
+			</div>
+			<div class="flex justify-end gap-2 pt-2">
+				<Button type="button" variant="outline" onclick={() => editing = false} class="border-slate-600 text-slate-300">Cancel</Button>
+				<Button type="submit" class="bg-emerald-600 hover:bg-emerald-700 text-white">Save Changes</Button>
+			</div>
+		</form>
+	</Card>
+	</div>
+	{/if}
+
+	<!-- Right column (or full width when not editing) -->
+	<div class="space-y-6">
 
 	<!-- Header card -->
 	<Card class="p-6 bg-slate-800/60 border-slate-700">
@@ -189,8 +388,21 @@
 				</div>
 				<div class="flex justify-between"><dt class="text-slate-400">Phone</dt><dd class="text-slate-100">{s?.primaryContactPhone || '—'}</dd></div>
 				<div class="flex justify-between"><dt class="text-slate-400">Location</dt><dd class="text-slate-100">{s?.location || '—'}</dd></div>
-				<div class="flex justify-between"><dt class="text-slate-400">Assigned Rep</dt>
-					<dd class="text-slate-100">{s?.expand?.assignedTo ? `${s.expand.assignedTo.firstName ?? ''} ${s.expand.assignedTo.lastName ?? ''}`.trim() || s.expand.assignedTo.email : '—'}</dd>
+				<div class="flex justify-between items-center">
+					<dt class="text-slate-400">Assigned Rep</dt>
+					<dd>
+						<button onclick={() => { showRepModal = true; repSearch = ''; }}
+							class="flex items-center gap-1.5 text-sm rounded-md px-2 py-0.5 -mr-2 transition-colors
+								{s?.expand?.assignedTo ? 'text-slate-100 hover:bg-slate-700' : 'text-emerald-400 hover:bg-emerald-900/30'}">
+							{#if s?.expand?.assignedTo}
+								<Users class="size-3.5 text-slate-400" />
+								{`${s.expand.assignedTo.firstName ?? ''} ${s.expand.assignedTo.lastName ?? ''}`.trim() || s.expand.assignedTo.email}
+							{:else}
+								<Plus class="size-3.5" />
+								Add Sales Rep
+							{/if}
+						</button>
+					</dd>
 				</div>
 			</dl>
 		</Card>
@@ -205,7 +417,22 @@
 				<div class="flex justify-between"><dt class="text-slate-400">Next Follow-Up</dt>
 					<dd class="{s?.nextFollowUpDate ? 'text-cyan-400 font-medium' : 'text-slate-100'}">{fmtDate(s?.nextFollowUpDate)}</dd>
 				</div>
-				<div class="flex justify-between"><dt class="text-slate-400">Territory</dt><dd class="text-slate-100">{s?.territory || '—'}</dd></div>
+				<div class="flex justify-between items-center">
+					<dt class="text-slate-400">Territory</dt>
+					<dd>
+						<button onclick={() => { showTerritoryModal = true; territorySearch = ''; customTerritory = s?.territory || ''; }}
+							class="flex items-center gap-1.5 text-sm rounded-md px-2 py-0.5 -mr-2 transition-colors
+								{s?.territory ? 'text-slate-100 hover:bg-slate-700' : 'text-emerald-400 hover:bg-emerald-900/30'}">
+							{#if s?.territory}
+								<MapPin class="size-3.5 text-slate-400" />
+								{s.territory}
+							{:else}
+								<Plus class="size-3.5" />
+								Add Territory
+							{/if}
+						</button>
+					</dd>
+				</div>
 			</dl>
 		</Card>
 	</div>
@@ -309,86 +536,112 @@
 	</Card>
 	{/if}
 
-	<!-- Edit form (inline) -->
-	{#if editing}
-	<Card class="p-6 bg-slate-800/60 border-slate-700">
-		<h2 class="text-lg font-semibold text-slate-100 mb-5">Edit Sponsor</h2>
-		<form method="POST" action="?/update" use:enhance class="space-y-4">
-			<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-				<div><label class={LABEL}>Company Name *</label><input name="companyName" required value={s?.companyName} class={INPUT} /></div>
-				<div><label class={LABEL}>Type</label>
-					<select name="type" class={INPUT}>
-						{#each ['corporate','casino','resort','hospitality','entertainment','media','technology','financial','other'] as t}
-							<option value={t} selected={s?.type === t}>{t.replace('_',' ')}</option>
-						{/each}
-					</select>
+	<!-- LOI Documents & Logo -->
+	<Card class="p-6 space-y-6">
+		<h2 class="text-base font-bold">Documents & Logo</h2>
+
+		{#if uploadErr}
+			<p class="text-xs text-red-400 bg-red-950/30 border border-red-800/40 rounded px-3 py-2">{uploadErr}</p>
+		{/if}
+
+		<!-- LOI Documents -->
+		<div class="space-y-3">
+			<div class="flex items-center justify-between">
+				<div>
+					<p class="text-sm font-semibold">Letter of Intent</p>
+					<p class="text-xs text-muted-foreground">Upload signed LOI documents — PDF or image</p>
 				</div>
-				<div><label class={LABEL}>Tier</label>
-					<select name="tier" class={INPUT}>
-						{#each ['tier_1','tier_2','tier_3','tier_4'] as t}
-							<option value={t} selected={s?.tier === t}>{SPONSOR_TIER_LABELS[t]}</option>
-						{/each}
-					</select>
-				</div>
-				<div><label class={LABEL}>Pipeline Stage</label>
-					<select name="status" class={INPUT}>
-						{#each [...PIPELINE_STAGES, 'expired', 'converted_to_franchise', 'lost'] as st}
-							<option value={st} selected={s?.status === st}>{SPONSOR_STATUS_LABELS[st]}</option>
-						{/each}
-					</select>
-				</div>
-				<div><label class={LABEL}>Contact Name</label><input name="primaryContactName" value={s?.primaryContactName || ''} class={INPUT} /></div>
-				<div><label class={LABEL}>Contact Email</label><input type="email" name="primaryContactEmail" value={s?.primaryContactEmail || ''} class={INPUT} /></div>
-				<div><label class={LABEL}>Phone</label><input name="primaryContactPhone" value={s?.primaryContactPhone || ''} class={INPUT} /></div>
-				<div><label class={LABEL}>Location</label><input name="location" value={s?.location || ''} class={INPUT} /></div>
-				<div><label class={LABEL}>Territory</label><input name="territory" value={s?.territory || ''} class={INPUT} /></div>
-				<div><label class={LABEL}>Annual Commitment ($)</label><input type="number" name="annualCommitment" value={s?.annualCommitment || ''} min="0" class={INPUT} /></div>
-				<div><label class={LABEL}>Close Probability (%)</label><input type="number" name="dealProbability" value={s?.dealProbability || ''} min="0" max="100" class={INPUT} /></div>
-				<div><label class={LABEL}>Contract Start</label><input type="date" name="contractStartDate" value={s?.contractStartDate?.slice(0,10) || ''} class={INPUT} /></div>
-				<div><label class={LABEL}>Contract End</label><input type="date" name="contractEndDate" value={s?.contractEndDate?.slice(0,10) || ''} class={INPUT} /></div>
-				<div><label class={LABEL}>Last Contact</label><input type="date" name="lastContactDate" value={s?.lastContactDate?.slice(0,10) || ''} class={INPUT} /></div>
-				<div><label class={LABEL}>Next Follow-Up</label><input type="date" name="nextFollowUpDate" value={s?.nextFollowUpDate?.slice(0,10) || ''} class={INPUT} /></div>
-				{#if data.userProfiles?.length}
-				<div><label class={LABEL}>Assigned Rep</label>
-					<select name="assignedTo" class={INPUT}>
-						<option value="">— Unassigned —</option>
-						{#each data.userProfiles as p}
-							<option value={p.id} selected={s?.assignedTo === p.id}>{p.firstName} {p.lastName}</option>
-						{/each}
-					</select>
-				</div>
-				{/if}
-				<div class="flex items-center gap-3 pt-4">
-					<input type="hidden" name="franchiseInterest" value="false" />
-					<input type="checkbox" id="fi" name="franchiseInterest" value="true" checked={s?.franchiseInterest} class="size-4 rounded border-slate-600 bg-slate-700 accent-emerald-500" />
-					<label for="fi" class="text-sm text-slate-300">Franchise Interest</label>
-				</div>
-				{#if s?.franchiseInterest}
-				<div class="md:col-span-2 grid grid-cols-2 gap-3 p-3 rounded-xl border border-violet-800/50 bg-violet-950/20">
-					<div>
-						<label class={LABEL}>Franchise Track Stage</label>
-						<select name="franchiseTrackStatus" class={INPUT}>
-							<option value="">— Not started —</option>
-							{#each FRANCHISE_TRACK_STAGES as stage}
-								<option value={stage} selected={s?.franchiseTrackStatus === stage}>{FRANCHISE_TRACK_LABELS[stage]}</option>
-							{/each}
-						</select>
-					</div>
-					<div>
-						<label class={LABEL}>Stage Entry Date</label>
-						<input type="date" name="franchiseTrackDate" value={s?.franchiseTrackDate?.slice(0,10) || ''} class={INPUT} />
-					</div>
-				</div>
-				{/if}
-				<div class="md:col-span-2"><label class={LABEL}>Notes</label><textarea name="notes" rows="4" class="{INPUT} resize-none">{s?.notes || ''}</textarea></div>
+				<label class="cursor-pointer">
+					<input type="file" accept=".pdf,image/*" multiple class="hidden"
+						onchange={(e) => handleUpload('loiDocuments', (e.target as HTMLInputElement).files)} />
+					<span class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium
+						bg-blue-600 hover:bg-blue-700 text-white transition-colors">
+						{#if uploading === 'loiDocuments'}
+							<Loader2 class="size-3.5 animate-spin" /> Uploading…
+						{:else}
+							<Upload class="size-3.5" /> Upload LOI
+						{/if}
+					</span>
+				</label>
 			</div>
-			<div class="flex justify-end gap-2 pt-2">
-				<Button type="button" variant="outline" onclick={() => editing = false} class="border-slate-600 text-slate-300">Cancel</Button>
-				<Button type="submit" class="bg-emerald-600 hover:bg-emerald-700 text-white">Save Changes</Button>
+
+			{#if s?.loiDocuments?.length}
+				<div class="grid grid-cols-2 sm:grid-cols-3 gap-3">
+					{#each s.loiDocuments as filename}
+						<div class="group relative rounded-lg border border-slate-700 bg-slate-800/60 overflow-hidden">
+							{#if isImage(filename)}
+								<img src={fileUrl(filename)} alt={filename}
+									class="w-full h-28 object-cover" />
+							{:else}
+								<div class="w-full h-28 flex flex-col items-center justify-center gap-2 bg-slate-800">
+									<FileText class="size-8 text-blue-400" />
+									<p class="text-[10px] text-slate-400 px-2 text-center truncate w-full">{filename}</p>
+								</div>
+							{/if}
+							<div class="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+								<a href={fileUrl(filename)} target="_blank"
+									class="px-2 py-1 rounded bg-blue-600 hover:bg-blue-700 text-white text-[10px] font-medium">
+									View
+								</a>
+								<button onclick={() => handleDelete('loiDocuments', filename)}
+									class="px-2 py-1 rounded bg-red-600 hover:bg-red-700 text-white text-[10px] font-medium">
+									Remove
+								</button>
+							</div>
+						</div>
+					{/each}
+				</div>
+			{:else}
+				<div class="flex items-center gap-3 p-4 rounded-lg border border-dashed border-slate-700 text-muted-foreground">
+					<FileText class="size-5 shrink-0" />
+					<p class="text-xs">No LOI documents uploaded yet.</p>
+				</div>
+			{/if}
+		</div>
+
+		<!-- Logo -->
+		<div class="space-y-3 pt-4 border-t border-slate-700/60">
+			<div class="flex items-center justify-between">
+				<div>
+					<p class="text-sm font-semibold">Sponsor Logo</p>
+					<p class="text-xs text-muted-foreground">PNG, JPG, WebP, or SVG</p>
+				</div>
+				<label class="cursor-pointer">
+					<input type="file" accept="image/*" class="hidden"
+						onchange={(e) => handleUpload('logo', (e.target as HTMLInputElement).files)} />
+					<span class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium
+						bg-violet-600 hover:bg-violet-700 text-white transition-colors">
+						{#if uploading === 'logo'}
+							<Loader2 class="size-3.5 animate-spin" /> Uploading…
+						{:else}
+							<Image class="size-3.5" /> Upload Logo
+						{/if}
+					</span>
+				</label>
 			</div>
-		</form>
+
+			{#if s?.logo}
+				<div class="group relative inline-block rounded-xl border border-slate-700 bg-slate-800/60 overflow-hidden">
+					<img src={fileUrl(s.logo)} alt="{s.companyName} logo"
+						class="h-24 w-auto object-contain p-3" />
+					<div class="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+						<button onclick={() => handleDelete('logo', s.logo)}
+							class="px-2 py-1 rounded bg-red-600 hover:bg-red-700 text-white text-[10px] font-medium">
+							Remove
+						</button>
+					</div>
+				</div>
+			{:else}
+				<div class="flex items-center gap-3 p-4 rounded-lg border border-dashed border-slate-700 text-muted-foreground">
+					<Image class="size-5 shrink-0" />
+					<p class="text-xs">No logo uploaded yet.</p>
+				</div>
+			{/if}
+		</div>
 	</Card>
-	{/if}
+
+	</div> <!-- end right column -->
+	</div> <!-- end two-column wrapper -->
 
 </div>
 
@@ -442,6 +695,187 @@
 				</Button>
 			</div>
 		</form>
+	</div>
+</div>
+{/if}
+
+<!-- Assign Territory Modal -->
+{#if showTerritoryModal}
+<div class="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4"
+	role="dialog" aria-modal="true" aria-label="Assign Territory">
+	<div class="bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl w-full max-w-md flex flex-col max-h-[80vh]">
+
+		<!-- Header -->
+		<div class="flex items-center justify-between p-5 border-b border-slate-700 shrink-0">
+			<div>
+				<h2 class="text-base font-semibold text-slate-100">Assign Territory</h2>
+				<p class="text-xs text-slate-400 mt-0.5">{s?.companyName}</p>
+			</div>
+			<button onclick={() => { showTerritoryModal = false; territorySearch = ''; }}
+				class="text-slate-400 hover:text-slate-100 transition-colors" aria-label="Close">
+				<X class="size-5" />
+			</button>
+		</div>
+
+		<!-- Search -->
+		<div class="p-4 border-b border-slate-800 shrink-0">
+			<input bind:value={territorySearch} type="search" placeholder="Search territories…"
+				class="w-full rounded-lg border border-slate-600 bg-slate-800 text-slate-100 px-3 py-2 text-sm
+					focus:outline-none focus:ring-2 focus:ring-emerald-500 placeholder:text-slate-500" />
+		</div>
+
+		<!-- Territory list -->
+		<div class="overflow-y-auto flex-1 p-2">
+			{#if territoryErr}
+				<p class="text-sm text-red-400 px-3 py-2">{territoryErr}</p>
+			{/if}
+
+			<!-- Remove assignment -->
+			{#if s?.territory}
+				<button onclick={() => assignTerritory(null)} disabled={territoryLoading}
+					class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-left text-sm
+						text-slate-400 hover:bg-slate-800 hover:text-slate-200 transition-colors disabled:opacity-50">
+					<div class="size-8 rounded-full bg-slate-700 flex items-center justify-center shrink-0">
+						<X class="size-3.5 text-slate-400" />
+					</div>
+					<span>Remove territory</span>
+				</button>
+				<div class="border-t border-slate-800 my-1"></div>
+			{/if}
+
+			{#if filteredTerritories.length === 0 && !territorySearch}
+				<p class="text-sm text-slate-500 italic px-3 py-4 text-center">No territories found</p>
+			{:else if filteredTerritories.length === 0}
+				<!-- No match — offer to save the search string as a custom value -->
+				<p class="text-sm text-slate-500 italic px-3 py-2 text-center">No match — use as custom territory?</p>
+				<button onclick={() => assignTerritory(territorySearch)} disabled={territoryLoading}
+					class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-left hover:bg-slate-800 transition-colors disabled:opacity-50">
+					<div class="size-8 rounded-full bg-emerald-900/40 border border-emerald-700/40 flex items-center justify-center shrink-0">
+						<Plus class="size-3.5 text-emerald-400" />
+					</div>
+					<div>
+						<p class="text-sm font-medium text-emerald-300">"{territorySearch}"</p>
+						<p class="text-xs text-slate-500">Save as custom territory</p>
+					</div>
+				</button>
+			{:else}
+				{#each filteredTerritories as t (t.id)}
+					{@const isAssigned = s?.territory === t.name}
+					<button onclick={() => assignTerritory(t.name)} disabled={territoryLoading || isAssigned}
+						class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-left transition-colors
+							disabled:cursor-default
+							{isAssigned ? 'bg-emerald-900/20 border border-emerald-700/40' : 'hover:bg-slate-800'}">
+						<div class="size-8 rounded-full bg-slate-700 flex items-center justify-center shrink-0">
+							<MapPin class="size-3.5 {isAssigned ? 'text-emerald-400' : 'text-slate-400'}" />
+						</div>
+						<div class="flex-1 min-w-0">
+							<p class="text-sm font-medium {isAssigned ? 'text-emerald-300' : 'text-slate-100'} truncate">
+								{t.name}{t.code ? ` · ${t.code}` : ''}
+							</p>
+							<p class="text-xs text-slate-500 truncate">
+								{[t.city, t.state].filter(Boolean).join(', ') || '—'}
+								{#if t.status && t.status !== 'available'}
+									· <span class="text-amber-400">{t.status}</span>
+								{/if}
+							</p>
+						</div>
+						{#if isAssigned}
+							<CheckCircle2 class="size-4 text-emerald-400 shrink-0" />
+						{/if}
+					</button>
+				{/each}
+			{/if}
+		</div>
+
+		<!-- Footer -->
+		<div class="p-4 border-t border-slate-800 shrink-0">
+			<Button type="button" variant="outline" onclick={() => { showTerritoryModal = false; territorySearch = ''; }}
+				class="w-full border-slate-600 text-slate-300">
+				Cancel
+			</Button>
+		</div>
+	</div>
+</div>
+{/if}
+
+<!-- Assign Sales Rep Modal -->
+{#if showRepModal}
+<div class="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4"
+	role="dialog" aria-modal="true" aria-label="Assign Sales Representative">
+	<div class="bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl w-full max-w-md flex flex-col max-h-[80vh]">
+
+		<!-- Header -->
+		<div class="flex items-center justify-between p-5 border-b border-slate-700 shrink-0">
+			<div>
+				<h2 class="text-base font-semibold text-slate-100">Assign Sales Representative</h2>
+				<p class="text-xs text-slate-400 mt-0.5">{s?.companyName}</p>
+			</div>
+			<button onclick={() => { showRepModal = false; repSearch = ''; }}
+				class="text-slate-400 hover:text-slate-100 transition-colors" aria-label="Close">
+				<X class="size-5" />
+			</button>
+		</div>
+
+		<!-- Search -->
+		<div class="p-4 border-b border-slate-800 shrink-0">
+			<input bind:value={repSearch} type="search" placeholder="Search by name or email…"
+				class="w-full rounded-lg border border-slate-600 bg-slate-800 text-slate-100 px-3 py-2 text-sm
+					focus:outline-none focus:ring-2 focus:ring-emerald-500 placeholder:text-slate-500" />
+		</div>
+
+		<!-- Rep list -->
+		<div class="overflow-y-auto flex-1 p-2">
+			{#if repErr}
+				<p class="text-sm text-red-400 px-3 py-2">{repErr}</p>
+			{/if}
+
+			<!-- Unassign option (only shown when someone is currently assigned) -->
+			{#if s?.assignedTo}
+				<button onclick={() => assignRep(null)} disabled={repLoading}
+					class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-left text-sm
+						text-slate-400 hover:bg-slate-800 hover:text-slate-200 transition-colors disabled:opacity-50">
+					<div class="size-8 rounded-full bg-slate-700 flex items-center justify-center shrink-0">
+						<X class="size-3.5 text-slate-400" />
+					</div>
+					<span>Remove assignment</span>
+				</button>
+				<div class="border-t border-slate-800 my-1"></div>
+			{/if}
+
+			{#if filteredReps.length === 0}
+				<p class="text-sm text-slate-500 italic px-3 py-4 text-center">No reps found</p>
+			{:else}
+				{#each filteredReps as rep (rep.id)}
+					{@const isAssigned = s?.assignedTo === rep.id}
+					<button onclick={() => assignRep(rep.id)} disabled={repLoading || isAssigned}
+						class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-left transition-colors
+							disabled:cursor-default
+							{isAssigned ? 'bg-emerald-900/20 border border-emerald-700/40' : 'hover:bg-slate-800'}">
+						<!-- Avatar initials -->
+						<div class="size-8 rounded-full bg-slate-700 flex items-center justify-center shrink-0 text-xs font-semibold text-slate-300">
+							{(rep.firstName?.[0] ?? '').toUpperCase()}{(rep.lastName?.[0] ?? '').toUpperCase()}
+						</div>
+						<div class="flex-1 min-w-0">
+							<p class="text-sm font-medium {isAssigned ? 'text-emerald-300' : 'text-slate-100'} truncate">
+								{rep.firstName} {rep.lastName}
+							</p>
+							<p class="text-xs text-slate-500 truncate">{rep.email}</p>
+						</div>
+						{#if isAssigned}
+							<CheckCircle2 class="size-4 text-emerald-400 shrink-0" />
+						{/if}
+					</button>
+				{/each}
+			{/if}
+		</div>
+
+		<!-- Footer -->
+		<div class="p-4 border-t border-slate-800 shrink-0">
+			<Button type="button" variant="outline" onclick={() => { showRepModal = false; repSearch = ''; }}
+				class="w-full border-slate-600 text-slate-300">
+				Cancel
+			</Button>
+		</div>
 	</div>
 </div>
 {/if}

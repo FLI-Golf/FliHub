@@ -32,6 +32,19 @@ export const TrademarkClassEnum = z.enum([
 	'other'
 ]);
 
+// Whether this filing covers a franchise, the league, or both
+export const EntityTypeEnum = z.enum([
+	'franchise', // Filing belongs to a specific franchise
+	'league',    // Filing belongs to the league entity
+	'both'       // Filing covers both (e.g. shared word mark)
+]);
+
+export const ENTITY_TYPE_LABELS: Record<string, string> = {
+	franchise: 'Franchise',
+	league:    'League',
+	both:      'League + All Franchises'
+};
+
 // Which logo variant this filing covers (mirrors franchises collection fields)
 export const LogoVariantEnum = z.enum([
 	'none',        // Word mark — no logo
@@ -106,7 +119,8 @@ export const TRADEMARK_PIPELINE: Array<z.infer<typeof TrademarkStatusEnum>> = [
 
 export const TrademarkFilingSchema = z.object({
 	id:               z.string().optional(),
-	franchiseId:      z.string().min(1),          // relation → franchises
+	franchiseId:      z.string().min(1),          // relation → franchises or league
+	entityType:       EntityTypeEnum.default('franchise'), // what this filing covers
 	markType:         MarkTypeEnum,
 	logoVariant:      LogoVariantEnum.default('none'),
 	trademarkClass:   TrademarkClassEnum.default('ic_041'),
@@ -124,6 +138,13 @@ export const TrademarkFilingSchema = z.object({
 	otherFees:        z.number().min(0).optional(), // Search, office action responses, etc.
 	feeNotes:         z.string().max(1000).optional(),
 	billingGroupId:   z.string().optional(),        // relation → trademark_billing_groups
+	// ── Attorney review history ───────────────────────────────────────────────
+	// Append-only array — one entry each time status moves to attorney_review
+	reviewHistory: z.array(z.object({
+		date:   z.string(),           // ISO date stamp
+		reason: z.string().optional(), // e.g. 'initial_clearance', 'office_action', 'renewal'
+		notes:  z.string().optional(), // free text from the user
+	})).optional(),
 	// ── Notes ─────────────────────────────────────────────────────────────────
 	attorneyNotes:    z.string().max(5000).optional(),
 	internalNotes:    z.string().max(5000).optional(),
@@ -228,6 +249,7 @@ export const TrademarkExpenseSchema = z.object({
 
 export type TrademarkStatus         = z.infer<typeof TrademarkStatusEnum>;
 export type MarkType                = z.infer<typeof MarkTypeEnum>;
+export type EntityType              = z.infer<typeof EntityTypeEnum>;
 export type TrademarkFiling         = z.infer<typeof TrademarkFilingSchema>;
 export type LogoVariant             = z.infer<typeof LogoVariantEnum>;
 export type TrademarkBillingGroup   = z.infer<typeof TrademarkBillingGroupSchema>;
