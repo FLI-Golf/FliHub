@@ -62,6 +62,10 @@
 	const pendingSponsorPmts = $derived(
 		sponsorPmts.filter((p: any) => p.status !== 'received' && p.status !== 'paid')
 	);
+
+	const netPosition = $derived(
+		(metrics?.totalIncoming ?? 0) - (metrics?.totalOutgoing ?? 0)
+	);
 </script>
 
 <svelte:head><title>Payments & Income — FliHub</title></svelte:head>
@@ -338,8 +342,7 @@
 					<div class="h-px bg-slate-700 my-1"></div>
 					<div class="flex justify-between">
 						<span class="font-semibold">Net</span>
-						{@const net = (metrics?.totalIncoming ?? 0) - (metrics?.totalOutgoing ?? 0)}
-						<span class="font-black {net >= 0 ? 'text-emerald-400' : 'text-red-400'}">{fmt(net)}</span>
+						<span class="font-black {netPosition >= 0 ? 'text-emerald-400' : 'text-red-400'}">{fmt(netPosition)}</span>
 					</div>
 					<div class="h-px bg-slate-700 my-1"></div>
 					<div class="flex justify-between text-xs">
