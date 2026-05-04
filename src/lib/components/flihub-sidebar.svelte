@@ -42,8 +42,7 @@
 		PenLine,
 		ClipboardList,
 		BadgeCheck,
-		Zap,
-		Wallet
+		Zap
 	} from 'lucide-svelte';
 
 	type NavItem = {
