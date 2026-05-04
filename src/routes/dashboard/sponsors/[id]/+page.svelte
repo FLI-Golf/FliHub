@@ -4,7 +4,7 @@
 	import { Button } from '$lib/components/ui/button';
 	import Card from '$lib/components/ui/card.svelte';
 	import type { PageData, ActionData } from './$types';
-	import { ArrowLeft, Pencil, Trash2, Plus, CheckCircle2, Clock, AlertCircle, DollarSign, Calendar, MapPin, Users, TrendingUp, X } from 'lucide-svelte';
+	import { ArrowLeft, Pencil, Trash2, Plus, CheckCircle2, Clock, AlertCircle, DollarSign, Calendar, MapPin, Users, TrendingUp, X, Upload, FileText, Image, Loader2 } from 'lucide-svelte';
 	import {
 		PIPELINE_STAGES, SPONSOR_STATUS_LABELS, SPONSOR_STATUS_COLORS,
 		SPONSOR_TIER_LABELS, SPONSOR_TIER_COLORS, SPONSOR_TIER_PRICING, isActivePayer,
@@ -27,6 +27,44 @@
 	const totalScheduled = $derived(payments.filter((p: any) => p.status === 'scheduled' || p.status === 'invoiced').reduce((sum: number, p: any) => sum + (p.amount || 0), 0));
 	const totalOverdue   = $derived(payments.filter((p: any) => p.status === 'overdue').reduce((sum: number, p: any) => sum + (p.amount || 0), 0));
 	const balance        = $derived((s?.annualCommitment || 0) - totalReceived);
+
+	// File uploads
+	let uploading = $state<'loiDocuments' | 'logo' | null>(null);
+	let uploadErr = $state('');
+
+	const PB_URL = 'https://pocketbase-production-6ab5.up.railway.app';
+
+	function fileUrl(filename: string) {
+		return `${PB_URL}/api/files/sponsors/${s?.id}/${filename}`;
+	}
+
+	async function handleUpload(field: 'loiDocuments' | 'logo', files: FileList | null) {
+		if (!files?.length || !s?.id) return;
+		uploading = field;
+		uploadErr = '';
+		try {
+			const fd = new FormData();
+			fd.append('field', field);
+			for (const f of Array.from(files)) fd.append('files', f);
+			const res = await fetch(`/api/sponsors/${s.id}/files`, { method: 'POST', body: fd });
+			if (!res.ok) { const d = await res.json(); throw new Error(d.message ?? 'Upload failed'); }
+			await invalidateAll();
+		} catch (e: any) {
+			uploadErr = e.message;
+		} finally {
+			uploading = null;
+		}
+	}
+
+	async function handleDelete(field: 'loiDocuments' | 'logo', filename: string) {
+		if (!s?.id) return;
+		const res = await fetch(`/api/sponsors/${s.id}/files?field=${field}&filename=${encodeURIComponent(filename)}`, { method: 'DELETE' });
+		if (res.ok) await invalidateAll();
+	}
+
+	function isImage(filename: string) {
+		return /\.(jpg|jpeg|png|webp|svg)$/i.test(filename);
+	}
 
 	// Pipeline stage index for progress bar
 	const stageIndex = $derived(PIPELINE_STAGES.indexOf(s?.status));
@@ -389,6 +427,110 @@
 		</form>
 	</Card>
 	{/if}
+
+	<!-- LOI Documents & Logo -->
+	<Card class="p-6 space-y-6">
+		<h2 class="text-base font-bold">Documents & Logo</h2>
+
+		{#if uploadErr}
+			<p class="text-xs text-red-400 bg-red-950/30 border border-red-800/40 rounded px-3 py-2">{uploadErr}</p>
+		{/if}
+
+		<!-- LOI Documents -->
+		<div class="space-y-3">
+			<div class="flex items-center justify-between">
+				<div>
+					<p class="text-sm font-semibold">Letter of Intent</p>
+					<p class="text-xs text-muted-foreground">Upload signed LOI documents — PDF or image</p>
+				</div>
+				<label class="cursor-pointer">
+					<input type="file" accept=".pdf,image/*" multiple class="hidden"
+						onchange={(e) => handleUpload('loiDocuments', (e.target as HTMLInputElement).files)} />
+					<span class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium
+						bg-blue-600 hover:bg-blue-700 text-white transition-colors">
+						{#if uploading === 'loiDocuments'}
+							<Loader2 class="size-3.5 animate-spin" /> Uploading…
+						{:else}
+							<Upload class="size-3.5" /> Upload LOI
+						{/if}
+					</span>
+				</label>
+			</div>
+
+			{#if s?.loiDocuments?.length}
+				<div class="grid grid-cols-2 sm:grid-cols-3 gap-3">
+					{#each s.loiDocuments as filename}
+						<div class="group relative rounded-lg border border-slate-700 bg-slate-800/60 overflow-hidden">
+							{#if isImage(filename)}
+								<img src={fileUrl(filename)} alt={filename}
+									class="w-full h-28 object-cover" />
+							{:else}
+								<div class="w-full h-28 flex flex-col items-center justify-center gap-2 bg-slate-800">
+									<FileText class="size-8 text-blue-400" />
+									<p class="text-[10px] text-slate-400 px-2 text-center truncate w-full">{filename}</p>
+								</div>
+							{/if}
+							<div class="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+								<a href={fileUrl(filename)} target="_blank"
+									class="px-2 py-1 rounded bg-blue-600 hover:bg-blue-700 text-white text-[10px] font-medium">
+									View
+								</a>
+								<button onclick={() => handleDelete('loiDocuments', filename)}
+									class="px-2 py-1 rounded bg-red-600 hover:bg-red-700 text-white text-[10px] font-medium">
+									Remove
+								</button>
+							</div>
+						</div>
+					{/each}
+				</div>
+			{:else}
+				<div class="flex items-center gap-3 p-4 rounded-lg border border-dashed border-slate-700 text-muted-foreground">
+					<FileText class="size-5 shrink-0" />
+					<p class="text-xs">No LOI documents uploaded yet.</p>
+				</div>
+			{/if}
+		</div>
+
+		<!-- Logo -->
+		<div class="space-y-3 pt-4 border-t border-slate-700/60">
+			<div class="flex items-center justify-between">
+				<div>
+					<p class="text-sm font-semibold">Sponsor Logo</p>
+					<p class="text-xs text-muted-foreground">PNG, JPG, WebP, or SVG</p>
+				</div>
+				<label class="cursor-pointer">
+					<input type="file" accept="image/*" class="hidden"
+						onchange={(e) => handleUpload('logo', (e.target as HTMLInputElement).files)} />
+					<span class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium
+						bg-violet-600 hover:bg-violet-700 text-white transition-colors">
+						{#if uploading === 'logo'}
+							<Loader2 class="size-3.5 animate-spin" /> Uploading…
+						{:else}
+							<Image class="size-3.5" /> Upload Logo
+						{/if}
+					</span>
+				</label>
+			</div>
+
+			{#if s?.logo}
+				<div class="group relative inline-block rounded-xl border border-slate-700 bg-slate-800/60 overflow-hidden">
+					<img src={fileUrl(s.logo)} alt="{s.companyName} logo"
+						class="h-24 w-auto object-contain p-3" />
+					<div class="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+						<button onclick={() => handleDelete('logo', s.logo)}
+							class="px-2 py-1 rounded bg-red-600 hover:bg-red-700 text-white text-[10px] font-medium">
+							Remove
+						</button>
+					</div>
+				</div>
+			{:else}
+				<div class="flex items-center gap-3 p-4 rounded-lg border border-dashed border-slate-700 text-muted-foreground">
+					<Image class="size-5 shrink-0" />
+					<p class="text-xs">No logo uploaded yet.</p>
+				</div>
+			{/if}
+		</div>
+	</Card>
 
 </div>
 
