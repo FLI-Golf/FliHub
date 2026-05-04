@@ -2,10 +2,10 @@ import { RequestContext } from '$lib/infra/RequestContext';
 import type { PageServerLoad } from './$types';
 import { error } from '@sveltejs/kit';
 
-export const load: PageServerLoad = async ({ params, locals }) => {
+export const load: PageServerLoad = async ({ params, locals, url }) => {
 	const ctx = await RequestContext.from(locals, url);
-	const { pb, userId, profile: userProfile, role } = ctx;
-		
+	const { pb } = ctx;
+
 	try {
 		const [league, franchises, deals, opportunities, sponsors, expenses] = await Promise.all([
 			pb.collection('league').getFirstListItem(`slug="${params.slug}"`, {
@@ -18,13 +18,24 @@ export const load: PageServerLoad = async ({ params, locals }) => {
 			pb.collection('expenses').getFullList()
 		]);
 
+		// Trademark filings for the league entity + filings marked 'both'
+		// (soft-fail if collection missing)
+		let trademarkFilings: any[] = [];
+		try {
+			trademarkFilings = await pb.collection('trademark_filings').getFullList({
+				filter: `franchiseId = "${league.id}" || entityType = "both"`,
+				sort:   'trademarkClass,markType'
+			});
+		} catch { /* collection not yet created */ }
+
 		return {
 			league,
 			franchises,
 			deals,
 			opportunities,
 			sponsors,
-			expenses
+			expenses,
+			trademarkFilings
 		};
 	} catch (err) {
 		throw error(404, 'League not found');

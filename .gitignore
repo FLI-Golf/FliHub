@@ -30,3 +30,6 @@ Thumbs.db
 # PocketBase data (if running locally)
 pb_data/
 pb_migrations/
+
+# Generated PDF artifacts
+trademark-pdfs/

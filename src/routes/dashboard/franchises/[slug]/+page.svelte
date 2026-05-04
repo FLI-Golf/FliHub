@@ -5,6 +5,7 @@
 	import { Button } from '$lib/components/ui/button/index.js';
 	import { Separator } from '$lib/components/ui/separator/index.js';
 	import { ArrowLeft, Download, ExternalLink } from 'lucide-svelte';
+	import TrademarkStatus from '$lib/components/trademarks/TrademarkStatus.svelte';
 	
 	export let data: PageData;
 	
@@ -306,6 +307,9 @@
 			</div>
 		</Card>
 	{/if}
+
+	<!-- Trademark Protection -->
+	<TrademarkStatus filings={data.trademarkFilings ?? []} entityType="franchise" />
 
 	<!-- Description -->
 	{#if franchise.description}

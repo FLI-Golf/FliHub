@@ -19,8 +19,20 @@ export const load: PageServerLoad = async ({ locals, url, params }) => {
 			throw error(404, 'Franchise not found');
 		}
 
+		const franchise = franchises[0];
+
+		// Trademark filings for this franchise (soft-fail if collection missing)
+		let trademarkFilings: any[] = [];
+		try {
+			trademarkFilings = await pb.collection('trademark_filings').getFullList({
+				filter: `franchiseId = "${franchise.id}"`,
+				sort:   'trademarkClass,markType'
+			});
+		} catch { /* collection not yet created */ }
+
 		return {
-			franchise: franchises[0]
+			franchise,
+			trademarkFilings
 		};
 	} catch (err: any) {
 		console.error('Error loading franchise:', err);

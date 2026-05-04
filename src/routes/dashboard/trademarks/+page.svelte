@@ -91,13 +91,121 @@
 	}
 
 	// ── Edit filing modal ─────────────────────────────────────────────────────
-	let editFiling  = $state<any | null>(null);
-	let editSaving  = $state(false);
-	let editErr     = $state('');
+	let editFiling    = $state<any | null>(null);
+	let editSaving    = $state(false);
+	let editErr       = $state('');
+	let autoStamped   = $state<Set<string>>(new Set()); // tracks which date fields were auto-filled
+
+	// Map each status → which date field it should stamp
+	const STATUS_DATE_MAP: Record<string, string> = {
+		attorney_review: 'attorneyReviewDate',
+		filed:           'filedDate',
+		published:       'publishedDate',
+		approved:        'approvedDate',
+		rejected:        'rejectedDate',
+		abandoned:       'abandonedDate',
+	};
+
+	// Inline row status update
+	let inlineUpdating  = $state<Set<string>>(new Set());
+	// Pending attorney_review inline — holds { filing, newStatus } while we show the reason prompt
+	let pendingReview   = $state<{ filing: any } | null>(null);
+	let pendingReviewNote = $state('');
+
+	function buildPatch(filing: any, newStatus: string, reviewNote = ''): Record<string, any> {
+		const patch: Record<string, any> = { status: newStatus };
+		const dateField = STATUS_DATE_MAP[newStatus];
+		if (dateField && !filing[dateField]) {
+			patch[dateField] = todayISO();
+		}
+		if (newStatus === 'attorney_review') {
+			const existing: any[] = Array.isArray(filing.reviewHistory) ? filing.reviewHistory : [];
+			patch.reviewHistory = [...existing, {
+				date:   todayISO(),
+				reason: reviewNote.trim() || 'sent_to_attorney',
+				notes:  reviewNote.trim(),
+			}];
+		}
+		return patch;
+	}
+
+	async function applyPatch(filingId: string, patch: Record<string, any>) {
+		const res = await fetch(`/api/trademarks/${filingId}`, {
+			method: 'PATCH',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify(patch)
+		});
+		if (!res.ok) throw new Error(`Error ${res.status}`);
+		await invalidateAll();
+	}
+
+	async function updateStatusInline(filing: any, newStatus: string) {
+		if (filing.status === newStatus) return;
+		// For attorney_review, show a small reason prompt before saving
+		if (newStatus === 'attorney_review') {
+			pendingReview     = { filing };
+			pendingReviewNote = '';
+			// Reset the select back to current value — the save happens on confirm
+			return;
+		}
+		inlineUpdating = new Set([...inlineUpdating, filing.id]);
+		try {
+			await applyPatch(filing.id, buildPatch(filing, newStatus));
+		} catch (e: any) {
+			alert(`Failed to update status: ${e.message}`);
+		} finally {
+			const next = new Set(inlineUpdating);
+			next.delete(filing.id);
+			inlineUpdating = next;
+		}
+	}
+
+	async function confirmInlineReview() {
+		if (!pendingReview) return;
+		const { filing } = pendingReview;
+		inlineUpdating = new Set([...inlineUpdating, filing.id]);
+		pendingReview  = null;
+		try {
+			await applyPatch(filing.id, buildPatch(filing, 'attorney_review', pendingReviewNote));
+		} catch (e: any) {
+			alert(`Failed to update status: ${e.message}`);
+		} finally {
+			const next = new Set(inlineUpdating);
+			next.delete(filing.id);
+			inlineUpdating = next;
+		}
+	}
+
+	function todayISO() {
+		return new Date().toISOString().slice(0, 10);
+	}
 
 	function openEdit(filing: any) {
-		editFiling = { ...filing };
-		editErr = '';
+		editFiling  = { ...filing };
+		editErr     = '';
+		autoStamped = new Set();
+	}
+
+	function handleStatusChange(newStatus: string) {
+		if (!editFiling) return;
+		editFiling.status = newStatus;
+
+		// Auto-stamp the relevant date
+		const dateField = STATUS_DATE_MAP[newStatus];
+		if (dateField && (!editFiling[dateField] || autoStamped.has(dateField))) {
+			editFiling[dateField] = todayISO();
+			autoStamped = new Set([...autoStamped, dateField]);
+		}
+
+		// Append a new entry to reviewHistory when moving to attorney_review
+		if (newStatus === 'attorney_review') {
+			const existing: any[] = Array.isArray(editFiling.reviewHistory) ? editFiling.reviewHistory : [];
+			editFiling.reviewHistory = [...existing, {
+				date:   todayISO(),
+				reason: '',   // user can fill in the notes field below
+				notes:  '',
+			}];
+		}
 	}
 
 	async function submitEdit(e: SubmitEvent) {
@@ -228,8 +336,9 @@
 
 	async function generatePDF(opts: {
 		key: string;
-		mode: 'combined' | 'individual';
+		mode?: string;
 		franchiseIds?: string[];
+		filingIds?: string[];
 		includeLeague?: boolean;
 		markIndex?: number;
 	}) {
@@ -239,10 +348,9 @@
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
 				body: JSON.stringify({
-					mode:         opts.mode,
-					franchiseIds: opts.franchiseIds,
-					includeLeague:opts.includeLeague ?? false,
-					markIndex:    opts.markIndex
+					franchiseIds:  opts.franchiseIds,
+					filingIds:     opts.filingIds,
+					includeLeague: opts.includeLeague ?? false,
 				})
 			});
 			if (!res.ok) {
@@ -250,15 +358,11 @@
 				alert(d.message ?? `PDF generation failed (${res.status})`);
 				return;
 			}
-			// Trigger browser download
-			const blob = await res.blob();
-			const url  = URL.createObjectURL(blob);
-			const a    = document.createElement('a');
-			a.href     = url;
-			a.download = res.headers.get('Content-Disposition')?.match(/filename="(.+)"/)?.[1]
-				?? 'FLI-Trademark.pdf';
-			a.click();
-			URL.revokeObjectURL(url);
+			const { urls } = await res.json() as { urls: { filingId: string; url: string }[] };
+			// Refresh data so PDF links appear in the table
+			await invalidateAll();
+			// Open the first PDF in a new tab
+			if (urls?.[0]?.url) window.open(urls[0].url, '_blank');
 		} catch (e: any) {
 			alert(e.message ?? 'PDF generation failed');
 		} finally {
@@ -449,9 +553,8 @@
 												<th class="px-4 py-2.5">Filed</th>
 												<th class="px-4 py-2.5">Approved</th>
 												<th class="px-4 py-2.5">Attorney Notes</th>
-												{#if data.isAdmin}
-													<th class="px-4 py-2.5"></th>
-												{/if}
+												<th class="px-4 py-2.5 w-10">PDF</th>
+												<th class="px-4 py-2.5 w-20"></th>
 											</tr>
 										</thead>
 										<tbody class="divide-y divide-slate-700/40">
@@ -467,34 +570,86 @@
 														{TRADEMARK_CLASS_LABELS[filing.trademarkClass] ?? filing.trademarkClass}
 													</td>
 													<td class="px-4 py-2.5 whitespace-nowrap">
-														<span class="text-xs px-2 py-0.5 rounded-full border {TRADEMARK_STATUS_COLORS[filing.status]}">
-															{TRADEMARK_STATUS_LABELS[filing.status]}
-														</span>
+														{#if inlineUpdating.has(filing.id)}
+															<span class="text-xs text-slate-500 italic">saving…</span>
+														{:else}
+															<select
+																value={filing.status}
+																onchange={(e) => updateStatusInline(filing, (e.target as HTMLSelectElement).value)}
+																class="text-xs rounded-full border px-2 py-0.5 bg-transparent cursor-pointer
+																	focus:outline-none focus:ring-1 focus:ring-violet-500
+																	{TRADEMARK_STATUS_COLORS[filing.status]}">
+																{#each Object.entries(TRADEMARK_STATUS_LABELS) as [val, label]}
+																	<option value={val} class="bg-slate-800 text-slate-100">{label}</option>
+																{/each}
+															</select>
+														{/if}
 													</td>
 													<td class="px-4 py-2.5 font-mono text-xs text-slate-300 whitespace-nowrap">
 														{filing.usptoAppNumber || '—'}
 													</td>
-													<td class="px-4 py-2.5 text-slate-400 text-xs whitespace-nowrap">
-														{fmtDate(filing.filedDate)}
+													<td class="px-4 py-2.5 text-xs whitespace-nowrap">
+														{#if inlineUpdating.has(filing.id)}
+															<span class="text-slate-600">—</span>
+														{:else}
+															<div class="flex items-center gap-1.5">
+																<span class="text-slate-400">{fmtDate(filing.filedDate)}</span>
+																{#if filing.reviewHistory?.length}
+																	<span
+																		title="{filing.reviewHistory.length} attorney review{filing.reviewHistory.length !== 1 ? 's' : ''}: {filing.reviewHistory.map((r: any) => r.date + (r.notes ? ' — ' + r.notes : '')).join(' | ')}"
+																		class="inline-flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded-full bg-blue-900/50 border border-blue-700/40 text-blue-300 cursor-default">
+																		<FileText class="size-2.5" />{filing.reviewHistory.length}
+																	</span>
+																{/if}
+															</div>
+														{/if}
 													</td>
 													<td class="px-4 py-2.5 text-slate-400 text-xs whitespace-nowrap">
-														{fmtDate(filing.approvedDate)}
+														{#if inlineUpdating.has(filing.id)}
+															<span class="text-slate-600">—</span>
+														{:else}
+															{fmtDate(filing.approvedDate)}
+														{/if}
 													</td>
 													<td class="px-4 py-2.5 text-slate-500 text-xs max-w-48 truncate" title={filing.attorneyNotes}>
 														{filing.attorneyNotes || '—'}
 													</td>
-													{#if data.isAdmin}
-														<td class="px-4 py-2.5">
-															<div class="opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1">
+													<!-- PDF link -->
+													<td class="px-4 py-2.5">
+														{#if filing.pdf}
+															{@const pdfFile = Array.isArray(filing.pdf) ? filing.pdf[0] : filing.pdf}
+															{#if pdfFile}
+																<a href="/api/pb-file/{filing.collectionId}/{filing.id}/{pdfFile}"
+																   target="_blank"
+																   class="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded bg-violet-900/40 border border-violet-700/40 text-violet-300 hover:bg-violet-800/50 transition-colors">
+																	<FileText class="size-3" />PDF
+																</a>
+															{/if}
+														{/if}
+													</td>
+													<td class="px-4 py-2.5">
+														<div class="opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1">
+															<button
+																onclick={() => generatePDF({ key: `filing-${filing.id}`, franchiseIds: [filing.franchiseId], filingIds: [filing.id] })}
+																disabled={pdfLoading !== null}
+																class="p-1 rounded hover:bg-slate-600 text-slate-400 hover:text-slate-200 disabled:opacity-40"
+																title="Download PDF">
+																{#if pdfLoading === `filing-${filing.id}`}
+																	<Loader class="size-3.5 animate-spin" />
+																{:else}
+																	<Download class="size-3.5" />
+																{/if}
+															</button>
+															{#if data.isAdmin}
 																<button onclick={() => openEdit(filing)} class="p-1 rounded hover:bg-slate-600 text-slate-400 hover:text-slate-200" title="Edit">
 																	<Pencil class="size-3.5" />
 																</button>
 																<button onclick={() => confirmDelete = filing} class="p-1 rounded hover:bg-red-900/50 text-slate-400 hover:text-red-400" title="Delete">
 																	<Trash2 class="size-3.5" />
 																</button>
-															</div>
-														</td>
-													{/if}
+															{/if}
+														</div>
+													</td>
 												</tr>
 											{/each}
 										</tbody>
@@ -623,7 +778,8 @@
 									<th class="px-4 py-2.5">Filed</th>
 									<th class="px-4 py-2.5">Approved</th>
 									<th class="px-4 py-2.5">Attorney Notes</th>
-									{#if data.isAdmin}<th class="px-4 py-2.5 w-16"></th>{/if}
+									<th class="px-4 py-2.5 w-10">PDF</th>
+									<th class="px-4 py-2.5 w-20"></th>
 								</tr>
 							</thead>
 							<tbody class="divide-y divide-slate-700/40">
@@ -633,24 +789,65 @@
 										<td class="px-4 py-2.5 text-slate-400 whitespace-nowrap text-xs">{LOGO_VARIANT_LABELS[filing.logoVariant] ?? filing.logoVariant}</td>
 										<td class="px-4 py-2.5 text-slate-400 whitespace-nowrap text-xs">{TRADEMARK_CLASS_LABELS[filing.trademarkClass] ?? filing.trademarkClass}</td>
 										<td class="px-4 py-2.5 whitespace-nowrap">
-											<span class="text-xs px-2 py-0.5 rounded-full border {TRADEMARK_STATUS_COLORS[filing.status]}">{TRADEMARK_STATUS_LABELS[filing.status]}</span>
+											{#if inlineUpdating.has(filing.id)}
+												<span class="text-xs text-slate-500 italic">saving…</span>
+											{:else}
+												<select
+													value={filing.status}
+													onchange={(e) => updateStatusInline(filing, (e.target as HTMLSelectElement).value)}
+													class="text-xs rounded-full border px-2 py-0.5 bg-transparent cursor-pointer
+														focus:outline-none focus:ring-1 focus:ring-violet-500
+														{TRADEMARK_STATUS_COLORS[filing.status]}">
+													{#each Object.entries(TRADEMARK_STATUS_LABELS) as [val, label]}
+														<option value={val} class="bg-slate-800 text-slate-100">{label}</option>
+													{/each}
+												</select>
+											{/if}
 										</td>
 										<td class="px-4 py-2.5 font-mono text-xs text-slate-300 whitespace-nowrap">{filing.usptoAppNumber || '—'}</td>
-										<td class="px-4 py-2.5 text-slate-400 text-xs whitespace-nowrap">{fmtDate(filing.filedDate)}</td>
-										<td class="px-4 py-2.5 text-slate-400 text-xs whitespace-nowrap">{fmtDate(filing.approvedDate)}</td>
+										<td class="px-4 py-2.5 text-slate-400 text-xs whitespace-nowrap">
+											{#if inlineUpdating.has(filing.id)}<span class="text-slate-600">—</span>{:else}{fmtDate(filing.filedDate)}{/if}
+										</td>
+										<td class="px-4 py-2.5 text-slate-400 text-xs whitespace-nowrap">
+											{#if inlineUpdating.has(filing.id)}<span class="text-slate-600">—</span>{:else}{fmtDate(filing.approvedDate)}{/if}
+										</td>
 										<td class="px-4 py-2.5 text-slate-500 text-xs max-w-48 truncate" title={filing.attorneyNotes}>{filing.attorneyNotes || '—'}</td>
-										{#if data.isAdmin}
-											<td class="px-4 py-2.5">
-												<div class="opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1">
+										<!-- PDF link -->
+										<td class="px-4 py-2.5">
+											{#if filing.pdf}
+												{@const pdfFile = Array.isArray(filing.pdf) ? filing.pdf[0] : filing.pdf}
+												{#if pdfFile}
+													<a href="/api/pb-file/{filing.collectionId}/{filing.id}/{pdfFile}"
+													   target="_blank"
+													   class="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded bg-violet-900/40 border border-violet-700/40 text-violet-300 hover:bg-violet-800/50 transition-colors">
+														<FileText class="size-3" />PDF
+													</a>
+												{/if}
+											{/if}
+										</td>
+										<td class="px-4 py-2.5">
+											<div class="opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1">
+												<button
+													onclick={() => generatePDF({ key: `filing-${filing.id}`, filingIds: [filing.id], includeLeague: true })}
+													disabled={pdfLoading !== null}
+													class="p-1 rounded hover:bg-slate-600 text-slate-400 hover:text-slate-200 disabled:opacity-40"
+													title="Download PDF">
+													{#if pdfLoading === `filing-${filing.id}`}
+														<Loader class="size-3.5 animate-spin" />
+													{:else}
+														<Download class="size-3.5" />
+													{/if}
+												</button>
+												{#if data.isAdmin}
 													<button onclick={() => openEdit(filing)} class="p-1 rounded hover:bg-slate-600 text-slate-400 hover:text-slate-200" title="Edit">
 														<Pencil class="size-3.5" />
 													</button>
 													<button onclick={() => confirmDelete = filing} class="p-1 rounded hover:bg-red-900/50 text-slate-400 hover:text-red-400" title="Delete">
 														<Trash2 class="size-3.5" />
 													</button>
-												</div>
-											</td>
-										{/if}
+												{/if}
+											</div>
+										</td>
 									</tr>
 								{/each}
 							</tbody>
@@ -819,19 +1016,23 @@
 					<div class="grid grid-cols-2 gap-3">
 						<div>
 							<label class={LABEL}>Mark Type <span class="text-red-400">*</span></label>
-							<select bind:value={newForm.markType} class={SELECT}>
+							<select bind:value={newForm.markType} onchange={() => { if (newForm.markType === 'word_mark') newForm.logoVariant = 'none'; else if (newForm.logoVariant === 'none') newForm.logoVariant = 'logoFull'; }} class={SELECT}>
 								{#each Object.entries(MARK_TYPE_LABELS) as [val, label]}
 									<option value={val}>{label}</option>
 								{/each}
 							</select>
 						</div>
 						<div>
-							<label class={LABEL}>Logo Variant</label>
-							<select bind:value={newForm.logoVariant} class={SELECT}>
-								{#each Object.entries(LOGO_VARIANT_LABELS) as [val, label]}
-									<option value={val}>{label}</option>
-								{/each}
-							</select>
+							<label class={LABEL}>Logo Variant {newForm.markType !== 'word_mark' ? '*' : ''}</label>
+							{#if newForm.markType === 'word_mark'}
+								<div class="{SELECT} opacity-50 cursor-not-allowed text-slate-500">N/A — Word Mark</div>
+							{:else}
+								<select bind:value={newForm.logoVariant} class={SELECT}>
+									{#each Object.entries(LOGO_VARIANT_LABELS).filter(([v]) => v !== 'none') as [val, label]}
+										<option value={val}>{label}</option>
+									{/each}
+								</select>
+							{/if}
 						</div>
 					</div>
 
@@ -890,6 +1091,39 @@
 	{/if}
 
 	<!-- ── Edit Filing Modal ──────────────────────────────────────────────── -->
+	<!-- ── Attorney Review Reason Prompt (inline table) ────────────────── -->
+	{#if pendingReview}
+		<div class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+			<div class="bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl w-full max-w-sm p-6 space-y-4">
+				<div class="flex items-center gap-2">
+					<div class="size-8 rounded-lg bg-blue-900/50 border border-blue-700/50 flex items-center justify-center shrink-0">
+						<FileText class="size-4 text-blue-300" />
+					</div>
+					<div>
+						<h3 class="text-sm font-semibold text-slate-100">Sending to Attorney Review</h3>
+						<p class="text-xs text-slate-400 mt-0.5">Today's date will be recorded. Add a reason (optional).</p>
+					</div>
+				</div>
+				<input
+					bind:value={pendingReviewNote}
+					placeholder="e.g. Initial clearance search, Office action response…"
+					class="w-full rounded-lg border border-slate-600 bg-slate-800 text-slate-100 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 placeholder:text-slate-500" />
+				<div class="flex justify-end gap-2">
+					<button
+						onclick={() => { pendingReview = null; }}
+						class="px-3 py-1.5 text-sm rounded-lg border border-slate-600 text-slate-300 hover:bg-slate-700 transition-colors">
+						Cancel
+					</button>
+					<button
+						onclick={confirmInlineReview}
+						class="px-3 py-1.5 text-sm rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-medium transition-colors">
+						Confirm & Save
+					</button>
+				</div>
+			</div>
+		</div>
+	{/if}
+
 	{#if editFiling}
 		<div class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
 			<div class="bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
@@ -913,19 +1147,23 @@
 					<div class="grid grid-cols-2 gap-3">
 						<div>
 							<label class={LABEL}>Mark Type</label>
-							<select bind:value={editFiling.markType} class={SELECT}>
+							<select bind:value={editFiling.markType} onchange={() => { if (editFiling.markType === 'word_mark') editFiling.logoVariant = 'none'; else if (editFiling.logoVariant === 'none') editFiling.logoVariant = 'logoFull'; }} class={SELECT}>
 								{#each Object.entries(MARK_TYPE_LABELS) as [val, label]}
 									<option value={val}>{label}</option>
 								{/each}
 							</select>
 						</div>
 						<div>
-							<label class={LABEL}>Logo Variant</label>
-							<select bind:value={editFiling.logoVariant} class={SELECT}>
-								{#each Object.entries(LOGO_VARIANT_LABELS) as [val, label]}
-									<option value={val}>{label}</option>
-								{/each}
-							</select>
+							<label class={LABEL}>Logo Variant {editFiling.markType !== 'word_mark' ? '*' : ''}</label>
+							{#if editFiling.markType === 'word_mark'}
+								<div class="{SELECT} opacity-50 cursor-not-allowed text-slate-500">N/A — Word Mark</div>
+							{:else}
+								<select bind:value={editFiling.logoVariant} class={SELECT}>
+									{#each Object.entries(LOGO_VARIANT_LABELS).filter(([v]) => v !== 'none') as [val, label]}
+										<option value={val}>{label}</option>
+									{/each}
+								</select>
+							{/if}
 						</div>
 					</div>
 
@@ -940,7 +1178,10 @@
 						</div>
 						<div>
 							<label class={LABEL}>Status</label>
-							<select bind:value={editFiling.status} class={SELECT}>
+							<select
+								value={editFiling.status}
+								onchange={(e) => handleStatusChange((e.target as HTMLSelectElement).value)}
+								class={SELECT}>
 								{#each Object.entries(TRADEMARK_STATUS_LABELS) as [val, label]}
 									<option value={val}>{label}</option>
 								{/each}
@@ -961,19 +1202,40 @@
 
 					<div class="grid grid-cols-2 gap-3">
 						<div>
-							<label class={LABEL}>Filed Date</label>
-							<input type="date" bind:value={editFiling.filedDate} class={INPUT} />
+							<label class="{LABEL} flex items-center gap-1.5">
+								Filed Date
+								{#if autoStamped.has('filedDate')}
+									<span class="text-[10px] text-violet-400 font-normal">auto-stamped</span>
+								{/if}
+							</label>
+							<input type="date" bind:value={editFiling.filedDate}
+								oninput={() => autoStamped.delete('filedDate')}
+								class="{INPUT} {autoStamped.has('filedDate') ? 'ring-1 ring-violet-500/50' : ''}" />
 						</div>
 						<div>
-							<label class={LABEL}>Published Date</label>
-							<input type="date" bind:value={editFiling.publishedDate} class={INPUT} />
+							<label class="{LABEL} flex items-center gap-1.5">
+								Published Date
+								{#if autoStamped.has('publishedDate')}
+									<span class="text-[10px] text-violet-400 font-normal">auto-stamped</span>
+								{/if}
+							</label>
+							<input type="date" bind:value={editFiling.publishedDate}
+								oninput={() => autoStamped.delete('publishedDate')}
+								class="{INPUT} {autoStamped.has('publishedDate') ? 'ring-1 ring-violet-500/50' : ''}" />
 						</div>
 					</div>
 
 					<div class="grid grid-cols-2 gap-3">
 						<div>
-							<label class={LABEL}>Approved Date</label>
-							<input type="date" bind:value={editFiling.approvedDate} class={INPUT} />
+							<label class="{LABEL} flex items-center gap-1.5">
+								Approved Date
+								{#if autoStamped.has('approvedDate')}
+									<span class="text-[10px] text-violet-400 font-normal">auto-stamped</span>
+								{/if}
+							</label>
+							<input type="date" bind:value={editFiling.approvedDate}
+								oninput={() => autoStamped.delete('approvedDate')}
+								class="{INPUT} {autoStamped.has('approvedDate') ? 'ring-1 ring-violet-500/50' : ''}" />
 						</div>
 						<div>
 							<label class={LABEL}>Renewal Date</label>
@@ -992,6 +1254,43 @@
 						<div>
 							<label class={LABEL}>Rejected Date</label>
 							<input type="date" bind:value={editFiling.rejectedDate} class={INPUT} />
+						</div>
+					{/if}
+
+					<!-- ── Attorney Review History ──────────────────────────── -->
+					{#if editFiling.reviewHistory?.length}
+						<div>
+							<label class="{LABEL} mb-2 flex items-center justify-between">
+								<span>Attorney Review History</span>
+								<span class="text-[10px] text-slate-500 font-normal">{editFiling.reviewHistory.length} review{editFiling.reviewHistory.length !== 1 ? 's' : ''}</span>
+							</label>
+							<div class="space-y-2">
+								{#each editFiling.reviewHistory as entry, i}
+									<div class="rounded-lg border border-slate-700 bg-slate-800/60 px-3 py-2.5 flex items-start gap-3">
+										<div class="size-5 rounded-full bg-blue-900/60 border border-blue-700/50 flex items-center justify-center shrink-0 mt-0.5">
+											<span class="text-[9px] text-blue-300 font-bold">{i + 1}</span>
+										</div>
+										<div class="flex-1 min-w-0 space-y-1.5">
+											<div class="flex items-center gap-2">
+												<span class="text-xs font-medium text-slate-200">{entry.date}</span>
+												{#if entry.reason}
+													<span class="text-[10px] px-1.5 py-0.5 rounded bg-slate-700 text-slate-400 border border-slate-600">{entry.reason}</span>
+												{/if}
+											</div>
+											<!-- Editable notes for this entry -->
+											<input
+												value={entry.notes ?? ''}
+												oninput={(e) => {
+													const updated = [...editFiling.reviewHistory];
+													updated[i] = { ...updated[i], notes: (e.target as HTMLInputElement).value };
+													editFiling.reviewHistory = updated;
+												}}
+												placeholder="Add notes for this review…"
+												class="w-full rounded border border-slate-600 bg-slate-700 text-slate-100 px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-violet-500 placeholder:text-slate-500" />
+										</div>
+									</div>
+								{/each}
+							</div>
 						</div>
 					{/if}
 
