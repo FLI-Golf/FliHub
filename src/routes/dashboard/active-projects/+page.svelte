@@ -65,6 +65,10 @@
 			{ label: 'Reimbursements', href: '/dashboard/reimbursements', icon: Wallet },
 			{ label: 'Expenses', href: '/dashboard/expenses', icon: TrendingUp },
 		],
+		'Trademark Pipeline': [
+			{ label: 'Trademark Pipeline', href: '/dashboard/trademarks', icon: Scale },
+			{ label: 'Legal Services', href: '/dashboard/projects', icon: Scale },
+		],
 	};
 
 	// Color per project for visual distinction
@@ -78,6 +82,7 @@
 		'Go Throw Media Partnership':  { border: 'border-l-emerald-500', badge: 'bg-emerald-500/15 text-emerald-300', bar: 'bg-emerald-500', icon: Handshake },
 		'Tax-Exempt Reimbursements':   { border: 'border-l-teal-500',    badge: 'bg-teal-500/15 text-teal-300',       bar: 'bg-teal-500',    icon: Wallet },
 		'Payments & Income':           { border: 'border-l-emerald-500', badge: 'bg-emerald-500/15 text-emerald-300',  bar: 'bg-emerald-500', icon: DollarSign },
+		'Trademark Pipeline':          { border: 'border-l-rose-400',    badge: 'bg-rose-500/15 text-rose-300',        bar: 'bg-rose-400',    icon: Scale },
 	};
 
 	function getColor(name: string) {
@@ -439,7 +444,7 @@
 
 	<!-- Footer note -->
 	<p class="text-xs text-muted-foreground text-center pb-2">
-		20 projects remain <span class="font-medium text-slate-400">planned</span> — they activate after the $7.5M seed raise closes.
+		19 projects remain <span class="font-medium text-slate-400">planned</span> — they activate after the $7.5M seed raise closes.
 		<a href="/dashboard/use-of-proceeds" class="text-primary hover:underline ml-1">View Use of Proceeds →</a>
 	</p>
 
