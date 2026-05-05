@@ -6,8 +6,9 @@
 		Zap, FolderKanban, DollarSign, CheckCircle2, Clock,
 		ArrowRight, Users, Star, Trophy, Building2,
 		Film, Scale, Handshake, Cpu, TrendingUp, ExternalLink,
-		ChevronDown, Info, Wallet
+		ChevronDown, Info, Wallet, Pencil, X, Loader
 	} from 'lucide-svelte';
+	import { invalidateAll } from '$app/navigation';
 
 	let { data }: { data: PageData } = $props();
 
@@ -92,8 +93,43 @@
 	let expandedDesc = $state<Record<string, boolean>>({});
 	let headerExpanded = $state(false);
 
-	const totalBudget   = $derived(projects.reduce((s, p) => s + p.budget, 0));
-	const totalSpend    = $derived(projects.reduce((s, p) => s + p.actualSpend, 0));
+	const totalBudget    = $derived(projects.reduce((s, p) => s + p.budget, 0));
+	const totalSpend     = $derived(projects.reduce((s, p) => s + p.actualSpend, 0));
+	const RAISE          = $derived(data.raiseTarget?.value ?? 7_500_000);
+	const raiseRemaining = $derived(RAISE - totalBudget);
+
+	// Set Raise Amount modal
+	let showRaiseModal = $state(false);
+	let raiseInput     = $state('');
+	let raiseSaving    = $state(false);
+	let raiseError     = $state('');
+
+	function openRaiseModal() {
+		raiseInput = String(data.raiseTarget?.value ?? 7_500_000);
+		raiseError = '';
+		showRaiseModal = true;
+	}
+
+	async function saveRaise() {
+		const val = Number(raiseInput.replace(/[^0-9.]/g, ''));
+		if (!val || val < 0) { raiseError = 'Enter a valid amount'; return; }
+		raiseSaving = true;
+		raiseError  = '';
+		try {
+			const res = await fetch('/api/settings', {
+				method: 'PATCH',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ id: data.raiseTarget?.id, value: val }),
+			});
+			if (!res.ok) { raiseError = 'Save failed'; return; }
+			await invalidateAll();
+			showRaiseModal = false;
+		} catch (e: any) {
+			raiseError = e.message;
+		} finally {
+			raiseSaving = false;
+		}
+	}
 	const totalTasks    = $derived(projects.reduce((s, p) => s + p.tasks.total, 0));
 	const totalDone     = $derived(projects.reduce((s, p) => s + p.tasks.done, 0));
 </script>
@@ -115,9 +151,15 @@
 				{projects.length} projects in flight right now — everything else is planned for post-raise execution.
 			</p>
 		</div>
-		<Button href="/dashboard/projects" variant="outline" size="sm" class="gap-1.5 shrink-0">
-			All Projects <ArrowRight class="size-3.5" />
-		</Button>
+		<div class="flex items-center gap-2 shrink-0">
+			<button onclick={openRaiseModal}
+				class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-emerald-700/50 bg-emerald-950/40 hover:bg-emerald-900/50 text-emerald-300 text-xs font-medium transition-colors">
+				<Pencil class="size-3" /> Set Raise Amount
+			</button>
+			<Button href="/dashboard/projects" variant="outline" size="sm" class="gap-1.5">
+				All Projects <ArrowRight class="size-3.5" />
+			</Button>
+		</div>
 	</div>
 
 	<!-- Info card -->
@@ -140,13 +182,13 @@
 			{#if headerExpanded}
 				<div class="text-xs text-yellow-200/70 leading-relaxed mt-3 pl-9 space-y-2">
 					<p>
-						This page shows only the projects currently marked <span class="font-semibold text-yellow-300">in progress</span> — the workstreams that matter right now on the path to getting FLI Golf off the ground. The <span class="font-semibold text-yellow-300">Combined Budget</span> card above reflects only these active projects, giving you a focused view of what capital is actually in motion today.
+						This page shows only the projects currently marked <span class="font-semibold text-yellow-300">in progress</span> — the workstreams that matter right now on the path to getting FLI Golf off the ground. The <span class="font-semibold text-yellow-300">Combined Budget</span> card reflects the total capital committed to these active projects, and the <span class="font-semibold text-yellow-300">Unallocated</span> card shows how much of the seed raise is still available to deploy.
 					</p>
 					<p>
-						As the league progresses — franchise deals close, the raise advances, and new workstreams kick off — you can flip additional projects from <span class="font-semibold text-yellow-300">planned → in progress</span> on the Projects page. Each one you activate will automatically increase the Combined Budget shown here, so this page always reflects your current operational footprint.
+						Use the <span class="font-semibold text-yellow-300">Set Raise Amount</span> button to update the total capital received as the raise progresses. The Unallocated figure updates automatically — it is always raise amount minus combined project budgets.
 					</p>
 					<p>
-						The 22 projects still in <span class="font-semibold text-yellow-300">planned</span> status represent the full post-raise execution plan — venue builds, broadcast infrastructure, player contracts, marketing launch, and more. They're ready to activate the moment the $7.5M seed round closes and the real build begins.
+						As new workstreams kick off, flip projects from <span class="font-semibold text-yellow-300">planned → in progress</span> on the Projects page. Each activation increases the Combined Budget and reduces Unallocated, so this page always reflects your current capital deployment in real time.
 					</p>
 				</div>
 			{/if}
@@ -195,16 +237,55 @@
 					</div>
 				</div>
 				<p class="text-2xl font-black text-white">{fmt(totalBudget)}</p>
-				<p class="text-xs text-blue-300/60 mt-0.5">{fmt(totalSpend)} spent</p>
+				<p class="text-xs text-blue-300/60 mt-0.5">{fmt(totalSpend)} spent · {pct(totalBudget, RAISE).toFixed(0)}% of raise</p>
 			</Card>
-			<div class="pointer-events-none absolute left-0 top-full mt-2 z-50 w-56 opacity-0 translate-y-1 group-hover/card:opacity-100 group-hover/card:translate-y-0 transition-all duration-200">
+			<div class="pointer-events-none absolute left-0 top-full mt-2 z-50 w-72 opacity-0 translate-y-1 group-hover/card:opacity-100 group-hover/card:translate-y-0 transition-all duration-200">
+				<div class="rounded-xl border border-slate-700 bg-slate-900 text-slate-100 shadow-2xl p-3 text-sm">
+					<p class="font-semibold text-xs uppercase tracking-wider text-blue-400 mb-2">Project Breakdown</p>
+					<div class="space-y-1 mb-2">
+						{#each [...projects].sort((a, b) => b.budget - a.budget) as p}
+							<div class="flex justify-between items-center gap-2">
+								<span class="text-slate-400 truncate text-xs">{p.name}</span>
+								<span class="font-medium text-xs shrink-0">{fmt(p.budget)}</span>
+							</div>
+						{/each}
+					</div>
+					<div class="h-px bg-slate-700 my-2"></div>
+					<div class="flex justify-between font-semibold">
+						<span class="text-slate-300">Allocated</span>
+						<span class="text-white">{fmt(totalBudget)}</span>
+					</div>
+					<div class="h-px bg-slate-700 my-2"></div>
+					<div class="flex justify-between text-xs"><span class="text-slate-400">$7.5M raise</span><span class="text-slate-300">{fmt(RAISE)}</span></div>
+					<div class="flex justify-between text-xs mt-1"><span class="text-slate-400">Unallocated</span><span class="text-emerald-400 font-semibold">{fmt(raiseRemaining)}</span></div>
+				</div>
+			</div>
+		</div>
+
+		<!-- Raise Remaining -->
+		<div class="group/card relative">
+			<Card class="p-4 border-l-4 border-l-emerald-500 bg-emerald-950/30 hover:bg-emerald-950/50 transition-colors cursor-default">
+				<div class="flex items-center justify-between mb-2">
+					<p class="text-xs text-emerald-300/70 font-medium">Unallocated</p>
+					<div class="size-7 rounded-lg bg-emerald-500/20 flex items-center justify-center">
+						<DollarSign class="size-3.5 text-emerald-400" />
+					</div>
+				</div>
+				<p class="text-2xl font-black text-white">{fmt(raiseRemaining)}</p>
+				<p class="text-xs text-emerald-300/60 mt-0.5">of $7.5M raise · {(100 - pct(totalBudget, RAISE)).toFixed(0)}% free</p>
+			</Card>
+			<div class="pointer-events-none absolute left-0 top-full mt-2 z-50 w-64 opacity-0 translate-y-1 group-hover/card:opacity-100 group-hover/card:translate-y-0 transition-all duration-200">
 				<div class="rounded-xl border border-slate-700 bg-slate-900 text-slate-100 shadow-2xl p-3 text-sm space-y-1.5">
-					<p class="font-semibold text-xs uppercase tracking-wider text-blue-400 mb-2">Budget Detail</p>
-					<div class="flex justify-between"><span class="text-slate-400">Total budget</span><span class="font-medium">{fmt(totalBudget)}</span></div>
-					<div class="flex justify-between"><span class="text-slate-400">Spent</span><span class="font-medium">{fmt(totalSpend)}</span></div>
-					<div class="flex justify-between"><span class="text-slate-400">Remaining</span><span class="font-medium text-emerald-400">{fmt(totalBudget - totalSpend)}</span></div>
+					<p class="font-semibold text-xs uppercase tracking-wider text-emerald-400 mb-2">Raise Allocation</p>
+					<div class="flex justify-between"><span class="text-slate-400">$7.5M raise</span><span class="font-medium">{fmt(RAISE)}</span></div>
+					<div class="flex justify-between"><span class="text-slate-400">Allocated to projects</span><span class="font-medium text-blue-300">{fmt(totalBudget)}</span></div>
 					<div class="h-px bg-slate-700 my-1"></div>
-					<div class="flex justify-between"><span class="text-slate-400">% of $7.5M raise</span><span class="font-medium text-blue-300">{pct(totalBudget, 7_500_000).toFixed(0)}%</span></div>
+					<div class="flex justify-between font-semibold"><span class="text-slate-300">Remaining</span><span class="text-emerald-400">{fmt(raiseRemaining)}</span></div>
+					<!-- Progress bar -->
+					<div class="mt-2 h-1.5 rounded-full bg-slate-700 overflow-hidden">
+						<div class="h-full rounded-full bg-blue-500 transition-all" style="width: {pct(totalBudget, RAISE).toFixed(1)}%"></div>
+					</div>
+					<p class="text-xs text-slate-500 text-right">{pct(totalBudget, RAISE).toFixed(0)}% allocated</p>
 				</div>
 			</div>
 		</div>
@@ -449,3 +530,88 @@
 	</p>
 
 </div>
+
+{#if showRaiseModal}
+	<div class="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4"
+		onclick={() => showRaiseModal = false}
+		onkeydown={(e) => e.key === 'Escape' && (showRaiseModal = false)}
+		role="dialog" aria-modal="true">
+		<div class="w-full max-w-sm rounded-2xl border border-slate-700 bg-slate-900 shadow-2xl"
+			onclick={(e) => e.stopPropagation()}
+			onkeydown={(e) => e.stopPropagation()}
+			role="document">
+
+			<div class="flex items-center justify-between p-5 border-b border-slate-700/60">
+				<div>
+					<h2 class="text-base font-bold text-white">Set Raise Amount</h2>
+					<p class="text-xs text-slate-400 mt-0.5">Total capital received from the seed round</p>
+				</div>
+				<button onclick={() => showRaiseModal = false}
+					class="p-1.5 rounded-lg hover:bg-slate-800 text-slate-500 hover:text-white transition-colors">
+					<X class="size-4" />
+				</button>
+			</div>
+
+			<div class="p-5 space-y-4">
+				<div class="space-y-1.5">
+					<label class="text-xs text-slate-400" for="raiseInput">Amount Received</label>
+					<div class="relative">
+						<span class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm font-medium">$</span>
+						<input
+							id="raiseInput"
+							bind:value={raiseInput}
+							type="text"
+							inputmode="numeric"
+							placeholder="7,500,000"
+							class="w-full rounded-lg bg-slate-800 border border-slate-700 pl-7 pr-3 py-2.5 text-white text-sm focus:outline-none focus:border-emerald-500"
+						/>
+					</div>
+					{#if raiseError}
+						<p class="text-xs text-red-400">{raiseError}</p>
+					{/if}
+				</div>
+
+				<!-- Quick presets -->
+				<div class="flex flex-wrap gap-2">
+					{#each [1_000_000, 2_500_000, 5_000_000, 7_500_000] as preset}
+						<button onclick={() => raiseInput = String(preset)}
+							class="px-2.5 py-1 rounded-lg text-xs border transition-colors
+								{Number(raiseInput) === preset
+									? 'bg-emerald-900/50 border-emerald-700 text-emerald-300'
+									: 'bg-slate-800 border-slate-700 text-slate-400 hover:border-slate-500 hover:text-slate-200'}">
+							{fmt(preset)}
+						</button>
+					{/each}
+				</div>
+
+				{#if Number(raiseInput) > 0}
+					<div class="rounded-lg bg-slate-800/60 border border-slate-700/60 p-3 text-xs space-y-1.5">
+						<div class="flex justify-between text-slate-400">
+							<span>Raise amount</span><span class="text-white font-medium">{fmt(Number(raiseInput.replace(/[^0-9.]/g, '')))}</span>
+						</div>
+						<div class="flex justify-between text-slate-400">
+							<span>Allocated to projects</span><span class="text-blue-300">{fmt(totalBudget)}</span>
+						</div>
+						<div class="h-px bg-slate-700"></div>
+						<div class="flex justify-between font-semibold">
+							<span class="text-slate-300">Unallocated</span>
+							<span class="text-emerald-400">{fmt(Number(raiseInput.replace(/[^0-9.]/g, '')) - totalBudget)}</span>
+						</div>
+					</div>
+				{/if}
+			</div>
+
+			<div class="flex items-center justify-end gap-3 px-5 py-4 border-t border-slate-700/60">
+				<button onclick={() => showRaiseModal = false}
+					class="px-4 py-2 rounded-lg text-sm text-slate-400 hover:text-white hover:bg-slate-800 transition-colors">
+					Cancel
+				</button>
+				<button onclick={saveRaise} disabled={raiseSaving}
+					class="inline-flex items-center gap-2 px-5 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white text-sm font-medium transition-colors">
+					{#if raiseSaving}<Loader class="size-3.5 animate-spin" />{/if}
+					Save
+				</button>
+			</div>
+		</div>
+	</div>
+{/if}

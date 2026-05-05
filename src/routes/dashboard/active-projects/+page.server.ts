@@ -6,13 +6,14 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 	const { pb, profile: userProfile } = ctx;
 
 	try {
-		const [projects, departments, tasks, expenses, sponsors, franchiseLeads] = await Promise.all([
+		const [projects, departments, tasks, expenses, sponsors, franchiseLeads, settings] = await Promise.all([
 			pb.collection('projects').getFullList({ filter: "status='in_progress'", sort: 'name' }).catch(() => []),
 			pb.collection('departments').getFullList({ fields: 'id,name,description,department_annual_budget,department_actual_expenses' }).catch(() => []),
 			pb.collection('tasks').getFullList({ fields: 'id,name,status,projectId,task_actual_cost,task_budget,dueDate,assignedTo' }).catch(() => []),
 			pb.collection('expenses').getFullList({ fields: 'id,amount,status,project,description,created' }).catch(() => []),
 			pb.collection('sponsors').getFullList({ fields: 'id,name,status,tier,committed_amount,paid_amount' }).catch(() => []),
 			pb.collection('franchise_leads').getFullList({ fields: 'id,name,status,created' }).catch(() => []),
+			pb.collection('settings').getFullList({ fields: 'id,key,value,label' }).catch(() => []),
 		]);
 
 		const deptMap = Object.fromEntries((departments as any[]).map(d => [d.id, d]));
@@ -89,11 +90,15 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 				.map((l: any) => ({ id: l.id, name: l.name, status: l.status })),
 		};
 
+		const raiseSetting = (settings as any[]).find(s => s.key === 'raise_target');
+		const raiseTarget  = raiseSetting ? { id: raiseSetting.id, value: Number(raiseSetting.value) } : { id: null, value: 7_500_000 };
+
 		return {
 			userProfile,
 			projects: enriched,
 			sponsorSummary,
 			franchiseSummary,
+			raiseTarget,
 		};
 	} catch (err: any) {
 		console.error('active-projects load error:', err?.message ?? err);
