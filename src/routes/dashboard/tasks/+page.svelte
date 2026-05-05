@@ -111,11 +111,20 @@
 	}
 	
 	function getSubtaskProgress(task: any): { completed: number; total: number } {
-		if (!task.subTasksChecklist || !Array.isArray(task.subTasksChecklist) || task.subTasksChecklist.length === 0) {
-			return { completed: 0, total: 0 };
+		const raw = task.subTasksChecklist;
+		if (!raw) return { completed: 0, total: 0 };
+		// Support both markdown string and legacy array format
+		if (typeof raw === 'string') {
+			const lines = raw.split('\n').filter((l: string) => l.trim().match(/^- \[[ x]\]/i));
+			if (!lines.length) return { completed: 0, total: 0 };
+			const completed = lines.filter((l: string) => /^- \[x\]/i.test(l.trim())).length;
+			return { completed, total: lines.length };
 		}
-		const completed = task.subTasksChecklist.filter((st: any) => st && st.completed).length;
-		return { completed, total: task.subTasksChecklist.length };
+		if (Array.isArray(raw)) {
+			const completed = raw.filter((st: any) => st && st.completed).length;
+			return { completed, total: raw.length };
+		}
+		return { completed: 0, total: 0 };
 	}
 	
 	function getPriorityColor(priority: string): string {

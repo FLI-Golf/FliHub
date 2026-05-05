@@ -12,7 +12,7 @@ export const PATCH: RequestHandler = async ({ locals, url, params, request }) =>
 		'status', 'markType', 'logoVariant', 'trademarkClass',
 		'usptoAppNumber', 'usptoSerialNumber',
 		'filedDate', 'publishedDate', 'approvedDate', 'rejectedDate', 'renewalDate',
-		'attorneyNotes', 'internalNotes', 'oppositionDetail'
+		'attorneyNotes', 'internalNotes', 'oppositionDetail', 'pdfLabel'
 	];
 
 	const patch: Record<string, unknown> = {};

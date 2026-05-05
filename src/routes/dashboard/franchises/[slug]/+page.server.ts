@@ -21,6 +21,15 @@ export const load: PageServerLoad = async ({ locals, url, params }) => {
 
 		const franchise = franchises[0];
 
+		// Talent list for roster dropdowns
+		let talent: any[] = [];
+		try {
+			talent = await pb.collection('talent').getFullList({
+				fields: 'id,name,gender',
+				sort:   'name'
+			});
+		} catch { /* soft-fail */ }
+
 		// Trademark filings for this franchise (soft-fail if collection missing)
 		let trademarkFilings: any[] = [];
 		try {
@@ -30,9 +39,15 @@ export const load: PageServerLoad = async ({ locals, url, params }) => {
 			});
 		} catch { /* collection not yet created */ }
 
+		// PDF filings — filings that have a pdf attached, for the community showcase
+		const pdfFilings = trademarkFilings.filter((f: any) => f.pdf);
+
 		return {
 			franchise,
-			trademarkFilings
+			trademarkFilings,
+			pdfFilings,
+			talent,
+			isAdmin: role === 'admin'
 		};
 	} catch (err: any) {
 		console.error('Error loading franchise:', err);

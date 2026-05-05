@@ -19,7 +19,7 @@ export const GET: RequestHandler = async ({ params, url }) => {
 	const pbUrl = `${PB_URL}/api/files/${params.path}${url.search}`;
 
 	try {
-		const res = await fetch(pbUrl, { signal: AbortSignal.timeout(15000) });
+		const res = await fetch(pbUrl, { signal: AbortSignal.timeout(120000) });
 
 		if (!res.ok) {
 			return new Response(`File not found: ${res.status}`, { status: res.status });
