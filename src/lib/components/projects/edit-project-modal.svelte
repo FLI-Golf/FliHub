@@ -4,7 +4,8 @@
 	import { Input } from '$lib/components/ui/input';
 	import { Label } from '$lib/components/ui/label';
 	import { Edit, Save, X } from 'lucide-svelte';
-	import { invalidateAll } from '$app/navigation';
+	import { goto } from '$app/navigation';
+	import { page } from '$app/stores';
 
 	let { open = $bindable(false), project } = $props();
 
@@ -81,9 +82,9 @@
 				throw new Error(data.message || 'Failed to update project');
 			}
 
-			// Close modal and invalidate data
+			// Close modal and reload page data
 			open = false;
-			await invalidateAll();
+			await goto($page.url.pathname, { invalidateAll: true });
 		} catch (err) {
 			error = err instanceof Error ? err.message : 'An error occurred';
 		} finally {

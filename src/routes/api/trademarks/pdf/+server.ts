@@ -74,7 +74,7 @@ function pick01(files: string[]): string|null {
 }
 
 async function buildPDF(
-	subject: { name:string; primaryColor?:string; secondaryColor?:string },
+	subject: { name:string; primaryColor?:string; secondaryColor?:string; colorPalette?: any[] },
 	filings: Array<{ filing:any; imgBuffer:Buffer|null }>
 ): Promise<Buffer> {
 	const PDFDocument = (await import('pdfkit')).default;
@@ -111,10 +111,17 @@ async function buildPDF(
 		y += 14;
 
 		const swatchW=110, swatchH=36, swatchGap=12;
-		const colorDefs = [
-			{ label:'Primary',   hex:primary,   rgb:[r1,g1,b1] as [number,number,number] },
-			{ label:'Secondary', hex:secondary, rgb:[r2,g2,b2] as [number,number,number] },
+		// Build full color list: Primary + Secondary + any palette entries
+		const paletteEntries: { label: string; hex: string }[] = Array.isArray(subject.colorPalette)
+			? subject.colorPalette.map((e: any) => ({ label: e.label || 'Color', hex: normalizeHex(e.value || '#000000') }))
+			: [];
+
+		const colorDefs: { label: string; hex: string; rgb: [number,number,number] }[] = [
+			{ label: 'Primary',   hex: primary,   rgb: [r1,g1,b1] },
+			{ label: 'Secondary', hex: secondary, rgb: [r2,g2,b2] },
+			...paletteEntries.map(e => ({ label: e.label, hex: e.hex, rgb: hex2rgb(e.hex) }))
 		];
+
 		colorDefs.forEach((c, i) => {
 			const cx = MARGIN + i * (swatchW + swatchGap);
 			doc.roundedRect(cx, y, swatchW, swatchH, 5).fill(c.rgb);
@@ -239,7 +246,7 @@ export const POST: RequestHandler = async ({ locals, url, request }) => {
 
 		// Load franchises (no territory field needed)
 		const allFranchises = await ctx.pb.collection('franchises').getFullList({
-			fields:'id,collectionId,name,primaryColor,secondaryColor,logoFull,logoMini,logoHorizontal,logoVertical,logoMonochrome,logoWordmark'
+			fields:'id,collectionId,name,primaryColor,secondaryColor,colorPalette,logoFull,logoMini,logoHorizontal,logoVertical,logoMonochrome,logoWordmark'
 		});
 
 		// Load league if needed
@@ -283,9 +290,10 @@ export const POST: RequestHandler = async ({ locals, url, request }) => {
 
 			// Build PDF
 			const pdfBuffer = await buildPDF({
-				name:          subject.name,
-				primaryColor:  subject.primaryColor,
-				secondaryColor:subject.secondaryColor,
+				name:           subject.name,
+				primaryColor:   subject.primaryColor,
+				secondaryColor: subject.secondaryColor,
+				colorPalette:   subject.colorPalette ?? [],
 			}, filingsWithImages);
 
 			const slug     = subject.name.replace(/\s+/g,'-').toLowerCase();

@@ -2,7 +2,8 @@
 	import { invalidateAll } from '$app/navigation';
 	import Card from '$lib/components/ui/card.svelte';
 	import { Button } from '$lib/components/ui/button/index.js';
-	import { Plus, X, ChevronDown, Pencil, Shield, FileText, AlertCircle, CheckCircle2, Clock, Download, Loader, Trash2, DollarSign, Receipt, Users } from 'lucide-svelte';
+	import { Plus, X, ChevronDown, Pencil, Shield, FileText, AlertCircle, CheckCircle2, Clock, Download, Loader, Trash2, DollarSign, Receipt, Users, Upload } from 'lucide-svelte';
+	import UploadPdfsModal from '$lib/components/trademarks/UploadPdfsModal.svelte';
 	import type { PageData } from './$types';
 	import {
 		TRADEMARK_STATUS_LABELS, TRADEMARK_STATUS_COLORS, TRADEMARK_PIPELINE,
@@ -56,8 +57,9 @@
 	);
 
 	// ── New filing modal ──────────────────────────────────────────────────────
-	let showNew   = $state(false);
-	let saving    = $state(false);
+	let showNew        = $state(false);
+	let showUploadPdfs = $state(false);
+	let saving         = $state(false);
 	let err       = $state('');
 	let newForm   = $state({
 		franchiseId: '',
@@ -400,6 +402,9 @@
 				All + League
 			</Button>
 			{#if data.isAdmin}
+				<Button onclick={() => showUploadPdfs = true} class="gap-2 bg-emerald-700 hover:bg-emerald-600 text-white">
+					<Upload class="size-4" /> Upload PDFs
+				</Button>
 				<Button onclick={() => { showNew = true; err = ''; }} class="gap-2 bg-violet-600 hover:bg-violet-700 text-white">
 					<Plus class="size-4" /> New Filing
 				</Button>
@@ -978,6 +983,13 @@
 			{/if}
 		</div>
 	{/if}<!-- end fees tab -->
+
+	<!-- ── Upload PDFs Modal ────────────────────────────────────────────── -->
+	<UploadPdfsModal
+		bind:open={showUploadPdfs}
+		franchises={data.franchises}
+		filings={data.filings}
+	/>
 
 	<!-- ── New Filing Modal ─────────────────────────────────────────────── -->
 	{#if showNew}

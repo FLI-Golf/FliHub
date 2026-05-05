@@ -3,7 +3,7 @@
 	import { Button } from '$lib/components/ui/button';
 	import { Input } from '$lib/components/ui/input';
 	import { Label } from '$lib/components/ui/label';
-	import { Edit, Save, X, Trash2 } from 'lucide-svelte';
+	import { Edit, Save, X, Trash2, Plus, GripVertical, CheckSquare, Square } from 'lucide-svelte';
 
 	let { open = $bindable(false), task, expenses = { total: 0, paid: 0 } }: {
 		open: boolean;
@@ -38,6 +38,45 @@
 	let isDeleting = $state(false);
 	let error = $state('');
 
+	// Interactive subtask list
+	interface Subtask { id: number; text: string; done: boolean; }
+	let subtasks = $state<Subtask[]>([]);
+	let newSubtaskText = $state('');
+	let nextId = $state(0);
+
+	function parseMarkdown(md: string): Subtask[] {
+		if (!md?.trim()) return [];
+		return md.split('\n')
+			.filter(l => l.trim().match(/^- \[[ x]\]/i))
+			.map(l => ({
+				id: nextId++,
+				done: /^- \[x\]/i.test(l.trim()),
+				text: l.trim().replace(/^- \[[ x]\]\s*/i, '').trim(),
+			}));
+	}
+
+	function toMarkdown(items: Subtask[]): string {
+		return items.map(s => `- [${s.done ? 'x' : ' '}] ${s.text}`).join('\n');
+	}
+
+	function addSubtask() {
+		const t = newSubtaskText.trim();
+		if (!t) return;
+		subtasks = [...subtasks, { id: nextId++, text: t, done: false }];
+		newSubtaskText = '';
+	}
+
+	function removeSubtask(id: number) {
+		subtasks = subtasks.filter(s => s.id !== id);
+	}
+
+	function toggleSubtask(id: number) {
+		subtasks = subtasks.map(s => s.id === id ? { ...s, done: !s.done } : s);
+	}
+
+	const subtasksDone  = $derived(subtasks.filter(s => s.done).length);
+	const subtasksPct   = $derived(subtasks.length ? Math.round((subtasksDone / subtasks.length) * 100) : 0);
+
 	// Format dates for input[type="date"] which expects YYYY-MM-DD
 	function formatDateForInput(dateStr: string): string {
 		if (!dateStr) return '';
@@ -69,28 +108,13 @@
 			formData.actualHours = task.actualHours?.toString() || '';
 			formData.notes = task.notes || '';
 			
-			// If no subtasks, provide sample
-			if (!task.subTasksChecklist || task.subTasksChecklist === '') {
-				formData.subTasksChecklist = `- [ ] Research and planning
-- [ ] Design mockups
-- [ ] Development
-- [ ] Testing
-- [ ] Documentation
-- [ ] Review and approval`;
-			} else {
-				formData.subTasksChecklist = task.subTasksChecklist;
-			}
+			// Parse subtasks into interactive list
+			subtasks = parseMarkdown(task.subTasksChecklist || '');
+			newSubtaskText = '';
 		}
 	});
 	
-	function insertSample() {
-		formData.subTasksChecklist = `- [ ] Research and planning
-- [ ] Design mockups
-- [ ] Development
-- [ ] Testing
-- [ ] Documentation
-- [ ] Review and approval`;
-	}
+
 
 	const statuses = [
 		{ value: 'todo', label: 'To Do' },
@@ -118,6 +142,7 @@
 				headers: { 'Content-Type': 'application/json' },
 				body: JSON.stringify({
 					...formData,
+					subTasksChecklist: toMarkdown(subtasks),
 					estimatedHours: formData.estimatedHours ? parseFloat(formData.estimatedHours) : undefined,
 					task_budget: formData.task_budget ? parseFloat(formData.task_budget) : 0,
 					actualHours: formData.actualHours ? parseFloat(formData.actualHours) : undefined
@@ -359,27 +384,61 @@
 				</div>
 			{/if}
 
+			<!-- Subtasks -->
 			<div class="space-y-2">
 				<div class="flex items-center justify-between">
-					<Label for="edit-subtasks" class="text-slate-200">Subtasks Checklist</Label>
-					<Button
-						type="button"
-						variant="ghost"
-						size="sm"
-						onclick={insertSample}
-						class="text-xs text-blue-400 hover:text-blue-300"
-					>
-						Insert Sample
-					</Button>
+					<Label class="text-slate-200 flex items-center gap-2">
+						<CheckSquare class="size-4 text-slate-400" />
+						Subtasks
+						{#if subtasks.length}
+							<span class="text-xs font-normal text-slate-500">{subtasksDone}/{subtasks.length} done</span>
+						{/if}
+					</Label>
 				</div>
-				<textarea
-					id="edit-subtasks"
-					bind:value={formData.subTasksChecklist}
-					placeholder="- [ ] First subtask&#10;- [ ] Second subtask&#10;- [ ] Third subtask"
-					rows="6"
-					class="flex w-full rounded-md border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-white placeholder:text-slate-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-500 font-mono"
-				></textarea>
-				<p class="text-xs text-slate-400">Use markdown format: - [ ] for unchecked, - [x] for checked</p>
+
+				{#if subtasks.length}
+					<!-- Progress bar -->
+					<div class="h-1 rounded-full bg-slate-700 overflow-hidden">
+						<div class="h-full rounded-full bg-emerald-500 transition-all duration-300" style="width:{subtasksPct}%"></div>
+					</div>
+
+					<!-- Checklist items -->
+					<div class="space-y-1 max-h-64 overflow-y-auto pr-1">
+						{#each subtasks as s (s.id)}
+							<div class="flex items-start gap-2 group/item rounded-lg px-2 py-1.5 hover:bg-slate-800/60">
+								<button type="button" onclick={() => toggleSubtask(s.id)}
+									class="mt-0.5 shrink-0 text-slate-400 hover:text-emerald-400 transition-colors">
+									{#if s.done}
+										<CheckSquare class="size-4 text-emerald-400" />
+									{:else}
+										<Square class="size-4" />
+									{/if}
+								</button>
+								<span class="flex-1 text-sm {s.done ? 'line-through text-slate-500' : 'text-slate-200'} leading-snug">{s.text}</span>
+								<button type="button" onclick={() => removeSubtask(s.id)}
+									class="opacity-0 group-hover/item:opacity-100 transition-opacity text-slate-600 hover:text-red-400 shrink-0">
+									<X class="size-3.5" />
+								</button>
+							</div>
+						{/each}
+					</div>
+				{:else}
+					<p class="text-xs text-slate-500 italic">No subtasks yet — add one below.</p>
+				{/if}
+
+				<!-- Add new subtask -->
+				<div class="flex gap-2 pt-1">
+					<input
+						bind:value={newSubtaskText}
+						onkeydown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addSubtask(); } }}
+						placeholder="Add a subtask…"
+						class="flex-1 rounded-lg bg-slate-800 border border-slate-700 px-3 py-1.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-blue-500"
+					/>
+					<button type="button" onclick={addSubtask}
+						class="px-3 py-1.5 rounded-lg bg-slate-700 hover:bg-slate-600 text-slate-300 hover:text-white transition-colors text-sm flex items-center gap-1">
+						<Plus class="size-3.5" /> Add
+					</button>
+				</div>
 			</div>
 
 			<div class="space-y-2">
