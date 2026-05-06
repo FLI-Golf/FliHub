@@ -6,15 +6,89 @@
 		Zap, FolderKanban, DollarSign, CheckCircle2, Clock,
 		ArrowRight, Users, Star, Trophy, Building2,
 		Film, Scale, Handshake, Cpu, TrendingUp, ExternalLink,
-		ChevronDown, Info, Wallet, Pencil, X, Loader
+		ChevronDown, ChevronRight, Info, Wallet, Pencil, X, Loader, Circle, FileText
 	} from 'lucide-svelte';
 	import { invalidateAll } from '$app/navigation';
+	import TaskDetailModal from '$lib/components/tasks/task-detail-modal.svelte';
 
 	let { data }: { data: PageData } = $props();
 
 	const projects = $derived(data.projects ?? []);
 	const sponsorSummary = $derived(data.sponsorSummary ?? { total: 0, committed: 0, totalCommitted: 0, totalPaid: 0, inPipeline: 0 });
 	const franchiseSummary = $derived(data.franchiseSummary ?? { total: 0, recent: [] });
+
+	// Task detail modal
+	let selectedTask = $state<any>(null);
+	let taskModalOpen = $state(false);
+	function openTask(task: any) { selectedTask = task; taskModalOpen = true; }
+
+	// Report generation — track which project is generating
+	let generatingReport = $state<Record<string, boolean>>({});
+
+	// Svelte action: attaches click via native addEventListener, bypassing Svelte delegation
+	function reportBtn(node: HTMLElement, project: any) {
+		function handler() {
+			console.log('[reportBtn] raw click fired, project:', project, typeof project);
+			const p = $state.snapshot(project);
+			console.log('[reportBtn] snapshot:', p);
+			generateReport(p);
+		}
+		node.addEventListener('click', handler);
+		return { destroy() { node.removeEventListener('click', handler); } };
+	}
+	async function generateReport(project: any) {
+		console.log('[Report] clicked for project:', project.id, project.name);
+		if (generatingReport[project.id]) { console.log('[Report] already generating, skipping'); return; }
+		generatingReport = { ...generatingReport, [project.id]: true };
+		console.log('[Report] fetching PDF...');
+		try {
+			const res = await fetch(`/api/projects/${project.id}/report`, {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ project }),
+			});
+			if (!res.ok) {
+				const msg = await res.text();
+				console.error('Report error:', msg);
+				alert('Report failed: ' + msg);
+				return;
+			}
+			const blob = await res.blob();
+			const url = URL.createObjectURL(blob);
+			// Open in new tab — most reliable cross-browser approach
+			const win = window.open(url, '_blank');
+			if (!win) {
+				// Popup blocked — fall back to direct download
+				const a = document.createElement('a');
+				a.href = url;
+				a.download = `${project.name.replace(/\s+/g, '-').toLowerCase()}-report-${new Date().toISOString().slice(0,10)}.pdf`;
+				document.body.appendChild(a);
+				a.click();
+				document.body.removeChild(a);
+			}
+			// Revoke after a delay to allow the tab/download to start
+			setTimeout(() => URL.revokeObjectURL(url), 10000);
+		} catch (e: any) {
+			console.error('Report generation failed:', e);
+			alert('Report generation failed: ' + e.message);
+		} finally {
+			generatingReport = { ...generatingReport, [project.id]: false };
+		}
+	}
+
+	// Track which project task lists are expanded — plain object for Svelte 5 proxy reactivity
+	let expandedTasks = $state<Record<string, boolean>>({});
+	function toggleTasks(id: string) {
+		expandedTasks = { ...expandedTasks, [id]: !expandedTasks[id] };
+	}
+
+	const STATUS_ICON: Record<string, { label: string; color: string }> = {
+		todo:        { label: 'To Do',       color: 'text-slate-400' },
+		in_progress: { label: 'In Progress', color: 'text-blue-400'  },
+		blocked:     { label: 'Blocked',     color: 'text-red-400'   },
+		completed:   { label: 'Done',        color: 'text-emerald-400' },
+		cancelled:   { label: 'Cancelled',   color: 'text-slate-600' }
+	};
 
 	function fmt(n: number) {
 		return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(n);
@@ -24,6 +98,24 @@
 	}
 	function pct(a: number, b: number) {
 		return b === 0 ? 0 : Math.min(100, (a / b) * 100);
+	}
+
+	function subtaskCounts(checklist: string | null | undefined): { done: number; total: number } {
+		if (!checklist) return { done: 0, total: 0 };
+		// Handle JSON array format
+		if (typeof checklist === 'string' && checklist.trim().startsWith('[')) {
+			try {
+				const arr = JSON.parse(checklist);
+				if (Array.isArray(arr)) {
+					const done = arr.filter((i: any) => i.checked || i.completed || i.done).length;
+					return { done, total: arr.length };
+				}
+			} catch { /* fall through */ }
+		}
+		// Markdown format: - [x] item or - [ ] item
+		const lines = checklist.split('\n').filter(l => l.trim().startsWith('- ['));
+		const done = lines.filter(l => l.includes('[x]') || l.includes('[X]')).length;
+		return { done, total: lines.length };
 	}
 
 	// Map project names to relevant hub links
@@ -152,7 +244,7 @@
 			</p>
 		</div>
 		<div class="flex items-center gap-2 shrink-0">
-			<button onclick={openRaiseModal}
+			<button type="button" onclick={openRaiseModal}
 				class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-emerald-700/50 bg-emerald-950/40 hover:bg-emerald-900/50 text-emerald-300 text-xs font-medium transition-colors">
 				<Pencil class="size-3" /> Set Raise Amount
 			</button>
@@ -163,7 +255,7 @@
 	</div>
 
 	<!-- Info card -->
-	<button
+	<button type="button"
 		onclick={() => headerExpanded = !headerExpanded}
 		class="w-full text-left group/info"
 	>
@@ -370,59 +462,176 @@
 								{/if}
 							</div>
 						</div>
-						<span class="text-[10px] font-bold uppercase tracking-wide px-2 py-1 rounded shrink-0 {color.badge}">
-							In Progress
-						</span>
+						<div class="flex items-center gap-2 shrink-0">
+							<a
+								href="/api/projects/{project.id}/report/view"
+								target="_blank"
+								rel="noopener noreferrer"
+								class="inline-flex items-center gap-1 text-[10px] font-medium px-2 py-1 rounded border border-slate-600 bg-slate-800 hover:bg-slate-700 hover:border-slate-500 text-slate-300 hover:text-white transition-colors no-underline"
+							>
+								<FileText class="size-3" />
+								Report
+							</a>
+							<span class="text-[10px] font-bold uppercase tracking-wide px-2 py-1 rounded {color.badge}">
+								In Progress
+							</span>
+						</div>
 					</div>
 
 					{#if project.description}
-						<button
-							onclick={() => expandedDesc[project.id] = !expandedDesc[project.id]}
-							class="w-full text-left group/desc mb-3"
-						>
+						<div class="mb-3">
 							<p class="text-xs text-muted-foreground leading-relaxed {expandedDesc[project.id] ? '' : 'line-clamp-2'}">
 								{project.description}
 							</p>
-							<span class="inline-flex items-center gap-0.5 text-[10px] text-slate-500 group-hover/desc:text-slate-300 transition-colors mt-0.5">
+							<button type="button"
+								onclick={() => { expandedDesc[project.id] = !expandedDesc[project.id]; expandedDesc = expandedDesc; }}
+								class="inline-flex items-center gap-0.5 text-[10px] text-slate-500 hover:text-slate-300 transition-colors mt-0.5"
+							>
 								<ChevronDown class="size-3 transition-transform duration-200 {expandedDesc[project.id] ? 'rotate-180' : ''}" />
 								{expandedDesc[project.id] ? 'less' : 'more'}
-							</span>
-						</button>
+							</button>
+						</div>
 					{/if}
 
-					<!-- Budget bar -->
-					<div class="mb-3">
-						<div class="flex justify-between text-xs mb-1">
-							<span class="text-muted-foreground">Budget</span>
-							<span class="font-medium tabular-nums">
-								{fmt(project.actualSpend)} <span class="text-muted-foreground">/ {fmt(project.budget)}</span>
-							</span>
+					<!-- Budget bars -->
+					<div class="mb-4 space-y-3">
+
+						<!-- Bar 0: Department budget -->
+						{#if project.department && project.department.budget > 0}
+							<div class="space-y-1">
+								<div class="flex items-center justify-between text-xs">
+									<span class="text-muted-foreground font-medium flex items-center gap-1.5">
+										<FolderKanban class="size-3.5" />Dept Budget
+									</span>
+									<span class="tabular-nums text-slate-400 text-[11px]">{fmt(project.budget)} of {fmt(project.department.budget)}</span>
+								</div>
+								<div class="h-3 rounded-full overflow-hidden bg-slate-900 border border-slate-700">
+									<div class="h-full transition-all duration-500 {color.bar}" style="width:{project.department.pct.toFixed(2)}%"></div>
+								</div>
+								<div class="flex justify-between text-[10px] text-slate-500">
+									<span>{project.department.name}</span>
+									<span>{project.department.pct.toFixed(1)}% of dept budget</span>
+								</div>
+							</div>
+						{/if}
+
+						<!-- Bar 1: Expense pipeline — task budgets flow into expenses into payments -->
+						<div class="space-y-1">
+							<div class="flex items-center justify-between text-xs">
+								<span class="text-muted-foreground font-medium flex items-center gap-1.5">
+									<DollarSign class="size-3.5" />Expense Pipeline
+								</span>
+								<span class="tabular-nums text-slate-300">{fmt(project.budget)}</span>
+							</div>
+							<div class="h-3 rounded-full overflow-hidden flex bg-slate-900 border border-slate-700">
+								{#if project.pipelinePct.paid > 0}
+									<div class="h-full bg-emerald-500 shrink-0 transition-all duration-500" style="width:{project.pipelinePct.paid.toFixed(2)}%"></div>
+								{/if}
+								{#if project.pipelinePct.approved > 0}
+									<div class="h-full bg-blue-500 shrink-0 transition-all duration-500" style="width:{project.pipelinePct.approved.toFixed(2)}%"></div>
+								{/if}
+								{#if project.pipelinePct.submitted > 0}
+									<div class="h-full bg-amber-400 shrink-0 transition-all duration-500" style="width:{project.pipelinePct.submitted.toFixed(2)}%"></div>
+								{/if}
+								{#if project.pipelinePct.inTasks > 0}
+									<div class="h-full bg-violet-500/80 shrink-0 transition-all duration-500" style="width:{project.pipelinePct.inTasks.toFixed(2)}%"></div>
+								{/if}
+							</div>
+							<div class="flex flex-wrap gap-x-3 text-[10px]">
+								<span class="flex items-center gap-1 {project.pipeline.paid > 0 ? 'text-emerald-400' : 'text-slate-600'}"><span class="size-1.5 rounded-full bg-emerald-500 shrink-0"></span>Paid {project.pipeline.paid > 0 ? fmt(project.pipeline.paid) : '—'}</span>
+								<span class="flex items-center gap-1 {project.pipeline.approved > 0 ? 'text-blue-400' : 'text-slate-600'}"><span class="size-1.5 rounded-full bg-blue-500 shrink-0"></span>Approved {project.pipeline.approved > 0 ? fmt(project.pipeline.approved) : '—'}</span>
+								<span class="flex items-center gap-1 {project.pipeline.submitted > 0 ? 'text-amber-400' : 'text-slate-600'}"><span class="size-1.5 rounded-full bg-amber-400 shrink-0"></span>Submitted {project.pipeline.submitted > 0 ? fmt(project.pipeline.submitted) : '—'}</span>
+								<span class="flex items-center gap-1 {project.pipeline.inTasks > 0 ? 'text-violet-400' : 'text-slate-600'}"><span class="size-1.5 rounded-full bg-violet-500 shrink-0"></span>In Tasks {project.pipeline.inTasks > 0 ? fmt(project.pipeline.inTasks) : '—'}</span>
+								{#if project.pipeline.unallocated > 0}
+									<span class="text-slate-500 ml-auto">{fmt(project.pipeline.unallocated)} unallocated</span>
+								{/if}
+							</div>
 						</div>
-						<div class="h-1.5 rounded-full overflow-hidden {rowEven ? 'bg-slate-700' : 'bg-slate-600/70'}">
-							<div class="h-full rounded-full transition-all {color.bar}"
-								style="width:{project.spendPct.toFixed(1)}%"></div>
-						</div>
-						<p class="text-[10px] text-muted-foreground mt-0.5">{project.spendPct.toFixed(0)}% spent</p>
+
+
+
 					</div>
 
-					<!-- Tasks -->
-					{#if project.tasks.total > 0}
-						<div class="flex items-center gap-3 text-xs mb-3">
-							<div class="flex items-center gap-1 text-muted-foreground">
-								<CheckCircle2 class="size-3.5 text-emerald-500" />
-								<span>{project.tasks.done} done</span>
+					<!-- Task progress + expandable list -->
+					{#if true}
+						{@const taskPct = pct(project.tasks.done, project.tasks.total)}
+						<div class="mb-4 space-y-1.5">
+						<!-- Header row — clickable to expand/collapse -->
+						<button type="button"
+							onclick={() => toggleTasks(project.id)}
+							class="w-full flex items-center justify-between text-xs group"
+						>
+							<div class="flex items-center gap-1.5 text-muted-foreground group-hover:text-slate-300 transition-colors">
+								<CheckCircle2 class="size-3.5" />
+								<span class="font-medium">Tasks</span>
 							</div>
-							<div class="flex items-center gap-1 text-muted-foreground">
-								<Clock class="size-3.5 text-amber-500" />
-								<span>{project.tasks.open} open</span>
+							<div class="flex items-center gap-2 tabular-nums text-[11px]">
+								{#if project.tasks.total > 0}
+									<span class="text-emerald-400 font-medium">{project.tasks.done} done</span>
+									<span class="text-slate-600">·</span>
+									<span class="text-amber-400">{project.tasks.open} open</span>
+									<span class="text-slate-600">·</span>
+									<span class="text-slate-400">{project.tasks.total} total</span>
+								{:else}
+									<span class="text-slate-600 italic">No tasks yet</span>
+								{/if}
+								<ChevronDown class="size-3.5 text-slate-500 transition-transform duration-200 {expandedTasks[project.id] ? 'rotate-180' : ''}" />
 							</div>
-							{#if project.tasks.total > 0}
-								<div class="flex-1 h-1 rounded-full overflow-hidden {rowEven ? 'bg-slate-700' : 'bg-slate-600/70'}">
-									<div class="h-full rounded-full bg-emerald-500 transition-all"
-										style="width:{pct(project.tasks.done, project.tasks.total).toFixed(0)}%"></div>
-								</div>
-							{/if}
-						</div>
+						</button>
+
+						<!-- Progress bar (only when tasks exist) -->
+						{#if project.tasks.total > 0}
+							<div class="h-3 rounded-full overflow-hidden {rowEven ? 'bg-slate-700' : 'bg-slate-600/70'}">
+								<div class="h-full rounded-full bg-emerald-500 transition-all duration-500"
+									style="width:{Math.max(taskPct, 0.5).toFixed(1)}%"></div>
+							</div>
+							<div class="text-[10px] text-muted-foreground">{taskPct.toFixed(0)}% complete</div>
+						{/if}
+
+						<!-- Expanded task list -->
+						{#if expandedTasks[project.id]}
+							<div class="mt-2 space-y-1 border-t {rowEven ? 'border-slate-700/60' : 'border-slate-700/40'} pt-2">
+								{#if project.tasks.items.length === 0}
+									<p class="text-[11px] text-slate-600 italic px-2 py-1">No tasks have been added to this project.</p>
+								{:else}
+									{#each project.tasks.items as task}
+										{@const s = STATUS_ICON[task.status] ?? STATUS_ICON.todo}
+										<button type="button"
+											onclick={() => openTask(task)}
+											class="w-full flex items-start gap-2 py-1.5 px-2 rounded-lg hover:bg-slate-800/60 transition-colors text-left group/task"
+										>
+											<!-- Status icon -->
+											<div class="mt-0.5 shrink-0">
+												{#if task.status === 'completed'}
+													<CheckCircle2 class="size-3.5 {s.color}" />
+												{:else if task.status === 'in_progress'}
+													<Loader class="size-3.5 {s.color}" />
+												{:else if task.status === 'blocked'}
+													<X class="size-3.5 {s.color}" />
+												{:else}
+													<Circle class="size-3.5 {s.color}" />
+												{/if}
+											</div>
+											<!-- Task name + meta -->
+											<div class="flex-1 min-w-0">
+												<p class="text-xs font-medium text-slate-300 truncate leading-snug group-hover/task:text-white transition-colors">{task.title}</p>
+												<div class="flex items-center gap-2 mt-0.5 text-[10px] text-slate-500">
+													<span class="{s.color}">{s.label}</span>
+													{#if task.dueDate}
+														<span>· Due {new Date(task.dueDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>
+													{/if}
+													{#if task.budget > 0}
+														<span>· {fmt(task.budget)}</span>
+													{/if}
+												</div>
+											</div>
+											<ChevronRight class="size-3 text-slate-600 group-hover/task:text-slate-400 shrink-0 mt-1 transition-colors" />
+										</button>
+									{/each}
+								{/if}
+							</div>
+						{/if}
+					</div>
 					{/if}
 
 					<!-- Related links -->
@@ -546,7 +755,7 @@
 					<h2 class="text-base font-bold text-white">Set Raise Amount</h2>
 					<p class="text-xs text-slate-400 mt-0.5">Total capital received from the seed round</p>
 				</div>
-				<button onclick={() => showRaiseModal = false}
+				<button type="button" onclick={() => showRaiseModal = false}
 					class="p-1.5 rounded-lg hover:bg-slate-800 text-slate-500 hover:text-white transition-colors">
 					<X class="size-4" />
 				</button>
@@ -574,7 +783,7 @@
 				<!-- Quick presets -->
 				<div class="flex flex-wrap gap-2">
 					{#each [1_000_000, 2_500_000, 5_000_000, 7_500_000] as preset}
-						<button onclick={() => raiseInput = String(preset)}
+						<button type="button" onclick={() => raiseInput = String(preset)}
 							class="px-2.5 py-1 rounded-lg text-xs border transition-colors
 								{Number(raiseInput) === preset
 									? 'bg-emerald-900/50 border-emerald-700 text-emerald-300'
@@ -602,11 +811,11 @@
 			</div>
 
 			<div class="flex items-center justify-end gap-3 px-5 py-4 border-t border-slate-700/60">
-				<button onclick={() => showRaiseModal = false}
+				<button type="button" onclick={() => showRaiseModal = false}
 					class="px-4 py-2 rounded-lg text-sm text-slate-400 hover:text-white hover:bg-slate-800 transition-colors">
 					Cancel
 				</button>
-				<button onclick={saveRaise} disabled={raiseSaving}
+				<button type="button" onclick={saveRaise} disabled={raiseSaving}
 					class="inline-flex items-center gap-2 px-5 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white text-sm font-medium transition-colors">
 					{#if raiseSaving}<Loader class="size-3.5 animate-spin" />{/if}
 					Save
@@ -615,3 +824,10 @@
 		</div>
 	</div>
 {/if}
+
+<!-- Task detail sheet -->
+<TaskDetailModal
+	bind:open={taskModalOpen}
+	bind:task={selectedTask}
+	onUpdated={() => invalidateAll()}
+/>

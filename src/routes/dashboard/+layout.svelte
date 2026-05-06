@@ -121,9 +121,11 @@
 								{data.userProfile?.role ?? 'user'}
 							</p>
 						</div>
-						<DropdownMenu.Item class="gap-2 cursor-pointer">
-							<User class="size-4 text-muted-foreground" />
-							<span>Profile</span>
+						<DropdownMenu.Item class="gap-2 cursor-pointer p-0">
+							<a href="/dashboard/player-profile" class="flex items-center gap-2 w-full px-2 py-1.5">
+								<User class="size-4 text-muted-foreground" />
+								<span>Profile</span>
+							</a>
 						</DropdownMenu.Item>
 						<DropdownMenu.Item class="gap-2 cursor-pointer">
 							<Settings class="size-4 text-muted-foreground" />
