@@ -35,6 +35,45 @@ export const PATCH: RequestHandler = async ({ locals, request }) => {
 
 		console.log(`✅ Updated expense ${expense.id} with status: ${expense.status}`);
 
+		// If status changed to "paid", update department actual expenses and work order
+		if (currentExpense.status !== 'paid' && expense.status === 'paid') {
+			try {
+				// Resolve project via taskId → project → department
+				let deptId: string | null = null;
+				if (expense.taskId) {
+					const task = await pb.collection('tasks').getOne(expense.taskId).catch(() => null) as any;
+					const pid = task ? (typeof task.projectId === 'object' ? task.projectId?.id : task.projectId) : null;
+					if (pid) {
+						const project = await pb.collection('projects').getOne(pid).catch(() => null) as any;
+						deptId = project?.department || null;
+					}
+				}
+				if (deptId) {
+					const dept = await pb.collection('departments').getOne(deptId).catch(() => null) as any;
+					if (dept) {
+						const currentActual = dept.department_actual_expenses || 0;
+						await pb.collection('departments').update(deptId, {
+							department_actual_expenses: currentActual + (expense.amount || 0),
+						});
+						console.log(`✅ Updated department ${deptId} actual expenses +${expense.amount}`);
+					}
+				}
+				// Mark linked work order as paid
+				const wos = await pb.collection('work_orders').getFullList({
+					filter: `expenseId = "${expense.id}"`,
+					fields: 'id'
+				}).catch(() => []) as any[];
+				for (const wo of wos) {
+					await pb.collection('work_orders').update(wo.id, {
+						status: 'paid',
+						paidDate: new Date().toISOString(),
+					}).catch(() => {});
+				}
+			} catch (paidError: any) {
+				console.warn('Could not process paid side-effects:', paidError.message);
+			}
+		}
+
 		// If status changed to "submitted", automatically create an approval request
 		if (currentExpense.status !== 'submitted' && expense.status === 'submitted') {
 			try {

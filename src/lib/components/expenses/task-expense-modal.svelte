@@ -88,7 +88,7 @@
 	// ── Validation per step ───────────────────────────────────────────────────
 	const step2Valid = $derived(
 		form.description.trim().length > 0 &&
-		form.amount.trim().length > 0 &&
+		String(form.amount ?? '').trim().length > 0 &&
 		Number(form.amount) > 0 &&
 		form.category.length > 0 &&
 		form.date.length > 0 &&
@@ -115,6 +115,7 @@
 				taskId:          task.id,
 				notes:           notesValue
 			};
+			// projectId is not a field on the expenses collection — resolved server-side via taskId
 			if (form.paymentMethod)   payload.paymentMethod   = form.paymentMethod;
 			if (form.vendor)          payload.vendor          = form.vendor;
 			if (form.reimbursementTo) payload.reimbursementTo = form.reimbursementTo.trim();
@@ -318,7 +319,8 @@
 					<div>
 						<label class={LABEL}>{form.billingType === 'hourly' ? 'Total Amount (auto-calculated)' : 'Amount ($) *'}</label>
 						<input
-							bind:value={form.amount}
+							value={form.amount}
+							oninput={(e) => { form.amount = (e.currentTarget as HTMLInputElement).value; }}
 							type="number" min="0.01" step="0.01"
 							readonly={form.billingType === 'hourly'}
 							class="{INPUT} {form.billingType === 'hourly' ? 'opacity-60 cursor-not-allowed' : ''}"
@@ -331,7 +333,7 @@
 						{/if}
 					</div>
 					<div>
-						<label class={LABEL}>Date *</label>
+						<label class={LABEL}>Expense Date * <span class="font-normal text-slate-500">(incurred or invoiced)</span></label>
 						<input bind:value={form.date} type="date" class={INPUT} />
 					</div>
 				</div>
