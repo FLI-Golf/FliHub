@@ -129,6 +129,7 @@
 				{ title: 'Expenses', url: '/dashboard/expenses', icon: Receipt },
 				{ title: 'Vendors', url: '/dashboard/vendors', icon: Store },
 				{ title: 'Approvals', url: '/dashboard/approvals', icon: CheckSquare },
+				{ title: 'Work Orders', url: '/dashboard/work-orders', icon: ClipboardList },
 				{ title: 'Reimbursements', url: '/dashboard/reimbursements', icon: Wallet },
 				{ title: 'Media', url: '/dashboard/media', icon: Images }
 			]

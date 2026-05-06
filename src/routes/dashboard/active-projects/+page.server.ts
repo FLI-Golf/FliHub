@@ -6,7 +6,7 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 	const { pb, profile: userProfile } = ctx;
 
 	try {
-		const [projects, departments, tasks, expenses, sponsors, franchiseLeads, settings] = await Promise.all([
+		const [projects, departments, tasks, expenses, sponsors, franchiseLeads, settings, pendingApprovals] = await Promise.all([
 			pb.collection('projects').getFullList({ filter: "status='in_progress'", sort: 'name' }).catch(() => []),
 			pb.collection('departments').getFullList({ fields: 'id,name,description,department_annual_budget,department_actual_expenses' }).catch(() => []),
 			pb.collection('tasks').getFullList({ sort: '-id', expand: 'projectId' }).catch(() => []),
@@ -14,9 +14,31 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 			pb.collection('sponsors').getFullList({ fields: 'id,name,status,tier,committed_amount,paid_amount' }).catch(() => []),
 			pb.collection('franchise_leads').getFullList({ fields: 'id,name,status,created' }).catch(() => []),
 			pb.collection('settings').getFullList({ fields: 'id,key,value,label' }).catch(() => []),
+			pb.collection('approvals').getFullList({ filter: "status='pending' && entityType='expense'", fields: 'id,entityId,amount' }).catch(() => []),
 		]);
 
 		const deptMap = Object.fromEntries((departments as any[]).map(d => [d.id, d]));
+
+		// Map task id → projectId for fallback resolution
+		const taskProjectMap: Record<string, string> = {};
+		for (const t of tasks as any[]) {
+			const pid = typeof t.projectId === 'object' ? t.projectId?.id : t.projectId;
+			if (t.id && pid) taskProjectMap[t.id] = pid;
+		}
+
+		// Map expense id → projectId (fall back to taskId lookup for older expenses)
+		const expenseProjectMap: Record<string, string> = {};
+		for (const e of expenses as any[]) {
+			if (!e.id) continue;
+			const pid = e.projectId || (e.taskId ? taskProjectMap[e.taskId] : null);
+			if (pid) expenseProjectMap[e.id] = pid;
+		}
+		// Count pending approvals per project
+		const pendingByProject: Record<string, number> = {};
+		for (const a of pendingApprovals as any[]) {
+			const pid = expenseProjectMap[a.entityId];
+			if (pid) pendingByProject[pid] = (pendingByProject[pid] ?? 0) + 1;
+		}
 
 
 		// Task rollup per project
@@ -30,12 +52,14 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 			}
 		}
 
-		// Expense rollup per project
+		// Expense rollup per project — resolve projectId via taskId fallback
+		// (expenses collection has no projectId field; link is task → project)
 		const expensesByProject: Record<string, any[]> = {};
 		for (const e of expenses as any[]) {
-			if (e.projectId) {
-				expensesByProject[e.projectId] ??= [];
-				expensesByProject[e.projectId].push(e);
+			const pid = e.projectId || (e.taskId ? taskProjectMap[e.taskId] : null);
+			if (pid) {
+				expensesByProject[pid] ??= [];
+				expensesByProject[pid].push(e);
 			}
 		}
 
@@ -118,6 +142,7 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 					}))
 				},
 				recentExpenses,
+			pendingApprovals: pendingByProject[p.id] ?? 0,
 			};
 		});
 

@@ -29,6 +29,7 @@
 		'/dashboard/expenses': 'Expenses',
 		'/dashboard/vendors': 'Vendors',
 		'/dashboard/approvals': 'Approvals',
+		'/dashboard/work-orders': 'Work Orders',
 		'/dashboard/media': 'Media',
 		'/dashboard/league': 'League Overview',
 		'/dashboard/talent': 'Talent Management',

@@ -463,6 +463,19 @@
 							</div>
 						</div>
 						<div class="flex items-center gap-2 shrink-0">
+							{#if project.pendingApprovals > 0}
+								<a
+									href="/dashboard/approvals"
+									class="relative inline-flex items-center gap-1.5 text-[10px] font-semibold px-2 py-1 rounded border border-amber-500/60 bg-amber-500/15 text-amber-400 hover:bg-amber-500/25 transition-colors no-underline"
+									title="{project.pendingApprovals} expense{project.pendingApprovals > 1 ? 's' : ''} awaiting approval"
+								>
+									<span class="relative flex size-2">
+										<span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
+										<span class="relative inline-flex rounded-full size-2 bg-amber-500"></span>
+									</span>
+									{project.pendingApprovals} Awaiting Approval
+								</a>
+							{/if}
 							<a
 								href="/api/projects/{project.id}/report/view"
 								target="_blank"
@@ -625,6 +638,12 @@
 													{/if}
 												</div>
 											</div>
+											{#if task.needs_review}
+												<span class="relative flex size-2 shrink-0 mt-1">
+													<span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
+													<span class="relative inline-flex rounded-full size-2 bg-amber-500"></span>
+												</span>
+											{/if}
 											<ChevronRight class="size-3 text-slate-600 group-hover/task:text-slate-400 shrink-0 mt-1 transition-colors" />
 										</button>
 									{/each}
