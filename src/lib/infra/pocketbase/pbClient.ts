@@ -23,14 +23,24 @@ export function createPocketBaseClient(url?: string): PocketBase {
  * regardless of the logged-in user's role permissions.
  */
 export async function getAdminPocketBase(): Promise<PocketBase> {
-	const pb = new PocketBase(env.POCKETBASE_URL || 'http://127.0.0.1:8090');
+	const baseUrl = (env.POCKETBASE_URL || 'https://pocketbase-production-6ab5.up.railway.app').replace(/\/$/, '');
+	const pb = new PocketBase(baseUrl);
+	pb.autoCancellation(false);
 	try {
-		await pb.admins.authWithPassword(
-			env.POCKETBASE_ADMIN_EMAIL!,
-			env.POCKETBASE_ADMIN_PASSWORD!
-		);
+		// Authenticate via raw fetch to get the token, then load it into the store
+		const res = await fetch(`${baseUrl}/api/collections/_superusers/auth-with-password`, {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({ identity: env.POCKETBASE_ADMIN_EMAIL, password: env.POCKETBASE_ADMIN_PASSWORD }),
+		});
+		if (res.ok) {
+			const data = await res.json();
+			pb.authStore.save(data.token, data.record);
+		} else {
+			console.error('Admin auth failed:', res.status, await res.text());
+		}
 	} catch (err: any) {
-		console.error('Admin auth failed:', err.message);
+		console.error('Admin auth error:', err.message);
 	}
 	return pb;
 }

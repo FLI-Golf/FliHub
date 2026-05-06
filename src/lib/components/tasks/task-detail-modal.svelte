@@ -170,43 +170,90 @@
 								<textarea bind:value={form.description} rows="5" placeholder="Task description..." class="flex w-full rounded-md border border-slate-600 bg-slate-800 px-3 py-2 text-sm text-white placeholder:text-slate-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-500"></textarea>
 							</div>
 						{:else}
-							<div class="grid grid-cols-2 gap-6">
-								<div class="space-y-4">
-									<div>
-										<div class="text-sm text-slate-400 mb-2">Status</div>
+							<div class="space-y-3">
+								<!-- Status + Priority -->
+								<div class="flex flex-wrap gap-3">
+									<div class="flex-1 min-w-[140px] bg-slate-800/50 rounded-lg p-3 border border-slate-700/50">
+										<div class="text-xs text-slate-500 mb-1.5">Status</div>
 										<StatusBadge status={task.status} />
 									</div>
-									<div>
-										<div class="text-sm text-slate-400 mb-2 flex items-center gap-1"><Calendar class="size-3" /> Due Date</div>
-										<div class="font-medium text-lg">{formatDate(task.dueDate)}</div>
-									</div>
-									<div>
-										<div class="text-sm text-slate-400 mb-2 flex items-center gap-1"><Calendar class="size-3" /> Start Date</div>
-										<div class="font-medium">{formatDate(task.startDate)}</div>
-									</div>
-								</div>
-								<div class="space-y-4">
-									<div>
-										<div class="text-sm text-slate-400 mb-2">Priority</div>
-										<span class="px-3 py-1.5 rounded-full text-sm font-medium capitalize
-											{task.priority === 'urgent' ? 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300' : ''}
-											{task.priority === 'high'   ? 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-300' : ''}
-											{task.priority === 'medium' ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300' : ''}
-											{task.priority === 'low'    ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300' : ''}
+									<div class="flex-1 min-w-[140px] bg-slate-800/50 rounded-lg p-3 border border-slate-700/50">
+										<div class="text-xs text-slate-500 mb-1.5">Priority</div>
+										<span class="px-2.5 py-1 rounded-full text-xs font-semibold capitalize
+											{task.priority === 'urgent' ? 'bg-red-900/40 text-red-300 border border-red-700/50' : ''}
+											{task.priority === 'high'   ? 'bg-orange-900/40 text-orange-300 border border-orange-700/50' : ''}
+											{task.priority === 'medium' ? 'bg-yellow-900/40 text-yellow-300 border border-yellow-700/50' : ''}
+											{task.priority === 'low'    ? 'bg-green-900/40 text-green-300 border border-green-700/50' : ''}
 										">{task.priority || 'medium'}</span>
 									</div>
-									<div>
-										<div class="text-sm text-slate-400 mb-2 flex items-center gap-1"><Clock class="size-3" /> Hours</div>
-										<div class="font-medium text-lg">{task.actualHours || 0} / {task.estimatedHours || 0}h</div>
+								</div>
+								<!-- Dates -->
+								<div class="grid grid-cols-3 gap-3">
+									<div class="bg-slate-800/50 rounded-lg p-3 border border-slate-700/50">
+										<div class="text-xs text-slate-500 mb-1 flex items-center gap-1"><Calendar class="size-3" />Start</div>
+										<div class="text-sm font-medium text-white">{formatDate(task.startDate)}</div>
+									</div>
+									<div class="bg-slate-800/50 rounded-lg p-3 border border-slate-700/50">
+										<div class="text-xs text-slate-500 mb-1 flex items-center gap-1"><Calendar class="size-3" />Due</div>
+										<div class="text-sm font-medium text-white">{formatDate(task.dueDate)}</div>
+									</div>
+									<div class="bg-slate-800/50 rounded-lg p-3 border border-slate-700/50">
+										<div class="text-xs text-slate-500 mb-1 flex items-center gap-1"><Calendar class="size-3" />Completed</div>
+										<div class="text-sm font-medium {task.completedDate ? 'text-emerald-400' : 'text-slate-600'}">{formatDate(task.completedDate)}</div>
 									</div>
 								</div>
-							</div>
-							{#if task.description}
-								<div class="pt-4 border-t border-slate-700">
-									<div class="text-sm text-slate-400 mb-3">Description</div>
-									<div class="prose prose-sm dark:prose-invert max-w-none bg-slate-800/50 p-4 rounded-lg">{@html task.description}</div>
+								<!-- Hours + Budget -->
+								<div class="grid grid-cols-2 gap-3">
+									<div class="bg-slate-800/50 rounded-lg p-3 border border-slate-700/50">
+										<div class="text-xs text-slate-500 mb-1 flex items-center gap-1"><Clock class="size-3" />Hours</div>
+										<div class="text-sm font-medium text-white tabular-nums">
+											{task.actualHours || 0}h actual
+											<span class="text-slate-500 text-xs">/ {task.estimatedHours || 0}h est.</span>
+										</div>
+										{#if (task.estimatedHours || 0) > 0}
+											<div class="mt-1.5 h-1.5 rounded-full bg-slate-700 overflow-hidden">
+												<div class="h-full rounded-full bg-blue-500 transition-all"
+													style="width:{Math.min(100,((task.actualHours||0)/(task.estimatedHours||1))*100).toFixed(0)}%">
+												</div>
+											</div>
+										{/if}
+									</div>
+									<div class="bg-slate-800/50 rounded-lg p-3 border border-slate-700/50">
+										<div class="text-xs text-slate-500 mb-1">Budget</div>
+										{#if (task.task_budget || 0) > 0}
+											<div class="text-sm font-medium text-white tabular-nums">
+												${(task.task_budget||0).toLocaleString()} <span class="text-slate-500 text-xs">budgeted</span>
+											</div>
+										{/if}
+										{#if (task.task_actual_cost || 0) > 0}
+											<div class="text-sm text-emerald-400 tabular-nums">
+												${(task.task_actual_cost||0).toLocaleString()} <span class="text-slate-500 text-xs">actual</span>
+											</div>
+										{/if}
+										{#if !(task.task_budget || 0) && !(task.task_actual_cost || 0)}
+											<span class="text-slate-600 text-sm">—</span>
+										{/if}
+									</div>
 								</div>
-							{/if}
+								<!-- Tags -->
+								{#if task.tags}
+									<div class="bg-slate-800/50 rounded-lg p-3 border border-slate-700/50">
+										<div class="text-xs text-slate-500 mb-2">Tags</div>
+										<div class="flex flex-wrap gap-1.5">
+											{#each task.tags.split(',').map((t: string) => t.trim()).filter(Boolean) as tag}
+												<span class="px-2 py-0.5 rounded-full text-xs bg-slate-700 text-slate-300 border border-slate-600">{tag}</span>
+											{/each}
+										</div>
+									</div>
+								{/if}
+								<!-- Description -->
+								{#if task.description}
+									<div class="bg-slate-800/50 rounded-lg p-3 border border-slate-700/50">
+										<div class="text-xs text-slate-500 mb-2">Description</div>
+										<div class="prose prose-sm dark:prose-invert max-w-none text-slate-300 leading-relaxed">{@html task.description}</div>
+									</div>
+								{/if}
+							</div>
 						{/if}
 
 					{:else if activeTab === 'checklist'}
