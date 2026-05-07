@@ -17,8 +17,7 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 		} catch { /* league collection not available */ }
 
 		const franchises = await pb.collection('franchises').getFullList({
-			sort: 'priority',
-			fields: 'id,name,slug,primaryColor,secondaryColor,logoMini,logoFull,collectionId'
+			sort: 'priority'
 		});
 
 		// trademark_filings — degrade gracefully if collection not yet created

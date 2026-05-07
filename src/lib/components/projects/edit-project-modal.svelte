@@ -18,7 +18,6 @@
 		startDate: '',
 		endDate: '',
 		project_budget: '',
-		project_forecasted_expenses: '',
 		fiscalYear: '',
 		notes: ''
 	});
@@ -26,15 +25,19 @@
 	// Update formData when modal opens or project changes
 	$effect(() => {
 		if (open) {
+			const today = new Date();
+			const plus60 = new Date(today);
+			plus60.setDate(plus60.getDate() + 60);
+			const fmt = (d: Date) => d.toISOString().slice(0, 10);
+
 			formData = {
 				name: project.name || '',
 				description: project.description || '',
 				type: project.type || 'tournament',
 				status: project.status || 'draft',
-				startDate: project.startDate ? project.startDate.split('T')[0] : '',
-				endDate: project.endDate ? project.endDate.split('T')[0] : '',
+				startDate: project.startDate ? project.startDate.split('T')[0] : fmt(today),
+				endDate: project.endDate ? project.endDate.split('T')[0] : fmt(plus60),
 				project_budget: project.project_budget?.toString() || '',
-				project_forecasted_expenses: project.project_forecasted_expenses?.toString() || '',
 				fiscalYear: project.fiscalYear || '',
 				notes: project.notes || ''
 			};
@@ -72,8 +75,7 @@
 				},
 				body: JSON.stringify({
 					...formData,
-					project_budget: formData.project_budget ? parseFloat(formData.project_budget) : undefined,
-					project_forecasted_expenses: formData.project_forecasted_expenses ? parseFloat(formData.project_forecasted_expenses) : undefined
+					project_budget: formData.project_budget ? parseFloat(formData.project_budget) : undefined
 				})
 			});
 
@@ -199,33 +201,50 @@
 				</div>
 			</div>
 
-			<!-- Budget and Forecasted -->
-			<div class="grid grid-cols-2 gap-4">
-				<div class="space-y-2">
-					<Label for="edit-budget" class="text-slate-200">Budget</Label>
-					<Input
-						id="edit-budget"
-						type="number"
-						step="0.01"
-						min="0"
-						bind:value={formData.project_budget}
-						placeholder="0.00"
-						class="bg-slate-800 border-slate-700 text-white placeholder:text-slate-400"
-					/>
+			<!-- Budget -->
+			<div class="space-y-3 rounded-xl bg-slate-800/60 border border-slate-700 p-4">
+				<div class="flex items-center justify-between">
+					<Label class="text-slate-200 font-semibold">Budget</Label>
+					{#if formData.project_budget}
+						{@const budget = parseFloat(formData.project_budget) || 0}
+						{@const actual = project.project_actual_expenses ?? 0}
+						{@const pct = budget > 0 ? Math.min(100, (actual / budget) * 100) : 0}
+						<span class="text-xs {pct > 90 ? 'text-red-400' : pct > 70 ? 'text-yellow-400' : 'text-emerald-400'} font-medium">
+							{pct.toFixed(0)}% used
+						</span>
+					{/if}
 				</div>
 
-				<div class="space-y-2">
-					<Label for="edit-forecastedExpenses" class="text-slate-200">Forecasted Expenses</Label>
-					<Input
-						id="edit-forecastedExpenses"
-						type="number"
-						step="0.01"
-						min="0"
-						bind:value={formData.project_forecasted_expenses}
-						placeholder="0.00"
-						class="bg-slate-800 border-slate-700 text-white placeholder:text-slate-400"
-					/>
+				<div class="space-y-1.5">
+					<Label for="edit-budget" class="text-xs text-slate-400">Project Budget</Label>
+					<div class="relative">
+						<span class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm">$</span>
+						<Input
+							id="edit-budget"
+							type="number"
+							step="1000"
+							min="0"
+							bind:value={formData.project_budget}
+							placeholder="0"
+							class="bg-slate-900 border-slate-600 text-white placeholder:text-slate-500 pl-6"
+						/>
+					</div>
 				</div>
+
+				{#if formData.project_budget}
+					{@const budget = parseFloat(formData.project_budget) || 0}
+					{@const actual = project.project_actual_expenses ?? 0}
+					{@const pct = budget > 0 ? Math.min(100, (actual / budget) * 100) : 0}
+					<div class="space-y-1.5 pt-1">
+						<div class="h-2 w-full rounded-full bg-slate-700 overflow-hidden">
+							<div class="h-full rounded-full {pct > 90 ? 'bg-red-500' : pct > 70 ? 'bg-yellow-400' : 'bg-emerald-500'} transition-all duration-300" style="width:{pct}%"></div>
+						</div>
+						<div class="flex justify-between text-[10px] text-slate-500">
+							<span>${actual.toLocaleString()} spent</span>
+							<span>${(budget - actual).toLocaleString()} remaining</span>
+						</div>
+					</div>
+				{/if}
 			</div>
 
 			<!-- Fiscal Year -->

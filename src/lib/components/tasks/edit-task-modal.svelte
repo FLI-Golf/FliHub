@@ -94,24 +94,33 @@
 		}
 	}
 
-	// Update form data when task or open state changes
+	// Populate form only when the modal opens or the task record changes.
+	// Assigning into formData must not create a dependency loop, so we
+	// capture the values we need before writing anything.
+	let _lastTaskId = $state('');
 	$effect(() => {
-		if (task && open) {
-			formData.title = task.title || '';
-			formData.description = task.description || '';
-			formData.status = task.status || 'todo';
-			formData.priority = task.priority || 'medium';
-			formData.startDate = formatDateForInput(task.startDate);
-			formData.dueDate = formatDateForInput(task.dueDate);
-			formData.estimatedHours = task.estimatedHours?.toString() || '';
-			formData.task_budget = task.task_budget?.toString() || '';
-			formData.actualHours = task.actualHours?.toString() || '';
-			formData.notes = task.notes || '';
-			
-			// Parse subtasks into interactive list
-			subtasks = parseMarkdown(task.subTasksChecklist || '');
-			newSubtaskText = '';
-		}
+		const shouldInit = task && open && task.id !== _lastTaskId;
+		if (!shouldInit) return;
+		_lastTaskId = task.id;
+
+		const t = task; // snapshot — avoid re-tracking inside assignments
+		formData.title          = t.title          || '';
+		formData.description    = t.description    || '';
+		formData.status         = t.status         || 'todo';
+		formData.priority       = t.priority       || 'medium';
+		formData.startDate      = formatDateForInput(t.startDate);
+		formData.dueDate        = formatDateForInput(t.dueDate);
+		formData.estimatedHours = t.estimatedHours?.toString() || '';
+		formData.task_budget    = t.task_budget?.toString()    || '';
+		formData.actualHours    = t.actualHours?.toString()    || '';
+		formData.notes          = t.notes          || '';
+		subtasks                = parseMarkdown(t.subTasksChecklist || '');
+		newSubtaskText          = '';
+	});
+
+	// Reset the task-id tracker when the modal closes so it re-initialises next open.
+	$effect(() => {
+		if (!open) _lastTaskId = '';
 	});
 	
 
@@ -195,19 +204,7 @@
 		if (!newOpen) error = '';
 	}
 
-	$effect(() => {
-		formData = {
-			title: task.title || '',
-			description: task.description || '',
-			status: task.status || 'todo',
-			priority: task.priority || 'medium',
-			startDate: task.startDate ? task.startDate.split('T')[0] : '',
-			dueDate: task.dueDate ? task.dueDate.split('T')[0] : '',
-			estimatedHours: task.estimatedHours?.toString() || '',
-			actualHours: task.actualHours?.toString() || '',
-			notes: task.notes || ''
-		};
-	});
+
 </script>
 
 <Sheet.Root {open} onOpenChange={handleOpenChange}>
