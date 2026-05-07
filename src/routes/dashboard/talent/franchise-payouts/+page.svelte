@@ -81,7 +81,7 @@
 			<div>
 				<label class="text-sm font-medium">Franchise</label>
 				<select
-					class="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2"
+					class="mt-1 block w-full appearance-none rounded-lg border border-slate-600 bg-slate-800 text-slate-100 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 cursor-pointer"
 					onchange={(e) => {
 						const franchiseId = e.currentTarget.value;
 						window.location.href = franchiseId
@@ -89,9 +89,9 @@
 							: '/dashboard/talent/franchise-payouts';
 					}}
 				>
-					<option value="">All Franchises</option>
+					<option value="" class="bg-slate-800">All Franchises</option>
 					{#each data.franchises as franchise}
-						<option value={franchise.id} selected={data.currentFranchiseId === franchise.id}>
+						<option value={franchise.id} class="bg-slate-800" selected={data.currentFranchiseId === franchise.id}>
 							{franchise.name}
 						</option>
 					{/each}
