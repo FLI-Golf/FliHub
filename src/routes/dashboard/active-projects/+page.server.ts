@@ -19,6 +19,14 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 
 		const deptMap = Object.fromEntries((departments as any[]).map(d => [d.id, d]));
 
+		// Map taskId → draft expense count
+		const draftByTask: Record<string, number> = {};
+		for (const e of expenses as any[]) {
+			if (e.status === 'draft' && e.taskId) {
+				draftByTask[e.taskId] = (draftByTask[e.taskId] ?? 0) + 1;
+			}
+		}
+
 		// Map task id → projectId for fallback resolution
 		const taskProjectMap: Record<string, string> = {};
 		for (const t of tasks as any[]) {
@@ -137,12 +145,14 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 						// Full record for TaskDetailModal
 						...t,
 						// Convenience aliases used in the task row UI
-						budget:     t.task_budget ?? 0,
-						actualCost: t.task_actual_cost ?? 0
+						budget:        t.task_budget ?? 0,
+						actualCost:    t.task_actual_cost ?? 0,
+						draftExpenses: draftByTask[t.id] ?? 0,
 					}))
 				},
 				recentExpenses,
 			pendingApprovals: pendingByProject[p.id] ?? 0,
+			draftExpenses: pexpenses.filter((e: any) => e.status === 'draft').length,
 			};
 		});
 

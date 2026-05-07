@@ -1,0 +1,7 @@
+services:
+  dev-server:
+    name: Dev Server
+    description: SvelteKit development server
+    commands:
+      start: cd /workspaces/FliHub && npm run dev
+      ready: curl -s http://localhost:5173/ > /dev/null
