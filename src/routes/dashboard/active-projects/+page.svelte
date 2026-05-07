@@ -6,10 +6,11 @@
 		Zap, FolderKanban, DollarSign, CheckCircle2, Clock,
 		ArrowRight, Users, Star, Trophy, Building2,
 		Film, Scale, Handshake, Cpu, TrendingUp, ExternalLink,
-		ChevronDown, ChevronRight, Info, Wallet, Pencil, X, Loader, Circle, FileText
+		ChevronDown, ChevronRight, Info, Wallet, Pencil, X, Loader, Circle, FileText, Receipt
 	} from 'lucide-svelte';
 	import { invalidateAll } from '$app/navigation';
 	import TaskDetailModal from '$lib/components/tasks/task-detail-modal.svelte';
+	import TaskExpenseModal from '$lib/components/expenses/task-expense-modal.svelte';
 
 	let { data }: { data: PageData } = $props();
 
@@ -21,6 +22,14 @@
 	let selectedTask = $state<any>(null);
 	let taskModalOpen = $state(false);
 	function openTask(task: any) { selectedTask = task; taskModalOpen = true; }
+
+	let expenseTask     = $state<any>(null);
+	let expenseModalOpen = $state(false);
+	function openExpense(task: any, e: Event) {
+		e.stopPropagation();
+		expenseTask = task;
+		expenseModalOpen = true;
+	}
 
 	// Report generation — track which project is generating
 	let generatingReport = $state<Record<string, boolean>>({});
@@ -463,6 +472,16 @@
 							</div>
 						</div>
 						<div class="flex items-center gap-2 shrink-0">
+							{#if project.draftExpenses > 0}
+								<a
+									href="/dashboard/expenses"
+									class="inline-flex items-center gap-1.5 text-[10px] font-semibold px-2 py-1 rounded border border-slate-500/50 bg-slate-700/50 text-slate-400 hover:bg-slate-700 transition-colors no-underline"
+									title="{project.draftExpenses} draft expense{project.draftExpenses > 1 ? 's' : ''} — not yet submitted"
+								>
+									<FileText class="size-3" />
+									{project.draftExpenses} Draft
+								</a>
+							{/if}
 							{#if project.pendingApprovals > 0}
 								<a
 									href="/dashboard/approvals"
@@ -609,9 +628,12 @@
 								{:else}
 									{#each project.tasks.items as task}
 										{@const s = STATUS_ICON[task.status] ?? STATUS_ICON.todo}
-										<button type="button"
+										<div
+											role="button"
+											tabindex="0"
 											onclick={() => openTask(task)}
-											class="w-full flex items-start gap-2 py-1.5 px-2 rounded-lg hover:bg-slate-800/60 transition-colors text-left group/task"
+											onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') openTask(task); }}
+											class="w-full flex items-start gap-2 py-1.5 px-2 rounded-lg hover:bg-slate-800/60 transition-colors text-left group/task cursor-pointer"
 										>
 											<!-- Status icon -->
 											<div class="mt-0.5 shrink-0">
@@ -638,14 +660,25 @@
 													{/if}
 												</div>
 											</div>
+											{#if task.draftExpenses > 0}
+												<a href="/dashboard/expenses" onclick={(e) => e.stopPropagation()} class="shrink-0 text-[9px] font-semibold px-1.5 py-0.5 rounded border border-slate-600/60 bg-slate-700/60 text-slate-400 hover:text-slate-200 transition-colors no-underline" title="{task.draftExpenses} draft expense — not yet submitted">Draft</a>
+											{/if}
 											{#if task.needs_review}
 												<span class="relative flex size-2 shrink-0 mt-1">
 													<span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
 													<span class="relative inline-flex rounded-full size-2 bg-amber-500"></span>
 												</span>
 											{/if}
+											<button
+												type="button"
+												onclick={(e) => openExpense(task, e)}
+												class="shrink-0 inline-flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded border border-emerald-600/40 bg-emerald-600/10 text-emerald-400 hover:bg-emerald-600/20 hover:border-emerald-500/60 transition-colors opacity-0 group-hover/task:opacity-100"
+												title="Log expense for this task"
+											>
+												<Receipt class="size-3" /> Log Expense
+											</button>
 											<ChevronRight class="size-3 text-slate-600 group-hover/task:text-slate-400 shrink-0 mt-1 transition-colors" />
-										</button>
+										</div>
 									{/each}
 								{/if}
 							</div>
@@ -850,3 +883,11 @@
 	bind:task={selectedTask}
 	onUpdated={() => invalidateAll()}
 />
+
+<!-- Log expense from task -->
+{#if expenseTask}
+	<TaskExpenseModal
+		bind:open={expenseModalOpen}
+		task={expenseTask}
+	/>
+{/if}

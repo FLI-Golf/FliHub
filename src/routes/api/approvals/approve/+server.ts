@@ -1,5 +1,6 @@
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
+import { getAdminPocketBase } from '$lib/infra/pocketbase/pbClient';
 
 /** Derive a short project code from the project name — first letter of each word, max 6 chars, uppercase. */
 function deriveProjectCode(name: string): string {
@@ -13,15 +14,19 @@ function deriveProjectCode(name: string): string {
 }
 
 export const POST: RequestHandler = async ({ locals, request }) => {
-	const pb = locals.pb;
+	const userPb = locals.pb;
 
-	if (!pb.authStore.isValid || !pb.authStore.model?.id) {
+	if (!userPb.authStore.isValid || !userPb.authStore.model?.id) {
 		return json({ error: 'Unauthorized - Not logged in' }, { status: 403 });
 	}
 
+	// Use admin client for all DB writes so auth state never blocks work order creation
+	const pb = await getAdminPocketBase();
+	console.log('[approve] admin pb auth valid:', pb.authStore.isValid, 'token length:', pb.authStore.token?.length ?? 0);
+
 	try {
 		const profiles = await pb.collection('user_profiles').getFullList({
-			filter: `userId = "${pb.authStore.model.id}"`
+			filter: `userId = "${userPb.authStore.model.id}"`
 		});
 		const userProfile = profiles[0] as any;
 
@@ -88,22 +93,16 @@ export const POST: RequestHandler = async ({ locals, request }) => {
 
 				// 2. Generate Work Order number: WO-{CODE}-{NNNN}
 				const projectCode = project ? deriveProjectCode(project.name) : 'GEN';
-				const existing = await pb.collection('work_orders').getList(1, 1, {
-					filter: `projectCode = "${projectCode}"`,
-					sort: '-created',
-					fields: 'work_order_number'
-				}).catch(() => ({ items: [] })) as any;
 
-				let seq = 1;
-				if (existing.items.length > 0) {
-					const last = existing.items[0].work_order_number as string;
-					const parts = last.split('-');
-					const lastSeq = parseInt(parts[parts.length - 1], 10);
-					if (!isNaN(lastSeq)) seq = lastSeq + 1;
-				}
+				// Sequence: count all existing work orders and add 1 (avoids filter on non-indexed field)
+				const allWOs = await pb.collection('work_orders').getFullList({
+					fields: 'work_order_number',
+					sort: '-created'
+				}).catch(() => []) as any[];
+				const seq = allWOs.length + 1;
 				workOrderNumber = `WO-${projectCode}-${String(seq).padStart(4, '0')}`;
 
-				updatePayload.comments = `<p>Approved by ${voteCount} of ${quorum} required approvers. Work Order: ${workOrderNumber}</p>`;
+				updatePayload.comments = `<p>Quorum reached — approved by ${voteCount} ${voteCount === 1 ? 'approver' : 'approvers'}. Work Order: ${workOrderNumber}</p>`;
 
 				// 3. Update expense: approved + work order number
 				await pb.collection('expenses').update(expense.id, {
@@ -114,19 +113,24 @@ export const POST: RequestHandler = async ({ locals, request }) => {
 				}).catch((e: any) => console.warn('expense update failed:', e.message));
 
 				// 4. Create work_orders record
-				await pb.collection('work_orders').create({
-					work_order_number: workOrderNumber,
-					expenseId:    expense.id,
-					taskId:       expense.taskId || '',
-					projectId:    project?.id || '',
-					projectCode,
-					projectName:  project?.name || '',
-					description:  expense.description || '',
-					amount:       expense.amount || 0,
-					approvedBy:   userProfile.id,
-					approvedDate: new Date().toISOString(),
-					status:       'open',
-				}).catch((e: any) => console.warn('work_order create failed:', e.message));
+				try {
+					const wo = await pb.collection('work_orders').create({
+						work_order_number: workOrderNumber,
+						expenseId:    expense.id,
+						taskId:       expense.taskId || '',
+						projectId:    project?.id || '',
+						projectCode,
+						projectName:  project?.name || '',
+						description:  expense.description || '',
+						amount:       expense.amount || 0,
+						approvedBy:   userProfile.id,
+						approvedDate: new Date().toISOString(),
+						status:       'open',
+					});
+					console.log(`✅ Work order ${workOrderNumber} created: ${wo.id}`);
+				} catch (e: any) {
+					console.error('❌ work_order create failed:', e.message, JSON.stringify(e.data ?? {}));
+				}
 
 				// 5. Flag the task for review
 				if (taskRecord) {
@@ -144,13 +148,13 @@ export const POST: RequestHandler = async ({ locals, request }) => {
 				}
 
 			} else if (approval.entityType === 'project') {
-				updatePayload.comments = `<p>Approved by ${voteCount} of ${quorum} required approvers.</p>`;
+				updatePayload.comments = `<p>Quorum reached — approved by ${voteCount} ${voteCount === 1 ? 'approver' : 'approvers'}.</p>`;
 				await pb.collection('projects').update(approval.entityId, {
 					status: 'in_progress',
 					approvedBy: userProfile.id,
 				}).catch((e: any) => console.warn('project update failed:', e.message));
 			} else {
-				updatePayload.comments = `<p>Approved by ${voteCount} of ${quorum} required approvers.</p>`;
+				updatePayload.comments = `<p>Quorum reached — approved by ${voteCount} ${voteCount === 1 ? 'approver' : 'approvers'}.</p>`;
 			}
 		}
 

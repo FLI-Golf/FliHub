@@ -6,12 +6,16 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 	const { pb, userId } = ctx;
 
 	try {
-		const [approvals, settings] = await Promise.all([
+		const [approvals, settings, draftExpenses] = await Promise.all([
 			pb.collection('approvals').getFullList({
 				expand: 'requestedBy,approver',
 				sort: '-requestedDate'
 			}).catch(() => []),
 			pb.collection('settings').getFullList({ fields: 'id,key,value,label' }).catch(() => []),
+			pb.collection('expenses').getFullList({
+				filter: `status="draft"`,
+				sort: '-date'
+			}).catch(() => []),
 		]);
 
 		const userProfiles = await pb.collection('user_profiles').getFullList({
@@ -38,7 +42,7 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 					await pb.collection('approvals').update(a.id, {
 						status: 'approved',
 						reviewedDate: new Date().toISOString(),
-						comments: `<p>Approved by ${voters.length} of ${quorum} required approvers.</p>`
+						comments: `<p>Quorum reached — approved by ${voters.length} ${voters.length === 1 ? 'approver' : 'approvers'}.</p>`
 					});
 					a.status = 'approved'; // update in-memory so stats are correct
 					if (a.entityType === 'expense') {
@@ -88,11 +92,12 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 			pendingAmount: annotated.filter((a: any) => a.status === 'pending').reduce((s: number, a: any) => s + (a.amount || 0), 0),
 		};
 
-		return { approvals: annotated, stats, userProfile, quorum, quorumSettingId };
+		return { approvals: annotated, draftExpenses, stats, userProfile, quorum, quorumSettingId };
 	} catch (error: any) {
 		console.error('Error loading approvals:', error);
 		return {
 			approvals: [],
+			draftExpenses: [],
 			stats: { total: 0, pending: 0, approved: 0, rejected: 0, revisionRequested: 0, byType: { expense: 0, project: 0, budget: 0 }, totalAmount: 0, pendingAmount: 0 },
 			userProfile: null,
 			quorum: 2,

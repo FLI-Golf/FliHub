@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { invalidateAll } from '$app/navigation';
-	import { X, ChevronRight, ChevronLeft, Receipt, CheckCircle2, AlertCircle, Building2, FolderKanban, ListTodo, DollarSign } from 'lucide-svelte';
+	import { X, ChevronRight, ChevronLeft, Receipt, CheckCircle2, AlertCircle, Building2, FolderKanban, ListTodo, DollarSign, ArrowRight } from 'lucide-svelte';
 
 	// ── Props ─────────────────────────────────────────────────────────────────
 	// task: the full task record (must have id, title, task_budget, task_actual_cost, projectId)
@@ -27,8 +27,8 @@
 
 	// ── Form state ────────────────────────────────────────────────────────────
 	let form = $state({
-		description:     '',
-		amount:          '',
+		description:     task?.title ?? '',
+		amount:          task?.task_budget ? String(task.task_budget) : '',
 		billingType:     'fixed',   // 'fixed' | 'hourly'
 		hours:           '',
 		hourlyRate:      '',
@@ -49,9 +49,10 @@
 		}
 	});
 
-	let saving  = $state(false);
-	let err     = $state('');
-	let success = $state(false);
+	let saving      = $state(false);
+	let err         = $state('');
+	let success     = $state(false);
+	let savedStatus = $state<'draft' | 'submitted'>('submitted');
 
 	// Budget context
 	const budget  = $derived(task?.task_budget    || 0);
@@ -131,12 +132,15 @@
 				throw new Error(data.error ?? data.message ?? `Error ${res.status}`);
 			}
 
+			savedStatus = form.status as 'draft' | 'submitted';
 			success = true;
 			await invalidateAll();
-			setTimeout(() => {
-				open = false;
-				reset();
-			}, 1400);
+			if (savedStatus === 'submitted') {
+				setTimeout(() => {
+					open = false;
+					reset();
+				}, 1400);
+			}
 		} catch (e: any) {
 			err = e.message ?? 'Failed to create expense';
 		} finally {
@@ -145,12 +149,12 @@
 	}
 
 	function reset() {
-		step = 1; success = false; err = '';
+		step = 1; success = false; err = ''; savedStatus = 'submitted';
 		form = {
-			description: '', amount: '', billingType: 'fixed', hours: '', hourlyRate: '',
+			description: task?.title ?? '', amount: task?.task_budget ? String(task.task_budget) : '', billingType: 'fixed', hours: '', hourlyRate: '',
 			category: 'Marketing', paymentMethod: '', vendor: '', reimbursementTo: '',
 			date: new Date().toISOString().slice(0, 10),
-			status: 'draft', notes: ''
+			status: 'submitted', notes: ''
 		};
 	}
 
@@ -377,12 +381,37 @@
 			{:else if step === 3}
 
 				{#if success}
-					<div class="flex flex-col items-center justify-center py-8 gap-3">
+					<div class="flex flex-col items-center justify-center py-8 gap-3 text-center">
 						<CheckCircle2 class="size-12 text-emerald-400" />
 						<p class="text-lg font-semibold text-emerald-300">Expense created!</p>
-						<p class="text-sm text-slate-400">
-							{form.status === 'submitted' ? 'Submitted for approval.' : 'Saved as draft.'}
-						</p>
+						{#if savedStatus === 'draft'}
+							<p class="text-sm text-slate-400">Saved as a draft. You can find and submit it from the Expenses or Approvals page.</p>
+							<div class="flex flex-col gap-2 mt-1 w-full max-w-xs">
+								<a
+									href="/dashboard/approvals"
+									onclick={close}
+									class="inline-flex items-center justify-center gap-2 text-sm font-semibold px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white transition-colors"
+								>
+									Go to Approvals <ArrowRight class="size-4" />
+								</a>
+								<a
+									href="/dashboard/expenses"
+									onclick={close}
+									class="inline-flex items-center justify-center gap-2 text-sm font-medium px-4 py-2 rounded-lg border border-slate-600 text-slate-300 hover:border-slate-500 hover:text-slate-100 transition-colors"
+								>
+									Go to Expenses
+								</a>
+								<button
+									type="button"
+									onclick={close}
+									class="text-xs text-slate-500 hover:text-slate-300 transition-colors mt-1"
+								>
+									Stay here
+								</button>
+							</div>
+						{:else}
+							<p class="text-sm text-slate-400">Submitted for approval.</p>
+						{/if}
 					</div>
 				{:else}
 					<!-- Summary -->
@@ -422,19 +451,25 @@
 					<div class="space-y-2">
 						<p class="text-xs text-slate-400 uppercase tracking-wide font-semibold">How would you like to save this?</p>
 						<label class="flex items-start gap-3 p-3 rounded-xl border cursor-pointer transition-all
-							{form.status === 'draft' ? 'border-slate-500 bg-slate-800' : 'border-slate-700 bg-slate-800/40 hover:border-slate-600'}">
-							<input type="radio" bind:group={form.status} value="draft" class="mt-0.5 accent-emerald-500" />
-							<div>
-								<p class="text-sm font-semibold text-slate-200">Save as Draft</p>
-								<p class="text-xs text-slate-400">You can edit and submit later</p>
-							</div>
-						</label>
-						<label class="flex items-start gap-3 p-3 rounded-xl border cursor-pointer transition-all
 							{form.status === 'submitted' ? 'border-emerald-600 bg-emerald-950/30' : 'border-slate-700 bg-slate-800/40 hover:border-slate-600'}">
 							<input type="radio" bind:group={form.status} value="submitted" class="mt-0.5 accent-emerald-500" />
 							<div>
 								<p class="text-sm font-semibold text-slate-200">Submit for Approval</p>
-								<p class="text-xs text-slate-400">Sends to approvals queue immediately</p>
+								<p class="text-xs text-slate-400">Sends to the approvals queue immediately — recommended in most cases</p>
+							</div>
+						</label>
+						<label class="flex items-start gap-3 p-3 rounded-xl border cursor-pointer transition-all
+							{form.status === 'draft' ? 'border-slate-500 bg-slate-800' : 'border-slate-700 bg-slate-800/40 hover:border-slate-600'}">
+							<input type="radio" bind:group={form.status} value="draft" class="mt-0.5 accent-emerald-500" />
+							<div>
+								<p class="text-sm font-semibold text-slate-300">Save as Draft</p>
+								<p class="text-xs text-slate-500 mt-0.5">Only use this if you need to:</p>
+								<ul class="text-xs text-slate-500 mt-1 space-y-0.5 list-disc list-inside">
+									<li>Gather a missing receipt or invoice before submitting</li>
+									<li>Confirm the final amount with a vendor</li>
+									<li>Get sign-off from your manager before it enters the queue</li>
+								</ul>
+								<p class="text-xs text-slate-600 mt-1.5">Drafts do not enter the approval queue until submitted.</p>
 							</div>
 						</label>
 					</div>

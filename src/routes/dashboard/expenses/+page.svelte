@@ -28,6 +28,7 @@
 		MoreHorizontal
 	} from 'lucide-svelte';
 	import EditExpenseModal from '$lib/components/expenses/edit-expense-modal.svelte';
+	import DraftReviewModal from '$lib/components/expenses/draft-review-modal.svelte';
 	import ExpensePieChart from '$lib/components/charts/ExpensePieChart.svelte';
 	
 	let { data }: { data: PageData } = $props();
@@ -39,11 +40,21 @@
 	
 	let statusFilter = $state<string>('all');
 	let categoryFilter = $state<string>('all');
-	let showEditModal = $state(false);
-	let selectedExpense = $state<any>(null);
+	let showEditModal        = $state(false);
+	let showDraftReviewModal = $state(false);
+	let selectedExpense      = $state<any>(null);
 
 	function handleRowClick(expense: any) {
 		selectedExpense = expense;
+		if (expense.status === 'draft') {
+			showDraftReviewModal = true;
+		} else {
+			showEditModal = true;
+		}
+	}
+
+	function handleEditFromDraft() {
+		showDraftReviewModal = false;
 		showEditModal = true;
 	}
 
@@ -407,4 +418,10 @@
 	vendors={data.vendors ?? []}
 	projects={data.projects ?? []}
 	onUpdated={handleExpenseUpdated}
+/>
+
+<DraftReviewModal
+	bind:open={showDraftReviewModal}
+	expense={selectedExpense}
+	onEdit={handleEditFromDraft}
 />
