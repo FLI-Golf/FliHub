@@ -113,9 +113,19 @@
 
 	// ── Admin: assign reference + mark paid ──────────────────────────────────
 	let adminForm = $state<Record<string, { refNum: string; payMethod: string; paidDate: string; reviewNotes: string }>>({});
+
+	// Pre-populate adminForm entries so getAdminForm never mutates state during rendering
+	$effect(() => {
+		const today = new Date().toISOString().slice(0, 10);
+		for (const claim of data.allClaims) {
+			if (!adminForm[claim.id]) {
+				adminForm[claim.id] = { refNum: '', payMethod: 'bank_transfer', paidDate: today, reviewNotes: '' };
+			}
+		}
+	});
+
 	function getAdminForm(id: string) {
-		if (!adminForm[id]) adminForm[id] = { refNum: '', payMethod: 'bank_transfer', paidDate: new Date().toISOString().slice(0,10), reviewNotes: '' };
-		return adminForm[id];
+		return adminForm[id] ?? { refNum: '', payMethod: 'bank_transfer', paidDate: new Date().toISOString().slice(0,10), reviewNotes: '' };
 	}
 
 	async function adminAction(claimId: string, action: 'approve' | 'pay' | 'reject' | 'review') {
