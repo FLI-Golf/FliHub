@@ -133,6 +133,13 @@ export const POST: RequestHandler = async ({ locals, url, request }) => {
 
 	try {
 		const adminPb = await getAdminPocketBase();
+
+		// Resolve the Tax-Exempt Reimbursements department once
+		const reimbDept = await adminPb.collection('departments')
+			.getFirstListItem(`name="Tax-Exempt Reimbursements"`, { fields: 'id' })
+			.catch(() => null);
+		const reimbDeptId = reimbDept?.id ?? null;
+
 		let created = 0;
 
 		for (let i = 0; i < count; i++) {
@@ -151,9 +158,10 @@ export const POST: RequestHandler = async ({ locals, url, request }) => {
 				notes: '',
 				reviewNotes: status === 'rejected'     ? 'Please resubmit with proper documentation.'
 				           : status === 'under_review' ? 'Reviewing line items with CPA.' : '',
-				paymentMethod:    status === 'paid' ? payMethod : '',
-				paidDate:         status === 'paid' ? paidDate  : '',
-				work_order_number: status === 'paid' ? wo : '',
+				paymentMethod:     status === 'paid' ? payMethod : '',
+				paidDate:          status === 'paid' ? paidDate  : '',
+				work_order_number: status === 'paid' ? wo        : '',
+				department:        reimbDeptId,
 				totalAmount: 0,
 			});
 

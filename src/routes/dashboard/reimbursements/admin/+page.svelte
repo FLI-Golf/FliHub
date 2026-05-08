@@ -253,6 +253,7 @@
 					<p class="text-xs font-semibold text-red-400 uppercase tracking-wide">Danger Zone</p>
 					<p class="text-xs text-slate-400">Currently <strong class="text-slate-200">{(data.claims as any[]).length}</strong> claims in the database.</p>
 
+
 					<div class="flex flex-col gap-2">
 						<button onclick={resetAndSeed} disabled={!!testBusy}
 							class="flex items-center gap-2 text-sm px-4 py-2 rounded-lg bg-amber-900/40 border border-amber-700/40 text-amber-300 hover:bg-amber-900/60 transition-colors disabled:opacity-50">

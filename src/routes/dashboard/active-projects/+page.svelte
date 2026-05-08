@@ -525,6 +525,70 @@
 						</div>
 					{/if}
 
+					{#if project.isReimbProject}
+					<!-- ── Reimbursement pipeline card body ───────────────────── -->
+					{@const rp = project.reimbPipeline}
+					{@const rpTotal = rp?.total ?? 0}
+					{@const rpBudget = project.budget}
+					{@const rpPct = (v: number) => rpBudget > 0 ? Math.min(100, (v / rpBudget) * 100) : (rpTotal > 0 ? Math.min(100, (v / rpTotal) * 100) : 0)}
+					<div class="mb-4 space-y-3">
+						{#if project.department && project.department.budget > 0}
+						<div class="space-y-1">
+							<div class="flex items-center justify-between text-xs">
+								<span class="text-muted-foreground font-medium flex items-center gap-1.5"><FolderKanban class="size-3.5" />Dept Budget</span>
+								<span class="tabular-nums text-slate-400 text-[11px]">{fmt(project.budget)} of {fmt(project.department.budget)}</span>
+							</div>
+							<div class="h-3 rounded-full overflow-hidden bg-slate-900 border border-slate-700">
+								<div class="h-full transition-all duration-500 {color.bar}" style="width:{project.department.pct.toFixed(2)}%"></div>
+							</div>
+							<div class="flex justify-between text-[10px] text-slate-500">
+								<span>{project.department.name}</span>
+								<span>{project.department.pct.toFixed(1)}% of dept budget</span>
+							</div>
+						</div>
+						{/if}
+						<div class="space-y-1">
+							<div class="flex items-center justify-between text-xs">
+								<span class="text-muted-foreground font-medium flex items-center gap-1.5"><Receipt class="size-3.5" />Claim Pipeline</span>
+								<span class="tabular-nums text-slate-300">{fmt(rpTotal)}</span>
+							</div>
+							<div class="h-3 rounded-full overflow-hidden flex bg-slate-900 border border-slate-700">
+								{#if (rp?.paid ?? 0) > 0}<div class="h-full bg-emerald-500 shrink-0 transition-all duration-500" style="width:{rpPct(rp?.paid ?? 0).toFixed(2)}%"></div>{/if}
+								{#if (rp?.approved ?? 0) > 0}<div class="h-full bg-blue-500 shrink-0 transition-all duration-500" style="width:{rpPct(rp?.approved ?? 0).toFixed(2)}%"></div>{/if}
+								{#if (rp?.under_review ?? 0) > 0}<div class="h-full bg-violet-500/80 shrink-0 transition-all duration-500" style="width:{rpPct(rp?.under_review ?? 0).toFixed(2)}%"></div>{/if}
+								{#if (rp?.submitted ?? 0) > 0}<div class="h-full bg-amber-400 shrink-0 transition-all duration-500" style="width:{rpPct(rp?.submitted ?? 0).toFixed(2)}%"></div>{/if}
+							</div>
+							<div class="flex flex-wrap gap-x-3 text-[10px]">
+								<span class="flex items-center gap-1 {(rp?.paid ?? 0) > 0 ? 'text-emerald-400' : 'text-slate-600'}"><span class="size-1.5 rounded-full bg-emerald-500 shrink-0"></span>Paid {(rp?.paid ?? 0) > 0 ? fmt(rp!.paid) : '—'}</span>
+								<span class="flex items-center gap-1 {(rp?.approved ?? 0) > 0 ? 'text-blue-400' : 'text-slate-600'}"><span class="size-1.5 rounded-full bg-blue-500 shrink-0"></span>Approved {(rp?.approved ?? 0) > 0 ? fmt(rp!.approved) : '—'}</span>
+								<span class="flex items-center gap-1 {(rp?.under_review ?? 0) > 0 ? 'text-violet-400' : 'text-slate-600'}"><span class="size-1.5 rounded-full bg-violet-500 shrink-0"></span>Under Review {(rp?.under_review ?? 0) > 0 ? fmt(rp!.under_review) : '—'}</span>
+								<span class="flex items-center gap-1 {(rp?.submitted ?? 0) > 0 ? 'text-amber-400' : 'text-slate-600'}"><span class="size-1.5 rounded-full bg-amber-400 shrink-0"></span>Submitted {(rp?.submitted ?? 0) > 0 ? fmt(rp!.submitted) : '—'}</span>
+							</div>
+						</div>
+					</div>
+					<!-- Active claims list -->
+					<div class="mb-4 space-y-1">
+						<div class="flex items-center justify-between text-xs text-muted-foreground mb-1.5">
+							<span class="font-medium flex items-center gap-1.5"><Wallet class="size-3.5" />Active Claims</span>
+							<span class="tabular-nums">{rp?.claimCount ?? 0} total · <span class="text-amber-400">{rp?.pendingCount ?? 0} pending</span></span>
+						</div>
+						{#if (rp?.recentClaims ?? []).length === 0}
+							<p class="text-[11px] text-slate-600 italic px-2 py-1">No active claims.</p>
+						{:else}
+							{#each (rp?.recentClaims ?? []) as claim}
+								{@const sc = claim.status === 'approved' ? 'bg-blue-500' : claim.status === 'under_review' ? 'bg-violet-500' : 'bg-amber-400'}
+								{@const tc = claim.status === 'approved' ? 'text-blue-400' : claim.status === 'under_review' ? 'text-violet-400' : 'text-amber-400'}
+								<div class="flex items-center gap-2 py-1 px-2 rounded-lg hover:bg-slate-800/60 transition-colors text-xs">
+									<span class="size-1.5 rounded-full {sc} shrink-0"></span>
+									<span class="flex-1 truncate text-slate-300">{claim.title}</span>
+									{#if claim.is_historical}<span class="text-[9px] px-1 py-0.5 rounded bg-slate-700 text-slate-500 shrink-0">historical</span>{/if}
+									<span class="tabular-nums text-slate-400 shrink-0">{fmt(claim.totalAmount ?? 0)}</span>
+									<span class="{tc} text-[10px] shrink-0 capitalize">{(claim.status ?? '').replace('_', ' ')}</span>
+								</div>
+							{/each}
+						{/if}
+					</div>
+					{:else}
 					<!-- Budget bars -->
 					<div class="mb-4 space-y-3">
 
@@ -685,6 +749,7 @@
 						{/if}
 					</div>
 					{/if}
+					{/if}<!-- end isReimbProject branch -->
 
 					<!-- Related links -->
 					{#if links.length > 0}
