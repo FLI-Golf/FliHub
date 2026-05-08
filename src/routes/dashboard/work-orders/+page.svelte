@@ -370,11 +370,13 @@ ${wo.notes ? `
 						<p class="text-xs font-bold text-violet-300 uppercase tracking-wide">Path 2 — Reimbursement Claim</p>
 						<div class="flex flex-col gap-1.5 text-xs text-slate-400">
 							{#each [
-								['New Claim', 'Team member creates a claim with one or more line items'],
-								['Submitted', 'Claim submitted for CPA review'],
-								['Under Review', 'Admin/CPA reviews line items and receipts'],
-								['Approved → Paid', 'Admin marks paid with reference number and payment method'],
-								['Work Order created', 'WO number stamped on claim, all line items, and work_orders record'],
+								['New Claim', 'Team member creates a claim with line items and receipts'],
+								['Submitted → Under Review → Approved', 'CPA reviews for tax compliance, admin approves'],
+								['Paid', 'Admin marks paid — WO number stamped on claim and all line items, department budget debited'],
+								['Work Order created', 'Electronic payment record created — Ina uses the WO number to enter the payment in QuickBooks'],
+								['QB Entry', 'Ina records the QuickBooks transaction ID, account, and date on the Work Order'],
+								['Expense submitted', 'An Expense record (category: Reimbursement) is automatically created and submitted to the approval pipeline'],
+								['Expense approved', 'Final approval in the expenses pipeline — audit chain complete'],
 							] as [step, desc], i}
 								<div class="flex items-start gap-2">
 									<span class="size-5 rounded-full bg-violet-900/60 text-violet-300 text-[10px] font-bold flex items-center justify-center shrink-0 mt-0.5">{i+1}</span>
@@ -386,9 +388,24 @@ ${wo.notes ? `
 				</div>
 			</div>
 
-			<div class="space-y-1.5">
-				<p class="text-xs font-bold uppercase tracking-wide text-slate-400">Audit Trail</p>
-				<p class="text-xs text-slate-400">Every Work Order links back to its full origin — the submitter, the approver, the expense or claim, the task, and the project. Click <strong class="text-slate-200">Audit Report</strong> on any row to generate a PDF showing the complete payment chain. This document is suitable for IRS audit, QuickBooks reconciliation, or internal review.</p>
+			<div class="space-y-2">
+				<p class="text-xs font-bold uppercase tracking-wide text-slate-400">Complete Audit Chain</p>
+				<p class="text-xs text-slate-400 leading-relaxed">Every paid reimbursement produces <strong class="text-slate-200">three linked records</strong> — all required for a complete audit trail:</p>
+				<div class="grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs">
+					<div class="rounded-lg border border-violet-700/40 bg-violet-950/20 p-3 space-y-1">
+						<p class="font-semibold text-violet-300">1. Reimbursement Claim</p>
+						<p class="text-slate-400">The original request — claimant, line items, receipts, CPA review. WO number stamped when paid.</p>
+					</div>
+					<div class="rounded-lg border border-blue-700/40 bg-blue-950/20 p-3 space-y-1">
+						<p class="font-semibold text-blue-300">2. Work Order</p>
+						<p class="text-slate-400">The payment authorization record. Ina uses the WO number to enter the payment in QuickBooks. QB transaction ID recorded here.</p>
+					</div>
+					<div class="rounded-lg border border-emerald-700/40 bg-emerald-950/20 p-3 space-y-1">
+						<p class="font-semibold text-emerald-300">3. Expense (Reimbursement)</p>
+						<p class="text-slate-400">Created automatically when QB entry is saved. Goes through the approval pipeline — final approval settles the payment in the financial record.</p>
+					</div>
+				</div>
+				<p class="text-xs text-slate-500">Click <strong class="text-slate-400">Audit Report</strong> on any row to generate a PDF of the complete chain — suitable for IRS audit, QuickBooks reconciliation, or internal review.</p>
 			</div>
 
 		</div>
