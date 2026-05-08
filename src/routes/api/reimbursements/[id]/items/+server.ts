@@ -1,5 +1,6 @@
 import { json } from '@sveltejs/kit';
 import { RequestContext } from '$lib/infra/RequestContext';
+import { getAdminPocketBase } from '$lib/infra/pocketbase/pbClient';
 import type { RequestHandler } from './$types';
 
 // POST /api/reimbursements/:id/items — add a line item to a claim
@@ -11,7 +12,8 @@ export const POST: RequestHandler = async ({ locals, url, params, request }) => 
 	if (!body.amount || Number(body.amount) <= 0) return json({ message: 'Amount must be > 0' }, { status: 400 });
 
 	try {
-		const item = await ctx.pb.collection('reimbursement_items').create({
+		const adminPb = await getAdminPocketBase();
+		const item = await adminPb.collection('reimbursement_items').create({
 			claim:       params.id,
 			description: body.description.trim(),
 			amount:      Number(body.amount),
@@ -24,10 +26,10 @@ export const POST: RequestHandler = async ({ locals, url, params, request }) => 
 		});
 
 		// Recalculate claim total
-		const allItems = await ctx.pb.collection('reimbursement_items')
-			.getFullList({ filter: `claim = "${params.id}"`, fields: 'amount' });
+		const allItems = await adminPb.collection('reimbursement_items')
+			.getFullList({ filter: `claim="${params.id}"`, fields: 'amount' });
 		const total = allItems.reduce((s, i) => s + (i.amount || 0), 0);
-		await ctx.pb.collection('reimbursement_claims').update(params.id, { totalAmount: total });
+		await adminPb.collection('reimbursement_claims').update(params.id, { totalAmount: total });
 
 		return json(item, { status: 201 });
 	} catch (err: any) {

@@ -1,5 +1,6 @@
 import { json } from '@sveltejs/kit';
 import { RequestContext } from '$lib/infra/RequestContext';
+import { getAdminPocketBase } from '$lib/infra/pocketbase/pbClient';
 import type { RequestHandler } from './$types';
 
 // PATCH /api/reimbursements/:id — update status, reference number, review notes, payment info
@@ -18,14 +19,16 @@ export const PATCH: RequestHandler = async ({ locals, url, params, request }) =>
 		if (body.paidDate        !== undefined) update.paidDate        = body.paidDate || null;
 		if (body.paidBy          !== undefined) update.paidBy          = body.paidBy  || null;
 
+		const adminPb = await getAdminPocketBase();
+
 		// Recalculate total from items if requested
 		if (body.recalcTotal) {
-			const items = await ctx.pb.collection('reimbursement_items')
-				.getFullList({ filter: `claim = "${params.id}"`, fields: 'amount' });
+			const items = await adminPb.collection('reimbursement_items')
+				.getFullList({ filter: `claim="${params.id}"`, fields: 'amount' });
 			update.totalAmount = items.reduce((s, i) => s + (i.amount || 0), 0);
 		}
 
-		const record = await ctx.pb.collection('reimbursement_claims').update(params.id, update);
+		const record = await adminPb.collection('reimbursement_claims').update(params.id, update);
 		return json(record);
 	} catch (err: any) {
 		return json({ message: err?.response?.message ?? err?.message ?? 'Failed' }, { status: 500 });
@@ -36,11 +39,12 @@ export const PATCH: RequestHandler = async ({ locals, url, params, request }) =>
 export const DELETE: RequestHandler = async ({ locals, url, params }) => {
 	const ctx = await RequestContext.from(locals, url);
 	try {
-		const claim = await ctx.pb.collection('reimbursement_claims').getOne(params.id, { fields: 'id,status' });
+		const adminPb = await getAdminPocketBase();
+		const claim = await adminPb.collection('reimbursement_claims').getOne(params.id, { fields: 'id,status' });
 		if (claim.status !== 'draft') {
 			return json({ message: 'Only draft claims can be deleted' }, { status: 400 });
 		}
-		await ctx.pb.collection('reimbursement_claims').delete(params.id);
+		await adminPb.collection('reimbursement_claims').delete(params.id);
 		return json({ ok: true });
 	} catch (err: any) {
 		return json({ message: err?.response?.message ?? err?.message ?? 'Failed' }, { status: 500 });

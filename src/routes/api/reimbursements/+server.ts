@@ -1,5 +1,6 @@
 import { json } from '@sveltejs/kit';
 import { RequestContext } from '$lib/infra/RequestContext';
+import { getAdminPocketBase } from '$lib/infra/pocketbase/pbClient';
 import type { RequestHandler } from './$types';
 
 // Generate next WO-NNN reference number
@@ -27,9 +28,10 @@ export const POST: RequestHandler = async ({ locals, url, request }) => {
 	if (!body.title?.trim()) return json({ message: 'Title is required' }, { status: 400 });
 
 	try {
-		const workOrder = await nextWorkOrderNumber(ctx.pb);
+		const adminPb = await getAdminPocketBase();
+		const workOrder = await nextWorkOrderNumber(adminPb);
 
-		const claim = await ctx.pb.collection('reimbursement_claims').create({
+		const claim = await adminPb.collection('reimbursement_claims').create({
 			title:           body.title.trim(),
 			claimant:        ctx.profile?.id ?? body.claimant ?? null,
 			status:          'draft',
@@ -41,7 +43,7 @@ export const POST: RequestHandler = async ({ locals, url, request }) => {
 		const items = body.items ?? [];
 		for (const item of items) {
 			if (!item.description?.trim() || !item.amount) continue;
-			await ctx.pb.collection('reimbursement_items').create({
+			await adminPb.collection('reimbursement_items').create({
 				claim:       claim.id,
 				description: item.description.trim(),
 				amount:      Number(item.amount),
@@ -57,7 +59,7 @@ export const POST: RequestHandler = async ({ locals, url, request }) => {
 		// Recalculate total
 		if (items.length) {
 			const total = items.reduce((s: number, i: any) => s + (Number(i.amount) || 0), 0);
-			await ctx.pb.collection('reimbursement_claims').update(claim.id, { totalAmount: total });
+			await adminPb.collection('reimbursement_claims').update(claim.id, { totalAmount: total });
 		}
 
 		return json(claim, { status: 201 });

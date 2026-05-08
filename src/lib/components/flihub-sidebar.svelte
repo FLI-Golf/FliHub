@@ -131,6 +131,7 @@
 				{ title: 'Approvals', url: '/dashboard/approvals', icon: CheckSquare },
 				{ title: 'Work Orders', url: '/dashboard/work-orders', icon: ClipboardList },
 				{ title: 'Reimbursements', url: '/dashboard/reimbursements', icon: Wallet },
+				{ title: 'Reimbursements Admin', url: '/dashboard/reimbursements/admin', icon: ShieldCheck, roles: ['admin', 'leader'] },
 				{ title: 'Media', url: '/dashboard/media', icon: Images }
 			]
 		},

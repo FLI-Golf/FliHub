@@ -2,7 +2,7 @@
 	import { invalidateAll } from '$app/navigation';
 	import Card from '$lib/components/ui/card.svelte';
 	import { Button } from '$lib/components/ui/button/index.js';
-	import { Plus, X, Receipt, CheckCircle2, Clock, AlertCircle, ChevronDown, ChevronRight, Pencil, Trash2, Send, DollarSign, Hash, UserCircle, Building2, ShieldCheck } from 'lucide-svelte';
+	import { Plus, X, Receipt, CheckCircle2, Clock, AlertCircle, ChevronDown, ChevronRight, Pencil, Trash2, Send, DollarSign, Hash, UserCircle, Building2, ShieldCheck, Info, FileText, ArrowRight } from 'lucide-svelte';
 	import type { PageData } from './$types';
 	import {
 		CLAIM_STATUS_LABELS, CLAIM_STATUS_COLORS, CLAIMANT_PIPELINE,
@@ -17,6 +17,7 @@
 	// ── UI state ──────────────────────────────────────────────────────────────
 	let showNewClaim    = $state(false);
 	let showInstructions = $state(false);
+	let showAbout       = $state(false);
 	let expandedClaim   = $state<string | null>(null);
 	let adminExpanded   = $state<string | null>(null);
 	let saving        = $state(false);
@@ -156,7 +157,7 @@
 
 <svelte:head><title>Reimbursements — FliHub</title></svelte:head>
 
-<div class="space-y-6 max-w-5xl">
+<div class="space-y-6">
 
 	<!-- Header -->
 	<div class="flex items-center justify-between">
@@ -164,9 +165,98 @@
 			<h1 class="text-3xl font-bold tracking-tight">Reimbursements</h1>
 			<p class="text-muted-foreground mt-1">Submit expenses for reimbursement — group multiple transactions into one claim</p>
 		</div>
-		<Button onclick={() => { showNewClaim = true; err = ''; }} class="gap-2 bg-emerald-600 hover:bg-emerald-700 text-white">
-			<Plus class="size-4" /> New Claim
-		</Button>
+		<div class="flex items-center gap-3">
+			{#if data.isAdmin}
+				<a href="/dashboard/reimbursements/admin"
+					class="flex items-center gap-1.5 text-sm px-3 py-2 rounded-lg border border-slate-600 bg-slate-800 text-slate-300 hover:bg-slate-700 transition-colors">
+					<FileText class="size-4" /> Admin View
+				</a>
+			{/if}
+			<Button onclick={() => { showNewClaim = true; err = ''; }} class="gap-2 bg-emerald-600 hover:bg-emerald-700 text-white">
+				<Plus class="size-4" /> New Claim
+			</Button>
+		</div>
+	</div>
+
+	<!-- About this page -->
+	<div class="rounded-xl border border-slate-700 bg-slate-800/40 overflow-hidden">
+		<button
+			onclick={() => showAbout = !showAbout}
+			class="w-full flex items-center justify-between px-5 py-3.5 hover:bg-slate-700/30 transition-colors text-left"
+		>
+			<div class="flex items-center gap-2.5">
+				<Info class="size-4 text-slate-400 shrink-0" />
+				<span class="text-sm font-medium text-slate-300">About this page &amp; how the pipeline works</span>
+			</div>
+			<ChevronDown class="size-4 text-slate-500 transition-transform {showAbout ? 'rotate-180' : ''}" />
+		</button>
+
+		{#if showAbout}
+		<div class="border-t border-slate-700 px-5 py-5 space-y-5 text-sm text-slate-300">
+
+			<!-- What is this -->
+			<div class="space-y-1.5">
+				<p class="text-xs font-bold uppercase tracking-wide text-slate-400">What is this?</p>
+				<p>The Reimbursements module lets FLI Golf team members submit out-of-pocket business expenses for reimbursement. Expenses are grouped into <strong class="text-slate-100">claims</strong> — each claim can contain multiple line items (receipts, transactions, etc.). Every claim is reviewed by Ina Masten (CPA, Masten Solutions) to verify tax treatment and IRS compliance before payment is authorized.</p>
+			</div>
+
+			<!-- Pipeline -->
+			<div class="space-y-3">
+				<p class="text-xs font-bold uppercase tracking-wide text-slate-400">The Pipeline</p>
+				<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-2">
+					{#each [
+						{ status: 'Draft',        color: 'border-slate-600 bg-slate-800/60',       dot: 'bg-slate-500',   who: 'Claimant',  desc: 'Claim created but not yet submitted. You can edit or delete it.' },
+						{ status: 'Submitted',    color: 'border-blue-700/50 bg-blue-950/30',      dot: 'bg-blue-400',    who: 'Claimant',  desc: 'Sent for admin review. No further edits allowed.' },
+						{ status: 'Under Review', color: 'border-yellow-700/50 bg-yellow-950/30',  dot: 'bg-yellow-400',  who: 'Admin',     desc: 'Admin is actively reviewing the claim and line items.' },
+						{ status: 'Approved',     color: 'border-violet-700/50 bg-violet-950/30',  dot: 'bg-violet-400',  who: 'Admin',     desc: 'Claim approved. Admin will assign a reference number and process payment.' },
+						{ status: 'Paid',         color: 'border-emerald-700/50 bg-emerald-950/30',dot: 'bg-emerald-400', who: 'Admin',     desc: 'Payment issued. Reference number recorded for QuickBooks.' },
+					] as stage}
+						<div class="rounded-lg border {stage.color} p-3 space-y-1.5">
+							<div class="flex items-center gap-2">
+								<span class="size-2 rounded-full {stage.dot} shrink-0"></span>
+								<span class="font-semibold text-slate-100 text-xs">{stage.status}</span>
+								<span class="ml-auto text-[10px] text-slate-500">{stage.who}</span>
+							</div>
+							<p class="text-xs text-slate-400 leading-relaxed">{stage.desc}</p>
+						</div>
+					{/each}
+				</div>
+				<p class="text-xs text-slate-500">Claims can also be <span class="text-red-400 font-medium">Rejected</span> at any point — the claimant will see a review note explaining why.</p>
+			</div>
+
+			<!-- How to submit -->
+			<div class="space-y-1.5">
+				<p class="text-xs font-bold uppercase tracking-wide text-slate-400">How to submit a claim</p>
+				<ol class="space-y-1 text-xs text-slate-400 list-none">
+					{#each [
+						'Click New Claim and give it a descriptive title (e.g. "March Travel — Phoenix Conference").',
+						'Add one line item per expense — description, amount, date, category, and vendor.',
+						'Click Submit for Review to send it to the admin queue. Or save as a draft to finish later.',
+						'Once approved, you\'ll see a QuickBooks reference number on your claim — keep this for your records.',
+					] as step, i}
+						<li class="flex items-start gap-2.5">
+							<span class="size-5 rounded-full bg-slate-700 text-slate-300 text-[10px] font-bold flex items-center justify-center shrink-0 mt-0.5">{i + 1}</span>
+							<span>{step}</span>
+						</li>
+					{/each}
+				</ol>
+			</div>
+
+			<!-- Admin actions -->
+			{#if data.isAdmin}
+			<div class="space-y-1.5 border-t border-slate-700 pt-4">
+				<p class="text-xs font-bold uppercase tracking-wide text-slate-400">Admin actions</p>
+				<div class="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs text-slate-400">
+					<div class="flex items-start gap-2"><ArrowRight class="size-3.5 text-blue-400 mt-0.5 shrink-0" /><span><strong class="text-slate-200">Mark Under Review</strong> — signals to the claimant that you're actively reviewing their claim.</span></div>
+					<div class="flex items-start gap-2"><ArrowRight class="size-3.5 text-violet-400 mt-0.5 shrink-0" /><span><strong class="text-slate-200">Approve</strong> — confirms the claim is valid and queued for payment.</span></div>
+					<div class="flex items-start gap-2"><ArrowRight class="size-3.5 text-emerald-400 mt-0.5 shrink-0" /><span><strong class="text-slate-200">Mark Paid</strong> — requires a reference number and payment method. Records the paid date.</span></div>
+					<div class="flex items-start gap-2"><ArrowRight class="size-3.5 text-red-400 mt-0.5 shrink-0" /><span><strong class="text-slate-200">Reject</strong> — closes the claim. Add a review note so the claimant knows why.</span></div>
+				</div>
+			</div>
+			{/if}
+
+		</div>
+		{/if}
 	</div>
 
 	<!-- Department info card -->
