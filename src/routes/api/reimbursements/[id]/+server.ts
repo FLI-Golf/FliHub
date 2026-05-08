@@ -29,6 +29,84 @@ export const PATCH: RequestHandler = async ({ locals, url, params, request }) =>
 		}
 
 		const record = await adminPb.collection('reimbursement_claims').update(params.id, update);
+
+		// When marking paid, create/update work order, stamp WO number, and debit department budget
+		if (body.status === 'paid') {
+			try {
+				const woNumber = record.referenceNumber;
+
+				// 1. Create work_orders record if not already there
+				const existing = await adminPb.collection('work_orders')
+					.getFullList({ filter: `work_order_number="${woNumber}"`, fields: 'id' })
+					.catch(() => []);
+
+				if (!existing.length) {
+					await adminPb.collection('work_orders').create({
+						work_order_number: woNumber,
+						// legacy text fields
+						expenseId:    '',
+						taskId:       '',
+						projectId:    '',
+						approvedBy:   ctx.profile?.id || '',
+						// proper relation fields
+						claimId:      record.id,
+						approver:     ctx.profile?.id || null,
+						submittedBy:  record.claimant || null,
+						// audit fields
+						source:       'reimbursement',
+						description:  record.title || '',
+						amount:       record.totalAmount || 0,
+						approvedDate: new Date().toISOString(),
+						paidDate:     body.paidDate || new Date().toISOString(),
+						paymentMethod: body.paymentMethod || '',
+						status:       'paid',
+						notes:        `Reimbursement claim paid via ${(body.paymentMethod || 'bank_transfer').replace('_', ' ')}`,
+					});
+					console.log(`[reimb] work order created: ${woNumber}`);
+				}
+
+				// 2. Stamp WO number on the claim itself
+				await adminPb.collection('reimbursement_claims').update(record.id, {
+					work_order_number: woNumber
+				}).catch((e: any) => console.error('[reimb] stamp claim WO failed:', e?.message));
+
+				// 3. Stamp WO number on every line item
+				const items = await adminPb.collection('reimbursement_items')
+					.getFullList({ filter: `claim="${record.id}"`, fields: 'id' })
+					.catch(() => []);
+				for (const item of items) {
+					await adminPb.collection('reimbursement_items').update(item.id, {
+						work_order_number: woNumber
+					}).catch(() => {});
+				}
+				console.log(`[reimb] stamped WO ${woNumber} on claim + ${items.length} items`);
+
+				// 4. Debit department actual spend — fetch the claim's department and increment
+				//    department_actual_expenses by the claim total (Option A: direct dept debit)
+				const claimFull = await adminPb.collection('reimbursement_claims')
+					.getOne(record.id, { fields: 'id,department,totalAmount' })
+					.catch(() => null);
+
+				if (claimFull?.department) {
+					const dept = await adminPb.collection('departments')
+						.getOne(claimFull.department, { fields: 'id,department_actual_expenses' })
+						.catch(() => null);
+
+					if (dept) {
+						const current = dept.department_actual_expenses ?? 0;
+						const claimTotal = claimFull.totalAmount ?? record.totalAmount ?? 0;
+						await adminPb.collection('departments').update(dept.id, {
+							department_actual_expenses: current + claimTotal
+						});
+						console.log(`[reimb] dept ${dept.id} actuals +${claimTotal} → ${current + claimTotal}`);
+					}
+				}
+
+			} catch (e: any) {
+				console.error('[reimb] work order create failed:', e?.message);
+			}
+		}
+
 		return json(record);
 	} catch (err: any) {
 		return json({ message: err?.response?.message ?? err?.message ?? 'Failed' }, { status: 500 });
