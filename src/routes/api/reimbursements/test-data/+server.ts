@@ -90,15 +90,23 @@ export const DELETE: RequestHandler = async ({ locals, url }) => {
 		const claims = await adminPb.collection('reimbursement_claims')
 			.getFullList({ fields: 'id,referenceNumber' });
 
-		// Delete all items first (cascade would handle it but let's be explicit)
 		let deleted = 0;
 		for (const claim of claims) {
 			try {
-				// Delete items for this claim
+				// Delete line items
 				const items = await adminPb.collection('reimbursement_items')
 					.getFullList({ filter: `claim="${claim.id}"`, fields: 'id' });
 				for (const item of items) {
 					await adminPb.collection('reimbursement_items').delete(item.id).catch(() => {});
+				}
+				// Delete matching work order if one exists
+				if (claim.referenceNumber) {
+					const wos = await adminPb.collection('work_orders')
+						.getFullList({ filter: `work_order_number="${claim.referenceNumber}"`, fields: 'id' })
+						.catch(() => []);
+					for (const wo of wos) {
+						await adminPb.collection('work_orders').delete(wo.id).catch(() => {});
+					}
 				}
 				await adminPb.collection('reimbursement_claims').delete(claim.id);
 				deleted++;
@@ -128,10 +136,12 @@ export const POST: RequestHandler = async ({ locals, url, request }) => {
 		let created = 0;
 
 		for (let i = 0; i < count; i++) {
-			const status   = rand(statuses);
-			const claimant = rand(CLAIMANTS);
-			const title    = rand(TITLES) + ` #${i + 1}`;
-			const wo       = await getNextWO(adminPb, i);
+			const status      = rand(statuses);
+			const claimant    = rand(CLAIMANTS);
+			const title       = rand(TITLES) + ` #${i + 1}`;
+			const wo          = await getNextWO(adminPb, i);
+			const payMethod   = rand(PAYMENT_METHODS);
+			const paidDate    = randDate(60);
 
 			const claim = await adminPb.collection('reimbursement_claims').create({
 				title,
@@ -139,9 +149,11 @@ export const POST: RequestHandler = async ({ locals, url, request }) => {
 				status,
 				referenceNumber: wo,
 				notes: '',
-				reviewNotes: status === 'rejected' ? 'Please resubmit with proper documentation.' : status === 'under_review' ? 'Reviewing line items with CPA.' : '',
-				paymentMethod: status === 'paid' ? rand(PAYMENT_METHODS) : '',
-				paidDate: status === 'paid' ? randDate(60) : '',
+				reviewNotes: status === 'rejected'     ? 'Please resubmit with proper documentation.'
+				           : status === 'under_review' ? 'Reviewing line items with CPA.' : '',
+				paymentMethod:    status === 'paid' ? payMethod : '',
+				paidDate:         status === 'paid' ? paidDate  : '',
+				work_order_number: status === 'paid' ? wo : '',
 				totalAmount: 0,
 			});
 
@@ -151,19 +163,40 @@ export const POST: RequestHandler = async ({ locals, url, request }) => {
 				const amount = randAmount();
 				total += amount;
 				await adminPb.collection('reimbursement_items').create({
-					claim: claim.id,
+					claim:       claim.id,
 					description: `${rand(CATEGORIES)} expense — ${rand(VENDORS)}`,
 					amount,
-					date: randDate(90),
-					category: rand(CATEGORIES),
-					vendor: rand(VENDORS),
-					notes: '',
+					date:        randDate(90),
+					category:    rand(CATEGORIES),
+					vendor:      rand(VENDORS),
+					notes:       '',
+					work_order_number: status === 'paid' ? wo : '',
 				});
 			}
 
+			const finalTotal = Math.round(total * 100) / 100;
 			await adminPb.collection('reimbursement_claims').update(claim.id, {
-				totalAmount: Math.round(total * 100) / 100
+				totalAmount: finalTotal
 			});
+
+			// Paid claims must have a matching work_orders record — this is the
+			// electronic record Ina uses to enter the payment in QuickBooks.
+			if (status === 'paid') {
+				await adminPb.collection('work_orders').create({
+					work_order_number: wo,
+					claimId:           claim.id,
+					submittedBy:       claimant,
+					source:            'reimbursement',
+					description:       title,
+					amount:            finalTotal,
+					approvedDate:      new Date(Date.now() - randInt(1, 30) * 86400000).toISOString(),
+					paidDate,
+					paymentMethod:     payMethod,
+					status:            'paid',
+					notes:             `Reimbursement claim paid via ${payMethod.replace(/_/g, ' ')}`,
+				}).catch((e: any) => console.error('[seed] WO create failed for', wo, e?.response?.data ?? e?.message));
+			}
+
 			created++;
 		}
 
