@@ -209,7 +209,7 @@
 						{ status: 'Submitted',    color: 'border-blue-700/50 bg-blue-950/30',      dot: 'bg-blue-400',    who: 'Claimant',  desc: 'Sent for admin review. No further edits allowed.' },
 						{ status: 'Under Review', color: 'border-yellow-700/50 bg-yellow-950/30',  dot: 'bg-yellow-400',  who: 'Admin',     desc: 'Admin is actively reviewing the claim and line items.' },
 						{ status: 'Approved',     color: 'border-violet-700/50 bg-violet-950/30',  dot: 'bg-violet-400',  who: 'Admin',     desc: 'Claim approved. Admin will assign a reference number and process payment.' },
-						{ status: 'Paid',         color: 'border-emerald-700/50 bg-emerald-950/30',dot: 'bg-emerald-400', who: 'Admin',     desc: 'Payment issued. A Work Order record is created automatically — this is the electronic record Ina uses to enter the payment in QuickBooks.' },
+						{ status: 'Paid',         color: 'border-emerald-700/50 bg-emerald-950/30',dot: 'bg-emerald-400', who: 'Admin',     desc: 'Payment issued. A Work Order (WO-NNN) is created automatically — Ina uses this to enter the payment in QuickBooks. Once the QB transaction ID is recorded on the Work Order, an Expense record is automatically submitted to the approval pipeline to fully settle the payment.' },
 					] as stage}
 						<div class="rounded-lg border {stage.color} p-3 space-y-1.5">
 							<div class="flex items-center gap-2">
@@ -222,6 +222,25 @@
 					{/each}
 				</div>
 				<p class="text-xs text-slate-500">Claims can also be <span class="text-red-400 font-medium">Rejected</span> at any point — the claimant will see a review note explaining why.</p>
+
+				<!-- Full audit chain callout -->
+				<div class="rounded-lg border border-slate-600/50 bg-slate-800/40 p-4 space-y-2">
+					<p class="text-xs font-bold uppercase tracking-wide text-slate-400">Every paid claim produces 3 linked records</p>
+					<div class="flex flex-col sm:flex-row gap-2 text-xs">
+						<div class="flex-1 flex items-start gap-2">
+							<span class="size-5 rounded-full bg-violet-900/60 text-violet-300 text-[10px] font-bold flex items-center justify-center shrink-0 mt-0.5">1</span>
+							<div><p class="font-semibold text-slate-200">Reimbursement Claim</p><p class="text-slate-500">Original request, line items, CPA review. WO number stamped when paid.</p></div>
+						</div>
+						<div class="flex-1 flex items-start gap-2">
+							<span class="size-5 rounded-full bg-blue-900/60 text-blue-300 text-[10px] font-bold flex items-center justify-center shrink-0 mt-0.5">2</span>
+							<div><p class="font-semibold text-slate-200">Work Order</p><p class="text-slate-500">Payment authorization record. Ina enters the WO number in QuickBooks and records the transaction ID here.</p></div>
+						</div>
+						<div class="flex-1 flex items-start gap-2">
+							<span class="size-5 rounded-full bg-emerald-900/60 text-emerald-300 text-[10px] font-bold flex items-center justify-center shrink-0 mt-0.5">3</span>
+							<div><p class="font-semibold text-slate-200">Expense (Reimbursement)</p><p class="text-slate-500">Auto-created when QB entry is saved. Approved in the expenses pipeline to fully settle the payment.</p></div>
+						</div>
+					</div>
+				</div>
 			</div>
 
 			<!-- How to submit -->

@@ -1,7 +1,7 @@
 <script lang="ts">
 	import type { PageData } from './$types';
 	import Card from '$lib/components/ui/card.svelte';
-	import { ClipboardList, CheckCircle2, Clock, XCircle, DollarSign, Copy, Check, Info, ChevronDown, FileDown, ArrowRight } from 'lucide-svelte';
+	import { ClipboardList, CheckCircle2, Clock, XCircle, DollarSign, Copy, Check, Info, ChevronDown, FileDown, ArrowRight, Receipt, AlertTriangle } from 'lucide-svelte';
 	import { invalidateAll } from '$app/navigation';
 
 	let { data }: { data: PageData } = $props();
@@ -13,6 +13,7 @@
 	let showAbout     = $state(false);
 	let expandedQB    = $state<string | null>(null);
 	let savingQB      = $state<string | null>(null);
+	let qbResult      = $state<{ woId: string; expenseCreated: boolean; expenseId?: string; warning?: string } | null>(null);
 
 	// QB form state per WO
 	let qbForms = $state<Record<string, { txnId: string; enteredBy: string; enteredDate: string; account: string; notes: string }>>({});
@@ -34,8 +35,9 @@
 
 	async function saveQB(woId: string) {
 		savingQB = woId;
+		qbResult = null;
 		const f = qbForms[woId];
-		await fetch(`/api/work-orders/${woId}`, {
+		const res = await fetch(`/api/work-orders/${woId}`, {
 			method: 'PATCH',
 			headers: { 'Content-Type': 'application/json' },
 			body: JSON.stringify({
@@ -47,8 +49,14 @@
 				status:            'paid',
 			})
 		});
+		const data = await res.json();
 		savingQB = null;
 		expandedQB = null;
+		if (data._expenseCreated) {
+			qbResult = { woId, expenseCreated: true, expenseId: data._expenseId };
+		} else if (data._expenseWarning) {
+			qbResult = { woId, expenseCreated: false, warning: data._expenseWarning };
+		}
 		await invalidateAll();
 	}
 
@@ -362,11 +370,13 @@ ${wo.notes ? `
 						<p class="text-xs font-bold text-violet-300 uppercase tracking-wide">Path 2 — Reimbursement Claim</p>
 						<div class="flex flex-col gap-1.5 text-xs text-slate-400">
 							{#each [
-								['New Claim', 'Team member creates a claim with one or more line items'],
-								['Submitted', 'Claim submitted for CPA review'],
-								['Under Review', 'Admin/CPA reviews line items and receipts'],
-								['Approved → Paid', 'Admin marks paid with reference number and payment method'],
-								['Work Order created', 'WO number stamped on claim, all line items, and work_orders record'],
+								['New Claim', 'Team member creates a claim with line items and receipts'],
+								['Submitted → Under Review → Approved', 'CPA reviews for tax compliance, admin approves'],
+								['Paid', 'Admin marks paid — WO number stamped on claim and all line items, department budget debited'],
+								['Work Order created', 'Electronic payment record created — Ina uses the WO number to enter the payment in QuickBooks'],
+								['QB Entry', 'Ina records the QuickBooks transaction ID, account, and date on the Work Order'],
+								['Expense submitted', 'An Expense record (category: Reimbursement) is automatically created and submitted to the approval pipeline'],
+								['Expense approved', 'Final approval in the expenses pipeline — audit chain complete'],
 							] as [step, desc], i}
 								<div class="flex items-start gap-2">
 									<span class="size-5 rounded-full bg-violet-900/60 text-violet-300 text-[10px] font-bold flex items-center justify-center shrink-0 mt-0.5">{i+1}</span>
@@ -378,9 +388,24 @@ ${wo.notes ? `
 				</div>
 			</div>
 
-			<div class="space-y-1.5">
-				<p class="text-xs font-bold uppercase tracking-wide text-slate-400">Audit Trail</p>
-				<p class="text-xs text-slate-400">Every Work Order links back to its full origin — the submitter, the approver, the expense or claim, the task, and the project. Click <strong class="text-slate-200">Audit Report</strong> on any row to generate a PDF showing the complete payment chain. This document is suitable for IRS audit, QuickBooks reconciliation, or internal review.</p>
+			<div class="space-y-2">
+				<p class="text-xs font-bold uppercase tracking-wide text-slate-400">Complete Audit Chain</p>
+				<p class="text-xs text-slate-400 leading-relaxed">Every paid reimbursement produces <strong class="text-slate-200">three linked records</strong> — all required for a complete audit trail:</p>
+				<div class="grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs">
+					<div class="rounded-lg border border-violet-700/40 bg-violet-950/20 p-3 space-y-1">
+						<p class="font-semibold text-violet-300">1. Reimbursement Claim</p>
+						<p class="text-slate-400">The original request — claimant, line items, receipts, CPA review. WO number stamped when paid.</p>
+					</div>
+					<div class="rounded-lg border border-blue-700/40 bg-blue-950/20 p-3 space-y-1">
+						<p class="font-semibold text-blue-300">2. Work Order</p>
+						<p class="text-slate-400">The payment authorization record. Ina uses the WO number to enter the payment in QuickBooks. QB transaction ID recorded here.</p>
+					</div>
+					<div class="rounded-lg border border-emerald-700/40 bg-emerald-950/20 p-3 space-y-1">
+						<p class="font-semibold text-emerald-300">3. Expense (Reimbursement)</p>
+						<p class="text-slate-400">Created automatically when QB entry is saved. Goes through the approval pipeline — final approval settles the payment in the financial record.</p>
+					</div>
+				</div>
+				<p class="text-xs text-slate-500">Click <strong class="text-slate-400">Audit Report</strong> on any row to generate a PDF of the complete chain — suitable for IRS audit, QuickBooks reconciliation, or internal review.</p>
 			</div>
 
 		</div>
@@ -461,6 +486,7 @@ ${wo.notes ? `
 		</Card>
 	{:else}
 		<Card class="overflow-hidden p-0">
+
 			<div class="overflow-x-auto">
 				<table class="w-full text-sm">
 					<thead>
@@ -505,6 +531,7 @@ ${wo.notes ? `
 										{wo.status}
 									</span>
 								</td>
+
 								<td class="px-4 py-3">
 									<div class="flex items-center gap-2 flex-wrap">
 										<!-- QB entry button — shown when no QB txn yet -->
@@ -547,6 +574,31 @@ ${wo.notes ? `
 											<DollarSign class="size-3.5" /> QuickBooks Transaction Entry
 										</p>
 										<p class="text-xs text-slate-400">Record the QB transaction details after entering this payment in QuickBooks. This completes the audit chain.</p>
+
+										<!-- Expense preview — reimbursement WOs only -->
+										{#if wo.source === 'reimbursement' && !wo.expense}
+										<div class="rounded-lg border border-amber-700/50 bg-amber-950/30 p-3 space-y-1.5">
+											<p class="text-xs font-semibold text-amber-300 flex items-center gap-1.5">
+												<Receipt class="size-3.5" /> This will also create an Expense record for approval
+											</p>
+											<p class="text-xs text-amber-200/70 leading-relaxed">
+												Saving this QB entry will automatically submit an <strong class="text-amber-200">Expense</strong> record to the approval pipeline. The expense will appear in <a href="/dashboard/approvals" class="underline underline-offset-2 hover:text-amber-100">Approvals</a> with status <strong class="text-amber-200">Pending</strong> — it must be approved there before the payment is fully settled in the financial record.
+											</p>
+											<div class="mt-2 rounded border border-amber-800/40 bg-slate-900/60 p-2.5 text-[11px] font-mono space-y-0.5 text-slate-300">
+												<p><span class="text-slate-500">description:</span> Reimbursement — {wo.description} ({wo.work_order_number})</p>
+												<p><span class="text-slate-500">amount:</span> {fmt(wo.amount)}</p>
+												<p><span class="text-slate-500">category:</span> Reimbursement</p>
+												<p><span class="text-slate-500">status:</span> <span class="text-amber-400">submitted → pending approval</span></p>
+												<p><span class="text-slate-500">invoice #:</span> {wo.work_order_number}</p>
+												<p><span class="text-slate-500">notes:</span> QB Transaction: {f.txnId || '<txn id>'}{f.account ? ` · Account: ${f.account}` : ''}</p>
+											</div>
+										</div>
+										{:else if wo.source === 'reimbursement' && wo.expense}
+										<div class="rounded-lg border border-emerald-700/50 bg-emerald-950/30 p-3 flex items-center gap-2">
+											<CheckCircle2 class="size-4 text-emerald-400 shrink-0" />
+											<p class="text-xs text-emerald-300">Expense already created for this work order — updating QB details only.</p>
+										</div>
+										{/if}
 										<div class="grid grid-cols-2 md:grid-cols-4 gap-3">
 											<div>
 												<label class="block text-[10px] font-semibold uppercase tracking-wide text-slate-400 mb-1">QB Transaction ID *</label>
