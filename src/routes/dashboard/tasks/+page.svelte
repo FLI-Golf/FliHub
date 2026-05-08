@@ -2,485 +2,482 @@
 	import type { PageData } from './$types';
 	import Card from '$lib/components/ui/card.svelte';
 	import { Button } from '$lib/components/ui/button/index.js';
-	import VisualTabs from '$lib/components/ui/visual-tabs.svelte';
-	import MetricCard from '$lib/components/metrics/metric-card.svelte';
-	import ProgressBar from '$lib/components/metrics/progress-bar.svelte';
-	import StatusBadge from '$lib/components/metrics/status-badge.svelte';
+	import { Input } from '$lib/components/ui/input/index.js';
 	import AddTaskModal from '$lib/components/tasks/add-task-modal.svelte';
 	import EditTaskModal from '$lib/components/tasks/edit-task-modal.svelte';
 	import TaskExpenseModal from '$lib/components/expenses/task-expense-modal.svelte';
-	import { 
-		ListTodo, 
-		CheckCircle2, 
-		Clock, 
-		AlertTriangle,
-		Plus,
-		Calendar,
-		Target,
-		Circle,
-		PlayCircle,
-		Ban,
-		XCircle,
-		AlertCircle,
-		ArrowUp,
-		ArrowDown,
-		Minus,
-		Receipt
-	} from 'lucide-svelte';
-	
+	import { Plus, Search, Receipt, ChevronUp, ChevronDown, ChevronsUpDown, SlidersHorizontal } from 'lucide-svelte';
+
 	let { data }: { data: PageData } = $props();
-	
+
+	// ── Modals ────────────────────────────────────────────────────────────────
 	let showAddModal     = $state(false);
 	let showEditModal    = $state(false);
 	let showExpenseModal = $state(false);
 	let selectedTask     = $state<any>(null);
-	
-	function handleRowClick(task: any) {
-		selectedTask = task;
-		showEditModal = true;
-	}
 
-	function handleLogExpense(e: MouseEvent, task: any) {
-		e.stopPropagation(); // don't open edit modal
+	function openEdit(task: any) { selectedTask = task; showEditModal = true; }
+	function openExpense(e: MouseEvent, task: any) {
+		e.stopPropagation();
 		selectedTask = task;
 		showExpenseModal = true;
 	}
-	
-	let tasks = $derived(data.tasks || []);
-	let stats = $derived(data.stats);
-	let subtaskStats = $derived(data.subtaskStats);
-	let alerts = $derived(data.alerts);
-	let overdueTasks = $derived(data.overdueTasks || []);
-	let upcomingTasks = $derived(data.upcomingTasks || []);
-	
-	// Console log for debugging - use $effect to run after initialization
-	$effect(() => {
-		console.log('=== TASKS PAGE DEBUG ===');
-		console.log('Raw data object:', data);
-		console.log('Tasks array:', tasks);
-		console.log('Tasks count:', tasks.length);
-		console.log('Stats:', stats);
-		console.log('Alerts:', alerts);
-		console.log('Error (if any):', data.error);
-		console.log('First task:', tasks[0]);
-		console.log('Filtered tasks count:', filteredTasks.length);
-		console.log('Status filter:', statusFilter);
-		console.log('Priority filter:', priorityFilter);
-		console.log('========================');
+
+	// ── Column visibility ─────────────────────────────────────────────────────
+	let showColMenu = $state(false);
+	let visibleCols = $state({
+		status: true, priority: true, project: true, assignedTo: true,
+		startDate: true, dueDate: true, hours: true, budget: true,
+		subtasks: true, tags: true
 	});
-	
-	let statusFilter = $state<string>('all');
-	let priorityFilter = $state<string>('all');
-	
-	// Filter tasks based on selected tabs
-	let filteredTasks = $derived(tasks.filter(task => {
-		const statusMatch = statusFilter === 'all' || task.status === statusFilter;
-		const priorityMatch = priorityFilter === 'all' || task.priority === priorityFilter;
-		return statusMatch && priorityMatch;
-	}));
-	
-	// Calculate filtered completion
-	let filteredCompleted = $derived(filteredTasks.filter(t => t.status === 'completed').length);
-	
-	// Build status tabs
-	let statusTabs = $derived([
-		{ value: 'all', label: 'All', count: tasks.length },
-		{ value: 'todo', label: 'To Do', count: stats.byStatus.todo, icon: Circle },
-		{ value: 'in_progress', label: 'In Progress', count: stats.byStatus.in_progress, icon: PlayCircle },
-		{ value: 'blocked', label: 'Blocked', count: stats.byStatus.blocked, icon: Ban },
-		{ value: 'completed', label: 'Completed', count: stats.byStatus.completed, icon: CheckCircle2 },
-		{ value: 'cancelled', label: 'Cancelled', count: stats.byStatus.cancelled, icon: XCircle }
-	]);
-	
-	// Build priority tabs
-	let priorityTabs = $derived([
-		{ value: 'all', label: 'All Priorities', count: tasks.length },
-		{ value: 'urgent', label: 'Urgent', count: stats.byPriority.urgent, icon: AlertCircle },
-		{ value: 'high', label: 'High', count: stats.byPriority.high, icon: ArrowUp },
-		{ value: 'medium', label: 'Medium', count: stats.byPriority.medium, icon: Minus },
-		{ value: 'low', label: 'Low', count: stats.byPriority.low, icon: ArrowDown }
-	]);
-	
-	function formatDate(dateString: string | null): string {
-		if (!dateString) return '-';
-		return new Date(dateString).toLocaleDateString('en-US', {
-			month: 'short',
-			day: 'numeric',
-			year: 'numeric'
+
+	// ── Filters ───────────────────────────────────────────────────────────────
+	let search     = $state('');
+	let fStatus    = $state('all');
+	let fPriority  = $state('all');
+	let fProject   = $state('all');
+	let fAssignee  = $state('all');
+
+	// ── Sorting ───────────────────────────────────────────────────────────────
+	type SortCol = 'title' | 'status' | 'priority' | 'project' | 'assignedTo' | 'startDate' | 'dueDate' | 'budget' | 'hours';
+	let sortCol = $state<SortCol>('title');
+	let sortDir = $state<'asc' | 'desc'>('asc');
+
+	function toggleSort(col: SortCol) {
+		if (sortCol === col) sortDir = sortDir === 'asc' ? 'desc' : 'asc';
+		else { sortCol = col; sortDir = 'asc'; }
+	}
+
+	// ── Derived ───────────────────────────────────────────────────────────────
+	let tasks = $derived(data.tasks ?? []);
+
+	let projects = $derived(
+		[...new Map(
+			tasks.filter((t: any) => t.expand?.projectId)
+				.map((t: any) => [t.expand.projectId.id, t.expand.projectId])
+		).values()]
+	);
+
+	let assignees = $derived(
+		[...new Map(
+			tasks.flatMap((t: any) => t.expand?.assignedTo ?? [])
+				.map((u: any) => [u.id, { id: u.id, name: [u.firstName, u.lastName].filter(Boolean).join(' ') || u.email }])
+		).values()].sort((a, b) => a.name.localeCompare(b.name))
+	);
+
+	const PRIORITY_ORDER: Record<string, number> = { urgent: 0, high: 1, medium: 2, low: 3 };
+	const STATUS_ORDER:   Record<string, number> = { in_progress: 0, blocked: 1, todo: 2, completed: 3, cancelled: 4 };
+
+	let filtered = $derived(() => {
+		const q = search.trim().toLowerCase();
+		let rows = tasks.filter((t: any) => {
+			if (fStatus   !== 'all' && t.status   !== fStatus)   return false;
+			if (fPriority !== 'all' && t.priority !== fPriority) return false;
+			if (fProject  !== 'all' && t.expand?.projectId?.id !== fProject) return false;
+			if (fAssignee !== 'all' && !t.expand?.assignedTo?.some((u: any) => u.id === fAssignee)) return false;
+			if (q && !t.title?.toLowerCase().includes(q) &&
+				!t.description?.toLowerCase().includes(q) &&
+				!t.tags?.toLowerCase().includes(q)) return false;
+			return true;
 		});
+		rows = [...rows].sort((a: any, b: any) => {
+			let cmp = 0;
+			if (sortCol === 'title')     cmp = (a.title ?? '').localeCompare(b.title ?? '');
+			if (sortCol === 'status')    cmp = (STATUS_ORDER[a.status] ?? 9) - (STATUS_ORDER[b.status] ?? 9);
+			if (sortCol === 'priority')  cmp = (PRIORITY_ORDER[a.priority] ?? 9) - (PRIORITY_ORDER[b.priority] ?? 9);
+			if (sortCol === 'project')    cmp = (a.expand?.projectId?.name ?? '').localeCompare(b.expand?.projectId?.name ?? '');
+			if (sortCol === 'assignedTo') cmp = (a.expand?.assignedTo?.[0] ? [a.expand.assignedTo[0].firstName, a.expand.assignedTo[0].lastName].filter(Boolean).join(' ') : '').localeCompare(b.expand?.assignedTo?.[0] ? [b.expand.assignedTo[0].firstName, b.expand.assignedTo[0].lastName].filter(Boolean).join(' ') : '');
+			if (sortCol === 'budget')    cmp = (a.task_budget ?? 0) - (b.task_budget ?? 0);
+			if (sortCol === 'hours')     cmp = (a.estimatedHours ?? 0) - (b.estimatedHours ?? 0);
+			if (sortCol === 'startDate') {
+				const da = a.startDate ? new Date(a.startDate).getTime() : Infinity;
+				const db = b.startDate ? new Date(b.startDate).getTime() : Infinity;
+				cmp = da - db;
+			}
+			if (sortCol === 'dueDate') {
+				const da = a.dueDate ? new Date(a.dueDate).getTime() : Infinity;
+				const db = b.dueDate ? new Date(b.dueDate).getTime() : Infinity;
+				cmp = da - db;
+			}
+			return sortDir === 'asc' ? cmp : -cmp;
+		});
+		return rows;
+	});
+
+	// ── Helpers ───────────────────────────────────────────────────────────────
+	function fmtDate(d: string | null) {
+		if (!d) return '—';
+		return new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 	}
-	
-	function getSubtaskProgress(task: any): { completed: number; total: number } {
-		const raw = task.subTasksChecklist;
-		if (!raw) return { completed: 0, total: 0 };
-		// Support both markdown string and legacy array format
-		if (typeof raw === 'string') {
-			const lines = raw.split('\n').filter((l: string) => l.trim().match(/^- \[[ x]\]/i));
-			if (!lines.length) return { completed: 0, total: 0 };
-			const completed = lines.filter((l: string) => /^- \[x\]/i.test(l.trim())).length;
-			return { completed, total: lines.length };
-		}
-		if (Array.isArray(raw)) {
-			const completed = raw.filter((st: any) => st && st.completed).length;
-			return { completed, total: raw.length };
-		}
-		return { completed: 0, total: 0 };
+	function fmtCurrency(n: number | null) {
+		if (!n) return '—';
+		return '$' + n.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
 	}
-	
-	function getPriorityColor(priority: string): string {
-		switch (priority) {
-			case 'urgent': return 'text-red-600 dark:text-red-400';
-			case 'high': return 'text-orange-600 dark:text-orange-400';
-			case 'medium': return 'text-yellow-600 dark:text-yellow-400';
-			case 'low': return 'text-green-600 dark:text-green-400';
-			default: return 'text-slate-600 dark:text-slate-400';
-		}
+	function isOverdue(t: any) {
+		if (!t.dueDate || t.status === 'completed' || t.status === 'cancelled') return false;
+		return new Date(t.dueDate) < new Date();
 	}
-	
-	function isOverdue(task: any): boolean {
-		if (!task.dueDate || task.status === 'completed' || task.status === 'cancelled') return false;
-		return new Date(task.dueDate) < new Date();
+	function subtaskProgress(t: any): { done: number; total: number } {
+		const raw = t.subTasksChecklist;
+		if (!raw || typeof raw !== 'string') return { done: 0, total: 0 };
+		const lines = raw.split('\n').filter((l: string) => l.trim().match(/^- \[[ x]\]/i));
+		if (!lines.length) return { done: 0, total: 0 };
+		return { done: lines.filter((l: string) => /^- \[x\]/i.test(l.trim())).length, total: lines.length };
 	}
+	function assigneeNames(t: any): string {
+		const list = t.expand?.assignedTo;
+		if (!list?.length) return '—';
+		return list.map((u: any) => [u.firstName, u.lastName].filter(Boolean).join(' ') || u.email || '?').join(', ');
+	}
+
+	const STATUS_LABEL: Record<string, string> = {
+		todo: 'To Do', in_progress: 'In Progress', blocked: 'Blocked',
+		completed: 'Completed', cancelled: 'Cancelled'
+	};
+	const STATUS_CLASS: Record<string, string> = {
+		todo:        'bg-slate-700 text-slate-200',
+		in_progress: 'bg-blue-900/60 text-blue-300 border border-blue-700/50',
+		blocked:     'bg-red-900/60 text-red-300 border border-red-700/50',
+		completed:   'bg-emerald-900/60 text-emerald-300 border border-emerald-700/50',
+		cancelled:   'bg-slate-800 text-slate-500',
+	};
+	const PRIORITY_CLASS: Record<string, string> = {
+		urgent: 'text-red-400', high: 'text-orange-400', medium: 'text-yellow-400', low: 'text-slate-400',
+	};
+	const PRIORITY_DOT: Record<string, string> = {
+		urgent: 'bg-red-500', high: 'bg-orange-500', medium: 'bg-yellow-500', low: 'bg-slate-500',
+	};
+
+	type ColKey = keyof typeof visibleCols;
+	const COL_LABELS: Record<ColKey, string> = {
+		status: 'Status', priority: 'Priority', project: 'Project', assignedTo: 'Assigned To',
+		startDate: 'Start Date', dueDate: 'Due Date', hours: 'Hours', budget: 'Budget',
+		subtasks: 'Subtasks', tags: 'Tags'
+	};
 </script>
 
-<svelte:head>
-	<title>Tasks - FliHub</title>
-</svelte:head>
+<svelte:head><title>Tasks — FliHub</title></svelte:head>
 
-<div class="flex flex-col gap-6">
-	<div class="flex justify-between items-center">
+<!-- Modals -->
+<AddTaskModal bind:open={showAddModal} />
+{#if selectedTask}
+	<EditTaskModal
+		bind:open={showEditModal}
+		task={selectedTask}
+		expenses={(data.expensesByTask as any)[selectedTask.id] ?? { total: 0, paid: 0 }}
+	/>
+	<TaskExpenseModal
+		bind:open={showExpenseModal}
+		task={selectedTask}
+		project={selectedTask?.expand?.projectId ?? null}
+		departmentName={selectedTask?.expand?.projectId?.expand?.department?.name ?? ''}
+		vendors={data.vendors ?? []}
+	/>
+{/if}
+
+<div class="flex flex-col gap-5">
+
+	<!-- Header -->
+	<div class="flex items-center justify-between">
 		<div>
-			<h1 class="text-3xl font-bold mb-2">Tasks</h1>
-			<p class="text-muted-foreground">Business roadmap and project tasks</p>
+			<h1 class="text-2xl font-bold text-slate-100">Tasks</h1>
+			<p class="text-sm text-slate-400 mt-0.5">{tasks.length} total · {filtered().length} shown</p>
 		</div>
-		<Button class="gap-2" onclick={() => showAddModal = true}>
-			<Plus class="size-4" />
-			Add Task
+		<Button onclick={() => showAddModal = true} class="gap-2">
+			<Plus class="size-4" /> New Task
 		</Button>
 	</div>
-	
-	<!-- Add Task Modal -->
-	<AddTaskModal bind:open={showAddModal} />
-	
-	<!-- Edit Task Modal -->
-	{#if selectedTask}
-		<EditTaskModal bind:open={showEditModal} task={selectedTask} expenses={(data.expensesByTask as Record<string,{total:number;paid:number}>)[selectedTask.id] ?? { total: 0, paid: 0 }} />
-	{/if}
 
-	<!-- Log Expense from Task Modal -->
-	{#if selectedTask}
-		<TaskExpenseModal
-			bind:open={showExpenseModal}
-			task={selectedTask}
-			project={selectedTask?.expand?.projectId ?? null}
-			departmentName={selectedTask?.expand?.projectId?.expand?.department?.name ?? ''}
-			vendors={data.vendors ?? []}
-		/>
-	{/if}
+	<!-- Filters + column toggle -->
+	<Card class="bg-slate-800/50 border-slate-700 p-4">
+		<div class="flex flex-wrap gap-3 items-center">
+			<div class="relative flex-1 min-w-48">
+				<Search class="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-slate-400 pointer-events-none" />
+				<Input bind:value={search} placeholder="Search tasks…"
+					class="pl-9 bg-slate-900/60 border-slate-600 text-slate-100 placeholder:text-slate-500 h-9" />
+			</div>
 
-	<!-- Alerts -->
-	{#if alerts.overdue > 0 || alerts.blocked > 0}
-		<div class="flex gap-4">
-			{#if alerts.overdue > 0}
-				<Card class="p-4 border-red-500 bg-red-50 dark:bg-red-900/20">
-					<div class="flex items-center gap-3">
-						<AlertTriangle class="size-5 text-red-600 dark:text-red-400" />
-						<div>
-							<p class="font-semibold text-red-900 dark:text-red-100">
-								{alerts.overdue} {alerts.overdue === 1 ? 'task is' : 'tasks are'} overdue
-							</p>
-							<p class="text-sm text-red-700 dark:text-red-300">Requires immediate attention</p>
-						</div>
-					</div>
-				</Card>
+			<select bind:value={fStatus}
+				class="h-9 rounded-md border border-slate-600 bg-slate-900 text-slate-200 text-sm px-3 focus:outline-none focus:ring-1 focus:ring-slate-500 [color-scheme:dark]">
+				<option value="all">All Statuses</option>
+				<option value="todo">To Do</option>
+				<option value="in_progress">In Progress</option>
+				<option value="blocked">Blocked</option>
+				<option value="completed">Completed</option>
+				<option value="cancelled">Cancelled</option>
+			</select>
+
+			<select bind:value={fPriority}
+				class="h-9 rounded-md border border-slate-600 bg-slate-900 text-slate-200 text-sm px-3 focus:outline-none focus:ring-1 focus:ring-slate-500 [color-scheme:dark]">
+				<option value="all">All Priorities</option>
+				<option value="urgent">Urgent</option>
+				<option value="high">High</option>
+				<option value="medium">Medium</option>
+				<option value="low">Low</option>
+			</select>
+
+			<select bind:value={fProject}
+				class="h-9 rounded-md border border-slate-600 bg-slate-900 text-slate-200 text-sm px-3 focus:outline-none focus:ring-1 focus:ring-slate-500 max-w-52 [color-scheme:dark]">
+				<option value="all">All Projects</option>
+				{#each projects as p}
+					<option value={(p as any).id}>{(p as any).name}</option>
+				{/each}
+			</select>
+
+			<select bind:value={fAssignee}
+				class="h-9 rounded-md border border-slate-600 bg-slate-900 text-slate-200 text-sm px-3 focus:outline-none focus:ring-1 focus:ring-slate-500 max-w-48 [color-scheme:dark]">
+				<option value="all">All Assignees</option>
+				{#each assignees as a}
+					<option value={(a as any).id}>{(a as any).name}</option>
+				{/each}
+			</select>
+
+			{#if search || fStatus !== 'all' || fPriority !== 'all' || fProject !== 'all' || fAssignee !== 'all'}
+				<button onclick={() => { search = ''; fStatus = 'all'; fPriority = 'all'; fProject = 'all'; fAssignee = 'all'; }}
+					class="text-xs text-slate-400 hover:text-slate-200 underline underline-offset-2 whitespace-nowrap">
+					Clear filters
+				</button>
 			{/if}
-			{#if alerts.blocked > 0}
-				<Card class="p-4 border-yellow-500 bg-yellow-50 dark:bg-yellow-900/20">
-					<div class="flex items-center gap-3">
-						<AlertTriangle class="size-5 text-yellow-600 dark:text-yellow-400" />
-						<div>
-							<p class="font-semibold text-yellow-900 dark:text-yellow-100">
-								{alerts.blocked} {alerts.blocked === 1 ? 'task is' : 'tasks are'} blocked
-							</p>
-							<p class="text-sm text-yellow-700 dark:text-yellow-300">Waiting on dependencies</p>
-						</div>
+
+			<!-- Column toggle -->
+			<div class="relative ml-auto">
+				<button onclick={() => showColMenu = !showColMenu}
+					class="flex items-center gap-1.5 h-9 px-3 rounded-md border border-slate-600 bg-slate-900/60 text-slate-300 text-sm hover:bg-slate-800 transition-colors">
+					<SlidersHorizontal class="size-3.5" /> Columns
+				</button>
+				{#if showColMenu}
+					<div class="absolute right-0 top-11 z-50 w-48 rounded-lg border border-slate-700 bg-slate-900 shadow-xl p-2">
+						{#each Object.keys(visibleCols) as col}
+							<label class="flex items-center gap-2.5 px-2 py-1.5 rounded hover:bg-slate-800 cursor-pointer text-sm text-slate-300">
+								<input type="checkbox" bind:checked={visibleCols[col as ColKey]}
+									class="rounded border-slate-600 bg-slate-800 accent-emerald-500" />
+								{COL_LABELS[col as ColKey]}
+							</label>
+						{/each}
 					</div>
-				</Card>
-			{/if}
+				{/if}
+			</div>
 		</div>
-	{/if}
+	</Card>
 
-	<!-- Statistics -->
-	<div>
-		<h2 class="text-xl font-semibold mb-4">Overview</h2>
-		<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-			<MetricCard
-				title="Total Tasks"
-				value={stats.total}
-				subtitle="{stats.byStatus.in_progress} in progress"
-				icon={ListTodo}
-			/>
-			
-			<MetricCard
-				title="Completed"
-				value={stats.byStatus.completed}
-				subtitle="{stats.completion.percentage.toFixed(0)}% completion rate"
-				icon={CheckCircle2}
-				variant="success"
-			/>
-			
-			<MetricCard
-				title="Upcoming"
-				value={alerts.upcoming}
-				subtitle="Due in next 7 days"
-				icon={Calendar}
-				variant="warning"
-			/>
-			
-			<MetricCard
-				title="Subtasks"
-				value={`${subtaskStats.completed}/${subtaskStats.total}`}
-				subtitle="Checklist items completed"
-				icon={Target}
-			/>
-		</div>
-	</div>
-
-	<!-- Progress Overview -->
-	<div>
-		<h2 class="text-xl font-semibold mb-4">Progress Overview</h2>
-		<div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
-			<Card class="p-6">
-				<h3 class="text-lg font-semibold mb-4">Task Completion</h3>
-				<div class="space-y-4">
-					<div class="flex justify-between text-sm">
-						<span class="text-muted-foreground">Completed</span>
-						<span class="font-semibold">{stats.byStatus.completed} / {stats.total}</span>
-					</div>
-					<ProgressBar
-						value={stats.byStatus.completed}
-						max={stats.total}
-						label="Overall Progress"
-						variant="success"
-						size="lg"
-					/>
-				</div>
-			</Card>
-
-			<Card class="p-6">
-				<h3 class="text-lg font-semibold mb-4">Subtask Completion</h3>
-				<div class="space-y-4">
-					<div class="flex justify-between text-sm">
-						<span class="text-muted-foreground">Completed</span>
-						<span class="font-semibold">{subtaskStats.completed} / {subtaskStats.total}</span>
-					</div>
-					<ProgressBar
-						value={subtaskStats.completed}
-						max={subtaskStats.total}
-						label="Checklist Progress"
-						variant="success"
-						size="lg"
-					/>
-				</div>
-			</Card>
-		</div>
-	</div>
-
-	<!-- Status Breakdown -->
-	<div>
-		<h2 class="text-xl font-semibold mb-4">Task Status</h2>
-		<div class="grid grid-cols-2 md:grid-cols-5 gap-4">
-			<Card class="p-4">
-				<p class="text-sm text-muted-foreground mb-1">To Do</p>
-				<p class="text-2xl font-bold">{stats.byStatus.todo}</p>
-			</Card>
-			<Card class="p-4">
-				<p class="text-sm text-muted-foreground mb-1">In Progress</p>
-				<p class="text-2xl font-bold">{stats.byStatus.in_progress}</p>
-			</Card>
-			<Card class="p-4">
-				<p class="text-sm text-muted-foreground mb-1">Blocked</p>
-				<p class="text-2xl font-bold">{stats.byStatus.blocked}</p>
-			</Card>
-			<Card class="p-4">
-				<p class="text-sm text-muted-foreground mb-1">Completed</p>
-				<p class="text-2xl font-bold">{stats.byStatus.completed}</p>
-			</Card>
-			<Card class="p-4">
-				<p class="text-sm text-muted-foreground mb-1">Cancelled</p>
-				<p class="text-2xl font-bold">{stats.byStatus.cancelled}</p>
-			</Card>
-		</div>
-	</div>
-
-	<!-- Priority Breakdown -->
-	<div>
-		<h2 class="text-xl font-semibold mb-4">Priority Distribution</h2>
-		<div class="grid grid-cols-2 md:grid-cols-4 gap-4">
-			<Card class="p-4">
-				<div class="flex items-center gap-2 mb-2">
-					<div class="size-3 rounded-full bg-red-500"></div>
-					<p class="text-sm text-muted-foreground">Urgent</p>
-				</div>
-				<p class="text-2xl font-bold">{stats.byPriority.urgent}</p>
-			</Card>
-			<Card class="p-4">
-				<div class="flex items-center gap-2 mb-2">
-					<div class="size-3 rounded-full bg-orange-500"></div>
-					<p class="text-sm text-muted-foreground">High</p>
-				</div>
-				<p class="text-2xl font-bold">{stats.byPriority.high}</p>
-			</Card>
-			<Card class="p-4">
-				<div class="flex items-center gap-2 mb-2">
-					<div class="size-3 rounded-full bg-yellow-500"></div>
-					<p class="text-sm text-muted-foreground">Medium</p>
-				</div>
-				<p class="text-2xl font-bold">{stats.byPriority.medium}</p>
-			</Card>
-			<Card class="p-4">
-				<div class="flex items-center gap-2 mb-2">
-					<div class="size-3 rounded-full bg-green-500"></div>
-					<p class="text-sm text-muted-foreground">Low</p>
-				</div>
-				<p class="text-2xl font-bold">{stats.byPriority.low}</p>
-			</Card>
-		</div>
-	</div>
-
-	<!-- Tasks Table with Tabs -->
-	<div>
-		<div class="flex items-center justify-between mb-4">
-			<h2 class="text-xl font-semibold">All Tasks</h2>
-			{#if statusFilter !== 'all' || priorityFilter !== 'all'}
-				<div class="text-sm text-muted-foreground">
-					Showing {filteredTasks.length} {filteredTasks.length === 1 ? 'task' : 'tasks'} • 
-					{filteredCompleted} completed ({filteredTasks.length > 0 ? ((filteredCompleted / filteredTasks.length) * 100).toFixed(0) : 0}%)
-				</div>
-			{/if}
-		</div>
-		
-		<!-- Status Filter Tabs -->
-		<div class="mb-4">
-			<h3 class="text-sm font-medium text-muted-foreground mb-3">Filter by Status</h3>
-			<VisualTabs
-				tabs={statusTabs}
-				activeTab={statusFilter}
-				onTabChange={(v) => statusFilter = v}
-				variant="button"
-			/>
-		</div>
-
-		<!-- Priority Filter Tabs -->
-		<div class="mb-4">
-			<h3 class="text-sm font-medium text-muted-foreground mb-3">Filter by Priority</h3>
-			<VisualTabs
-				tabs={priorityTabs}
-				activeTab={priorityFilter}
-				onTabChange={(v) => priorityFilter = v}
-				variant="pill"
-			/>
-		</div>
-
-		<Card class="overflow-hidden">
-			<div class="overflow-x-auto">
-				<table class="w-full">
-					<thead class="bg-slate-50 dark:bg-slate-900 border-b">
-						<tr>
-							<th class="px-6 py-3 text-left text-xs font-medium text-black dark:text-black uppercase tracking-wider">
+	<!-- Table -->
+	<Card class="bg-slate-800/50 border-slate-700 overflow-hidden">
+		<div class="overflow-x-auto">
+			<table class="w-full text-sm">
+				<thead>
+					<tr class="border-b border-slate-700 bg-slate-900/40">
+						<!-- Task (always visible) -->
+						<th class="px-4 py-3 text-left font-medium text-slate-400">
+							<button onclick={() => toggleSort('title')} class="flex items-center gap-1.5 hover:text-slate-200 transition-colors group">
 								Task
-							</th>
-							<th class="px-6 py-3 text-left text-xs font-medium text-black dark:text-black uppercase tracking-wider">
-								Status
-							</th>
-							<th class="px-6 py-3 text-left text-xs font-medium text-black dark:text-black uppercase tracking-wider">
-								Priority
-							</th>
-							<th class="px-6 py-3 text-left text-xs font-medium text-black dark:text-black uppercase tracking-wider">
-								Progress
-							</th>
-							<th class="px-6 py-3 text-left text-xs font-medium text-black dark:text-black uppercase tracking-wider">
-								Due Date
-							</th>
-							<th class="px-6 py-3 text-left text-xs font-medium text-black dark:text-black uppercase tracking-wider">
-								
-							</th>
+								<span class="text-slate-600 group-hover:text-slate-400">
+									{#if sortCol === 'title'}{#if sortDir === 'asc'}<ChevronUp class="size-3.5" />{:else}<ChevronDown class="size-3.5" />{/if}{:else}<ChevronsUpDown class="size-3.5" />{/if}
+								</span>
+							</button>
+						</th>
+						{#if visibleCols.status}
+						<th class="px-4 py-3 text-left font-medium text-slate-400">
+							<button onclick={() => toggleSort('status')} class="flex items-center gap-1.5 hover:text-slate-200 transition-colors group">
+								Status <span class="text-slate-600 group-hover:text-slate-400">{#if sortCol === 'status'}{#if sortDir === 'asc'}<ChevronUp class="size-3.5" />{:else}<ChevronDown class="size-3.5" />{/if}{:else}<ChevronsUpDown class="size-3.5" />{/if}</span>
+							</button>
+						</th>
+						{/if}
+						{#if visibleCols.priority}
+						<th class="px-4 py-3 text-left font-medium text-slate-400">
+							<button onclick={() => toggleSort('priority')} class="flex items-center gap-1.5 hover:text-slate-200 transition-colors group">
+								Priority <span class="text-slate-600 group-hover:text-slate-400">{#if sortCol === 'priority'}{#if sortDir === 'asc'}<ChevronUp class="size-3.5" />{:else}<ChevronDown class="size-3.5" />{/if}{:else}<ChevronsUpDown class="size-3.5" />{/if}</span>
+							</button>
+						</th>
+						{/if}
+						{#if visibleCols.project}
+						<th class="px-4 py-3 text-left font-medium text-slate-400">
+							<button onclick={() => toggleSort('project')} class="flex items-center gap-1.5 hover:text-slate-200 transition-colors group">
+								Project <span class="text-slate-600 group-hover:text-slate-400">{#if sortCol === 'project'}{#if sortDir === 'asc'}<ChevronUp class="size-3.5" />{:else}<ChevronDown class="size-3.5" />{/if}{:else}<ChevronsUpDown class="size-3.5" />{/if}</span>
+							</button>
+						</th>
+						{/if}
+						{#if visibleCols.assignedTo}
+						<th class="px-4 py-3 text-left font-medium text-slate-400 whitespace-nowrap">
+							<button onclick={() => toggleSort('assignedTo')} class="flex items-center gap-1.5 hover:text-slate-200 transition-colors group">
+								Assigned To <span class="text-slate-600 group-hover:text-slate-400">{#if sortCol === 'assignedTo'}{#if sortDir === 'asc'}<ChevronUp class="size-3.5" />{:else}<ChevronDown class="size-3.5" />{/if}{:else}<ChevronsUpDown class="size-3.5" />{/if}</span>
+							</button>
+						</th>
+						{/if}
+						{#if visibleCols.startDate}
+						<th class="px-4 py-3 text-left font-medium text-slate-400">
+							<button onclick={() => toggleSort('startDate')} class="flex items-center gap-1.5 hover:text-slate-200 transition-colors group">
+								Start <span class="text-slate-600 group-hover:text-slate-400">{#if sortCol === 'startDate'}{#if sortDir === 'asc'}<ChevronUp class="size-3.5" />{:else}<ChevronDown class="size-3.5" />{/if}{:else}<ChevronsUpDown class="size-3.5" />{/if}</span>
+							</button>
+						</th>
+						{/if}
+						{#if visibleCols.dueDate}
+						<th class="px-4 py-3 text-left font-medium text-slate-400">
+							<button onclick={() => toggleSort('dueDate')} class="flex items-center gap-1.5 hover:text-slate-200 transition-colors group">
+								Due <span class="text-slate-600 group-hover:text-slate-400">{#if sortCol === 'dueDate'}{#if sortDir === 'asc'}<ChevronUp class="size-3.5" />{:else}<ChevronDown class="size-3.5" />{/if}{:else}<ChevronsUpDown class="size-3.5" />{/if}</span>
+							</button>
+						</th>
+						{/if}
+						{#if visibleCols.hours}
+						<th class="px-4 py-3 text-left font-medium text-slate-400">
+							<button onclick={() => toggleSort('hours')} class="flex items-center gap-1.5 hover:text-slate-200 transition-colors group">
+								Hours <span class="text-slate-600 group-hover:text-slate-400">{#if sortCol === 'hours'}{#if sortDir === 'asc'}<ChevronUp class="size-3.5" />{:else}<ChevronDown class="size-3.5" />{/if}{:else}<ChevronsUpDown class="size-3.5" />{/if}</span>
+							</button>
+						</th>
+						{/if}
+						{#if visibleCols.budget}
+						<th class="px-4 py-3 text-left font-medium text-slate-400">
+							<button onclick={() => toggleSort('budget')} class="flex items-center gap-1.5 hover:text-slate-200 transition-colors group">
+								Budget <span class="text-slate-600 group-hover:text-slate-400">{#if sortCol === 'budget'}{#if sortDir === 'asc'}<ChevronUp class="size-3.5" />{:else}<ChevronDown class="size-3.5" />{/if}{:else}<ChevronsUpDown class="size-3.5" />{/if}</span>
+							</button>
+						</th>
+						{/if}
+						{#if visibleCols.subtasks}<th class="px-4 py-3 text-left font-medium text-slate-400 whitespace-nowrap">Subtasks</th>{/if}
+						{#if visibleCols.tags}<th class="px-4 py-3 text-left font-medium text-slate-400">Tags</th>{/if}
+						<th class="px-4 py-3 w-28"></th>
+					</tr>
+				</thead>
+				<tbody class="divide-y divide-slate-700/50">
+					{#if filtered().length === 0}
+						<tr>
+							<td colspan="20" class="px-4 py-12 text-center text-slate-500">
+								{tasks.length === 0 ? 'No tasks yet. Click New Task to get started.' : 'No tasks match the current filters.'}
+							</td>
 						</tr>
-					</thead>
-					<tbody class="divide-y divide-slate-200 dark:divide-slate-800">
-						{#if filteredTasks.length === 0}
-							<tr>
-								<td colspan="5" class="px-6 py-8 text-center text-foreground">
-									{#if tasks.length === 0}
-										No tasks found. Create your first task to get started.
-									{:else}
-										No tasks match the selected filters.
+					{:else}
+						{#each filtered() as task (task.id)}
+							{@const overdue = isOverdue(task)}
+							{@const sub = subtaskProgress(task)}
+							<tr onclick={() => openEdit(task)}
+								class="cursor-pointer transition-colors hover:bg-slate-700/40 {overdue ? 'border-l-2 border-l-red-500' : ''}">
+
+								<!-- Task title -->
+								<td class="px-4 py-3 max-w-xs">
+									<p class="font-medium text-slate-100 truncate">{task.title}</p>
+									{#if task.description}
+										<p class="text-xs text-slate-500 truncate mt-0.5">{task.description}</p>
 									{/if}
 								</td>
+
+								{#if visibleCols.status}
+								<td class="px-4 py-3 whitespace-nowrap">
+									<span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium {STATUS_CLASS[task.status] ?? 'bg-slate-700 text-slate-300'}">
+										{STATUS_LABEL[task.status] ?? task.status}
+									</span>
+								</td>
+								{/if}
+
+								{#if visibleCols.priority}
+								<td class="px-4 py-3 whitespace-nowrap">
+									{#if task.priority}
+										<span class="inline-flex items-center gap-1.5 text-xs font-medium capitalize {PRIORITY_CLASS[task.priority] ?? 'text-slate-400'}">
+											<span class="size-1.5 rounded-full {PRIORITY_DOT[task.priority] ?? 'bg-slate-500'}"></span>
+											{task.priority}
+										</span>
+									{:else}<span class="text-slate-600">—</span>{/if}
+								</td>
+								{/if}
+
+								{#if visibleCols.project}
+								<td class="px-4 py-3 max-w-[160px]">
+									{#if task.expand?.projectId}
+										<span class="text-slate-300 truncate block">{task.expand.projectId.name}</span>
+									{:else}<span class="text-slate-600">—</span>{/if}
+								</td>
+								{/if}
+
+								{#if visibleCols.assignedTo}
+								<td class="px-4 py-3 max-w-[140px]">
+									<span class="text-slate-300 truncate block text-xs">{assigneeNames(task)}</span>
+								</td>
+								{/if}
+
+								{#if visibleCols.startDate}
+								<td class="px-4 py-3 whitespace-nowrap text-slate-400 text-xs">{fmtDate(task.startDate)}</td>
+								{/if}
+
+								{#if visibleCols.dueDate}
+								<td class="px-4 py-3 whitespace-nowrap text-xs {overdue ? 'text-red-400 font-medium' : 'text-slate-400'}">
+									{fmtDate(task.dueDate)}
+									{#if overdue}<span class="ml-1 text-red-500">overdue</span>{/if}
+								</td>
+								{/if}
+
+								{#if visibleCols.hours}
+								<td class="px-4 py-3 whitespace-nowrap text-xs text-slate-400">
+									{#if task.estimatedHours || task.actualHours}
+										<span class="{task.actualHours > task.estimatedHours ? 'text-red-400' : ''}">
+											{task.actualHours ?? 0}h
+										</span>
+										<span class="text-slate-600"> / {task.estimatedHours ?? 0}h</span>
+									{:else}<span class="text-slate-600">—</span>{/if}
+								</td>
+								{/if}
+
+								{#if visibleCols.budget}
+								<td class="px-4 py-3 whitespace-nowrap text-xs">
+									{#if task.task_budget}
+										{@const spent = task.task_actual_cost ?? 0}
+										{@const pct = Math.min(100, (spent / task.task_budget) * 100)}
+										<div>
+											<div class="flex items-center justify-between mb-1">
+												<span class="{spent > task.task_budget ? 'text-red-400' : 'text-slate-300'}">{fmtCurrency(spent)}</span>
+												<span class="text-slate-500"> / {fmtCurrency(task.task_budget)}</span>
+											</div>
+											<div class="h-1 w-20 rounded-full bg-slate-700">
+												<div class="h-1 rounded-full {spent > task.task_budget ? 'bg-red-500' : 'bg-emerald-500'}" style="width:{pct}%"></div>
+											</div>
+										</div>
+									{:else}<span class="text-slate-600">—</span>{/if}
+								</td>
+								{/if}
+
+								{#if visibleCols.subtasks}
+								<td class="px-4 py-3 whitespace-nowrap text-xs">
+									{#if sub.total > 0}
+										{@const pct = Math.round((sub.done / sub.total) * 100)}
+										<div>
+											<div class="flex items-center justify-between mb-1">
+												<span class="text-slate-300">{sub.done}/{sub.total}</span>
+												<span class="text-slate-500">{pct}%</span>
+											</div>
+											<div class="h-1 w-16 rounded-full bg-slate-700">
+												<div class="h-1 rounded-full bg-blue-500" style="width:{pct}%"></div>
+											</div>
+										</div>
+									{:else}<span class="text-slate-600">—</span>{/if}
+								</td>
+								{/if}
+
+								{#if visibleCols.tags}
+								<td class="px-4 py-3 max-w-[120px]">
+									{#if task.tags}
+										<div class="flex flex-wrap gap-1">
+											{#each task.tags.split(',').map((t: string) => t.trim()).filter(Boolean) as tag}
+												<span class="px-1.5 py-0.5 rounded bg-slate-700 text-slate-300 text-xs">{tag}</span>
+											{/each}
+										</div>
+									{:else}<span class="text-slate-600">—</span>{/if}
+								</td>
+								{/if}
+
+								<td class="px-4 py-3" onclick={(e) => e.stopPropagation()}>
+									<button onclick={(e) => openExpense(e, task)}
+										class="flex items-center gap-1 text-xs px-2 py-1 rounded border border-emerald-700/50 bg-emerald-950/40 text-emerald-400 hover:bg-emerald-900/50 hover:text-emerald-300 transition-all whitespace-nowrap">
+										<Receipt class="size-3" /> Log Expense
+									</button>
+								</td>
 							</tr>
-						{:else}
-							{#each filteredTasks as task, i}
-								{@const progress = getSubtaskProgress(task)}
-								{@const overdue = isOverdue(task)}
-								<tr 
-									class="hover:bg-green-800 dark:hover:bg-green-800/50 transition-colors cursor-pointer {overdue ? 'bg-red-900/20 dark:bg-red-900/30 border-l-4 border-red-500' : i % 2 === 1 ? 'bg-blue-800 dark:bg-blue-800/30' : ''}"
-									onclick={() => handleRowClick(task)}
-								>
-									<td class="px-6 py-4">
-										<div class="font-medium">{task.title}</div>
-										{#if task.description}
-											<div class="text-sm text-muted-foreground truncate max-w-md">
-												{task.description}
-											</div>
-										{/if}
-									</td>
-									<td class="px-6 py-4">
-										<StatusBadge status={task.status} />
-									</td>
-									<td class="px-6 py-4">
-										{#if task.priority}
-											<span class="text-sm font-medium capitalize {getPriorityColor(task.priority)}">
-												{task.priority}
-											</span>
-										{:else}
-											<span class="text-sm text-muted-foreground">-</span>
-										{/if}
-									</td>
-									<td class="px-6 py-4">
-										{#if progress.total > 0}
-											<div class="w-32">
-												<ProgressBar
-													value={progress.completed}
-													max={progress.total}
-													showPercentage={false}
-													variant="success"
-													size="sm"
-												/>
-												<p class="text-xs text-muted-foreground mt-1">
-													{progress.completed}/{progress.total} subtasks
-												</p>
-											</div>
-										{:else}
-											<span class="text-sm text-muted-foreground">-</span>
-										{/if}
-									</td>
-									<td class="px-6 py-4 text-sm text-muted-foreground">
-										{formatDate(task.dueDate)}
-									</td>
-									<td class="px-6 py-4" onclick={(e) => e.stopPropagation()}>
-										<button
-											onclick={(e) => handleLogExpense(e, task)}
-											class="flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-lg border border-emerald-700/60 bg-emerald-950/40 text-emerald-400 hover:bg-emerald-900/60 hover:text-emerald-300 hover:border-emerald-600 transition-all whitespace-nowrap"
-										>
-											<Receipt class="size-3.5" /> Log Expense
-										</button>
-									</td>
-								</tr>
-							{/each}
-						{/if}
-					</tbody>
-				</table>
+						{/each}
+					{/if}
+				</tbody>
+			</table>
+		</div>
+
+		{#if filtered().length > 0}
+			<div class="px-4 py-2.5 border-t border-slate-700/50 text-xs text-slate-500">
+				{filtered().length} {filtered().length === 1 ? 'task' : 'tasks'}
+				{#if filtered().length !== tasks.length} · filtered from {tasks.length}{/if}
 			</div>
-		</Card>
-	</div>
+		{/if}
+	</Card>
 </div>

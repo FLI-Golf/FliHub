@@ -6,11 +6,12 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 	const { pb } = ctx;
 	try {
 	
-		const [departments, userProfiles, projects, expenses] = await Promise.all([
+		const [departments, userProfiles, projects, expenses, reimbClaims] = await Promise.all([
 			pb.collection('departments').getFullList({ sort: 'name', expand: 'headOfDepartment' }).catch(() => []),
 			pb.collection('user_profiles').getFullList({ sort: 'firstName,lastName' }).catch(() => []),
 			pb.collection('projects').getFullList({ fields: 'id,department,project_budget,status' }).catch(() => []),
-			pb.collection('expenses').getFullList({ fields: 'id,amount,status,taskId' }).catch(() => [])
+			pb.collection('expenses').getFullList({ fields: 'id,amount,status,taskId' }).catch(() => []),
+			pb.collection('reimbursement_claims').getFullList({ fields: 'id,totalAmount,status,department' }).catch(() => []),
 		]);
 
 		// Tasks to resolve expense → project → department
@@ -43,7 +44,14 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 			if (e.status === 'submitted' || e.status === 'approved') expensesByDept[deptId].pending += e.amount ?? 0;
 		}
 
-		return { departments, userProfiles, allocatedByDept, projectCountByDept, activeProjectsByDept, expensesByDept };
+		// Reimbursement paid totals per department
+		const reimbByDept: Record<string, number> = {};
+		for (const c of reimbClaims as any[]) {
+			if (!c.department || c.status !== 'paid') continue;
+			reimbByDept[c.department] = (reimbByDept[c.department] ?? 0) + (c.totalAmount ?? 0);
+		}
+
+		return { departments, userProfiles, allocatedByDept, projectCountByDept, activeProjectsByDept, expensesByDept, reimbByDept };
 	} catch (err: any) {
 		console.error('departments load error:', err?.message ?? err);
 		return {};

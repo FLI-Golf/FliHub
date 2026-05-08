@@ -78,8 +78,11 @@
 				{@const expTotal    = exp?.total ?? 0}
 				{@const expPaid     = exp?.paid ?? 0}
 				{@const expPending  = exp?.pending ?? 0}
-				{@const paidPct     = expTotal > 0 ? Math.min(100, (expPaid / expTotal) * 100) : 0}
-				{@const pendingPct  = expTotal > 0 ? Math.min(100 - paidPct, (expPending / expTotal) * 100) : 0}
+				{@const reimbPaid   = data.reimbByDept?.[department.id] ?? 0}
+				{@const combinedTotal = expTotal + reimbPaid}
+				{@const paidPct     = combinedTotal > 0 ? Math.min(100, (expPaid / combinedTotal) * 100) : 0}
+				{@const pendingPct  = combinedTotal > 0 ? Math.min(100 - paidPct, (expPending / combinedTotal) * 100) : 0}
+				{@const reimbPct    = combinedTotal > 0 ? Math.min(100 - paidPct - pendingPct, (reimbPaid / combinedTotal) * 100) : 0}
 				<a href="/dashboard/departments/{department.id}" class="group">
 					<Card class="p-5 h-full flex flex-col gap-4 hover:bg-slate-800/80 transition-colors duration-200 cursor-pointer border-slate-700/60">
 
@@ -174,20 +177,28 @@
 							{/if}
 						</div>
 
-						<!-- Expense bar -->
-						{#if expTotal > 0}
+						<!-- Spend bar: project expenses + reimbursements -->
+						{#if combinedTotal > 0}
 							<div class="space-y-1.5 pt-1 border-t border-slate-700/50">
 								<div class="flex items-baseline justify-between">
-									<span class="text-[10px] text-slate-500 uppercase tracking-wide flex items-center gap-1"><Receipt class="size-3" />Expenses</span>
-									<span class="text-sm font-bold text-slate-100">{formatCurrency(expTotal)}</span>
+									<span class="text-[10px] text-slate-500 uppercase tracking-wide flex items-center gap-1"><Receipt class="size-3" />Spend</span>
+									<span class="text-sm font-bold text-slate-100">{formatCurrency(combinedTotal)}</span>
 								</div>
 								<div class="h-1.5 w-full rounded-full bg-slate-700 overflow-hidden flex">
 									<div class="h-full bg-emerald-500 transition-all duration-500" style="width:{paidPct}%"></div>
 									<div class="h-full bg-yellow-400/70 transition-all duration-500" style="width:{pendingPct}%"></div>
+									<div class="h-full bg-orange-400/70 transition-all duration-500" style="width:{reimbPct}%"></div>
 								</div>
-								<div class="flex justify-between text-[10px] text-slate-500">
-									<span class="flex items-center gap-1"><span class="size-1.5 rounded-full bg-emerald-500 inline-block"></span>{formatCurrency(expPaid)} paid</span>
-									<span class="flex items-center gap-1"><span class="size-1.5 rounded-full bg-yellow-400/70 inline-block"></span>{formatCurrency(expPending)} pending</span>
+								<div class="flex flex-wrap gap-x-3 gap-y-0.5 text-[10px] text-slate-500">
+									{#if expPaid > 0}
+										<span class="flex items-center gap-1"><span class="size-1.5 rounded-full bg-emerald-500 inline-block"></span>{formatCurrency(expPaid)} expenses paid</span>
+									{/if}
+									{#if expPending > 0}
+										<span class="flex items-center gap-1"><span class="size-1.5 rounded-full bg-yellow-400/70 inline-block"></span>{formatCurrency(expPending)} pending</span>
+									{/if}
+									{#if reimbPaid > 0}
+										<span class="flex items-center gap-1"><span class="size-1.5 rounded-full bg-orange-400/70 inline-block"></span>{formatCurrency(reimbPaid)} reimbursed</span>
+									{/if}
 								</div>
 							</div>
 						{/if}

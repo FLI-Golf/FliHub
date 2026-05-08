@@ -63,8 +63,25 @@ export const load: PageServerLoad = async ({ locals, url, params }) => {
 		var inTasks = 0;
 	}
 
+	// ── Reimbursement pipeline for this department ────────────────────────────
+	// Paid reimbursements debit the department directly (not via project expenses)
+	let reimbPaid = 0, reimbApproved = 0, reimbSubmitted = 0;
+	try {
+		const reimbClaims = await pb.collection('reimbursement_claims').getFullList({
+			filter: `department="${params.id}"`,
+			fields: 'id,totalAmount,status'
+		}).catch(() => []) as any[];
+
+		for (const c of reimbClaims) {
+			const amt = c.totalAmount || 0;
+			if (c.status === 'paid')                                    reimbPaid      += amt;
+			else if (c.status === 'approved')                           reimbApproved  += amt;
+			else if (c.status === 'submitted' || c.status === 'under_review') reimbSubmitted += amt;
+		}
+	} catch { /* non-fatal */ }
+
 	const allocatedBudget = department.metrics?.budget?.allocated ?? 0;
-	const totalExpensed2 = paid + approved + submitted + draft;
+	const totalExpensed2 = paid + approved + submitted + draft + reimbPaid + reimbApproved + reimbSubmitted;
 	const unallocated = Math.max(0, allocatedBudget - totalExpensed2 - inTasks);
 	const pct = (v: number) => allocatedBudget > 0 ? Math.min(100, (v / allocatedBudget) * 100) : 0;
 
@@ -96,22 +113,26 @@ export const load: PageServerLoad = async ({ locals, url, params }) => {
 		userProfiles,
 		tasksByProject,
 		budgetRollup: {
-			allocated:  allocatedBudget,
+			allocated:      allocatedBudget,
 			paid,
 			approved,
 			submitted,
 			draft,
 			inTasks,
 			unallocated,
-			actual:     totalExpensed2,
-			remaining:  Math.max(0, allocatedBudget - totalExpensed2),
-			usedPct:    pct(totalExpensed2),
+			// reimbursement totals (direct dept debit, not via project expenses)
+			reimbPaid,
+			reimbApproved,
+			reimbSubmitted,
+			actual:         totalExpensed2,
+			remaining:      Math.max(0, allocatedBudget - totalExpensed2),
+			usedPct:        pct(totalExpensed2),
 			pipelinePct: {
-				paid:        pct(paid),
-				approved:    pct(approved),
-				submitted:   pct(submitted),
-				inTasks:     pct(inTasks),
-				unallocated: pct(unallocated),
+				paid:          pct(paid + reimbPaid),
+				approved:      pct(approved + reimbApproved),
+				submitted:     pct(submitted + reimbSubmitted),
+				inTasks:       pct(inTasks),
+				unallocated:   pct(unallocated),
 			},
 			expensesByCategory,
 		}

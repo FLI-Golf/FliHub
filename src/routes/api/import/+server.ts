@@ -19,6 +19,9 @@ export const POST: RequestHandler = async ({ locals, url, request }) => {
 	let failed = 0;
 	const errors: string[] = [];
 
+	// Cache for grouping multi-item reimbursement rows into one claim per title+claimant
+	const claimCache = new Map<string, string>();
+
 	for (let i = 0; i < rows.length; i++) {
 		const row = rows[i];
 		try {
@@ -104,20 +107,52 @@ export const POST: RequestHandler = async ({ locals, url, request }) => {
 					}
 				}
 
-				const itemAmount = row.itemAmount ? Number(row.itemAmount) : 0;
+				// Resolve optional department by name
+				let departmentId: string | undefined;
+				const deptName = row.departmentName?.trim();
+				if (deptName) {
+					try {
+						const dept = await pb.collection('departments').getFirstListItem(`name="${deptName}"`);
+						departmentId = dept.id;
+					} catch {
+						// Department not found — proceed without linking
+					}
+				}
 
-				// Create the claim
-				const claim = await pb.collection('reimbursement_claims').create({
-					title:       row.claimTitle?.trim() || '',
-					claimant:    claimantId,
-					status:      row.claimStatus?.trim() || 'draft',
-					totalAmount: itemAmount,
-					notes:       row.claimNotes?.trim() || ''
-				});
+				const isHistorical = row.isHistorical?.trim().toLowerCase() === 'true';
+				const itemAmount   = row.itemAmount ? Number(row.itemAmount.replace(/[^0-9.]/g, '')) : 0;
+				const claimTitle   = row.claimTitle?.trim() || '';
+				const claimStatus  = row.claimStatus?.trim() || 'draft';
+
+				// Group multi-item rows: reuse an existing claim created in this import
+				// batch if claimTitle + claimantEmail match a previously created claim.
+				const cacheKey = `${email}::${claimTitle}`;
+				let claimId: string;
+
+				if (claimCache.has(cacheKey)) {
+					claimId = claimCache.get(cacheKey)!;
+					// Update totalAmount on the existing claim
+					const existing = await pb.collection('reimbursement_claims').getOne(claimId, { fields: 'id,totalAmount' });
+					await pb.collection('reimbursement_claims').update(claimId, {
+						totalAmount: (existing.totalAmount || 0) + itemAmount
+					});
+				} else {
+					const claim = await pb.collection('reimbursement_claims').create({
+						title:        claimTitle,
+						claimant:     claimantId,
+						status:       claimStatus,
+						totalAmount:  itemAmount,
+						notes:        row.claimNotes?.trim() || '',
+						department:   departmentId ?? '',
+						is_historical: isHistorical,
+					});
+					claimId = claim.id;
+					claimCache.set(cacheKey, claimId);
+				}
 
 				// Create the line item
 				await pb.collection('reimbursement_items').create({
-					claim:       claim.id,
+					claim:       claimId,
 					description: row.itemDescription?.trim() || '',
 					amount:      itemAmount,
 					date:        row.itemDate?.trim() || '',

@@ -1,0 +1,174 @@
+import { json } from '@sveltejs/kit';
+import { RequestContext } from '$lib/infra/RequestContext';
+import { getAdminPocketBase } from '$lib/infra/pocketbase/pbClient';
+import type { RequestHandler } from './$types';
+
+const CLAIMANTS = [
+	'l8wj56007t6cqoo', // Dustin Dinsmore
+	'b1q8lmerdwzt1d4', // Mark Coleman
+	'ipa0vii1qs3ycbj', // Gary Santos
+	'z3gnzf5fg1284or', // Andrew Panza
+	'cr1zmsps9yive0k', // Kimberly Martinez
+	'l1dvc585cozc3ov', // Nate Panza
+	'tsyjlae5ienzd8z', // Corey La Russo
+	'j534vv0tvcc7q9c', // Gannon Buhr
+];
+
+const STATUSES = ['draft','submitted','submitted','under_review','under_review','approved','approved','paid','paid','rejected'];
+
+const CATEGORIES = ['travel','meals','equipment','software','marketing','legal','office','other'];
+
+const TITLES = [
+	'March Travel — Phoenix Conference',
+	'Team Lunch — Strategy Session',
+	'Office Supplies Q2',
+	'Software Licenses — Adobe Suite',
+	'Marketing Materials — Trade Show',
+	'Legal Review — Player Contracts',
+	'San Diego Office Expenses',
+	'Flight — Scottsdale to Portland',
+	'Hotel — PDGA Worlds',
+	'Equipment — Camera Gear',
+	'Uber Rides — Event Week',
+	'Client Dinner — Sponsor Meeting',
+	'Printing — Sponsor Decks',
+	'Parking — Tournament Day',
+	'Internet — Remote Office',
+	'Phone Bill — March',
+	'Catering — Team Meeting',
+	'Shipping — Apparel Samples',
+	'Conference Registration',
+	'Airfare — Board Meeting NYC',
+	'Rental Car — Phoenix Trip',
+	'Meals — Production Week',
+	'Hardware — iPad for Scoring',
+	'Subscription — Slack Annual',
+	'PR Event — Media Day Expenses',
+	'Travel — League Partnership Visit',
+	'Office Furniture — Standing Desk',
+	'Photography — Event Coverage',
+	'Miscellaneous — Q1 Ops',
+	'Background Check — New Hire',
+];
+
+const VENDORS = ['Delta Airlines','Marriott','Uber','Amazon','Adobe','Slack','FedEx','Staples','Costco','Best Buy','Apple','Google','Zoom','Dropbox','Canva'];
+const PAYMENT_METHODS = ['bank_transfer','check','zelle','paypal'];
+
+function rand<T>(arr: T[]): T { return arr[Math.floor(Math.random() * arr.length)]; }
+function randInt(min: number, max: number) { return Math.floor(Math.random() * (max - min + 1)) + min; }
+function randAmount() { return Math.round((Math.random() * 1800 + 20) * 100) / 100; }
+function randDate(daysBack = 180) {
+	const d = new Date();
+	d.setDate(d.getDate() - randInt(0, daysBack));
+	return d.toISOString().slice(0, 10);
+}
+function pad(n: number) { return String(n).padStart(3, '0'); }
+
+async function getNextWO(adminPb: any, offset: number): Promise<string> {
+	const existing = await adminPb.collection('reimbursement_claims')
+		.getFullList({ fields: 'referenceNumber' }).catch(() => []);
+	let max = 0;
+	for (const r of existing) {
+		const m = (r.referenceNumber ?? '').match(/^WO-(\d+)$/);
+		if (m) { const n = parseInt(m[1]); if (n > max) max = n; }
+	}
+	return `WO-${pad(max + 1 + offset)}`;
+}
+
+// DELETE all test claims (those with WO- reference numbers)
+export const DELETE: RequestHandler = async ({ locals, url }) => {
+	const ctx = await RequestContext.from(locals, url);
+	const profile = ctx.profile;
+	if (profile?.role !== 'admin' && profile?.role !== 'leader') {
+		return json({ message: 'Unauthorized' }, { status: 403 });
+	}
+
+	try {
+		const adminPb = await getAdminPocketBase();
+
+		// Get all claims
+		const claims = await adminPb.collection('reimbursement_claims')
+			.getFullList({ fields: 'id,referenceNumber' });
+
+		// Delete all items first (cascade would handle it but let's be explicit)
+		let deleted = 0;
+		for (const claim of claims) {
+			try {
+				// Delete items for this claim
+				const items = await adminPb.collection('reimbursement_items')
+					.getFullList({ filter: `claim="${claim.id}"`, fields: 'id' });
+				for (const item of items) {
+					await adminPb.collection('reimbursement_items').delete(item.id).catch(() => {});
+				}
+				await adminPb.collection('reimbursement_claims').delete(claim.id);
+				deleted++;
+			} catch { /* skip */ }
+		}
+
+		return json({ ok: true, deleted });
+	} catch (e: any) {
+		return json({ message: e?.message ?? 'Failed' }, { status: 500 });
+	}
+};
+
+// POST — seed N claims
+export const POST: RequestHandler = async ({ locals, url, request }) => {
+	const ctx = await RequestContext.from(locals, url);
+	const profile = ctx.profile;
+	if (profile?.role !== 'admin' && profile?.role !== 'leader') {
+		return json({ message: 'Unauthorized' }, { status: 403 });
+	}
+
+	const body = await request.json().catch(() => ({}));
+	const count    = Math.min(Math.max(parseInt(body.count ?? 10), 1), 200);
+	const statuses: string[] = body.statuses?.length ? body.statuses : STATUSES;
+
+	try {
+		const adminPb = await getAdminPocketBase();
+		let created = 0;
+
+		for (let i = 0; i < count; i++) {
+			const status   = rand(statuses);
+			const claimant = rand(CLAIMANTS);
+			const title    = rand(TITLES) + ` #${i + 1}`;
+			const wo       = await getNextWO(adminPb, i);
+
+			const claim = await adminPb.collection('reimbursement_claims').create({
+				title,
+				claimant,
+				status,
+				referenceNumber: wo,
+				notes: '',
+				reviewNotes: status === 'rejected' ? 'Please resubmit with proper documentation.' : status === 'under_review' ? 'Reviewing line items with CPA.' : '',
+				paymentMethod: status === 'paid' ? rand(PAYMENT_METHODS) : '',
+				paidDate: status === 'paid' ? randDate(60) : '',
+				totalAmount: 0,
+			});
+
+			const itemCount = randInt(1, 4);
+			let total = 0;
+			for (let j = 0; j < itemCount; j++) {
+				const amount = randAmount();
+				total += amount;
+				await adminPb.collection('reimbursement_items').create({
+					claim: claim.id,
+					description: `${rand(CATEGORIES)} expense — ${rand(VENDORS)}`,
+					amount,
+					date: randDate(90),
+					category: rand(CATEGORIES),
+					vendor: rand(VENDORS),
+					notes: '',
+				});
+			}
+
+			await adminPb.collection('reimbursement_claims').update(claim.id, {
+				totalAmount: Math.round(total * 100) / 100
+			});
+			created++;
+		}
+
+		return json({ ok: true, created });
+	} catch (e: any) {
+		return json({ message: e?.message ?? 'Failed' }, { status: 500 });
+	}
+};

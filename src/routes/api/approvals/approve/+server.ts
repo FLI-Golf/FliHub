@@ -116,15 +116,25 @@ export const POST: RequestHandler = async ({ locals, request }) => {
 				try {
 					const wo = await pb.collection('work_orders').create({
 						work_order_number: workOrderNumber,
+						// legacy text fields (kept for backwards compat)
 						expenseId:    expense.id,
 						taskId:       expense.taskId || '',
 						projectId:    project?.id || '',
 						projectCode,
 						projectName:  project?.name || '',
+						approvedBy:   userProfile.id,
+						// proper relation fields
+						expense:      expense.id,
+						task:         expense.taskId || null,
+						project:      project?.id || null,
+						approver:     userProfile.id,
+						submittedBy:  expense.submittedBy || null,
+						// audit fields
 						description:  expense.description || '',
 						amount:       expense.amount || 0,
-						approvedBy:   userProfile.id,
 						approvedDate: new Date().toISOString(),
+						source:       'expense',
+						paymentMethod: expense.paymentMethod || '',
 						status:       'open',
 					});
 					console.log(`✅ Work order ${workOrderNumber} created: ${wo.id}`);
@@ -136,6 +146,7 @@ export const POST: RequestHandler = async ({ locals, request }) => {
 				if (taskRecord) {
 					await pb.collection('tasks').update(taskRecord.id, {
 						needs_review: true,
+						work_order_number: workOrderNumber,
 					}).catch((e: any) => console.warn('task flag failed:', e.message));
 				}
 
