@@ -6,7 +6,7 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 	const { pb, profile: userProfile } = ctx;
 
 	try {
-		const [projects, departments, tasks, expenses, sponsors, franchiseLeads, settings, pendingApprovals] = await Promise.all([
+		const [projects, departments, tasks, expenses, sponsors, franchiseLeads, settings, pendingApprovals, reimbClaims] = await Promise.all([
 			pb.collection('projects').getFullList({ filter: "status='in_progress'", sort: 'name' }).catch(() => []),
 			pb.collection('departments').getFullList({ fields: 'id,name,description,department_annual_budget,department_actual_expenses' }).catch(() => []),
 			pb.collection('tasks').getFullList({ sort: '-id', expand: 'projectId' }).catch(() => []),
@@ -15,9 +15,37 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 			pb.collection('franchise_leads').getFullList({ fields: 'id,name,status,created' }).catch(() => []),
 			pb.collection('settings').getFullList({ fields: 'id,key,value,label' }).catch(() => []),
 			pb.collection('approvals').getFullList({ filter: "status='pending' && entityType='expense'", fields: 'id,entityId,amount' }).catch(() => []),
+			pb.collection('reimbursement_claims').getFullList({ fields: 'id,totalAmount,status,department,claimant,title,is_historical,referenceNumber', expand: 'claimant' }).catch(() => []),
 		]);
 
 		const deptMap = Object.fromEntries((departments as any[]).map(d => [d.id, d]));
+
+		// Reimbursement pipeline rollup — all claims roll up to the Tax-Exempt dept project.
+		// We key by department ID but also accept claims with no department set (legacy/seed data)
+		// by falling back to any department named 'Tax-Exempt Reimbursements'.
+		const reimbDeptId = (departments as any[]).find(d => d.name === 'Tax-Exempt Reimbursements')?.id ?? null;
+
+		const reimbRollup = { draft: 0, submitted: 0, under_review: 0, approved: 0, paid: 0, rejected: 0, total: 0, claimCount: 0, pendingCount: 0, recentClaims: [] as any[] };
+		for (const c of reimbClaims as any[]) {
+			// Include claim if it has the right dept, or if it has no dept (treat as belonging here)
+			const belongsHere = !c.department || c.department === reimbDeptId;
+			if (!belongsHere) continue;
+			const amt = c.totalAmount ?? 0;
+			const s   = c.status ?? 'draft';
+			(reimbRollup as any)[s] = ((reimbRollup as any)[s] ?? 0) + amt;
+			reimbRollup.total      += amt;
+			reimbRollup.claimCount += 1;
+			if (s === 'submitted' || s === 'under_review' || s === 'approved') reimbRollup.pendingCount += 1;
+			if (s !== 'paid' && s !== 'rejected') reimbRollup.recentClaims.push(c);
+		}
+		// Most recent 5 active claims for the card list
+		reimbRollup.recentClaims = reimbRollup.recentClaims
+			.sort((a: any, b: any) => b.id.localeCompare(a.id))
+			.slice(0, 5);
+
+		// Build a dept-keyed map so the enriched project lookup still works
+		const reimbByDept: Record<string, typeof reimbRollup> = {};
+		if (reimbDeptId) reimbByDept[reimbDeptId] = reimbRollup;
 
 		// Map taskId → draft expense count
 		const draftByTask: Record<string, number> = {};
@@ -73,6 +101,7 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 
 		const enriched = (projects as any[]).map(p => {
 			const dept = deptMap[p.department] ?? null;
+			const isReimbDept = dept?.name === 'Tax-Exempt Reimbursements';
 			const ptasks = tasksByProject[p.id] ?? [];
 			const pexpenses = expensesByProject[p.id] ?? [];
 
@@ -151,8 +180,10 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 					}))
 				},
 				recentExpenses,
-			pendingApprovals: pendingByProject[p.id] ?? 0,
-			draftExpenses: pexpenses.filter((e: any) => e.status === 'draft').length,
+				pendingApprovals:  pendingByProject[p.id] ?? 0,
+				draftExpenses:     pexpenses.filter((e: any) => e.status === 'draft').length,
+				isReimbProject:    isReimbDept,
+				reimbPipeline:     isReimbDept ? reimbRollup : null,
 			};
 		});
 

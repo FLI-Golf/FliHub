@@ -31,12 +31,22 @@ export const POST: RequestHandler = async ({ locals, url, request }) => {
 		const adminPb = await getAdminPocketBase();
 		const workOrder = await nextWorkOrderNumber(adminPb);
 
+		// Always link new claims to the Tax-Exempt Reimbursements department
+		let reimbDeptId: string | null = body.department ?? null;
+		if (!reimbDeptId) {
+			const dept = await adminPb.collection('departments')
+				.getFirstListItem(`name="Tax-Exempt Reimbursements"`, { fields: 'id' })
+				.catch(() => null);
+			reimbDeptId = dept?.id ?? null;
+		}
+
 		const claim = await adminPb.collection('reimbursement_claims').create({
 			title:           body.title.trim(),
 			claimant:        ctx.profile?.id ?? body.claimant ?? null,
 			status:          'draft',
 			notes:           body.notes?.trim() || '',
 			referenceNumber: workOrder,
+			department:      reimbDeptId,
 		});
 
 		// Create any initial items passed along with the claim

@@ -209,7 +209,7 @@
 						{ status: 'Submitted',    color: 'border-blue-700/50 bg-blue-950/30',      dot: 'bg-blue-400',    who: 'Claimant',  desc: 'Sent for admin review. No further edits allowed.' },
 						{ status: 'Under Review', color: 'border-yellow-700/50 bg-yellow-950/30',  dot: 'bg-yellow-400',  who: 'Admin',     desc: 'Admin is actively reviewing the claim and line items.' },
 						{ status: 'Approved',     color: 'border-violet-700/50 bg-violet-950/30',  dot: 'bg-violet-400',  who: 'Admin',     desc: 'Claim approved. Admin will assign a reference number and process payment.' },
-						{ status: 'Paid',         color: 'border-emerald-700/50 bg-emerald-950/30',dot: 'bg-emerald-400', who: 'Admin',     desc: 'Payment issued. Reference number recorded for QuickBooks.' },
+						{ status: 'Paid',         color: 'border-emerald-700/50 bg-emerald-950/30',dot: 'bg-emerald-400', who: 'Admin',     desc: 'Payment issued. A Work Order record is created automatically — this is the electronic record Ina uses to enter the payment in QuickBooks.' },
 					] as stage}
 						<div class="rounded-lg border {stage.color} p-3 space-y-1.5">
 							<div class="flex items-center gap-2">
@@ -232,7 +232,7 @@
 						'Click New Claim and give it a descriptive title (e.g. "March Travel — Phoenix Conference").',
 						'Add one line item per expense — description, amount, date, category, and vendor.',
 						'Click Submit for Review to send it to the admin queue. Or save as a draft to finish later.',
-						'Once approved, you\'ll see a QuickBooks reference number on your claim — keep this for your records.',
+						'Once paid, your claim will show a Work Order number (WO-NNN). This is the reference Ina uses to enter the payment in QuickBooks — keep it for your records.',
 					] as step, i}
 						<li class="flex items-start gap-2.5">
 							<span class="size-5 rounded-full bg-slate-700 text-slate-300 text-[10px] font-bold flex items-center justify-center shrink-0 mt-0.5">{i + 1}</span>
@@ -249,7 +249,7 @@
 				<div class="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs text-slate-400">
 					<div class="flex items-start gap-2"><ArrowRight class="size-3.5 text-blue-400 mt-0.5 shrink-0" /><span><strong class="text-slate-200">Mark Under Review</strong> — signals to the claimant that you're actively reviewing their claim.</span></div>
 					<div class="flex items-start gap-2"><ArrowRight class="size-3.5 text-violet-400 mt-0.5 shrink-0" /><span><strong class="text-slate-200">Approve</strong> — confirms the claim is valid and queued for payment.</span></div>
-					<div class="flex items-start gap-2"><ArrowRight class="size-3.5 text-emerald-400 mt-0.5 shrink-0" /><span><strong class="text-slate-200">Mark Paid</strong> — requires a reference number and payment method. Records the paid date.</span></div>
+					<div class="flex items-start gap-2"><ArrowRight class="size-3.5 text-emerald-400 mt-0.5 shrink-0" /><span><strong class="text-slate-200">Mark Paid</strong> — requires a reference number (WO-NNN) and payment method. Automatically creates a <strong class="text-slate-200">Work Order</strong> record — the electronic payment record Ina enters in QuickBooks. Also stamps the WO number on the claim and every line item, and debits the department budget.</span></div>
 					<div class="flex items-start gap-2"><ArrowRight class="size-3.5 text-red-400 mt-0.5 shrink-0" /><span><strong class="text-slate-200">Reject</strong> — closes the claim. Add a review note so the claimant knows why.</span></div>
 				</div>
 			</div>
