@@ -38,10 +38,10 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 			if (s === 'submitted' || s === 'under_review' || s === 'approved') reimbRollup.pendingCount += 1;
 			if (s !== 'paid' && s !== 'rejected') reimbRollup.recentClaims.push(c);
 		}
-		// Most recent 5 active claims for the card list
+		// Most recent 8 active (non-paid, non-rejected) claims for the card list
 		reimbRollup.recentClaims = reimbRollup.recentClaims
 			.sort((a: any, b: any) => b.id.localeCompare(a.id))
-			.slice(0, 5);
+			.slice(0, 8);
 
 		// Build a dept-keyed map so the enriched project lookup still works
 		const reimbByDept: Record<string, typeof reimbRollup> = {};
