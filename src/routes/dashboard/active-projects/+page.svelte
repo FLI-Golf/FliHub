@@ -495,30 +495,22 @@
 									{project.pendingApprovals} Awaiting Approval
 								</a>
 							{/if}
-							{#if project.isReimbProject}
 							<a
-								href="/dashboard/reimbursements"
+							href="/api/projects/{project.id}/report/view"
+							target="_blank"
+							rel="noopener noreferrer"
+							class="inline-flex items-center gap-1 text-[10px] font-medium px-2 py-1 rounded border border-slate-600 bg-slate-800 hover:bg-slate-700 hover:border-slate-500 text-slate-300 hover:text-white transition-colors no-underline"
+						>
+							<FileText class="size-3" />
+							Report
+						</a>
+						{#if project.isReimbProject}
+							<a
+								href="/dashboard/reimbursements/admin"
 								class="inline-flex items-center gap-1 text-[10px] font-medium px-2 py-1 rounded border border-orange-700/60 bg-orange-950/40 hover:bg-orange-900/60 text-orange-300 hover:text-orange-100 transition-colors no-underline"
 							>
 								<Receipt class="size-3" />
-								View All Claims
-							</a>
-							<a
-								href="/dashboard/reimbursements/admin"
-								class="inline-flex items-center gap-1 text-[10px] font-medium px-2 py-1 rounded border border-slate-600 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition-colors no-underline"
-							>
-								<FileText class="size-3" />
 								Admin
-							</a>
-						{:else}
-							<a
-								href="/api/projects/{project.id}/report/view"
-								target="_blank"
-								rel="noopener noreferrer"
-								class="inline-flex items-center gap-1 text-[10px] font-medium px-2 py-1 rounded border border-slate-600 bg-slate-800 hover:bg-slate-700 hover:border-slate-500 text-slate-300 hover:text-white transition-colors no-underline"
-							>
-								<FileText class="size-3" />
-								Report
 							</a>
 						{/if}
 							<span class="text-[10px] font-bold uppercase tracking-wide px-2 py-1 rounded {color.badge}">
