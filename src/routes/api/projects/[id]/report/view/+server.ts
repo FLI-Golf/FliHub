@@ -47,7 +47,9 @@ const STATUS_LABEL:Record<string,string>={todo:'To Do',in_progress:'In Progress'
 const STATUS_COLOR:Record<string,string>={todo:C.gray,in_progress:C.blue,blocked:C.red,completed:C.green,cancelled:C.muted};
 const PRI_COLOR:Record<string,string>={low:C.gray,medium:C.amber,high:C.red,urgent:'#dc2626'};
 
-async function buildPDF(project:any,tasks:any[],expenses:any[]):Promise<Buffer>{
+async function buildPDF(project:any,tasks:any[],expenses:any[],claims:any[]=[]):Promise<Buffer>{
+	const isReimbProject = project.expand?.department?.name === 'Tax-Exempt Reimbursements'
+	                    || project.name === 'Tax-Exempt Reimbursements';
 	const PDFDocument=(await import('pdfkit')).default;
 	return new Promise((resolve,reject)=>{
 		const doc=new PDFDocument({size:'LETTER',margin:0,bufferPages:true,
@@ -111,13 +113,27 @@ async function buildPDF(project:any,tasks:any[],expenses:any[]):Promise<Buffer>{
 		const actualSpend=paid+approved;
 		const p=(v:number)=>budget>0?Math.min(100,(v/budget)*100):0;
 
+		// Reimbursement-specific totals
+		const rPaid     = claims.filter(c=>c.status==='paid').reduce((s,c)=>s+(c.totalAmount??0),0);
+		const rApproved = claims.filter(c=>c.status==='approved').reduce((s,c)=>s+(c.totalAmount??0),0);
+		const rReview   = claims.filter(c=>c.status==='under_review').reduce((s,c)=>s+(c.totalAmount??0),0);
+		const rSubmitted= claims.filter(c=>c.status==='submitted').reduce((s,c)=>s+(c.totalAmount??0),0);
+		const rTotal    = claims.reduce((s,c)=>s+(c.totalAmount??0),0);
+		const rPending  = claims.filter(c=>['submitted','under_review','approved'].includes(c.status)).length;
+		const rp=(v:number)=>rTotal>0?Math.min(100,(v/rTotal)*100):0;
+
 		const boxW=(CW-9)/4;
-		[
+		(isReimbProject ? [
+			{label:'DEPT BUDGET',    value:fmt(budget),    sub:null},
+			{label:'TOTAL CLAIMS',   value:fmt(rTotal),    sub:`${claims.length} claims`},
+			{label:'PAID',           value:fmt(rPaid),     sub:`${claims.filter(c=>c.status==='paid').length} claims paid`},
+			{label:'PENDING',        value:fmt(rApproved+rReview+rSubmitted), sub:`${rPending} awaiting action`},
+		] : [
 			{label:'PROJECT BUDGET',value:fmt(budget),sub:null},
 			{label:'TASK BUDGETS',value:fmt(taskBudgetSum),sub:`${p(taskBudgetSum).toFixed(0)}% allocated`},
 			{label:'ACTUAL SPEND',value:fmt(actualSpend),sub:`${p(actualSpend).toFixed(0)}% of budget`},
 			{label:'UNALLOCATED',value:fmt(unallocated),sub:'remaining'},
-		].forEach((b,i)=>{
+		]).forEach((b,i)=>{
 			const bx=ML+i*(boxW+3);
 			doc.roundedRect(bx,y,boxW,54,5).fillAndStroke(C.bgLight,C.border);
 			doc.fillColor(C.muted).font('Helvetica-Bold').fontSize(6.5)
@@ -155,40 +171,99 @@ async function buildPDF(project:any,tasks:any[],expenses:any[]):Promise<Buffer>{
 			y=(doc as any).y+12;
 		}
 
-		// Expense pipeline
+		// Pipeline section — reimbursements or standard expenses
 		y=ensure(y,70);
-		y=sectionLabel('EXPENSE PIPELINE',y);
-		const segs=[
-			{pct:p(paid),color:C.green,label:'Paid',amt:paid},
-			{pct:p(approved),color:C.blue,label:'Approved',amt:approved},
-			{pct:p(submitted),color:C.amber,label:'Submitted',amt:submitted},
-			{pct:p(inTasks),color:C.violet,label:'In Tasks',amt:inTasks},
-		];
-		doc.roundedRect(ML,y,CW,14,4).fill('#e2e8f0');
-		let bx2=ML;
-		for(const s of segs){
-			if(s.pct<=0)continue;
-			const sw=Math.max(1,(s.pct/100)*CW);
-			doc.rect(bx2,y,sw,14).fill(s.color);
-			bx2+=sw;
+		if(isReimbProject){
+			y=sectionLabel('REIMBURSEMENT PIPELINE',y);
+			const rSegs=[
+				{pct:rp(rPaid),     color:C.green,   label:'Paid',         amt:rPaid},
+				{pct:rp(rApproved), color:C.blue,    label:'Approved',     amt:rApproved},
+				{pct:rp(rReview),   color:'#7c3aed', label:'Under Review', amt:rReview},
+				{pct:rp(rSubmitted),color:C.amber,   label:'Submitted',    amt:rSubmitted},
+			];
+			doc.roundedRect(ML,y,CW,14,4).fill('#e2e8f0');
+			let bx3=ML;
+			for(const s of rSegs){
+				if(s.pct<=0)continue;
+				const sw=Math.max(1,(s.pct/100)*CW);
+				doc.rect(bx3,y,sw,14).fill(s.color);
+				bx3+=sw;
+			}
+			doc.roundedRect(ML,y,CW,14,4).stroke(C.border);
+			y+=22;
+			const legColW2=CW/2;
+			rSegs.forEach((s,i)=>{
+				const col=i%2,row=Math.floor(i/2);
+				const lx=ML+col*legColW2,ly=y+row*16;
+				doc.circle(lx+5,ly+5,4).fill(s.color);
+				doc.fillColor(s.amt>0?C.navy:C.gray).font('Helvetica').fontSize(8)
+				   .text(`${s.label}: ${s.amt>0?fmt(s.amt):'\u2014'}`,lx+14,ly,{width:legColW2-14,lineBreak:false});
+			});
+			y+=Math.ceil(rSegs.length/2)*16+12;
+			// Claims table
+			if(claims.length>0){
+				y=ensure(y,50);
+				y=sectionLabel('CLAIMS',y);
+				doc.fillColor(C.muted).font('Helvetica').fontSize(7.5)
+				   .text('Claimant',ML,y,{width:120,lineBreak:false})
+				   .text('Title',ML+125,y,{width:200,lineBreak:false})
+				   .text('Status',ML+330,y,{width:70,lineBreak:false})
+				   .text('Amount',ML+405,y,{width:CW-405,align:'right',lineBreak:false});
+				y+=12;
+				doc.moveTo(ML,y).lineTo(ML+CW,y).strokeColor(C.border).lineWidth(0.5).stroke();
+				y+=4;
+				const STATUS_C:Record<string,string>={paid:C.green,approved:C.blue,under_review:'#7c3aed',submitted:C.amber,rejected:'#ef4444',draft:C.gray};
+				for(const c of claims){
+					y=ensure(y,14);
+					const claimant=c.expand?.claimant?.firstName
+						? `${c.expand.claimant.firstName} ${c.expand.claimant.lastName??''}`.trim()
+						: '\u2014';
+					const sc=STATUS_C[c.status]??C.gray;
+					doc.fillColor(C.navy).font('Helvetica').fontSize(7.5)
+					   .text(claimant,ML,y,{width:120,lineBreak:false})
+					   .text(c.title??'\u2014',ML+125,y,{width:200,lineBreak:false});
+					doc.fillColor(sc).font('Helvetica-Bold').fontSize(7.5)
+					   .text((c.status??'\u2014').replace('_',' '),ML+330,y,{width:70,lineBreak:false});
+					doc.fillColor(C.navy).font('Helvetica').fontSize(7.5)
+					   .text(fmt(c.totalAmount??0),ML+405,y,{width:CW-405,align:'right',lineBreak:false});
+					y+=13;
+				}
+				y+=8;
+			}
+		} else {
+			y=sectionLabel('EXPENSE PIPELINE',y);
+			const segs=[
+				{pct:p(paid),color:C.green,label:'Paid',amt:paid},
+				{pct:p(approved),color:C.blue,label:'Approved',amt:approved},
+				{pct:p(submitted),color:C.amber,label:'Submitted',amt:submitted},
+				{pct:p(inTasks),color:C.violet,label:'In Tasks',amt:inTasks},
+			];
+			doc.roundedRect(ML,y,CW,14,4).fill('#e2e8f0');
+			let bx2=ML;
+			for(const s of segs){
+				if(s.pct<=0)continue;
+				const sw=Math.max(1,(s.pct/100)*CW);
+				doc.rect(bx2,y,sw,14).fill(s.color);
+				bx2+=sw;
+			}
+			doc.roundedRect(ML,y,CW,14,4).stroke(C.border);
+			y+=22;
+			const legColW=CW/2;
+			segs.forEach((s,i)=>{
+				const col=i%2,row=Math.floor(i/2);
+				const lx=ML+col*legColW,ly=y+row*16;
+				doc.circle(lx+5,ly+5,4).fill(s.color);
+				doc.fillColor(s.amt>0?C.navy:C.gray).font('Helvetica').fontSize(8)
+				   .text(`${s.label}: ${s.amt>0?fmt(s.amt):'\u2014'}`,lx+14,ly,{width:legColW-14,lineBreak:false});
+			});
+			y+=Math.ceil(segs.length/2)*16+4;
+			if(unallocated>0){
+				doc.fillColor(C.muted).font('Helvetica').fontSize(7.5)
+				   .text(`${fmt(unallocated)} unallocated`,ML,y,{lineBreak:false});
+				y+=14;
+			}
+			y+=8;
 		}
-		doc.roundedRect(ML,y,CW,14,4).stroke(C.border);
-		y+=22;
-		const legColW=CW/2;
-		segs.forEach((s,i)=>{
-			const col=i%2,row=Math.floor(i/2);
-			const lx=ML+col*legColW,ly=y+row*16;
-			doc.circle(lx+5,ly+5,4).fill(s.color);
-			doc.fillColor(s.amt>0?C.navy:C.gray).font('Helvetica').fontSize(8)
-			   .text(`${s.label}: ${s.amt>0?fmt(s.amt):'\u2014'}`,lx+14,ly,{width:legColW-14,lineBreak:false});
-		});
-		y+=Math.ceil(segs.length/2)*16+4;
-		if(unallocated>0){
-			doc.fillColor(C.muted).font('Helvetica').fontSize(7.5)
-			   .text(`${fmt(unallocated)} unallocated`,ML,y,{lineBreak:false});
-			y+=14;
-		}
-		y+=8;
 
 		// Tasks
 		if(tasks.length>0){
@@ -357,8 +432,14 @@ export const GET: RequestHandler = async ({ locals, url, params }) => {
 
 		if (!projectRec) throw error(404, 'Project not found');
 
+		// Load reimbursement claims for the Tax-Exempt Reimbursements project
+		const isReimbProject = (projectRec as any).name === 'Tax-Exempt Reimbursements'
+		                    || (projectRec as any).expand?.department?.name === 'Tax-Exempt Reimbursements';
+		const claims = isReimbProject
+			? await pb.collection('reimbursement_claims').getFullList({ sort: 'status,-id', expand: 'claimant' }).catch(() => [])
+			: [];
 
-		const buf = await buildPDF(projectRec as any, filteredTasks, filteredExpenses);
+		const buf = await buildPDF(projectRec as any, filteredTasks, filteredExpenses, claims as any[]);
 		const slug = ((projectRec as any).name as string).replace(/\s+/g,'-').toLowerCase().replace(/[^a-z0-9-]/g,'');
 		const date = new Date().toISOString().slice(0,10);
 
