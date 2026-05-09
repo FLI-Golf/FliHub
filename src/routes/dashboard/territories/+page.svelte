@@ -81,6 +81,56 @@
 		</div>
 	</div>
 
+	<!-- Tribal Casino Expansion Strategy -->
+	<div class="rounded-xl border border-amber-700/40 bg-amber-950/20 p-5 space-y-4">
+		<div class="flex items-start justify-between gap-4">
+			<div>
+				<p class="text-xs font-bold uppercase tracking-wide text-amber-400 mb-1">Tribal Casino Franchise Strategy</p>
+				<p class="text-sm text-slate-300 leading-relaxed">FLI Golf is uniquely positioned to partner with Native American tribal casino operators as franchise owners, tournament hosts, and sportsbook partners. Tribal casinos offer sovereign control over gaming, existing high-volume entertainment traffic, and proven infrastructure for large-scale live events.</p>
+			</div>
+		</div>
+
+		<!-- 6 Regions -->
+		<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+			{#each [
+				{ phase: 1, emoji: '🌵', region: 'Southwest (AZ / NM)', label: 'Phase 1 — Launch', color: 'border-emerald-700/50 bg-emerald-950/30 text-emerald-300', targets: ['Talking Stick Resort', 'Wild Horse Pass Casino', 'Gila River Resorts & Casinos', 'Desert Diamond Casino'], angle: 'Ideal for FIRST flagship tribal franchise. Legal sportsbook infrastructure. 5,000–20,000 person event capacity.' },
+				{ phase: 2, emoji: '🌴', region: 'West Coast (CA)', label: 'Phase 3 — Scale & Media', color: 'border-blue-700/50 bg-blue-950/30 text-blue-300', targets: ['Pechanga Resort Casino', 'Yaamava\' Resort & Casino', 'Morongo Casino Resort & Spa'], angle: 'Premium valuation franchise. Massive upside when sports betting fully opens in California.' },
+				{ phase: 3, emoji: '🏟️', region: 'Midwest (MN / WI / MI)', label: 'Phase 2 — Expansion', color: 'border-violet-700/50 bg-violet-950/30 text-violet-300', targets: ['Mystic Lake Casino', 'Soaring Eagle Casino', 'Potawatomi Casino Hotel'], angle: 'Disc golf hotbed. Lower acquisition cost, high engagement ROI. Fan-driven franchise model.' },
+				{ phase: 4, emoji: '🎰', region: 'South Central (OK / TX)', label: 'Phase 1 — Launch', color: 'border-emerald-700/50 bg-emerald-950/30 text-emerald-300', targets: ['WinStar World Casino', 'Choctaw Casino & Resort'], angle: 'Some of the largest casinos in the world. Heavy Texas traffic funnel. 10,000–25,000 capacity events.' },
+				{ phase: 5, emoji: '🌴', region: 'Southeast (FL)', label: 'Phase 2 — Expansion', color: 'border-orange-700/50 bg-orange-950/30 text-orange-300', targets: ['Seminole Hard Rock Hollywood', 'Seminole Hard Rock Tampa'], angle: 'Seminole Tribe controls one of the most powerful gaming operations in the U.S. International tourism hub.' },
+				{ phase: 6, emoji: '🏙️', region: 'Northeast (CT / NY)', label: 'Phase 3 — Scale & Media', color: 'border-blue-700/50 bg-blue-950/30 text-blue-300', targets: ['Foxwoods Resort Casino', 'Mohegan Sun'], angle: 'Best region for media rights + broadcast growth. Close to NYC & Boston markets. High ticket pricing potential.' },
+			] as r}
+			<div class="rounded-lg border {r.color.split(' ')[0]} {r.color.split(' ')[1]} p-3 space-y-2">
+				<div class="flex items-center justify-between">
+					<p class="text-xs font-bold {r.color.split(' ')[2]}">{r.emoji} {r.region}</p>
+					<span class="text-[10px] px-1.5 py-0.5 rounded-full border {r.color.split(' ')[0]} {r.color.split(' ')[2]} opacity-80">{r.label}</span>
+				</div>
+				<div class="space-y-0.5">
+					{#each r.targets as t}
+						<p class="text-[11px] text-slate-400 flex items-center gap-1.5"><span class="size-1 rounded-full bg-current opacity-60 shrink-0"></span>{t}</p>
+					{/each}
+				</div>
+				<p class="text-[11px] text-slate-500 leading-relaxed border-t border-slate-700/50 pt-2">{r.angle}</p>
+			</div>
+			{/each}
+		</div>
+
+		<!-- Rollout phases -->
+		<div class="flex flex-wrap gap-3 pt-1 border-t border-amber-800/30">
+			<p class="text-xs text-amber-400/70 font-semibold uppercase tracking-wide self-center">Rollout:</p>
+			{#each [
+				{ phase: 'Phase 1 — Launch', regions: 'Southwest (AZ) · South Central (OK)', color: 'bg-emerald-900/40 text-emerald-300 border-emerald-700/40' },
+				{ phase: 'Phase 2 — Expansion', regions: 'Florida · Midwest', color: 'bg-orange-900/40 text-orange-300 border-orange-700/40' },
+				{ phase: 'Phase 3 — Scale & Media', regions: 'Northeast · California', color: 'bg-blue-900/40 text-blue-300 border-blue-700/40' },
+			] as p}
+				<div class="rounded-lg border {p.color} px-3 py-1.5 text-xs">
+					<span class="font-semibold">{p.phase}</span>
+					<span class="opacity-70 ml-1.5">{p.regions}</span>
+				</div>
+			{/each}
+		</div>
+	</div>
+
 	<TerritoryGrid territories={data.territories} />
 </div>
 
