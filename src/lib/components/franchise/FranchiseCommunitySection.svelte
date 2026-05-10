@@ -11,8 +11,8 @@
 		isAdmin:   boolean;
 	} = $props();
 
-	const primary   = franchise.primaryColor   ?? '#7c3aed';
-	const secondary = franchise.secondaryColor ?? '#1e1b4b';
+	const primary   = $derived(franchise.primaryColor   ?? '#7c3aed');
+	const secondary = $derived(franchise.secondaryColor ?? '#1e1b4b');
 
 	const SLOTS = [
 		{ key: 'origins', label: 'Origins'       },
@@ -21,7 +21,13 @@
 	] as const;
 	type SlotKey = typeof SLOTS[number]['key'];
 
-	function getLinks(): Record<SlotKey, string> {
+	let showEdit  = $state(false);
+	let saving    = $state(false);
+	let saveError = $state('');
+	let saved     = $state(false);
+	let inputs    = $state<Record<SlotKey, string>>({ origins: '', team: '', quest: '' });
+
+	const links = $derived.by(() => {
 		const raw: { label: string; url: string }[] = franchise.storyLinks ?? [];
 		const map: Record<string, string> = {};
 		for (const l of raw) map[l.label.toLowerCase().replace(/\s+/g, '_')] = l.url;
@@ -30,13 +36,8 @@
 			team:    map['team']    ?? '',
 			quest:   map['quest_for_gold'] ?? map['quest'] ?? '',
 		};
-	}
-
-	let showEdit  = $state(false);
-	let saving    = $state(false);
-	let saveError = $state('');
-	let saved     = $state(false);
-	let inputs    = $state<Record<SlotKey, string>>({ origins: '', team: '', quest: '' });
+	});
+	const hasAny = $derived(!!(links.origins || links.team || links.quest));
 
 	function openEdit() {
 		const current = getLinks();
@@ -87,9 +88,6 @@
 		</Button>
 	{/if}
 </div>
-
-{@const links = getLinks()}
-{@const hasAny = !!(links.origins || links.team || links.quest)}
 
 {#if hasAny}
 	<div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
