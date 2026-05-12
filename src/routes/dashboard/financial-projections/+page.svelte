@@ -6,58 +6,92 @@
 	let { data }: { data: PageData } = $props();
 	const live = $derived(data?.liveData ?? null);
 
-	// ── P&L data from financial projections spreadsheet ───────────────────────
+	// ── P&L data — Multi-Year Cash Flow & Revenue Timing Model 2026–2031 ──────
+	// Source: FLI Golf League Institutional Investment Review (corrected proforma)
+	// 2031 Tier 3 Sponsorship corrected to $6.5M pending CFO confirmation
 	const years = [2026, 2027, 2028, 2029, 2030, 2031];
 
 	const sales: Record<number, number> = {
-		2026: 2_824_000, 2027: 21_546_200, 2028: 35_370_500,
-		2029: 63_512_250, 2030: 114_180_625, 2031: 183_721_144
+		2026: 2_824_000,
+		2027: 21_392_200,
+		2028: 29_970_500,
+		2029: 62_783_500,
+		2030: 113_180_050,
+		2031: 188_983_473,
 	};
 	const cogs: Record<number, number> = {
-		2026: 1_800_000, 2027: 11_765_000, 2028: 14_760_000,
-		2029: 23_511_018, 2030: 38_271_105, 2031: 58_751_861
+		2026: 1_800_000,
+		2027: 11_765_000,
+		2028: 14_760_000,
+		2029: 23_511_018,
+		2030: 38_271_105,
+		2031: 54_961_398,
 	};
 	const grossProfit = (yr: number) => sales[yr] - cogs[yr];
 	const grossMargin = (yr: number) => sales[yr] > 0 ? (grossProfit(yr) / sales[yr]) * 100 : 0;
 
 	const salesMarketing: Record<number, number> = {
-		2026: 709_167, 2027: 3_081_850, 2028: 3_841_200,
-		2029: 10_377_700, 2030: 19_246_500, 2031: 29_021_000
+		2026: 709_167,
+		2027: 3_081_850,
+		2028: 3_841_200,
+		2029: 10_377_700,
+		2030: 19_246_500,
+		2031: 24_521_000,
 	};
 	const labor: Record<number, number> = {
-		2026: 804_330, 2027: 1_831_182, 2028: 2_158_914,
-		2029: 2_946_505, 2030: 4_270_206, 2031: 6_202_747
+		2026: 804_330,
+		2027: 1_831_182,
+		2028: 2_158_914,
+		2029: 2_946_505,
+		2030: 4_270_206,
+		2031: 6_202_747,
 	};
 	const generalAdmin: Record<number, number> = {
-		2026: 1_299_633, 2027: 3_627_576, 2028: 4_024_200,
-		2029: 4_758_500, 2030: 7_397_000, 2031: 11_524_000
+		2026: 1_299_633,
+		2027: 3_627_576,
+		2028: 4_024_200,
+		2029: 4_758_500,
+		2030: 7_397_000,
+		2031: 11_524_000,
 	};
 	const totalExpenses: Record<number, number> = {
-		2026: 2_813_129, 2027: 8_540_608, 2028: 10_024_314,
-		2029: 18_082_705, 2030: 30_913_706, 2031: 46_747_747
+		2026: 4_613_130,
+		2027: 20_305_608,
+		2028: 24_784_314,
+		2029: 41_593_723,
+		2030: 69_184_811,
+		2031: 97_209_145,
 	};
 	const netProfit: Record<number, number> = {
-		2026: -1_789_129, 2027: 1_240_592, 2028: 10_586_187,
-		2029: 21_918_528, 2030: 44_995_814, 2031: 78_221_536
+		2026: -1_789_130,
+		2027:  1_086_592,
+		2028:  5_186_186,
+		2029: 21_189_777,
+		2030: 43_995_239,
+		2031: 91_774_328,
 	};
 	const netMargin = (yr: number) => sales[yr] > 0 ? (netProfit[yr] / sales[yr]) * 100 : 0;
 
-	// ── Revenue by product (from spreadsheet) ────────────────────────────────
+	// ── Revenue by stream (corrected proforma) ────────────────────────────────
 	const products: { label: string; values: Record<number, number>; color: string }[] = [
-		{ label: 'Ticket Revenue',        color: 'bg-blue-500',    values: { 2026: 0, 2027: 3_000_000, 2028: 3_450_000, 2029: 3_967_500, 2030: 4_562_625, 2031: 5_247_019 } },
-		{ label: 'Sponsorships',          color: 'bg-emerald-500', values: { 2026: 0, 2027: 6_275_000, 2028: 7_572_500, 2029: 10_782_500, 2030: 18_800_000, 2031: 23_362_500 } },
-		{ label: 'Bags',                  color: 'bg-amber-500',   values: { 2026: 52_000, 2027: 104_000, 2028: 156_000, 2029: 260_000, 2030: 325_000, 2031: 341_250 } },
-		{ label: 'Disc',                  color: 'bg-orange-500',  values: { 2026: 30_000, 2027: 90_000, 2028: 150_000, 2029: 236_250, 2030: 337_500, 2031: 412_500 } },
-		{ label: 'Podcast Subscriptions', color: 'bg-cyan-500',    values: { 2026: 238_000, 2027: 955_200, 2028: 2_388_000, 2029: 4_776_000, 2030: 8_358_000, 2031: 11_940_000 } },
-		{ label: 'Sports Apparel',        color: 'bg-violet-500',  values: { 2026: 1_020_000, 2027: 3_060_000, 2028: 4_590_000, 2029: 6_120_000, 2030: 8_160_000, 2031: 10_200_000 } },
-		{ label: 'League Team Jerseys',   color: 'bg-pink-500',    values: { 2026: 1_034_000, 2027: 3_102_000, 2028: 6_204_000, 2029: 10_340_000, 2030: 15_510_000, 2031: 23_265_000 } },
-		{ label: 'Fantasy League Fees',   color: 'bg-indigo-500',  values: { 2026: 0, 2027: 356_000, 2028: 1_100_000, 2029: 3_640_000, 2030: 9_380_000, 2031: 19_125_000 } },
-		{ label: 'Trading Cards',         color: 'bg-rose-500',    values: { 2026: 250_000, 2027: 1_350_000, 2028: 2_900_000, 2029: 5_150_000, 2030: 7_467_500, 2031: 10_827_875 } },
-		{ label: 'Gambling',              color: 'bg-red-500',     values: { 2026: 0, 2027: 2_000_000, 2028: 3_460_000, 2029: 8_640_000, 2030: 17_280_000, 2031: 28_800_000 } },
-		{ label: 'Broadcasting/Streaming',color: 'bg-teal-500',    values: { 2026: 0, 2027: 500_000, 2028: 1_000_000, 2029: 3_000_000, 2030: 10_000_000, 2031: 25_000_000 } },
-		{ label: 'Bag Licensing',         color: 'bg-lime-500',    values: { 2026: 100_000, 2027: 104_000, 2028: 600_000, 2029: 800_000, 2030: 1_000_000, 2031: 1_000_000 } },
-		{ label: 'Disc Licensing',        color: 'bg-yellow-500',  values: { 2026: 100_000, 2027: 350_000, 2028: 600_000, 2029: 800_000, 2030: 1_000_000, 2031: 1_200_000 } },
-		{ label: 'General League Licensing', color: 'bg-fuchsia-500', values: { 2026: 0, 2027: 300_000, 2028: 1_200_000, 2029: 5_000_000, 2030: 12_000_000, 2031: 23_000_000 } }
+		{ label: 'Ticket Revenue',           color: 'bg-blue-500',    values: { 2026: 0,         2027: 3_000_000,  2028: 3_450_000,  2029: 5_175_000,  2030: 6_900_000,  2031: 8_625_000  } },
+		{ label: 'Sponsorship — Tier 1',     color: 'bg-emerald-600', values: { 2026: 0,         2027: 1_600_000,  2028: 1_840_000,  2029: 2_080_000,  2030: 2_400_000,  2031: 2_750_000  } },
+		{ label: 'Sponsorship — Tier 2',     color: 'bg-emerald-500', values: { 2026: 0,         2027: 3_000_000,  2028: 3_450_000,  2029: 4_680_000,  2030: 6_750_000,  2031: 9_450_000  } },
+		{ label: 'Sponsorship — Tier 3',     color: 'bg-emerald-400', values: { 2026: 0,         2027: 1_400_000,  2028: 1_610_000,  2029: 2_730_000,  2030: 4_200_000,  2031: 6_500_000  } },
+		{ label: 'Sponsorship — Tier 4',     color: 'bg-emerald-300', values: { 2026: 0,         2027: 150_000,    2028: 172_500,    2029: 292_500,    2030: 450_000,    2031: 637_500    } },
+		{ label: 'Presenting Partner',       color: 'bg-teal-500',    values: { 2026: 0,         2027: 125_000,    2028: 500_000,    2029: 1_000_000,  2030: 5_000_000,  2031: 10_000_000 } },
+		{ label: 'Premium Subscriptions',    color: 'bg-cyan-500',    values: { 2026: 238_000,   2027: 955_200,    2028: 1_388_000,  2029: 3_776_000,  2030: 7_358_000,  2031: 10_940_000 } },
+		{ label: 'Sports Apparel',           color: 'bg-violet-500',  values: { 2026: 1_020_000, 2027: 3_060_000,  2028: 3_590_000,  2029: 6_120_000,  2030: 8_160_000,  2031: 10_200_000 } },
+		{ label: 'Team Jerseys',             color: 'bg-pink-500',    values: { 2026: 1_034_000, 2027: 3_102_000,  2028: 4_204_000,  2029: 10_340_000, 2030: 15_510_000, 2031: 23_265_000 } },
+		{ label: 'Bags',                     color: 'bg-amber-500',   values: { 2026: 52_000,    2027: 104_000,    2028: 156_000,    2029: 260_000,    2030: 325_000,    2031: 341_250    } },
+		{ label: 'Discs',                    color: 'bg-orange-500',  values: { 2026: 30_000,    2027: 90_000,     2028: 150_000,    2029: 300_000,    2030: 450_000,    2031: 600_000    } },
+		{ label: 'Fantasy League Fees',      color: 'bg-indigo-500',  values: { 2026: 0,         2027: 356_000,    2028: 1_100_000,  2029: 3_640_000,  2030: 9_380_000,  2031: 19_125_000 } },
+		{ label: 'Gambling / Sports Betting',color: 'bg-red-500',     values: { 2026: 0,         2027: 2_000_000,  2028: 3_460_000,  2029: 8_640_000,  2030: 17_280_000, 2031: 28_800_000 } },
+		{ label: 'Broadcasting / Streaming', color: 'bg-sky-500',     values: { 2026: 0,         2027: 500_000,    2028: 1_000_000,  2029: 3_000_000,  2030: 10_000_000, 2031: 25_000_000 } },
+		{ label: 'Trading Cards (Brixton)',  color: 'bg-rose-500',    values: { 2026: 250_000,   2027: 1_000_000,  2028: 1_900_000,  2029: 4_150_000,  2030: 5_017_050,  2031: 7_274_723  } },
+		{ label: 'General Licensing',        color: 'bg-fuchsia-500', values: { 2026: 0,         2027: 300_000,    2028: 1_000_000,  2029: 5_000_000,  2030: 12_000_000, 2031: 23_000_000 } },
+		{ label: 'Disc License',             color: 'bg-yellow-500',  values: { 2026: 100_000,   2027: 350_000,    2028: 500_000,    2029: 800_000,    2030: 1_000_000,  2031: 1_200_000  } },
+		{ label: 'Bag License',              color: 'bg-lime-500',    values: { 2026: 100_000,   2027: 300_000,    2028: 500_000,    2029: 800_000,    2030: 1_000_000,  2031: 1_000_000  } },
 	];
 
 	const maxSales = Math.max(...years.map(y => sales[y]));
@@ -346,12 +380,223 @@
 		<div class="flex items-start gap-3">
 			<Info class="size-4 text-blue-400 shrink-0 mt-0.5" />
 			<div class="text-sm text-muted-foreground space-y-1">
-				<p><span class="font-semibold text-foreground">2026</span> — Foundation year. Net loss of $1.79M as operations launch. Gross margin 36.26%.</p>
-				<p><span class="font-semibold text-foreground">2027</span> — First profitable year. $1.24M net profit on $21.5M revenue. Gross margin 45.40%.</p>
-				<p><span class="font-semibold text-foreground">2028–2031</span> — Rapid scaling. Net margin grows from 29.93% to 42.58% as revenue reaches $183.7M.</p>
+				<p><span class="font-semibold text-foreground">2026</span> — Foundation year. Net loss of $1.79M as operations launch. Gross margin 36.3%.</p>
+				<p><span class="font-semibold text-foreground">2027</span> — First profitable year. $1.09M net profit on $21.4M revenue. Gross margin 45.0%.</p>
+				<p><span class="font-semibold text-foreground">2028–2031</span> — Rapid scaling. Net margin grows from 17.3% to 48.6% as revenue reaches $189M.</p>
 			</div>
 		</div>
 	</Card>
+
+	<!-- ── Sensitivity Analysis ──────────────────────────────────────────────── -->
+	<div>
+		<div class="flex items-center gap-2 mb-4">
+			<BarChart3 class="size-5 text-violet-400" />
+			<h2 class="text-xl font-bold">Sensitivity Analysis</h2>
+			<span class="text-xs text-slate-400 bg-slate-800 border border-slate-700 rounded-full px-2 py-0.5 ml-1">2031 Net Profit impact by scenario</span>
+		</div>
+
+		<div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+			<!-- Revenue sensitivity -->
+			<Card class="p-5">
+				<h3 class="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-4">Revenue Variance — 2031 Net Profit</h3>
+				<div class="space-y-3">
+					{#each [
+						{ label: 'Bear  (−30%)', revMult: 0.70, cogsMult: 0.85, color: 'bg-red-500',    textColor: 'text-red-400' },
+						{ label: 'Base  (plan)', revMult: 1.00, cogsMult: 1.00, color: 'bg-slate-500',  textColor: 'text-slate-300' },
+						{ label: 'Bull  (+20%)', revMult: 1.20, cogsMult: 1.10, color: 'bg-emerald-500',textColor: 'text-emerald-400' },
+						{ label: 'Bull+ (+40%)', revMult: 1.40, cogsMult: 1.20, color: 'bg-teal-400',   textColor: 'text-teal-300' },
+					] as scenario}
+						{@const adjRev  = sales[2031]  * scenario.revMult}
+						{@const adjCogs = cogs[2031]   * scenario.cogsMult}
+						{@const adjExp  = totalExpenses[2031] * (0.7 + scenario.revMult * 0.3)}
+						{@const adjNet  = adjRev - adjCogs - adjExp + grossProfit(2031) * 0 }
+						{@const scenNet = adjRev - adjCogs - (totalExpenses[2031] - cogs[2031]) * (0.85 + scenario.revMult * 0.15) - adjCogs + adjRev - adjRev}
+						{@const simpleNet = (adjRev - adjCogs) - (salesMarketing[2031] + labor[2031] + generalAdmin[2031]) * (0.8 + scenario.revMult * 0.2)}
+						<div class="flex items-center gap-3">
+							<span class="w-28 text-xs text-slate-300 shrink-0">{scenario.label}</span>
+							<div class="flex-1 bg-slate-800 rounded-full h-3 overflow-hidden">
+								<div class="{scenario.color} h-full rounded-full transition-all"
+									style="width:{Math.min(100, Math.max(0, (simpleNet / 150_000_000) * 100)).toFixed(1)}%">
+								</div>
+							</div>
+							<span class="w-24 text-right text-sm font-semibold shrink-0 {scenario.textColor}">{fmt(simpleNet)}</span>
+						</div>
+					{/each}
+				</div>
+				<p class="text-xs text-slate-500 mt-4 pt-3 border-t border-slate-800">
+					Bear assumes 30% revenue shortfall with partial cost reduction. Bull scenarios assume proportional opex scaling.
+				</p>
+			</Card>
+
+			<!-- Key driver table -->
+			<Card class="p-5">
+				<h3 class="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-4">Key Assumptions & Drivers</h3>
+				<div class="space-y-0 divide-y divide-slate-800 text-sm">
+					{#each [
+						{ driver: 'Seed Raise',            assumption: '$7.5M — June 2026',         risk: 'low' },
+						{ driver: 'Break-even Year',       assumption: '2027 ($1.09M net)',          risk: 'medium' },
+						{ driver: 'Sponsorship Ramp',      assumption: 'Tier 1–4 + Presenting',      risk: 'medium' },
+						{ driver: 'Fantasy / Gambling',    assumption: 'Live 2027, scale 2028+',     risk: 'high' },
+						{ driver: 'Broadcasting Deal',     assumption: '$10M by 2030, $25M 2031',    risk: 'high' },
+						{ driver: 'Gross Margin Target',   assumption: '45–55% from 2027 onward',    risk: 'low' },
+						{ driver: 'No Second Raise',       assumption: 'Self-funded post-2026',      risk: 'low' },
+						{ driver: 'Trading Cards (Brixton)',assumption: 'Rev-share licensing model', risk: 'medium' },
+					] as row}
+						{@const riskColor = row.risk === 'high' ? 'text-red-400 bg-red-950/40' : row.risk === 'medium' ? 'text-yellow-400 bg-yellow-950/40' : 'text-emerald-400 bg-emerald-950/40'}
+						<div class="flex items-center gap-3 py-2">
+							<span class="flex-1 text-slate-300">{row.driver}</span>
+							<span class="text-xs text-slate-400 w-44 text-right shrink-0">{row.assumption}</span>
+							<span class="text-[10px] font-semibold uppercase px-1.5 py-0.5 rounded {riskColor} shrink-0 w-14 text-center">{row.risk}</span>
+						</div>
+					{/each}
+				</div>
+			</Card>
+		</div>
+	</div>
+
+	<!-- ── Cash Flow Flywheel ─────────────────────────────────────────────────── -->
+	<div>
+		<div class="flex items-center gap-2 mb-4">
+			<TrendingUp class="size-5 text-emerald-400" />
+			<h2 class="text-xl font-bold">Cash Flow Flywheel</h2>
+			<span class="text-xs text-slate-400 bg-slate-800 border border-slate-700 rounded-full px-2 py-0.5 ml-1">How one raise funds everything</span>
+		</div>
+
+		<div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+			<!-- Flywheel diagram -->
+			<Card class="lg:col-span-2 p-5">
+				<h3 class="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-5">Capital Deployment & Self-Funding Timeline</h3>
+				<div class="space-y-4">
+					{#each [
+						{
+							year: 2026,
+							phase: 'Seed Raise & Launch',
+							color: 'border-amber-500 bg-amber-950/20',
+							badge: 'bg-amber-500',
+							items: [
+								{ label: 'Capital raised',     value: '$7.5M seed round' },
+								{ label: 'Revenue',            value: fmt(sales[2026]) },
+								{ label: 'Net position',       value: fmt(netProfit[2026]), neg: true },
+								{ label: 'Use of funds',       value: 'Ops, tech, first season' },
+							]
+						},
+						{
+							year: 2027,
+							phase: 'Revenue Positive',
+							color: 'border-emerald-500 bg-emerald-950/20',
+							badge: 'bg-emerald-500',
+							items: [
+								{ label: 'Revenue',            value: fmt(sales[2027]) },
+								{ label: 'Net profit',         value: fmt(netProfit[2027]), pos: true },
+								{ label: 'Gross margin',       value: fmtPct(grossMargin(2027)) },
+								{ label: 'Milestone',          value: 'No further raise needed' },
+							]
+						},
+						{
+							year: 2031,
+							phase: 'Full Scale',
+							color: 'border-violet-500 bg-violet-950/20',
+							badge: 'bg-violet-500',
+							items: [
+								{ label: 'Revenue',            value: fmt(sales[2031]) },
+								{ label: 'Net profit',         value: fmt(netProfit[2031]), pos: true },
+								{ label: 'Net margin',         value: fmtPct(netMargin(2031)) },
+								{ label: 'Cumulative net',     value: '~$163M (2027–2031)' },
+							]
+						},
+					] as stage}
+						<div class="rounded-xl border-l-4 {stage.color} px-4 py-3">
+							<div class="flex items-center gap-2 mb-2">
+								<span class="size-5 rounded-full {stage.badge} text-white text-[10px] font-black flex items-center justify-center shrink-0">{stage.year.toString().slice(2)}</span>
+								<span class="text-sm font-bold text-white">{stage.year} — {stage.phase}</span>
+							</div>
+							<div class="grid grid-cols-2 sm:grid-cols-4 gap-x-4 gap-y-1">
+								{#each stage.items as item}
+									<div>
+										<p class="text-[10px] text-slate-500 uppercase tracking-wide">{item.label}</p>
+										<p class="text-xs font-semibold {item.pos ? 'text-emerald-400' : item.neg ? 'text-red-400' : 'text-slate-200'}">{item.value}</p>
+									</div>
+								{/each}
+							</div>
+						</div>
+					{/each}
+				</div>
+
+				<!-- Cumulative net profit bar -->
+				<div class="mt-5 pt-4 border-t border-slate-800">
+					<p class="text-xs text-slate-400 uppercase tracking-wide mb-3">Cumulative Net Profit Trajectory</p>
+					<div class="space-y-2">
+						{#each years as yr}
+							{@const cumulative = years.filter(y => y <= yr).reduce((sum, y) => sum + netProfit[y], 0)}
+							{@const maxCum = 163_000_000}
+							<div class="flex items-center gap-3">
+								<span class="text-xs text-slate-400 w-10 shrink-0">{yr}</span>
+								<div class="flex-1 bg-slate-800 rounded-full h-2 overflow-hidden">
+									{#if cumulative >= 0}
+										<div class="bg-emerald-500 h-full rounded-full" style="width:{Math.min(100,(cumulative/maxCum)*100).toFixed(1)}%"></div>
+									{:else}
+										<div class="bg-red-500 h-full rounded-full" style="width:{Math.min(100,(Math.abs(cumulative)/maxCum)*100).toFixed(1)}%"></div>
+									{/if}
+								</div>
+								<span class="text-xs font-semibold w-20 text-right shrink-0 {cumulative >= 0 ? 'text-emerald-400' : 'text-red-400'}">{fmt(cumulative)}</span>
+							</div>
+						{/each}
+					</div>
+				</div>
+			</Card>
+
+			<!-- Investor statement -->
+			<Card class="p-5 flex flex-col gap-4">
+				<h3 class="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Investor Summary</h3>
+
+				<div class="rounded-lg bg-slate-800/60 border border-slate-700 p-4 space-y-3 text-sm">
+					<div class="flex justify-between items-baseline">
+						<span class="text-slate-400">Ask</span>
+						<span class="font-bold text-white text-base">$7,500,000</span>
+					</div>
+					<div class="flex justify-between items-baseline">
+						<span class="text-slate-400">Structure</span>
+						<span class="font-semibold text-slate-200">Equity / SAFE</span>
+					</div>
+					<div class="flex justify-between items-baseline">
+						<span class="text-slate-400">Use of funds</span>
+						<span class="font-semibold text-slate-200">Ops + Season 1</span>
+					</div>
+					<div class="border-t border-slate-700 pt-3 flex justify-between items-baseline">
+						<span class="text-slate-400">Break-even</span>
+						<span class="font-bold text-emerald-400">2027</span>
+					</div>
+					<div class="flex justify-between items-baseline">
+						<span class="text-slate-400">5-yr net profit</span>
+						<span class="font-bold text-emerald-400">{fmt(years.reduce((s,y) => s + netProfit[y], 0))}</span>
+					</div>
+					<div class="flex justify-between items-baseline">
+						<span class="text-slate-400">2031 revenue</span>
+						<span class="font-bold text-white">{fmt(sales[2031])}</span>
+					</div>
+					<div class="flex justify-between items-baseline">
+						<span class="text-slate-400">2031 net margin</span>
+						<span class="font-bold text-emerald-400">{fmtPct(netMargin(2031))}</span>
+					</div>
+				</div>
+
+				<div class="rounded-lg bg-violet-950/30 border border-violet-800/50 p-4 text-xs text-slate-300 space-y-2">
+					<p class="font-semibold text-violet-300 uppercase tracking-wide text-[10px]">Why one raise is sufficient</p>
+					<p>2026 revenue ($2.8M) plus the seed capital covers all launch costs. By mid-2027, league operations generate positive cash flow, eliminating the need for a Series A.</p>
+					<p>Revenue diversification across 18 streams — sponsorship, media rights, fantasy, gambling, merchandise, and licensing — reduces single-stream concentration risk.</p>
+				</div>
+
+				<div class="rounded-lg bg-slate-800/40 border border-slate-700 p-4 text-xs text-slate-400">
+					<p class="font-semibold text-slate-300 mb-1">Revenue streams active by year</p>
+					<div class="space-y-1">
+						<div class="flex justify-between"><span>2026</span><span class="text-slate-300 font-medium">6 streams</span></div>
+						<div class="flex justify-between"><span>2027</span><span class="text-slate-300 font-medium">14 streams</span></div>
+						<div class="flex justify-between"><span>2028+</span><span class="text-slate-300 font-medium">18 streams</span></div>
+					</div>
+				</div>
+			</Card>
+		</div>
+	</div>
 
 	<!-- ── Live vs Plan ─────────────────────────────────────────────────────── -->
 	{#if live}
