@@ -162,6 +162,7 @@
 			iconActiveClass: 'text-orange-600 dark:text-orange-400',
 			items: [
 				{ title: 'Marketing Goals', url: '/dashboard/marketing-goals', icon: Target },
+				{ title: 'Geo Marketing', url: '/dashboard/geo-marketing', icon: MapPin },
 				{ title: 'Campaigns', url: '/dashboard/campaigns', icon: Megaphone },
 				{ title: 'Manager Dashboard', url: '/dashboard/managers', icon: Users, roles: ['admin'] }
 			]
