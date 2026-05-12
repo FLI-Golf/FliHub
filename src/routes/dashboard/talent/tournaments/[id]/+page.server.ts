@@ -5,6 +5,7 @@ import { error, fail } from '@sveltejs/kit';
 import {
 	calculatePlacementPayouts,
 	calculateFranchisePayout,
+	seasonConfigFromRecord,
 	formatCurrency
 } from '$lib/domain/services/PayoutCalculator';
 
@@ -19,31 +20,66 @@ export const load: PageServerLoad = async ({ locals, url, params }) => {
 		const [results, franchises, pros, franchisePayouts] = await Promise.all([
 			resultRepo.findByTournament(params.id),
 			pb.collection('franchises').getFullList({ sort: 'name' }),
-			pb.collection('talent').getFullList({ sort: 'name' }),
-			pb
-				.collection('franchise_payouts')
+			pb.collection('talent').getFullList({ sort: 'name', fields: 'id,name,gender,managerName,managerCutPercentage,managerEmail' }),
+			pb.collection('franchise_payouts')
 				.getFullList({ filter: `tournament = '${params.id}'`, expand: 'franchise' })
 		]);
 
-		// Calculate payout structure
-		const franchiseCutPercentage = tournament.franchiseCutPercentage || 20;
+		// Load season record for config — fall back to tournament-level field if no relation set
+		let seasonRecord: any = null;
+		if (tournament.seasonRef) {
+			seasonRecord = await pb.collection('seasons').getOne(tournament.seasonRef).catch(() => null);
+		}
+
+		// Resolve settings: season record wins, then tournament field, then safe defaults
+		const franchiseCutPercentage = seasonRecord
+			? (seasonRecord.franchiseCutPercentage ?? 0)
+			: (tournament.franchiseCutPercentage ?? 20);
+		const numberOfPlacements = seasonRecord
+			? (seasonRecord.numberOfPlacements ?? franchises.length)
+			: franchises.length || 12;
+
 		const { franchiseCut, proCut } = calculateFranchisePayout(
 			tournament.prizePool,
 			franchiseCutPercentage
 		);
 		const divisionPurse = proCut / 2;
-		const payoutStructure = calculatePlacementPayouts(divisionPurse, 20, franchiseCutPercentage);
+		const payoutStructure = calculatePlacementPayouts(divisionPurse, numberOfPlacements, franchiseCutPercentage);
+
+		// Build a quick-lookup map of pro id → pro record (with manager fields)
+		const prosMap = Object.fromEntries(pros.map((p: any) => [p.id, p]));
+
+		// Enrich each result with manager earnings calculated from the pro's cut %
+		const enrichedResults = results.items.map((r: any) => {
+			const pro = prosMap[r.pro];
+			const managerCutPct = pro?.managerCutPercentage ?? 0;
+			const managerEarnings = managerCutPct > 0
+				? Math.round((r.proEarnings || 0) * (managerCutPct / 100) * 100) / 100
+				: (r.managerEarnings ?? 0);
+			const netProEarnings = (r.proEarnings || 0) - managerEarnings;
+			return {
+				...r,
+				managerEarnings,
+				managerCutPercentage: managerCutPct,
+				netProEarnings,
+				managerName:  pro?.managerName  ?? r.managerName  ?? null,
+				managerEmail: pro?.managerEmail ?? r.managerEmail ?? null,
+			};
+		});
 
 		return {
 			tournament,
-			results: results.items,
+			seasonRecord,
+			results: enrichedResults,
 			franchises,
 			pros,
+			prosMap,
 			franchisePayouts,
 			payoutStructure,
 			franchiseCut,
 			proCut,
-			divisionPurse
+			divisionPurse,
+			franchiseCutPercentage,
 		};
 	} catch (err) {
 		console.error('Error loading tournament:', err);
@@ -71,11 +107,21 @@ export const actions: Actions = {
 				franchiseId = pro.franchise;
 			}
 
-			// Calculate earnings
-			const franchiseCutPercentage = tournament.franchiseCutPercentage || 20;
+			// Resolve season config for earnings calculation
+			let seasonRec: any = null;
+			if (tournament.seasonRef) {
+				seasonRec = await pb.collection('seasons').getOne(tournament.seasonRef).catch(() => null);
+			}
+			const franchiseCutPercentage = seasonRec
+				? (seasonRec.franchiseCutPercentage ?? 0)
+				: (tournament.franchiseCutPercentage ?? 20);
+			const allFranchises = await pb.collection('franchises').getFullList({ fields: 'id' });
+			const numberOfPlacements = seasonRec
+				? (seasonRec.numberOfPlacements ?? allFranchises.length)
+				: allFranchises.length || 12;
 			const { proCut } = calculateFranchisePayout(tournament.prizePool, franchiseCutPercentage);
 			const divisionPurse = proCut / 2;
-			const payoutStructure = calculatePlacementPayouts(divisionPurse);
+			const payoutStructure = calculatePlacementPayouts(divisionPurse, numberOfPlacements, franchiseCutPercentage);
 			const placementPayout = payoutStructure.find((p) => p.placement === placement);
 
 			if (!placementPayout) {
@@ -83,9 +129,17 @@ export const actions: Actions = {
 			}
 
 			const proEarnings = placementPayout.amount;
-			const franchiseEarnings =
-				(proEarnings / (100 - franchiseCutPercentage)) * franchiseCutPercentage;
+			const franchiseEarnings = franchiseCutPercentage > 0
+				? (proEarnings / (100 - franchiseCutPercentage)) * franchiseCutPercentage
+				: 0;
 			const totalEarnings = proEarnings + franchiseEarnings;
+
+			// Manager cut — read from pro record
+			const managerCutPct = pro.managerCutPercentage ?? 0;
+			const managerEarnings = managerCutPct > 0
+				? Math.round(proEarnings * (managerCutPct / 100) * 100) / 100
+				: 0;
+			const netProEarnings = proEarnings - managerEarnings;
 
 			// Create result
 			const result = await pb.collection('tournament_results').create({
@@ -97,6 +151,9 @@ export const actions: Actions = {
 				earnings: totalEarnings,
 				franchiseEarnings,
 				proEarnings,
+				managerEarnings,
+				managerCutPercentage: managerCutPct,
+				netProEarnings,
 				score: formData.get('score') as string,
 				rounds: formData.get('rounds') ? parseInt(formData.get('rounds') as string) : undefined,
 				notes: formData.get('notes') as string
