@@ -11,6 +11,16 @@
 	let expandedResult = $state<string | null>(null);
 	const toggleResult = (id: string) => expandedResult = expandedResult === id ? null : id;
 
+	let expandedPayout = $state<number | null>(null);
+	const togglePayout = (n: number) => expandedPayout = expandedPayout === n ? null : n;
+
+	// Manager overlay — user-adjustable cut % applied to the payout table preview
+	let managerOverlayOn  = $state(false);
+	let managerOverlayCut = $state(15);
+	const applyMgr = (gross: number) => managerOverlayOn
+		? { gross, mgr: Math.round(gross * (managerOverlayCut / 100)), net: Math.round(gross * (1 - managerOverlayCut / 100)) }
+		: { gross, mgr: 0, net: gross };
+
 	const formatCurrency = (amount: number) =>
 		new Intl.NumberFormat('en-US', {
 			style: 'currency',
@@ -143,67 +153,172 @@
 			{/if}
 		</div>
 
-		<!-- Full placement payout table (per division) -->
+		<!-- Interactive placement payout accordion -->
 		<div class="border-t border-slate-700 pt-4">
 			<h3 class="font-semibold mb-3 text-slate-200">
 				Placement Payouts — Per Division
-				<span class="text-xs font-normal text-slate-400 ml-2">(every team gets a cheque)</span>
+				<span class="text-xs font-normal text-slate-400 ml-2">(click a row to see breakdown · every team gets a cheque)</span>
 			</h3>
-			<div class="overflow-x-auto">
-				<table class="w-full text-sm">
-					<thead>
-						<tr class="text-left text-xs text-slate-400 uppercase tracking-wide border-b border-slate-700">
-							<th class="pb-2 pr-4">Place</th>
-							<th class="pb-2 pr-4 text-right">Pro Earnings</th>
-							{#if !noFranchiseCut}
-								<th class="pb-2 pr-4 text-right">Franchise Cut</th>
-								<th class="pb-2 text-right">Total Payout</th>
-							{/if}
-						</tr>
-					</thead>
-					<tbody class="divide-y divide-slate-700/50">
-						{#each data.payoutStructure as payout}
-							<tr class="hover:bg-slate-700/30 transition-colors {payout.placement <= 3 ? 'bg-slate-700/20' : ''}">
-								<td class="py-2 pr-4 font-semibold text-slate-200">
-									{placementLabel(payout.placement)}
-								</td>
-								<td class="py-2 pr-4 text-right font-bold text-emerald-300">
-									{formatCurrency(payout.amount)}
-								</td>
+			<div class="space-y-1">
+				{#each data.payoutStructure as payout}
+					{@const isOpen = expandedPayout === payout.placement}
+					{@const topThree = payout.placement <= 3}
+					<div class="rounded-lg border {topThree ? 'border-slate-600' : 'border-slate-700/60'} overflow-hidden">
+						<!-- Summary row -->
+						<button
+							type="button"
+							onclick={() => togglePayout(payout.placement)}
+							class="w-full flex items-center justify-between px-4 py-2.5 text-sm transition-colors hover:bg-slate-700/50 {topThree ? 'bg-slate-700/30' : 'bg-slate-800/30'} text-left"
+						>
+							<span class="font-semibold text-slate-200 w-20 shrink-0">{placementLabel(payout.placement)}</span>
+							<div class="flex items-center gap-6 ml-auto">
+								<span class="font-bold text-emerald-300">{formatCurrency(payout.amount)}</span>
 								{#if !noFranchiseCut}
-									<td class="py-2 pr-4 text-right text-purple-300">
-										{formatCurrency(payout.franchiseAmount)}
-									</td>
-									<td class="py-2 text-right font-bold text-slate-100">
-										{formatCurrency(payout.totalAmount)}
-									</td>
+									<span class="text-xs text-purple-300 hidden sm:inline">Franchise: {formatCurrency(payout.franchiseAmount)}</span>
+									<span class="text-xs text-slate-300 hidden sm:inline">Total: {formatCurrency(payout.totalAmount)}</span>
 								{/if}
-							</tr>
-						{/each}
-					</tbody>
-					<tfoot class="border-t border-slate-600">
-						<tr class="text-slate-300 font-semibold">
-							<td class="pt-3 pr-4">Total</td>
-							<td class="pt-3 pr-4 text-right text-emerald-300">
-								{formatCurrency(data.payoutStructure.reduce((s, p) => s + p.amount, 0))}
-							</td>
-							{#if !noFranchiseCut}
-								<td class="pt-3 pr-4 text-right text-purple-300">
-									{formatCurrency(data.payoutStructure.reduce((s, p) => s + p.franchiseAmount, 0))}
-								</td>
-								<td class="pt-3 text-right text-slate-100">
-									{formatCurrency(data.payoutStructure.reduce((s, p) => s + p.totalAmount, 0))}
-								</td>
-							{/if}
-						</tr>
-					</tfoot>
-				</table>
+								<span class="text-slate-500 text-xs w-4">{isOpen ? '▲' : '▼'}</span>
+							</div>
+						</button>
+
+						<!-- Expanded breakdown -->
+						{#if isOpen}
+							{@const mens   = mensResults.find(r => r.placement === payout.placement) ?? null}
+							{@const womens = womensResults.find(r => r.placement === payout.placement) ?? null}
+							{@const mMgr   = applyMgr(payout.amount)}
+							<div class="border-t border-slate-700 px-4 py-4 bg-slate-800/60 space-y-4">
+
+								<!-- Header row: label + manager toggle -->
+								<div class="flex items-center justify-between flex-wrap gap-2">
+									<p class="text-xs font-semibold text-slate-400 uppercase tracking-wide">Payment Breakdown — {placementLabel(payout.placement)}</p>
+									<div class="flex items-center gap-2">
+										<span class="text-xs text-slate-400">Manager overlay</span>
+										<button
+											type="button"
+											onclick={() => managerOverlayOn = !managerOverlayOn}
+											class="relative inline-flex h-5 w-9 shrink-0 rounded-full border-2 border-transparent transition-colors {managerOverlayOn ? 'bg-amber-500' : 'bg-slate-600'}"
+										>
+											<span class="pointer-events-none inline-block h-4 w-4 rounded-full bg-white shadow transition-transform {managerOverlayOn ? 'translate-x-4' : 'translate-x-0'}"></span>
+										</button>
+										{#if managerOverlayOn}
+											<div class="flex items-center gap-1">
+												<input
+													type="number"
+													min="1" max="50" step="1"
+													bind:value={managerOverlayCut}
+													class="w-12 rounded bg-slate-700 border border-slate-600 px-1.5 py-0.5 text-xs text-white text-center focus:outline-none focus:ring-1 focus:ring-amber-500"
+												/>
+												<span class="text-xs text-slate-400">%</span>
+											</div>
+										{/if}
+									</div>
+								</div>
+
+								<!-- Men's / Women's side-by-side columns -->
+								<div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+									{#each [
+										{ label: "Men's Division", result: mens, accent: 'cyan', border: 'border-cyan-800/40', bg: 'bg-cyan-950/20' },
+										{ label: "Women's Division", result: womens, accent: 'pink', border: 'border-pink-800/40', bg: 'bg-pink-950/20' },
+									] as div}
+										<div class="rounded-xl border {div.border} {div.bg} px-4 py-3 space-y-3">
+											<p class="text-xs font-bold text-{div.accent}-400 uppercase tracking-wide">{div.label}</p>
+
+											{#if div.result}
+												<div class="text-sm text-slate-300 font-semibold">{div.result.expand?.pro?.name || 'Unknown'}</div>
+												{#if div.result.expand?.franchise}
+													<div class="text-xs text-slate-500">{div.result.expand.franchise.name}</div>
+												{/if}
+											{:else}
+												<div class="space-y-1.5">
+													<div class="text-xs text-slate-500 italic">No result entered</div>
+													<div class="flex gap-1.5 flex-wrap">
+														{#each [10, 15, 20] as pct}
+															<button
+																type="button"
+																onclick={() => { managerOverlayOn = true; managerOverlayCut = pct; }}
+																class="text-[10px] font-semibold px-2 py-0.5 rounded-full border transition-colors {managerOverlayOn && managerOverlayCut === pct ? 'bg-amber-500 border-amber-400 text-white' : 'bg-amber-950/40 border-amber-700/50 text-amber-400 hover:bg-amber-900/50'}"
+															>{pct}% mgr</button>
+														{/each}
+													</div>
+												</div>
+											{/if}
+
+											<!-- Earnings breakdown -->
+											<div class="space-y-1.5 pt-1 border-t border-slate-700/50">
+												<div class="flex justify-between text-xs">
+													<span class="text-slate-400">Gross earnings</span>
+													<span class="font-semibold text-emerald-300">{formatCurrency(payout.amount)}</span>
+												</div>
+
+												{#if managerOverlayOn}
+													<div class="flex justify-between text-xs">
+														<span class="text-amber-400">Manager cut ({managerOverlayCut}%)</span>
+														<span class="font-semibold text-amber-300">−{formatCurrency(mMgr.mgr)}</span>
+													</div>
+												{/if}
+
+												{#if !noFranchiseCut}
+													<div class="flex justify-between text-xs">
+														<span class="text-purple-400">Franchise cut ({franchiseCutPct}%)</span>
+														<span class="font-semibold text-purple-300">−{formatCurrency(payout.franchiseAmount)}</span>
+													</div>
+												{/if}
+
+												<div class="flex justify-between text-xs pt-1 border-t border-slate-700/50 font-bold">
+													<span class="text-white">Pro takes home</span>
+													<span class="text-emerald-300">
+														{formatCurrency(managerOverlayOn ? mMgr.net : payout.amount)}
+													</span>
+												</div>
+
+												{#if managerOverlayOn}
+													<div class="flex justify-between text-xs">
+														<span class="text-amber-400">Manager receives</span>
+														<span class="font-semibold text-amber-300">{formatCurrency(mMgr.mgr)}</span>
+													</div>
+												{/if}
+
+												{#if div.result?.managerName}
+													<div class="text-[10px] text-amber-400/70 pt-0.5">
+														Actual mgr: {div.result.managerName} ({div.result.managerCutPercentage}%)
+													</div>
+												{/if}
+											</div>
+										</div>
+									{/each}
+								</div>
+
+								<!-- % of purse + totals strip -->
+								<div class="rounded-lg bg-slate-700/40 border border-slate-600 px-3 py-2 flex flex-wrap gap-x-6 gap-y-1 text-xs">
+									<span class="text-slate-400">% of purse: <span class="text-blue-300 font-semibold">{((payout.amount / data.divisionPurse) * 100).toFixed(1)}%</span></span>
+									<span class="text-slate-400">Per division: <span class="text-white font-semibold">{formatCurrency(payout.amount)}</span></span>
+									<span class="text-slate-400">Both divisions: <span class="text-white font-semibold">{formatCurrency(payout.amount * 2)}</span></span>
+									{#if managerOverlayOn}
+										<span class="text-amber-400">Manager (both): <span class="font-semibold">{formatCurrency(mMgr.mgr * 2)}</span></span>
+										<span class="text-emerald-400">Pros net (both): <span class="font-semibold">{formatCurrency(mMgr.net * 2)}</span></span>
+									{/if}
+								</div>
+							</div>
+						{/if}
+					</div>
+				{/each}
+
+				<!-- Totals row -->
+				<div class="flex items-center justify-between px-4 py-2.5 rounded-lg bg-slate-700/50 border border-slate-600 text-sm font-semibold mt-1">
+					<span class="text-slate-300">Total</span>
+					<div class="flex items-center gap-6">
+						<span class="text-emerald-300">{formatCurrency(data.payoutStructure.reduce((s, p) => s + p.amount, 0))}</span>
+						{#if !noFranchiseCut}
+							<span class="text-purple-300 hidden sm:inline">{formatCurrency(data.payoutStructure.reduce((s, p) => s + p.franchiseAmount, 0))}</span>
+							<span class="text-slate-100 hidden sm:inline">{formatCurrency(data.payoutStructure.reduce((s, p) => s + p.totalAmount, 0))}</span>
+						{/if}
+						<span class="w-4"></span>
+					</div>
+				</div>
 			</div>
 			<p class="text-xs text-slate-500 mt-2">
 				* Amounts shown are per division (Men's and Women's each receive the same schedule).
-				{#if noFranchiseCut}
-					Season 1: franchise cut waived — pros receive 100% of the purse.
-				{/if}
+				{#if noFranchiseCut}Season 1: franchise cut waived — pros receive 100% of the purse.{/if}
 			</p>
 		</div>
 	</div>

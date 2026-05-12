@@ -1,198 +1,214 @@
 import { RequestContext } from '$lib/infra/RequestContext';
-import type { PageServerLoad, Actions } from './$types';
-import { ProPaymentRepo } from '$lib/infra/pocketbase/repositories';
 import { fail } from '@sveltejs/kit';
-import type PocketBase from 'pocketbase';
-
-/**
- * Mirror a pro payment as an expense record so it appears in the finance
- * dashboard and rolls up into department/project budgets.
- * Safe to call multiple times — checks for an existing linked expense first.
- */
-async function syncExpenseForPayment(pb: PocketBase, paymentId: string): Promise<void> {
-	try {
-		const payment = await pb.collection('pro_payments').getOne(paymentId, {
-			expand: 'pro'
-		});
-
-		// Only sync paid or pending payments (skip cancelled)
-		if (payment.status === 'cancelled') return;
-
-		// Check if an expense already exists for this payment
-		const existing = await pb.collection('expenses').getFullList({
-			filter: `proPaymentId = "${paymentId}"`,
-			fields: 'id'
-		}).catch(() => []);
-
-		const proName = payment.expand?.pro?.name ?? 'Unknown Pro';
-		const paymentTypeLabel: Record<string, string> = {
-			tournament:    'Tournament Prize',
-			special_event: 'Special Event Payment',
-			bonus:         'Bonus',
-			salary:        'Salary',
-			appearance_fee:'Appearance Fee',
-			other:         'Payment'
-		};
-		const label = paymentTypeLabel[payment.paymentType] ?? 'Pro Payment';
-
-		const expenseData = {
-			amount:       payment.amount,
-			category:     'talent_payment',
-			status:       payment.status === 'paid' ? 'paid' : 'submitted',
-			date:         payment.paymentDate || payment.dueDate || new Date().toISOString().split('T')[0],
-			description:  `${label} — ${proName}`,
-			notes:        payment.notes || '',
-			proPaymentId: paymentId
-		};
-
-		if (existing.length > 0) {
-			await pb.collection('expenses').update(existing[0].id, expenseData);
-		} else {
-			await pb.collection('expenses').create(expenseData);
-		}
-	} catch (err) {
-		// Non-fatal — log but don't block the payment action
-		console.error('syncExpenseForPayment failed:', err);
-	}
-}
+import type { PageServerLoad, Actions } from './$types';
+import { writeAuditLog, writeAuditLogBatch } from '$lib/domain/services/PaymentWorkOrderService';
 
 export const load: PageServerLoad = async ({ locals, url }) => {
-	const ctx = await RequestContext.from(locals, url);
-	const { pb, userId, profile: userProfile, role } = ctx;
-		const paymentRepo = new ProPaymentRepo(pb);
+	const { pb } = await RequestContext.from(locals, url);
 
-	const status = url.searchParams.get('status');
-	const proId = url.searchParams.get('pro');
+	const filterStatus    = url.searchParams.get('status') ?? '';
+	const filterRecipient = url.searchParams.get('recipient') ?? '';
+	const filterSeason    = url.searchParams.get('season') ?? '';
+
+	const filters: string[] = [];
+	if (filterStatus)    filters.push(`status = '${filterStatus}'`);
+	if (filterRecipient) filters.push(`recipient = '${filterRecipient}'`);
+	if (filterSeason)    filters.push(`season = '${filterSeason}'`);
 
 	try {
-		let payments;
-		if (status) {
-			payments = await paymentRepo.findByStatus(status);
-		} else if (proId) {
-			payments = await paymentRepo.findByPro(proId);
-		} else {
-			payments = await paymentRepo.findAll({
-				expand: 'pro,tournament,specialEvent',
-				perPage: 100
-			});
-		}
-
-		const [pros, tournaments, specialEvents] = await Promise.all([
-			pb.collection('talent').getFullList({ sort: 'name' }),
-			pb.collection('tournaments').getFullList({ sort: '-season,-tournamentNumber' }),
-			pb.collection('special_events').getFullList({ sort: '-eventDate' })
+		const filterStr = filters.join(' && ') || undefined;
+		const [payments, pros, seasons, workOrders, auditLogs] = await Promise.all([
+			pb.collection('pro_payments').getFullList({
+				filter: filterStr,
+				sort:   '-created',
+				expand: 'pro',
+			}),
+			pb.collection('talent').getFullList({
+				sort:   'name',
+				fields: 'id,name,managerName,managerEmail,managerCutPercentage',
+			}),
+			pb.collection('seasons').getFullList({ sort: '-year' }),
+			// Load all pro_payment work orders so we can link them
+			pb.collection('work_orders').getFullList({
+				filter: `source = 'pro_payment'`,
+				fields: 'id,work_order_number,status,amount,projectId,projectName,proPayment',
+				sort:   '-created',
+			}).catch(() => [] as any[]),
+			// Load audit log for all payments in the current filter
+			pb.collection('payment_audit_log').getFullList({
+				sort: 'changedAt',
+				fields: 'id,payment,workOrder,fromStatus,toStatus,changedBy,changedAt,amount,recipient,notes',
+			}).catch(() => [] as any[]),
 		]);
 
-		return {
-			payments: payments.items,
-			pros,
-			tournaments,
-			specialEvents,
-			currentStatus: status,
-			currentProId: proId
+		const prosMap = Object.fromEntries(pros.map((p: any) => [p.id, p]));
+
+		// Map: paymentId → work order
+		const paymentToWO: Record<string, any> = {};
+		for (const wo of workOrders) {
+			const ids: string[] = Array.isArray(wo.proPayment) ? wo.proPayment : [];
+			for (const pid of ids) paymentToWO[pid] = wo;
+		}
+
+		// Map: paymentId → audit entries (sorted oldest first)
+		const paymentAudit: Record<string, any[]> = {};
+		for (const entry of auditLogs) {
+			if (!paymentAudit[entry.payment]) paymentAudit[entry.payment] = [];
+			paymentAudit[entry.payment].push(entry);
+		}
+
+		// Enrich each payment with its WO and audit trail
+		const enrichedPayments = payments.map((p: any) => ({
+			...p,
+			_workOrder: paymentToWO[p.id] ?? null,
+			_auditLog:  paymentAudit[p.id] ?? [],
+		}));
+
+		type PaymentGroup = {
+			pro: any;
+			proPayments: any[];
+			managerPayments: any[];
+			totalGross: number;
+			totalNet: number;
+			totalManager: number;
+			pendingPro: number;
+			pendingManager: number;
 		};
-	} catch (error) {
-		console.error('Error loading payments:', error);
+
+		const groups: Record<string, PaymentGroup> = {};
+		for (const p of enrichedPayments) {
+			const proId = p.pro;
+			if (!groups[proId]) {
+				groups[proId] = {
+					pro: prosMap[proId] ?? p.expand?.pro ?? { id: proId, name: 'Unknown' },
+					proPayments: [],
+					managerPayments: [],
+					totalGross: 0, totalNet: 0, totalManager: 0,
+					pendingPro: 0, pendingManager: 0,
+				};
+			}
+			const g = groups[proId];
+			if (p.recipient === 'manager') {
+				g.managerPayments.push(p);
+				g.totalManager += p.amount ?? 0;
+				if (p.status === 'pending') g.pendingManager += p.amount ?? 0;
+			} else {
+				g.proPayments.push(p);
+				g.totalNet   += p.amount ?? 0;
+				g.totalGross += p.grossAmount ?? p.amount ?? 0;
+				if (p.status === 'pending') g.pendingPro += p.amount ?? 0;
+			}
+		}
+
+		const allGroups = Object.values(groups);
+		const summary = {
+			totalGross:     allGroups.reduce((s, g) => s + g.totalGross, 0),
+			totalNet:       allGroups.reduce((s, g) => s + g.totalNet, 0),
+			totalManager:   allGroups.reduce((s, g) => s + g.totalManager, 0),
+			pendingPro:     allGroups.reduce((s, g) => s + g.pendingPro, 0),
+			pendingManager: allGroups.reduce((s, g) => s + g.pendingManager, 0),
+			totalPayments:  payments.length,
+		};
+
+		return { payments: enrichedPayments, groups: allGroups, summary, seasons, workOrders, filterStatus, filterRecipient, filterSeason };
+	} catch (err: any) {
+		console.error('payments load error:', err?.message ?? err);
 		return {
-			payments: [],
-			pros: [],
-			tournaments: [],
-			specialEvents: [],
-			currentStatus: null,
-			currentProId: null
+			payments: [], groups: [], seasons: [], workOrders: [],
+			summary: { totalGross: 0, totalNet: 0, totalManager: 0, pendingPro: 0, pendingManager: 0, totalPayments: 0 },
+			filterStatus, filterRecipient, filterSeason,
 		};
 	}
 };
 
 export const actions: Actions = {
-	create: async ({ request, locals }) => {
-		const pb = locals.pb;
-		const formData = await request.formData();
-
-		const data = {
-			pro: formData.get('pro') as string,
-			paymentType: formData.get('paymentType') as string,
-			tournament: formData.get('tournament') as string || undefined,
-			specialEvent: formData.get('specialEvent') as string || undefined,
-			amount: parseFloat(formData.get('amount') as string),
-			paymentDate: formData.get('paymentDate') as string || undefined,
-			dueDate: formData.get('dueDate') as string || undefined,
-			status: (formData.get('status') as string) || 'pending',
-			paymentMethod: formData.get('paymentMethod') as string || undefined,
-			transactionId: formData.get('transactionId') as string || undefined,
-			description: formData.get('description') as string || undefined,
-			notes: formData.get('notes') as string || undefined
-		};
-
-		try {
-			const payment = await pb.collection('pro_payments').create(data);
-			await syncExpenseForPayment(pb, payment.id);
-			return { success: true, payment };
-		} catch (error: any) {
-			console.error('Error creating payment:', error);
-			return fail(400, { error: error.message });
-		}
-	},
-
-	update: async ({ request, locals }) => {
-		const pb = locals.pb;
-		const formData = await request.formData();
-		const id = formData.get('id') as string;
-
-		const data = {
-			pro: formData.get('pro') as string,
-			paymentType: formData.get('paymentType') as string,
-			tournament: formData.get('tournament') as string || undefined,
-			specialEvent: formData.get('specialEvent') as string || undefined,
-			amount: parseFloat(formData.get('amount') as string),
-			paymentDate: formData.get('paymentDate') as string || undefined,
-			dueDate: formData.get('dueDate') as string || undefined,
-			status: formData.get('status') as string,
-			paymentMethod: formData.get('paymentMethod') as string || undefined,
-			transactionId: formData.get('transactionId') as string || undefined,
-			description: formData.get('description') as string || undefined,
-			notes: formData.get('notes') as string || undefined
-		};
-
-		try {
-			const payment = await pb.collection('pro_payments').update(id, data);
-			await syncExpenseForPayment(pb, payment.id);
-			return { success: true, payment };
-		} catch (error: any) {
-			console.error('Error updating payment:', error);
-			return fail(400, { error: error.message });
-		}
-	},
-
 	markPaid: async ({ request, locals }) => {
 		const pb = locals.pb;
-		const formData = await request.formData();
-		const id = formData.get('id') as string;
-
+		const fd = await request.formData();
+		const ids = (fd.get('ids') as string ?? fd.get('id') as string ?? '').split(',').filter(Boolean);
+		const paidBy = fd.get('paidBy') as string || 'admin';
+		const paidAt = new Date().toISOString().split('T')[0];
 		try {
-			const payment = await pb.collection('pro_payments').update(id, {
+			// Fetch current state for audit log before updating
+			const current = await Promise.all(
+				ids.map(id => pb.collection('pro_payments').getOne(id, { fields: 'id,status,amount,recipient,workOrder' }).catch(() => null))
+			);
+
+			await Promise.all(ids.map(id => pb.collection('pro_payments').update(id, {
 				status: 'paid',
-				paymentDate: new Date().toISOString().split('T')[0]
-			});
-			await syncExpenseForPayment(pb, payment.id);
-			return { success: true, payment };
-		} catch (error: any) {
-			console.error('Error marking payment as paid:', error);
-			return fail(400, { error: error.message });
-		}
+				paidAt,
+				paidBy,
+			})));
+
+			// Audit log entries
+			await writeAuditLogBatch(pb, current.filter(Boolean).map((p: any) => ({
+				paymentId:  p.id,
+				fromStatus: p.status,
+				toStatus:   'paid',
+				changedBy:  paidBy,
+				amount:     p.amount,
+				recipient:  p.recipient,
+				notes:      `Marked paid on ${paidAt}`,
+			})));
+
+			return { success: true };
+		} catch (e: any) { return fail(400, { error: e.message }); }
 	},
 
-	delete: async ({ request, locals }) => {
+	markPending: async ({ request, locals }) => {
 		const pb = locals.pb;
-		const formData = await request.formData();
-		const id = formData.get('id') as string;
-
+		const fd = await request.formData();
+		const id = fd.get('id') as string;
 		try {
-			await pb.collection('pro_payments').delete(id);
+			const current = await pb.collection('pro_payments').getOne(id, { fields: 'id,status,amount,recipient' }).catch(() => null);
+			await pb.collection('pro_payments').update(id, { status: 'pending', paidAt: '' });
+
+			if (current) {
+				await writeAuditLog(pb, {
+					paymentId:  id,
+					fromStatus: current.status,
+					toStatus:   'pending',
+					changedBy:  'admin',
+					amount:     current.amount,
+					recipient:  current.recipient,
+					notes:      'Reverted to pending',
+				});
+			}
 			return { success: true };
-		} catch (error: any) {
-			console.error('Error deleting payment:', error);
-			return fail(400, { error: error.message });
-		}
-	}
+		} catch (e: any) { return fail(400, { error: e.message }); }
+	},
+
+	updatePayment: async ({ request, locals }) => {
+		const pb = locals.pb;
+		const fd = await request.formData();
+		const id = fd.get('id') as string;
+		const newStatus = fd.get('status') as string;
+		try {
+			const current = await pb.collection('pro_payments').getOne(id, { fields: 'id,status,amount,recipient' }).catch(() => null);
+
+			await pb.collection('pro_payments').update(id, {
+				amount:        parseFloat(fd.get('amount') as string),
+				status:        newStatus,
+				paymentMethod: fd.get('paymentMethod') as string,
+				transactionId: fd.get('transactionId') as string,
+				notes:         fd.get('notes') as string,
+				dueDate:       fd.get('dueDate') as string,
+			});
+
+			// Only log if status actually changed
+			if (current && current.status !== newStatus) {
+				await writeAuditLog(pb, {
+					paymentId:     id,
+					fromStatus:    current.status,
+					toStatus:      newStatus,
+					changedBy:     'admin',
+					amount:        parseFloat(fd.get('amount') as string),
+					recipient:     current.recipient,
+					paymentMethod: fd.get('paymentMethod') as string || undefined,
+					notes:         fd.get('notes') as string || undefined,
+				});
+			}
+			return { success: true };
+		} catch (e: any) { return fail(400, { error: e.message }); }
+	},
 };

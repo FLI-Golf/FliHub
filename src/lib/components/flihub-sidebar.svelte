@@ -66,6 +66,20 @@
 	};
 
 	const navGroups: NavGroup[] = [
+		// ── Manager portal — only visible to manager role ──
+		{
+			id: 'manager-portal',
+			title: 'My Portal',
+			labelClass: 'text-amber-600 dark:text-amber-400',
+			activeClass: 'bg-amber-50 dark:bg-amber-950/60 text-amber-900 dark:text-amber-100',
+			hoverClass: 'hover:bg-amber-50 dark:hover:bg-amber-950/40 hover:text-amber-900 dark:hover:text-amber-100',
+			borderClass: 'border-amber-500',
+			iconActiveClass: 'text-amber-600 dark:text-amber-400',
+			roles: ['manager'],
+			items: [
+				{ title: 'My Payments', url: '/dashboard/my-payments', icon: Wallet, roles: ['manager'] },
+			]
+		},
 		// ── Onboarding group — only visible to pro, manager, broadcaster ──
 		{
 			id: 'onboarding',
