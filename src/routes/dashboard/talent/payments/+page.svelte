@@ -1,328 +1,387 @@
 <script lang="ts">
-	import { Button } from '$lib/components/ui/button';
-	import { Badge } from '$lib/components/ui/badge';
-	import type { PageData } from './$types';
 	import { enhance } from '$app/forms';
+	import Card from '$lib/components/ui/card.svelte';
+	import type { PageData } from './$types';
+	import { DollarSign, Users, TrendingUp, Clock, CheckCircle, ChevronDown, ChevronUp, FileText, History } from 'lucide-svelte';
 
 	let { data }: { data: PageData } = $props();
 
-	let showCreateModal = $state(false);
-	let editingPayment = $state<any>(null);
+	const fmt = (n: number) =>
+		new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(n ?? 0);
 
-	const formatCurrency = (amount: number) => {
-		return new Intl.NumberFormat('en-US', {
-			style: 'currency',
-			currency: 'USD'
-		}).format(amount);
+	const statusColor = (s: string) =>
+		s === 'paid'    ? 'text-emerald-400 bg-emerald-950/40 border-emerald-700' :
+		s === 'pending' ? 'text-amber-400 bg-amber-950/40 border-amber-700' :
+		s === 'overdue' ? 'text-red-400 bg-red-950/40 border-red-700' :
+		                  'text-slate-400 bg-slate-800 border-slate-600';
+
+	const woStatusColor = (s: string) =>
+		s === 'paid' ? 'text-emerald-400 border-emerald-700' :
+		s === 'open' ? 'text-blue-400 border-blue-700' :
+		               'text-slate-400 border-slate-600';
+
+	let expandedGroup  = $state<string | null>(null);
+	let expandedAudit  = $state<string | null>(null);
+
+	const toggle      = (id: string) => expandedGroup = expandedGroup === id ? null : id;
+	const toggleAudit = (id: string) => expandedAudit = expandedAudit === id ? null : id;
+
+	const fmtDateTime = (iso: string) => {
+		if (!iso) return '—';
+		const d = new Date(iso);
+		return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+			+ ' ' + d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
 	};
-
-	const formatDate = (dateStr: string) => {
-		if (!dateStr) return 'N/A';
-		return new Date(dateStr).toLocaleDateString('en-US', {
-			year: 'numeric',
-			month: 'short',
-			day: 'numeric'
-		});
-	};
-
-	const getStatusColor = (status: string) => {
-		switch (status) {
-			case 'paid':
-				return 'bg-green-100 text-green-800';
-			case 'pending':
-				return 'bg-yellow-100 text-yellow-800';
-			case 'processing':
-				return 'bg-blue-100 text-blue-800';
-			case 'cancelled':
-				return 'bg-red-100 text-red-800';
-			default:
-				return 'bg-gray-100 text-gray-800';
-		}
-	};
-
-	const getPaymentTypeLabel = (type: string) => {
-		switch (type) {
-			case 'tournament':
-				return '🏆 Tournament';
-			case 'special_event':
-				return '⭐ Special Event';
-			case 'bonus':
-				return '💰 Bonus';
-			default:
-				return '📄 Other';
-		}
-	};
-
-	const openCreateModal = () => {
-		editingPayment = null;
-		showCreateModal = true;
-	};
-
-	const openEditModal = (payment: any) => {
-		editingPayment = payment;
-		showCreateModal = true;
-	};
-
-	const closeModal = () => {
-		showCreateModal = false;
-		editingPayment = null;
-	};
-
-	const totalPending = $derived(
-		data.payments
-			.filter((p) => p.status === 'pending')
-			.reduce((sum, p) => sum + p.amount, 0)
-	);
-
-	const totalPaid = $derived(
-		data.payments.filter((p) => p.status === 'paid').reduce((sum, p) => sum + p.amount, 0)
-	);
 </script>
 
-<div class="container mx-auto p-6 space-y-6">
-	<div class="flex items-center justify-between">
+<svelte:head><title>Pro & Manager Payments — FliHub</title></svelte:head>
+
+<div class="flex flex-col gap-6">
+
+	<!-- Header -->
+	<div class="flex items-center justify-between flex-wrap gap-3">
 		<div>
-			<h1 class="text-3xl font-bold">Pro Payments</h1>
-			<p class="text-muted-foreground">Manage payments to professional players</p>
+			<h1 class="text-3xl font-bold">Pro & Manager Payments</h1>
+			<p class="text-muted-foreground">Tournament earnings · per-pro breakdown · manager splits</p>
 		</div>
-		<div class="flex gap-2">
-			<Button href="/dashboard/talent">← Back to Pros</Button>
-			<Button onclick={openCreateModal}>Create Payment</Button>
+		<div class="flex items-center gap-3">
+			<a href="/dashboard/my-payments" class="text-xs px-3 py-1.5 rounded-lg bg-amber-900/30 hover:bg-amber-900/50 text-amber-400 border border-amber-800 transition-colors">
+				Preview Manager Portal
+			</a>
+			<a href="/dashboard/talent" class="text-sm text-slate-400 hover:text-white transition-colors">← Back to Talent</a>
 		</div>
 	</div>
 
-	<!-- Stats -->
-	<div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-		<div class="bg-slate-800 p-6 rounded-lg border border-slate-700">
-			<div class="text-sm text-slate-400">Total Pending</div>
-			<div class="text-3xl font-bold text-yellow-400">{formatCurrency(totalPending)}</div>
-		</div>
-		<div class="bg-slate-800 p-6 rounded-lg border border-slate-700">
-			<div class="text-sm text-slate-400">Total Paid</div>
-			<div class="text-3xl font-bold text-emerald-400">{formatCurrency(totalPaid)}</div>
-		</div>
-		<div class="bg-slate-800 p-6 rounded-lg border border-slate-700">
-			<div class="text-sm text-slate-400">Total Payments</div>
-			<div class="text-3xl font-bold text-slate-100">{data.payments.length}</div>
-		</div>
+	<!-- Summary strip -->
+	<div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+		{#each [
+			{ label: 'Total Gross',       value: fmt(data.summary.totalGross),     color: 'border-slate-600',   icon: DollarSign,  iconColor: 'text-slate-400' },
+			{ label: 'Total to Pros',     value: fmt(data.summary.totalNet),       color: 'border-emerald-700', icon: TrendingUp,  iconColor: 'text-emerald-400' },
+			{ label: 'Total to Managers', value: fmt(data.summary.totalManager),   color: 'border-amber-700',   icon: Users,       iconColor: 'text-amber-400' },
+			{ label: 'Pending — Pros',    value: fmt(data.summary.pendingPro),     color: 'border-amber-700',   icon: Clock,       iconColor: 'text-amber-400' },
+			{ label: 'Pending — Mgrs',    value: fmt(data.summary.pendingManager), color: 'border-amber-700',   icon: Clock,       iconColor: 'text-amber-400' },
+			{ label: 'Payment Records',   value: data.summary.totalPayments,       color: 'border-slate-600',   icon: CheckCircle, iconColor: 'text-slate-400' },
+		] as s}
+			<div class="rounded-xl border {s.color} bg-slate-800/40 px-4 py-3">
+				<svelte:component this={s.icon} class="size-4 {s.iconColor} mb-1" />
+				<p class="text-lg font-black text-white">{s.value}</p>
+				<p class="text-[10px] text-slate-500 uppercase tracking-wide">{s.label}</p>
+			</div>
+		{/each}
 	</div>
+
+	<!-- Work Orders strip -->
+	{#if data.workOrders && data.workOrders.length > 0}
+		<div>
+			<p class="text-xs text-slate-500 uppercase tracking-wide mb-2 flex items-center gap-1.5">
+				<FileText class="size-3" /> Work Orders
+			</p>
+			<div class="flex flex-wrap gap-2">
+				{#each data.workOrders as wo}
+					<a
+						href="/dashboard/work-orders"
+						class="flex items-center gap-2 rounded-lg border px-3 py-1.5 text-xs transition-colors hover:bg-slate-800 {woStatusColor(wo.status)} bg-slate-800/40"
+					>
+						<span class="font-mono font-semibold">{wo.work_order_number}</span>
+						<span class="text-slate-500">·</span>
+						<span class="text-slate-300">{wo.projectName}</span>
+						<span class="text-slate-500">·</span>
+						<span class="font-semibold">{fmt(wo.amount)}</span>
+						<span class="uppercase tracking-wide opacity-60 text-[10px]">{wo.status}</span>
+					</a>
+				{/each}
+			</div>
+		</div>
+	{/if}
 
 	<!-- Filters -->
-	<div class="bg-slate-800 rounded-lg border border-slate-700 p-4">
-		<div class="flex gap-4">
+	<div class="flex flex-wrap gap-3 items-end">
+		{#each [
+			{ label: 'Status',    param: 'status',    current: data.filterStatus,    options: [['','All'],['pending','Pending'],['paid','Paid'],['overdue','Overdue']] },
+			{ label: 'Recipient', param: 'recipient', current: data.filterRecipient, options: [['','All'],['pro','Pro'],['manager','Manager']] },
+		] as f}
 			<div>
-				<label class="text-sm font-medium text-slate-300">Status</label>
+				<p class="text-xs text-slate-400 mb-1">{f.label}</p>
 				<select
-					class="mt-1 block w-full rounded-md border border-slate-600 bg-slate-700 text-slate-100 px-3 py-2"
+					class="rounded-lg bg-slate-800 border border-slate-600 px-3 py-1.5 text-sm text-white focus:outline-none focus:ring-2 focus:ring-orange-500"
 					onchange={(e) => {
-						const status = e.currentTarget.value;
-						window.location.href = status
-							? `/dashboard/talent/payments?status=${status}`
-							: '/dashboard/talent/payments';
+						const u = new URL(window.location.href);
+						if (e.currentTarget.value) u.searchParams.set(f.param, e.currentTarget.value);
+						else u.searchParams.delete(f.param);
+						window.location.href = u.toString();
 					}}
 				>
-					<option value="">All Statuses</option>
-					<option value="pending" selected={data.currentStatus === 'pending'}>Pending</option>
-					<option value="processing" selected={data.currentStatus === 'processing'}
-						>Processing</option
-					>
-					<option value="paid" selected={data.currentStatus === 'paid'}>Paid</option>
-					<option value="cancelled" selected={data.currentStatus === 'cancelled'}>Cancelled</option>
-				</select>
-			</div>
-			<div>
-				<label class="text-sm font-medium text-slate-300">Pro</label>
-				<select
-					class="mt-1 block w-full rounded-md border border-slate-600 bg-slate-700 text-slate-100 px-3 py-2"
-					onchange={(e) => {
-						const proId = e.currentTarget.value;
-						window.location.href = proId
-							? `/dashboard/talent/payments?pro=${proId}`
-							: '/dashboard/talent/payments';
-					}}
-				>
-					<option value="">All Pros</option>
-					{#each data.pros as pro}
-						<option value={pro.id} selected={data.currentProId === pro.id}>{pro.name}</option>
+					{#each f.options as [val, label]}
+						<option value={val} selected={f.current === val}>{label}</option>
 					{/each}
 				</select>
 			</div>
+		{/each}
+		<div>
+			<p class="text-xs text-slate-400 mb-1">Season</p>
+			<select
+				class="rounded-lg bg-slate-800 border border-slate-600 px-3 py-1.5 text-sm text-white focus:outline-none focus:ring-2 focus:ring-orange-500"
+				onchange={(e) => {
+					const u = new URL(window.location.href);
+					if (e.currentTarget.value) u.searchParams.set('season', e.currentTarget.value);
+					else u.searchParams.delete('season');
+					window.location.href = u.toString();
+				}}
+			>
+				<option value="">All Seasons</option>
+				{#each data.seasons as s}
+					<option value={s.id} selected={data.filterSeason === s.id}>{s.name}</option>
+				{/each}
+			</select>
 		</div>
 	</div>
 
-	<!-- Payments List -->
-	<div class="rounded-lg border border-slate-700 overflow-hidden">
-		<div class="divide-y divide-slate-700">
-			{#each data.payments as payment, i}
-				<div class="p-4 {i % 2 === 0 ? 'bg-slate-800' : 'bg-slate-700/60'} hover:bg-slate-600/50 transition-colors">
-					<div class="flex items-start justify-between">
-						<div class="flex-1">
-							<div class="flex items-center gap-3">
-								<h3 class="text-lg font-semibold text-slate-100">
-									{payment.expand?.pro?.name || 'Unknown Pro'}
-								</h3>
-								<Badge class={getStatusColor(payment.status)}>{payment.status}</Badge>
-								<span class="text-sm text-slate-400">
-									{getPaymentTypeLabel(payment.paymentType)}
-								</span>
-							</div>
-							<div class="mt-2 space-y-1 text-sm text-slate-400">
-								{#if payment.tournament && payment.expand?.tournament}
-									<div>🏆 {payment.expand.tournament.name}</div>
-								{/if}
-								{#if payment.specialEvent && payment.expand?.specialEvent}
-									<div>⭐ {payment.expand.specialEvent.name}</div>
-								{/if}
-								{#if payment.description}
-									<div>{payment.description}</div>
-								{/if}
-								<div class="flex gap-4">
-									{#if payment.dueDate}
-										<span>Due: {formatDate(payment.dueDate)}</span>
-									{/if}
-									{#if payment.paymentDate}
-										<span>Paid: {formatDate(payment.paymentDate)}</span>
-									{/if}
-									{#if payment.paymentMethod}
-										<span>Method: {payment.paymentMethod}</span>
-									{/if}
-								</div>
-							</div>
-						</div>
-						<div class="text-right space-y-2">
-							<div class="text-2xl font-bold text-slate-100">{formatCurrency(payment.amount)}</div>
-							<div class="flex gap-2">
-								{#if payment.status === 'pending'}
-									<form method="POST" action="?/markPaid" use:enhance>
-										<input type="hidden" name="id" value={payment.id} />
-										<Button type="submit" size="sm" variant="outline">Mark Paid</Button>
-									</form>
-								{/if}
-								<Button onclick={() => openEditModal(payment)} variant="outline" size="sm"
-									>Edit</Button
-								>
-							</div>
-						</div>
+	<!-- Per-pro groups -->
+	{#if data.groups.length === 0}
+		<Card class="p-12 text-center text-slate-400">
+			No payment records yet. Add tournament results to auto-generate payments.
+		</Card>
+	{/if}
+
+	{#each data.groups as group}
+		{@const isOpen     = expandedGroup === group.pro.id}
+		{@const hasManager = group.pro.managerName && group.pro.managerCutPercentage > 0}
+
+		<div class="rounded-xl border border-slate-700 overflow-hidden">
+			<!-- Group header -->
+			<button
+				type="button"
+				onclick={() => toggle(group.pro.id)}
+				class="w-full flex items-center justify-between px-5 py-4 bg-slate-800/60 hover:bg-slate-800 transition-colors text-left"
+			>
+				<div>
+					<p class="font-bold text-white text-base">{group.pro.name}</p>
+					{#if hasManager}
+						<p class="text-xs text-amber-400">Manager: {group.pro.managerName} · {group.pro.managerCutPercentage}% cut</p>
+					{:else}
+						<p class="text-xs text-slate-500">No manager</p>
+					{/if}
+				</div>
+				<div class="flex items-center gap-6">
+					<div class="text-right hidden sm:block">
+						<p class="text-[10px] text-slate-500 uppercase tracking-wide">Pro net</p>
+						<p class="text-sm font-bold text-emerald-300">{fmt(group.totalNet)}</p>
+						{#if group.pendingPro > 0}
+							<p class="text-[10px] text-amber-400">{fmt(group.pendingPro)} pending</p>
+						{:else}
+							<p class="text-[10px] text-emerald-500">All paid ✓</p>
+						{/if}
 					</div>
+					{#if hasManager}
+						<div class="text-right hidden sm:block">
+							<p class="text-[10px] text-slate-500 uppercase tracking-wide">Manager</p>
+							<p class="text-sm font-bold text-amber-300">{fmt(group.totalManager)}</p>
+							{#if group.pendingManager > 0}
+								<p class="text-[10px] text-amber-400">{fmt(group.pendingManager)} pending</p>
+							{:else}
+								<p class="text-[10px] text-emerald-500">All paid ✓</p>
+							{/if}
+						</div>
+					{/if}
+					<div class="text-right hidden lg:block">
+						<p class="text-[10px] text-slate-500 uppercase tracking-wide">Gross</p>
+						<p class="text-sm font-bold text-slate-300">{fmt(group.totalGross)}</p>
+					</div>
+					<svelte:component this={isOpen ? ChevronUp : ChevronDown} class="size-4 text-slate-500 shrink-0" />
 				</div>
-			{:else}
-				<div class="p-8 text-center text-slate-400 bg-slate-800">
-					No payments found. Create your first payment to get started.
+			</button>
+
+			<!-- Expanded rows -->
+			{#if isOpen}
+				<div class="divide-y divide-slate-800">
+
+					<!-- Pro payments -->
+					{#if group.proPayments.length > 0}
+						<div class="px-5 py-3 bg-slate-900/40">
+							<p class="text-xs font-semibold text-emerald-400 uppercase tracking-wide mb-2">Pro Payments — {group.pro.name}</p>
+							<div class="space-y-2">
+								{#each group.proPayments as p}
+									{@const auditOpen = expandedAudit === p.id}
+									<div class="rounded-lg bg-slate-800/60 border border-slate-700 overflow-hidden">
+										<div class="flex items-center justify-between gap-3 px-4 py-2.5 flex-wrap">
+											<div class="flex-1 min-w-0">
+												<p class="text-sm text-slate-200 font-medium truncate">{p.description || p.expand?.tournament?.name || 'Payment'}</p>
+												<div class="flex items-center gap-2 flex-wrap mt-0.5">
+													<p class="text-xs text-slate-500">
+														Due: {p.dueDate || '—'}
+														{#if p.paidAt} · Paid: {p.paidAt}{/if}
+														{#if p.paymentMethod} · {p.paymentMethod}{/if}
+													</p>
+													{#if p._workOrder}
+														<span class="text-[10px] font-mono px-1.5 py-0.5 rounded border {woStatusColor(p._workOrder.status)} bg-slate-900/40">
+															{p._workOrder.work_order_number}
+														</span>
+													{/if}
+												</div>
+											</div>
+											<div class="flex items-center gap-2 shrink-0">
+												<div class="text-right">
+													<p class="text-sm font-bold text-emerald-300">{fmt(p.amount)}</p>
+													{#if p.grossAmount && p.grossAmount !== p.amount}
+														<p class="text-[10px] text-slate-500">Gross: {fmt(p.grossAmount)}</p>
+													{/if}
+												</div>
+												<span class="text-[10px] font-semibold px-2 py-0.5 rounded border {statusColor(p.status)}">{p.status}</span>
+												{#if p._auditLog?.length > 0}
+													<button type="button" onclick={() => toggleAudit(p.id)}
+														class="p-1 rounded transition-colors {auditOpen ? 'text-blue-400' : 'text-slate-500 hover:text-slate-300'}"
+														title="{p._auditLog.length} audit entries">
+														<History class="size-3.5" />
+													</button>
+												{/if}
+												{#if p.status !== 'paid'}
+													<form method="POST" action="?/markPaid" use:enhance>
+														<input type="hidden" name="id" value={p.id} />
+														<button type="submit" class="text-xs px-2.5 py-1 rounded-lg bg-emerald-900/50 hover:bg-emerald-800 text-emerald-300 border border-emerald-700 transition-colors">Mark Paid</button>
+													</form>
+												{:else}
+													<form method="POST" action="?/markPending" use:enhance>
+														<input type="hidden" name="id" value={p.id} />
+														<button type="submit" class="text-xs px-2.5 py-1 rounded-lg bg-slate-700 hover:bg-slate-600 text-slate-400 border border-slate-600 transition-colors">Undo</button>
+													</form>
+												{/if}
+											</div>
+										</div>
+										{#if auditOpen}
+											<div class="border-t border-slate-700 bg-slate-900/70 px-4 py-2.5">
+												<p class="text-[10px] text-slate-500 uppercase tracking-wide mb-2 flex items-center gap-1">
+													<History class="size-3" /> Audit Trail
+												</p>
+												<div class="space-y-1.5">
+													{#each p._auditLog as entry}
+														<div class="flex items-start gap-3 text-xs">
+															<span class="text-slate-600 font-mono text-[10px] shrink-0 pt-0.5">{fmtDateTime(entry.changedAt)}</span>
+															<span class="shrink-0">
+																<span class="text-slate-500">{entry.fromStatus || 'created'}</span>
+																<span class="text-slate-600 mx-1">→</span>
+																<span class="{entry.toStatus === 'paid' ? 'text-emerald-400' : entry.toStatus === 'pending' ? 'text-amber-400' : 'text-slate-300'} font-semibold">{entry.toStatus}</span>
+															</span>
+															{#if entry.changedBy && entry.changedBy !== 'system'}
+																<span class="text-slate-500">by {entry.changedBy}</span>
+															{/if}
+															{#if entry.notes}
+																<span class="text-slate-600 truncate">· {entry.notes}</span>
+															{/if}
+														</div>
+													{/each}
+												</div>
+											</div>
+										{/if}
+									</div>
+								{/each}
+							</div>
+						</div>
+					{/if}
+
+					<!-- Manager payments -->
+					{#if group.managerPayments.length > 0}
+						<div class="px-5 py-3 bg-slate-900/20">
+							<p class="text-xs font-semibold text-amber-400 uppercase tracking-wide mb-2">
+								Manager Payments — {group.pro.managerName}
+								{#if group.pro.managerEmail}<span class="text-slate-500 normal-case font-normal">· {group.pro.managerEmail}</span>{/if}
+							</p>
+							<div class="space-y-2">
+								{#each group.managerPayments as p}
+									{@const auditOpen = expandedAudit === p.id}
+									<div class="rounded-lg bg-amber-950/20 border border-amber-900/40 overflow-hidden">
+										<div class="flex items-center justify-between gap-3 px-4 py-2.5 flex-wrap">
+											<div class="flex-1 min-w-0">
+												<p class="text-sm text-slate-200 font-medium truncate">{p.description || p.expand?.tournament?.name || 'Manager cut'}</p>
+												<div class="flex items-center gap-2 flex-wrap mt-0.5">
+													<p class="text-xs text-slate-500">
+														{p.managerCutPercentage}% of {fmt(p.grossAmount ?? 0)}
+														· Due: {p.dueDate || '—'}
+														{#if p.paidAt} · Paid: {p.paidAt}{/if}
+													</p>
+													{#if p._workOrder}
+														<span class="text-[10px] font-mono px-1.5 py-0.5 rounded border {woStatusColor(p._workOrder.status)} bg-slate-900/40">
+															{p._workOrder.work_order_number}
+														</span>
+													{/if}
+												</div>
+											</div>
+											<div class="flex items-center gap-2 shrink-0">
+												<p class="text-sm font-bold text-amber-300">{fmt(p.amount)}</p>
+												<span class="text-[10px] font-semibold px-2 py-0.5 rounded border {statusColor(p.status)}">{p.status}</span>
+												{#if p._auditLog?.length > 0}
+													<button type="button" onclick={() => toggleAudit(p.id)}
+														class="p-1 rounded transition-colors {auditOpen ? 'text-blue-400' : 'text-slate-500 hover:text-slate-300'}"
+														title="{p._auditLog.length} audit entries">
+														<History class="size-3.5" />
+													</button>
+												{/if}
+												{#if p.status !== 'paid'}
+													<form method="POST" action="?/markPaid" use:enhance>
+														<input type="hidden" name="id" value={p.id} />
+														<button type="submit" class="text-xs px-2.5 py-1 rounded-lg bg-amber-900/50 hover:bg-amber-800 text-amber-300 border border-amber-700 transition-colors">Mark Paid</button>
+													</form>
+												{:else}
+													<form method="POST" action="?/markPending" use:enhance>
+														<input type="hidden" name="id" value={p.id} />
+														<button type="submit" class="text-xs px-2.5 py-1 rounded-lg bg-slate-700 hover:bg-slate-600 text-slate-400 border border-slate-600 transition-colors">Undo</button>
+													</form>
+												{/if}
+											</div>
+										</div>
+										{#if auditOpen}
+											<div class="border-t border-amber-900/30 bg-slate-900/70 px-4 py-2.5">
+												<p class="text-[10px] text-slate-500 uppercase tracking-wide mb-2 flex items-center gap-1">
+													<History class="size-3" /> Audit Trail
+												</p>
+												<div class="space-y-1.5">
+													{#each p._auditLog as entry}
+														<div class="flex items-start gap-3 text-xs">
+															<span class="text-slate-600 font-mono text-[10px] shrink-0 pt-0.5">{fmtDateTime(entry.changedAt)}</span>
+															<span class="shrink-0">
+																<span class="text-slate-500">{entry.fromStatus || 'created'}</span>
+																<span class="text-slate-600 mx-1">→</span>
+																<span class="{entry.toStatus === 'paid' ? 'text-emerald-400' : entry.toStatus === 'pending' ? 'text-amber-400' : 'text-slate-300'} font-semibold">{entry.toStatus}</span>
+															</span>
+															{#if entry.changedBy && entry.changedBy !== 'system'}
+																<span class="text-slate-500">by {entry.changedBy}</span>
+															{/if}
+															{#if entry.notes}
+																<span class="text-slate-600 truncate">· {entry.notes}</span>
+															{/if}
+														</div>
+													{/each}
+												</div>
+											</div>
+										{/if}
+									</div>
+								{/each}
+							</div>
+						</div>
+					{:else if hasManager}
+						<div class="px-5 py-3 bg-slate-900/20">
+							<p class="text-xs text-slate-500 italic">No manager payment records yet for {group.pro.managerName}.</p>
+						</div>
+					{/if}
+
+					<!-- Mark all pending -->
+					{#if group.pendingPro > 0 || group.pendingManager > 0}
+						<div class="px-5 py-3 bg-slate-900/60 flex items-center justify-between flex-wrap gap-2">
+							<p class="text-xs text-slate-400">
+								{fmt(group.pendingPro + group.pendingManager)} total pending for {group.pro.name}
+								{#if hasManager} + {group.pro.managerName}{/if}
+							</p>
+							<form method="POST" action="?/markPaid" use:enhance>
+								<input type="hidden" name="ids" value={[...group.proPayments, ...group.managerPayments].filter(p => p.status === 'pending').map(p => p.id).join(',')} />
+								<button type="submit" class="text-xs px-3 py-1.5 rounded-lg bg-emerald-900/50 hover:bg-emerald-800 text-emerald-300 border border-emerald-700 transition-colors font-semibold">
+									Mark All Paid
+								</button>
+							</form>
+						</div>
+					{/if}
+
 				</div>
-			{/each}
+			{/if}
 		</div>
-	</div>
+	{/each}
+
 </div>
-
-<!-- Create/Edit Modal -->
-{#if showCreateModal}
-	<div class="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
-		<div class="bg-slate-900 border border-slate-700 rounded-xl p-6 max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-			<h2 class="text-2xl font-bold text-slate-100 mb-4">
-				{editingPayment ? 'Edit Payment' : 'Create Payment'}
-			</h2>
-			<form method="POST" action="?/{editingPayment ? 'update' : 'create'}" use:enhance>
-				{#if editingPayment}
-					<input type="hidden" name="id" value={editingPayment.id} />
-				{/if}
-				<div class="space-y-4">
-					<div>
-						<label class="block text-xs font-medium text-slate-400 mb-1">Pro *</label>
-						<select name="pro" required class="w-full rounded-md border border-slate-600 bg-slate-800 text-slate-100 px-3 py-2 text-sm">
-							<option value="">Select Pro</option>
-							{#each data.pros as pro}
-								<option value={pro.id} selected={editingPayment?.pro === pro.id}>{pro.name}</option>
-							{/each}
-						</select>
-					</div>
-					<div>
-						<label class="block text-xs font-medium text-slate-400 mb-1">Payment Type *</label>
-						<select name="paymentType" required class="w-full rounded-md border border-slate-600 bg-slate-800 text-slate-100 px-3 py-2 text-sm">
-							<option value="tournament"    selected={editingPayment?.paymentType === 'tournament'}>Tournament</option>
-							<option value="special_event" selected={editingPayment?.paymentType === 'special_event'}>Special Event</option>
-							<option value="bonus"         selected={editingPayment?.paymentType === 'bonus'}>Bonus</option>
-							<option value="other"         selected={editingPayment?.paymentType === 'other'}>Other</option>
-						</select>
-					</div>
-					<div>
-						<label class="block text-xs font-medium text-slate-400 mb-1">Tournament (if applicable)</label>
-						<select name="tournament" class="w-full rounded-md border border-slate-600 bg-slate-800 text-slate-100 px-3 py-2 text-sm">
-							<option value="">None</option>
-							{#each data.tournaments as tournament}
-								<option value={tournament.id} selected={editingPayment?.tournament === tournament.id}>{tournament.name} (Season {tournament.season})</option>
-							{/each}
-						</select>
-					</div>
-					<div>
-						<label class="block text-xs font-medium text-slate-400 mb-1">Special Event (if applicable)</label>
-						<select name="specialEvent" class="w-full rounded-md border border-slate-600 bg-slate-800 text-slate-100 px-3 py-2 text-sm">
-							<option value="">None</option>
-							{#each data.specialEvents as event}
-								<option value={event.id} selected={editingPayment?.specialEvent === event.id}>{event.name}</option>
-							{/each}
-						</select>
-					</div>
-					<div>
-						<label class="block text-xs font-medium text-slate-400 mb-1">Amount *</label>
-						<input type="number" name="amount" value={editingPayment?.amount || 0} required min="0" step="0.01"
-							class="w-full rounded-md border border-slate-600 bg-slate-800 text-slate-100 px-3 py-2 text-sm" />
-					</div>
-					<div class="grid grid-cols-2 gap-4">
-						<div>
-							<label class="block text-xs font-medium text-slate-400 mb-1">Due Date</label>
-							<input type="date" name="dueDate" value={editingPayment?.dueDate || ''}
-								class="w-full rounded-md border border-slate-600 bg-slate-800 text-slate-100 px-3 py-2 text-sm" />
-						</div>
-						<div>
-							<label class="block text-xs font-medium text-slate-400 mb-1">Payment Date</label>
-							<input type="date" name="paymentDate" value={editingPayment?.paymentDate || ''}
-								class="w-full rounded-md border border-slate-600 bg-slate-800 text-slate-100 px-3 py-2 text-sm" />
-						</div>
-					</div>
-					<div class="grid grid-cols-2 gap-4">
-						<div>
-							<label class="block text-xs font-medium text-slate-400 mb-1">Status *</label>
-							<select name="status" required class="w-full rounded-md border border-slate-600 bg-slate-800 text-slate-100 px-3 py-2 text-sm">
-								<option value="pending"    selected={editingPayment?.status === 'pending'}>Pending</option>
-								<option value="processing" selected={editingPayment?.status === 'processing'}>Processing</option>
-								<option value="paid"       selected={editingPayment?.status === 'paid'}>Paid</option>
-								<option value="cancelled"  selected={editingPayment?.status === 'cancelled'}>Cancelled</option>
-							</select>
-						</div>
-						<div>
-							<label class="block text-xs font-medium text-slate-400 mb-1">Payment Method</label>
-							<select name="paymentMethod" class="w-full rounded-md border border-slate-600 bg-slate-800 text-slate-100 px-3 py-2 text-sm">
-								<option value="">Select Method</option>
-								<option value="bank_transfer" selected={editingPayment?.paymentMethod === 'bank_transfer'}>Bank Transfer</option>
-								<option value="check"         selected={editingPayment?.paymentMethod === 'check'}>Check</option>
-								<option value="paypal"        selected={editingPayment?.paymentMethod === 'paypal'}>PayPal</option>
-								<option value="venmo"         selected={editingPayment?.paymentMethod === 'venmo'}>Venmo</option>
-								<option value="zelle"         selected={editingPayment?.paymentMethod === 'zelle'}>Zelle</option>
-								<option value="other"         selected={editingPayment?.paymentMethod === 'other'}>Other</option>
-							</select>
-						</div>
-					</div>
-					<div>
-						<label class="block text-xs font-medium text-slate-400 mb-1">Transaction ID</label>
-						<input type="text" name="transactionId" value={editingPayment?.transactionId || ''}
-							class="w-full rounded-md border border-slate-600 bg-slate-800 text-slate-100 px-3 py-2 text-sm" />
-					</div>
-					<div>
-						<label class="block text-xs font-medium text-slate-400 mb-1">Description</label>
-						<textarea name="description" value={editingPayment?.description || ''} rows="2"
-							class="w-full rounded-md border border-slate-600 bg-slate-800 text-slate-100 px-3 py-2 text-sm"></textarea>
-					</div>
-					<div>
-						<label class="block text-xs font-medium text-slate-400 mb-1">Notes</label>
-						<textarea name="notes" value={editingPayment?.notes || ''} rows="3"
-							class="w-full rounded-md border border-slate-600 bg-slate-800 text-slate-100 px-3 py-2 text-sm"></textarea>
-					</div>
-				</div>
-				<div class="flex justify-end gap-2 mt-6">
-					<Button type="button" variant="outline" class="border-slate-600 text-slate-300 hover:bg-slate-700" onclick={closeModal}>Cancel</Button>
-					<Button type="submit" class="bg-emerald-600 hover:bg-emerald-700 text-white">{editingPayment ? 'Update' : 'Create'}</Button>
-				</div>
-			</form>
-		</div>
-	</div>
-{/if}

@@ -8,6 +8,18 @@
 
 	let showCreateModal = $state(false);
 	let editingTournament = $state<any>(null);
+	let activeTab = $state<'tournaments' | 'seasons'>('tournaments');
+	let showSeasonModal = $state(false);
+	let editingSeason = $state<any>(null);
+	let seasonSaving = $state(false);
+
+	const openSeasonModal = (s?: any) => { editingSeason = s ?? null; showSeasonModal = true; };
+	const closeSeasonModal = () => { showSeasonModal = false; editingSeason = null; };
+
+	const seasonStatusColor = (s: string) =>
+		s === 'active'    ? 'text-emerald-400 bg-emerald-950/40 border-emerald-700' :
+		s === 'completed' ? 'text-slate-400 bg-slate-800 border-slate-600' :
+		                    'text-amber-400 bg-amber-950/40 border-amber-700';
 
 	const formatCurrency = (amount: number) =>
 		new Intl.NumberFormat('en-US', {
@@ -54,10 +66,27 @@
 		</div>
 		<div class="flex gap-2">
 			<Button href="/dashboard/talent">← Back to Pros</Button>
-			<Button onclick={openCreateModal}>Create Tournament</Button>
+			{#if activeTab === 'seasons'}
+				<Button onclick={() => openSeasonModal()}>+ New Season</Button>
+			{:else}
+				<Button onclick={openCreateModal}>Create Tournament</Button>
+			{/if}
 		</div>
 	</div>
 
+	<!-- Tab toggle -->
+	<div class="flex gap-2">
+		<button
+			class="px-4 py-1.5 rounded-full text-sm font-semibold transition-colors {activeTab === 'tournaments' ? 'bg-orange-500 text-white' : 'bg-slate-800 text-slate-400 hover:text-white'}"
+			onclick={() => activeTab = 'tournaments'}
+		>Tournaments</button>
+		<button
+			class="px-4 py-1.5 rounded-full text-sm font-semibold transition-colors {activeTab === 'seasons' ? 'bg-orange-500 text-white' : 'bg-slate-800 text-slate-400 hover:text-white'}"
+			onclick={() => activeTab = 'seasons'}
+		>Season Settings</button>
+	</div>
+
+	{#if activeTab === 'tournaments'}
 	<!-- Filters -->
 	<div class="bg-slate-800 rounded-lg border border-slate-700 p-4">
 		<div class="flex gap-4">
@@ -73,8 +102,8 @@
 					}}
 				>
 					<option value="">All Seasons</option>
-					{#each data.seasons as season}
-						<option value={season} selected={data.currentSeason === season}>{season}</option>
+					{#each data.seasonRecords as s}
+						<option value={s.id} selected={data.currentSeasonId === s.id}>{s.name} ({s.year})</option>
 					{/each}
 				</select>
 			</div>
@@ -90,10 +119,10 @@
 					}}
 				>
 					<option value="">All Statuses</option>
-					<option value="scheduled"  selected={data.currentStatus === 'scheduled'}>Scheduled</option>
+					<option value="scheduled"   selected={data.currentStatus === 'scheduled'}>Scheduled</option>
 					<option value="in_progress" selected={data.currentStatus === 'in_progress'}>In Progress</option>
-					<option value="completed"  selected={data.currentStatus === 'completed'}>Completed</option>
-					<option value="cancelled"  selected={data.currentStatus === 'cancelled'}>Cancelled</option>
+					<option value="completed"   selected={data.currentStatus === 'completed'}>Completed</option>
+					<option value="cancelled"   selected={data.currentStatus === 'cancelled'}>Cancelled</option>
 				</select>
 			</div>
 		</div>
@@ -224,9 +253,169 @@
 			{/each}
 		</div>
 	</div>
+{/if} <!-- end activeTab === 'tournaments' -->
 </div>
 
 <!-- Create/Edit Modal -->
+
+<!-- ── Seasons Settings Tab ──────────────────────────────────────────────── -->
+{#if activeTab === 'seasons'}
+<div class="space-y-4">
+	{#if data.seasonRecords?.length === 0}
+		<div class="text-center py-12 text-slate-400">
+			No seasons yet. Click <strong>+ New Season</strong> to create one.
+		</div>
+	{/if}
+	{#each data.seasonRecords as s}
+		{@const cfg = { totalBudget: s.totalBudget, numberOfTournaments: s.numberOfTournaments, franchiseCutPercentage: s.franchiseCutPercentage ?? 0, numberOfPlacements: s.numberOfPlacements ?? 12 }}
+		<div class="bg-slate-800 border border-slate-700 rounded-xl p-5">
+			<div class="flex items-start justify-between mb-4">
+				<div>
+					<div class="flex items-center gap-3">
+						<h3 class="text-lg font-bold text-white">{s.name}</h3>
+						<span class="text-xs font-semibold px-2 py-0.5 rounded border {seasonStatusColor(s.status)}">{s.status}</span>
+					</div>
+					{#if s.notes}
+						<p class="text-sm text-slate-400 mt-1">{s.notes}</p>
+					{/if}
+				</div>
+				<div class="flex gap-2">
+					<button
+						onclick={() => openSeasonModal(s)}
+						class="text-xs px-3 py-1.5 rounded-lg bg-slate-700 hover:bg-slate-600 text-slate-300 border border-slate-600 transition-colors"
+					>Edit</button>
+					<form method="POST" action="?/deleteSeason" use:enhance>
+						<input type="hidden" name="id" value={s.id} />
+						<button
+							type="submit"
+							onclick={(e) => { if (!confirm('Delete this season? This will not delete tournaments.')) e.preventDefault(); }}
+							class="text-xs px-3 py-1.5 rounded-lg bg-red-950/40 hover:bg-red-900/60 text-red-400 border border-red-800 transition-colors"
+						>Delete</button>
+					</form>
+				</div>
+			</div>
+
+			<div class="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-3">
+				{#each [
+					{ label: 'Year',              value: s.year },
+					{ label: 'Total Budget',      value: new Intl.NumberFormat('en-US',{style:'currency',currency:'USD',maximumFractionDigits:0}).format(s.totalBudget) },
+					{ label: 'Tournaments',       value: s.numberOfTournaments },
+					{ label: 'Franchise Cut',     value: (s.franchiseCutPercentage ?? 0) + '%' },
+					{ label: 'Placements Paid',   value: s.numberOfPlacements ?? 12 },
+					{ label: 'Budget / Event',    value: new Intl.NumberFormat('en-US',{style:'currency',currency:'USD',maximumFractionDigits:0}).format(s.totalBudget / s.numberOfTournaments) },
+				] as stat}
+					<div class="rounded-lg bg-slate-900/50 border border-slate-700 px-3 py-2">
+						<p class="text-[10px] text-slate-500 uppercase tracking-wide">{stat.label}</p>
+						<p class="text-sm font-bold text-white mt-0.5">{stat.value}</p>
+					</div>
+				{/each}
+			</div>
+
+			{#if cfg.franchiseCutPercentage === 0}
+				<p class="text-xs text-emerald-400 mt-3">★ Franchise cut waived this season — 100% of prize pool goes to pros.</p>
+			{/if}
+		</div>
+	{/each}
+</div>
+{/if}
+
+<!-- ── Season Create / Edit Modal ────────────────────────────────────────── -->
+{#if showSeasonModal}
+	<div class="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
+		<div class="bg-slate-800 border border-slate-700 rounded-xl p-6 w-full max-w-lg">
+			<h2 class="text-xl font-bold mb-5">{editingSeason ? 'Edit Season' : 'New Season'}</h2>
+			<form
+				method="POST"
+				action={editingSeason ? '?/updateSeason' : '?/createSeason'}
+				use:enhance={() => {
+					seasonSaving = true;
+					return async ({ update }) => { seasonSaving = false; closeSeasonModal(); await update(); };
+				}}
+				class="space-y-4"
+			>
+				{#if editingSeason}
+					<input type="hidden" name="id" value={editingSeason.id} />
+				{/if}
+
+				<div class="grid grid-cols-2 gap-4">
+					<div>
+						<label class="block text-sm font-medium text-slate-300 mb-1">Season Name *</label>
+						<input type="text" name="name" required value={editingSeason?.name ?? ''}
+							placeholder="e.g. Season 2028"
+							class="w-full rounded-lg bg-slate-700 border border-slate-600 px-3 py-2 text-white text-sm focus:outline-none focus:ring-2 focus:ring-orange-500" />
+					</div>
+					<div>
+						<label class="block text-sm font-medium text-slate-300 mb-1">Year *</label>
+						<input type="number" name="year" required value={editingSeason?.year ?? new Date().getFullYear() + 1}
+							min="2024"
+							class="w-full rounded-lg bg-slate-700 border border-slate-600 px-3 py-2 text-white text-sm focus:outline-none focus:ring-2 focus:ring-orange-500" />
+					</div>
+				</div>
+
+				<div class="grid grid-cols-2 gap-4">
+					<div>
+						<label class="block text-sm font-medium text-slate-300 mb-1">Total Budget ($) *</label>
+						<input type="number" name="totalBudget" required value={editingSeason?.totalBudget ?? 4000000}
+							min="0" step="1000"
+							class="w-full rounded-lg bg-slate-700 border border-slate-600 px-3 py-2 text-white text-sm focus:outline-none focus:ring-2 focus:ring-orange-500" />
+					</div>
+					<div>
+						<label class="block text-sm font-medium text-slate-300 mb-1">Number of Tournaments *</label>
+						<input type="number" name="numberOfTournaments" required value={editingSeason?.numberOfTournaments ?? 6}
+							min="1" max="20"
+							class="w-full rounded-lg bg-slate-700 border border-slate-600 px-3 py-2 text-white text-sm focus:outline-none focus:ring-2 focus:ring-orange-500" />
+					</div>
+				</div>
+
+				<div class="grid grid-cols-2 gap-4">
+					<div>
+						<label class="block text-sm font-medium text-slate-300 mb-1">Franchise Cut %</label>
+						<input type="number" name="franchiseCutPercentage" value={editingSeason?.franchiseCutPercentage ?? 0}
+							min="0" max="100" step="1"
+							class="w-full rounded-lg bg-slate-700 border border-slate-600 px-3 py-2 text-white text-sm focus:outline-none focus:ring-2 focus:ring-orange-500" />
+						<p class="text-[10px] text-slate-500 mt-1">Set to 0 to waive franchise cut (Season 1)</p>
+					</div>
+					<div>
+						<label class="block text-sm font-medium text-slate-300 mb-1">Placements Paid</label>
+						<input type="number" name="numberOfPlacements" value={editingSeason?.numberOfPlacements ?? 12}
+							min="1" max="20"
+							class="w-full rounded-lg bg-slate-700 border border-slate-600 px-3 py-2 text-white text-sm focus:outline-none focus:ring-2 focus:ring-orange-500" />
+						<p class="text-[10px] text-slate-500 mt-1">Typically equals number of franchises</p>
+					</div>
+				</div>
+
+				<div class="grid grid-cols-2 gap-4">
+					<div>
+						<label class="block text-sm font-medium text-slate-300 mb-1">Status</label>
+						<select name="status" class="w-full rounded-lg bg-slate-700 border border-slate-600 px-3 py-2 text-white text-sm focus:outline-none focus:ring-2 focus:ring-orange-500">
+							{#each ['upcoming','active','completed'] as st}
+								<option value={st} selected={editingSeason?.status === st}>{st}</option>
+							{/each}
+						</select>
+					</div>
+					<div>
+						<label class="block text-sm font-medium text-slate-300 mb-1">Notes</label>
+						<input type="text" name="notes" value={editingSeason?.notes ?? ''}
+							placeholder="Optional notes"
+							class="w-full rounded-lg bg-slate-700 border border-slate-600 px-3 py-2 text-white text-sm focus:outline-none focus:ring-2 focus:ring-orange-500" />
+					</div>
+				</div>
+
+				<div class="flex gap-3 pt-2">
+					<button type="submit" disabled={seasonSaving}
+						class="flex-1 rounded-lg bg-orange-500 hover:bg-orange-600 disabled:opacity-50 text-white font-semibold py-2 text-sm transition-colors">
+						{seasonSaving ? 'Saving…' : editingSeason ? 'Update Season' : 'Create Season'}
+					</button>
+					<button type="button" onclick={closeSeasonModal}
+						class="flex-1 rounded-lg bg-slate-700 hover:bg-slate-600 text-slate-300 font-semibold py-2 text-sm transition-colors">
+						Cancel
+					</button>
+				</div>
+			</form>
+		</div>
+	</div>
+{/if}
+
 {#if showCreateModal}
 	<div class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
 		<div class="bg-slate-900 border border-slate-700 rounded-xl p-6 max-w-2xl w-full max-h-[90vh] overflow-y-auto">
@@ -251,14 +440,12 @@
 					<div class="grid grid-cols-2 gap-4">
 						<div>
 							<label class="block text-sm font-medium mb-1">Season *</label>
-							<input
-								type="number"
-								name="season"
-								value={editingTournament?.season || new Date().getFullYear()}
-								required
-								min="2024"
-								class="w-full rounded-md border border-gray-300 px-3 py-2"
-							/>
+							<select name="seasonRef" required class="w-full rounded-md border border-gray-300 px-3 py-2">
+								{#each data.seasonRecords as s}
+									<option value={s.id} selected={editingTournament?.seasonRef === s.id}>{s.name} ({s.year})</option>
+								{/each}
+							</select>
+							<input type="hidden" name="season" value={editingTournament?.season || new Date().getFullYear()} />
 						</div>
 						<div>
 							<label class="block text-sm font-medium mb-1">Tournament Number</label>

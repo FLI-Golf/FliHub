@@ -27,7 +27,11 @@ export const load: PageServerLoad = async ({ locals }) => {
 				throw redirect(303, `/dashboard/department/${userProfile.departmentId}`);
 			}
 
-			if (['pro', 'manager', 'broadcaster'].includes(userProfile?.role)) {
+			if (userProfile?.role === 'manager') {
+				throw redirect(303, '/dashboard/my-payments');
+			}
+
+			if (['pro', 'broadcaster'].includes(userProfile?.role)) {
 				throw redirect(303, '/dashboard/welcome');
 			}
 		}
@@ -89,8 +93,13 @@ export const actions: Actions = {
 					throw redirect(303, `/dashboard/department/${userProfile.departmentId}`);
 				}
 
-				// Pro, manager, broadcaster — send to welcome/onboarding flow
-				if (['pro', 'manager', 'broadcaster'].includes(userProfile.role)) {
+				// Manager — send to their payment portal
+				if (userProfile.role === 'manager') {
+					throw redirect(303, '/dashboard/my-payments');
+				}
+
+				// Pro, broadcaster — send to welcome/onboarding flow
+				if (['pro', 'broadcaster'].includes(userProfile.role)) {
 					// Check if they've already seen the welcome page
 					try {
 						const pb = locals.pb;

@@ -21,7 +21,7 @@ export class TournamentResultRepo extends BaseRepo<TournamentResultRecord> {
 		return await this.findAll({
 			filter: `tournament = '${tournamentId}'`,
 			sort: 'placement',
-			expand: 'pro'
+			expand: 'pro,franchise'
 		});
 	}
 

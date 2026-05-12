@@ -5,8 +5,13 @@ import { error, fail } from '@sveltejs/kit';
 import {
 	calculatePlacementPayouts,
 	calculateFranchisePayout,
+	seasonConfigFromRecord,
 	formatCurrency
 } from '$lib/domain/services/PayoutCalculator';
+import {
+	upsertTournamentWorkOrder,
+	writeAuditLog,
+} from '$lib/domain/services/PaymentWorkOrderService';
 
 export const load: PageServerLoad = async ({ locals, url, params }) => {
 	const ctx = await RequestContext.from(locals, url);
@@ -19,31 +24,66 @@ export const load: PageServerLoad = async ({ locals, url, params }) => {
 		const [results, franchises, pros, franchisePayouts] = await Promise.all([
 			resultRepo.findByTournament(params.id),
 			pb.collection('franchises').getFullList({ sort: 'name' }),
-			pb.collection('talent').getFullList({ sort: 'name' }),
-			pb
-				.collection('franchise_payouts')
+			pb.collection('talent').getFullList({ sort: 'name', fields: 'id,name,gender,managerName,managerCutPercentage,managerEmail' }),
+			pb.collection('franchise_payouts')
 				.getFullList({ filter: `tournament = '${params.id}'`, expand: 'franchise' })
 		]);
 
-		// Calculate payout structure
-		const franchiseCutPercentage = tournament.franchiseCutPercentage || 20;
+		// Load season record for config — fall back to tournament-level field if no relation set
+		let seasonRecord: any = null;
+		if (tournament.seasonRef) {
+			seasonRecord = await pb.collection('seasons').getOne(tournament.seasonRef).catch(() => null);
+		}
+
+		// Resolve settings: season record wins, then tournament field, then safe defaults
+		const franchiseCutPercentage = seasonRecord
+			? (seasonRecord.franchiseCutPercentage ?? 0)
+			: (tournament.franchiseCutPercentage ?? 20);
+		const numberOfPlacements = seasonRecord
+			? (seasonRecord.numberOfPlacements ?? franchises.length)
+			: franchises.length || 12;
+
 		const { franchiseCut, proCut } = calculateFranchisePayout(
 			tournament.prizePool,
 			franchiseCutPercentage
 		);
 		const divisionPurse = proCut / 2;
-		const payoutStructure = calculatePlacementPayouts(divisionPurse, 20, franchiseCutPercentage);
+		const payoutStructure = calculatePlacementPayouts(divisionPurse, numberOfPlacements, franchiseCutPercentage);
+
+		// Build a quick-lookup map of pro id → pro record (with manager fields)
+		const prosMap = Object.fromEntries(pros.map((p: any) => [p.id, p]));
+
+		// Enrich each result with manager earnings calculated from the pro's cut %
+		const enrichedResults = results.items.map((r: any) => {
+			const pro = prosMap[r.pro];
+			const managerCutPct = pro?.managerCutPercentage ?? 0;
+			const managerEarnings = managerCutPct > 0
+				? Math.round((r.proEarnings || 0) * (managerCutPct / 100) * 100) / 100
+				: (r.managerEarnings ?? 0);
+			const netProEarnings = (r.proEarnings || 0) - managerEarnings;
+			return {
+				...r,
+				managerEarnings,
+				managerCutPercentage: managerCutPct,
+				netProEarnings,
+				managerName:  pro?.managerName  ?? r.managerName  ?? null,
+				managerEmail: pro?.managerEmail ?? r.managerEmail ?? null,
+			};
+		});
 
 		return {
 			tournament,
-			results: results.items,
+			seasonRecord,
+			results: enrichedResults,
 			franchises,
 			pros,
+			prosMap,
 			franchisePayouts,
 			payoutStructure,
 			franchiseCut,
 			proCut,
-			divisionPurse
+			divisionPurse,
+			franchiseCutPercentage,
 		};
 	} catch (err) {
 		console.error('Error loading tournament:', err);
@@ -71,11 +111,21 @@ export const actions: Actions = {
 				franchiseId = pro.franchise;
 			}
 
-			// Calculate earnings
-			const franchiseCutPercentage = tournament.franchiseCutPercentage || 20;
+			// Resolve season config for earnings calculation
+			let seasonRec: any = null;
+			if (tournament.seasonRef) {
+				seasonRec = await pb.collection('seasons').getOne(tournament.seasonRef).catch(() => null);
+			}
+			const franchiseCutPercentage = seasonRec
+				? (seasonRec.franchiseCutPercentage ?? 0)
+				: (tournament.franchiseCutPercentage ?? 20);
+			const allFranchises = await pb.collection('franchises').getFullList({ fields: 'id' });
+			const numberOfPlacements = seasonRec
+				? (seasonRec.numberOfPlacements ?? allFranchises.length)
+				: allFranchises.length || 12;
 			const { proCut } = calculateFranchisePayout(tournament.prizePool, franchiseCutPercentage);
 			const divisionPurse = proCut / 2;
-			const payoutStructure = calculatePlacementPayouts(divisionPurse);
+			const payoutStructure = calculatePlacementPayouts(divisionPurse, numberOfPlacements, franchiseCutPercentage);
 			const placementPayout = payoutStructure.find((p) => p.placement === placement);
 
 			if (!placementPayout) {
@@ -83,9 +133,17 @@ export const actions: Actions = {
 			}
 
 			const proEarnings = placementPayout.amount;
-			const franchiseEarnings =
-				(proEarnings / (100 - franchiseCutPercentage)) * franchiseCutPercentage;
+			const franchiseEarnings = franchiseCutPercentage > 0
+				? (proEarnings / (100 - franchiseCutPercentage)) * franchiseCutPercentage
+				: 0;
 			const totalEarnings = proEarnings + franchiseEarnings;
+
+			// Manager cut — read from pro record
+			const managerCutPct = pro.managerCutPercentage ?? 0;
+			const managerEarnings = managerCutPct > 0
+				? Math.round(proEarnings * (managerCutPct / 100) * 100) / 100
+				: 0;
+			const netProEarnings = proEarnings - managerEarnings;
 
 			// Create result
 			const result = await pb.collection('tournament_results').create({
@@ -97,10 +155,82 @@ export const actions: Actions = {
 				earnings: totalEarnings,
 				franchiseEarnings,
 				proEarnings,
+				managerEarnings,
+				managerCutPercentage: managerCutPct,
+				netProEarnings,
 				score: formData.get('score') as string,
 				rounds: formData.get('rounds') ? parseInt(formData.get('rounds') as string) : undefined,
-				notes: formData.get('notes') as string
+				notes: formData.get('notes') as string,
 			});
+
+			// Auto-create payment records (draft status)
+			const paymentBase = {
+				pro:             proId,
+				tournament:      params.id,
+				tournamentResult: result.id,
+				season:          tournament.seasonRef || undefined,
+				paymentType:     'tournament_winnings',
+				grossAmount:     proEarnings,
+				netProAmount:    netProEarnings,
+				managerAmount:   managerEarnings,
+				managerCutPercentage: managerCutPct,
+				managerName:     pro.managerName  || undefined,
+				managerEmail:    pro.managerEmail || undefined,
+				status:          'pending',
+				dueDate:         (() => { const d = new Date(); d.setDate(d.getDate() + 14); return d.toISOString().split('T')[0]; })(),
+				description:     `${tournament.name} — ${division === 'mens' ? "Men's" : "Women's"} ${placement}${placement === 1 ? 'st' : placement === 2 ? 'nd' : placement === 3 ? 'rd' : 'th'} place`,
+			};
+
+			// Pro payment record
+			const proPaymentRecord = await pb.collection('pro_payments').create({
+				...paymentBase,
+				recipient: 'pro',
+				amount:    netProEarnings,
+			});
+
+			// Manager payment record (only if manager cut applies)
+			let managerPaymentRecord: any = null;
+			if (managerCutPct > 0 && managerEarnings > 0) {
+				managerPaymentRecord = await pb.collection('pro_payments').create({
+					...paymentBase,
+					recipient: 'manager',
+					amount:    managerEarnings,
+				});
+			}
+
+			// Upsert one work order per tournament covering all pro_payment records
+			const paymentIds = [proPaymentRecord.id, managerPaymentRecord?.id].filter(Boolean) as string[];
+			const workOrderId = await upsertTournamentWorkOrder(
+				pb,
+				params.id,
+				tournament.name,
+				proEarnings, // gross amount this result contributes
+				paymentIds,
+			);
+
+			// Audit log — initial 'created' → 'pending' entry for each payment
+			await writeAuditLog(pb, {
+				paymentId:  proPaymentRecord.id,
+				workOrderId,
+				fromStatus: 'created',
+				toStatus:   'pending',
+				changedBy:  'system',
+				amount:     netProEarnings,
+				recipient:  'pro',
+				notes:      paymentBase.description,
+			});
+			if (managerPaymentRecord) {
+				await writeAuditLog(pb, {
+					paymentId:  managerPaymentRecord.id,
+					workOrderId,
+					fromStatus: 'created',
+					toStatus:   'pending',
+					changedBy:  'system',
+					amount:     managerEarnings,
+					recipient:  'manager',
+					notes:      paymentBase.description,
+				});
+			}
 
 			// Update or create franchise payout
 			if (franchiseId) {
@@ -188,6 +318,29 @@ export const actions: Actions = {
 					}
 				}
 			}
+
+			// Remove auto-generated payment records for this result
+			const payments = await pb.collection('pro_payments').getFullList({
+				filter: `tournamentResult = '${id}'`, fields: 'id,amount,recipient,status',
+			}).catch(() => []);
+
+			// Remove these payment IDs from the tournament work order
+			if (payments.length > 0) {
+				const deletedIds = payments.map((p: any) => p.id);
+				const wo = await pb.collection('work_orders')
+					.getFirstListItem(`projectId = '${result.tournament}' && source = 'pro_payment'`)
+					.catch(() => null);
+				if (wo) {
+					const remaining = (wo.proPayment as string[] ?? []).filter(id => !deletedIds.includes(id));
+					const removedAmount = payments.reduce((s: number, p: any) => s + (p.amount ?? 0), 0);
+					await pb.collection('work_orders').update(wo.id, {
+						proPayment: remaining,
+						amount: Math.max(0, (wo.amount ?? 0) - removedAmount),
+					});
+				}
+			}
+
+			await Promise.all(payments.map((p: any) => pb.collection('pro_payments').delete(p.id)));
 
 			await pb.collection('tournament_results').delete(id);
 			return { success: true };

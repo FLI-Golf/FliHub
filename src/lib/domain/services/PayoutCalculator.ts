@@ -168,21 +168,25 @@ export function getTournamentPayoutStructure(
 // Season configurations
 // ---------------------------------------------------------------------------
 
-/** 2027 Season — $4 M total across 6 tournaments */
-export const SEASON_2027_CONFIG: SeasonConfig = {
-	year: 2027,
-	totalSeasonBudget: 4_000_000,
-	numberOfTournaments: 6,
-	franchiseCutPercentage: 20,
-	numberOfPlacements: 20
-};
-
 export function getSeasonPurses(config: SeasonConfig): TournamentPurse[] {
 	return calculateSeasonPurses(config.totalSeasonBudget, config.numberOfTournaments);
 }
 
-export function get2027SeasonPurses(): TournamentPurse[] {
-	return getSeasonPurses(SEASON_2027_CONFIG);
+/** Build a SeasonConfig from a seasons collection record. */
+export function seasonConfigFromRecord(record: {
+	year: number;
+	totalBudget: number;
+	numberOfTournaments: number;
+	franchiseCutPercentage?: number;
+	numberOfPlacements?: number;
+}): SeasonConfig {
+	return {
+		year: record.year,
+		totalSeasonBudget: record.totalBudget,
+		numberOfTournaments: record.numberOfTournaments,
+		franchiseCutPercentage: record.franchiseCutPercentage ?? 20,
+		numberOfPlacements: record.numberOfPlacements ?? 12,
+	};
 }
 
 // ---------------------------------------------------------------------------
@@ -198,34 +202,4 @@ export function formatCurrency(amount: number): string {
 	}).format(amount);
 }
 
-// ---------------------------------------------------------------------------
-// Validation helper
-// ---------------------------------------------------------------------------
 
-export function validatePayoutStructure(): void {
-	const purses = get2027SeasonPurses();
-
-	console.log('2027 Season Payout Structure');
-	console.log('============================\n');
-
-	let totalValidation = 0;
-
-	purses.forEach((purse) => {
-		console.log(`Tournament ${purse.tournamentNumber}:`);
-		console.log(`  Total: ${formatCurrency(purse.totalPurse)}`);
-		console.log(`  Men's Division: ${formatCurrency(purse.mensPurse)}`);
-		console.log(`  Women's Division: ${formatCurrency(purse.womensPurse)}`);
-
-		const structure = getTournamentPayoutStructure(purse.totalPurse);
-		console.log(`  Franchise Cut (20%): ${formatCurrency(structure.franchiseCut)}`);
-		console.log(`  Pro Cut (80%): ${formatCurrency(structure.proCut)}`);
-		console.log('');
-
-		totalValidation += purse.totalPurse;
-	});
-
-	console.log(`Total Season Purse: ${formatCurrency(totalValidation)}`);
-	console.log(
-		`Validation: ${Math.round(totalValidation) === SEASON_2027_CONFIG.totalSeasonBudget ? 'PASS' : 'FAIL'}`
-	);
-}

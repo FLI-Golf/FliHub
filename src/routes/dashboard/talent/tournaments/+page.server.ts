@@ -1,82 +1,65 @@
 import { RequestContext } from '$lib/infra/RequestContext';
 import type { PageServerLoad, Actions } from './$types';
 import { TournamentRepo } from '$lib/infra/pocketbase/repositories';
-import { fail, redirect } from '@sveltejs/kit';
+import { fail } from '@sveltejs/kit';
 import {
 	calculateSeasonPurses,
-	calculateFranchisePayout,
-	calculatePlacementPayouts,
-	SEASON_2027_CONFIG,
-	type SeasonConfig
+	seasonConfigFromRecord,
 } from '$lib/domain/services/PayoutCalculator';
 
 export const load: PageServerLoad = async ({ locals, url }) => {
 	const ctx = await RequestContext.from(locals, url);
-	const { pb, userId, profile: userProfile, role } = ctx;
-		const tournamentRepo = new TournamentRepo(pb);
+	const { pb } = ctx;
+	const tournamentRepo = new TournamentRepo(pb);
 
-	const season = url.searchParams.get('season');
-	const status = url.searchParams.get('status');
+	const seasonId = url.searchParams.get('season');
+	const status   = url.searchParams.get('status');
 
 	try {
+		// Load all season records
+		const seasonRecords = await pb.collection('seasons').getFullList({ sort: '-year' });
+
+		// Resolve active season record
+		let activeSeasonRecord: any = null;
+		if (seasonId) {
+			activeSeasonRecord = seasonRecords.find((s: any) => s.id === seasonId) ?? null;
+		}
+		if (!activeSeasonRecord && seasonRecords.length > 0) {
+			// Default to most recent (active first, then by year)
+			activeSeasonRecord =
+				seasonRecords.find((s: any) => s.status === 'active') ?? seasonRecords[0];
+		}
+
+		// Load tournaments filtered by season relation or status
 		let tournaments;
-		if (season) {
-			tournaments = await tournamentRepo.findBySeason(parseInt(season));
+		if (seasonId) {
+			tournaments = await tournamentRepo.findAll({
+				filter: `seasonRef = '${seasonId}'`,
+				sort: 'tournamentNumber',
+				expand: 'seasonRef',
+			});
 		} else if (status) {
 			tournaments = await tournamentRepo.findAll({
 				filter: `status = '${status}'`,
-				sort: '-startDate'
+				sort: '-startDate',
+				expand: 'seasonRef',
 			});
 		} else {
 			tournaments = await tournamentRepo.findAll({
 				sort: '-season,-tournamentNumber',
-				perPage: 100
+				expand: 'seasonRef',
+				perPage: 100,
 			});
 		}
 
-		const seasons = await pb.collection('tournaments').getFullList({
-			fields: 'season',
-			sort: '-season'
-		});
-		const uniqueSeasons = [...new Set(seasons.map((t: any) => t.season))] as number[];
-
-		// Build season budget map: use SEASON_2027_CONFIG for 2027, derive others from actual prize pools
-		const seasonBudgets: Record<number, { totalBudget: number; config: SeasonConfig }> = {};
-		for (const yr of uniqueSeasons) {
-			if (yr === 2027) {
-				seasonBudgets[yr] = {
-					totalBudget: SEASON_2027_CONFIG.totalSeasonBudget,
-					config: SEASON_2027_CONFIG
-				};
-			} else {
-				// Derive from actual tournament prize pools for other seasons
-				const seasonTournaments = await pb.collection('tournaments').getFullList({
-					filter: `season = ${yr}`,
-					fields: 'prizePool,tournamentNumber'
-				});
-				const total = seasonTournaments.reduce((s: number, t: any) => s + (t.prizePool || 0), 0);
-				seasonBudgets[yr] = {
-					totalBudget: total,
-					config: {
-						year: yr,
-						totalSeasonBudget: total,
-						numberOfTournaments: seasonTournaments.length,
-						franchiseCutPercentage: 20,
-						numberOfPlacements: 20
-					}
-				};
-			}
-		}
-
-		// For the active season filter (or default to most recent), compute progressive purse schedule
-		const activeSeason = season ? parseInt(season) : (uniqueSeasons[0] ?? null);
+		// Build purse schedule for the active season
 		let seasonPurseSchedule: Array<{ tournamentNumber: number; totalPurse: number; mensPurse: number; womensPurse: number }> = [];
 		let seasonBudget = 0;
 		let seasonFranchiseCut = 0;
 		let seasonProCut = 0;
 
-		if (activeSeason && seasonBudgets[activeSeason]) {
-			const cfg = seasonBudgets[activeSeason].config;
+		if (activeSeasonRecord) {
+			const cfg = seasonConfigFromRecord(activeSeasonRecord);
 			seasonBudget = cfg.totalSeasonBudget;
 			seasonPurseSchedule = calculateSeasonPurses(cfg.totalSeasonBudget, cfg.numberOfTournaments);
 			seasonFranchiseCut = seasonBudget * (cfg.franchiseCutPercentage / 100);
@@ -85,53 +68,109 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 
 		return {
 			tournaments: tournaments.items,
-			seasons: uniqueSeasons,
-			currentSeason: season ? parseInt(season) : null,
+			seasonRecords,
+			activeSeasonRecord,
+			currentSeasonId: seasonId,
 			currentStatus: status,
-			seasonBudgets,
-			activeSeason,
 			seasonBudget,
 			seasonFranchiseCut,
 			seasonProCut,
-			seasonPurseSchedule
+			seasonPurseSchedule,
 		};
-	} catch (error) {
-		console.error('Error loading tournaments:', error);
+	} catch (err) {
+		console.error('Error loading tournaments:', err);
 		return {
 			tournaments: [],
-			seasons: [],
-			currentSeason: null,
-			currentStatus: null
+			seasonRecords: [],
+			activeSeasonRecord: null,
+			currentSeasonId: null,
+			currentStatus: null,
+			seasonBudget: 0,
+			seasonFranchiseCut: 0,
+			seasonProCut: 0,
+			seasonPurseSchedule: [],
 		};
 	}
 };
 
 export const actions: Actions = {
+	// ── Season CRUD ───────────────────────────────────────────────────────────
+	createSeason: async ({ request, locals }) => {
+		const pb = locals.pb;
+		const fd = await request.formData();
+		try {
+			const record = await pb.collection('seasons').create({
+				name:                   fd.get('name') as string,
+				year:                   parseInt(fd.get('year') as string),
+				totalBudget:            parseFloat(fd.get('totalBudget') as string),
+				numberOfTournaments:    parseInt(fd.get('numberOfTournaments') as string),
+				franchiseCutPercentage: parseFloat(fd.get('franchiseCutPercentage') as string) || 0,
+				numberOfPlacements:     parseInt(fd.get('numberOfPlacements') as string) || 12,
+				status:                 (fd.get('status') as string) || 'upcoming',
+				notes:                  fd.get('notes') as string,
+			});
+			return { success: true, record };
+		} catch (err: any) {
+			return fail(400, { error: err.message });
+		}
+	},
+
+	updateSeason: async ({ request, locals }) => {
+		const pb = locals.pb;
+		const fd = await request.formData();
+		const id = fd.get('id') as string;
+		try {
+			const record = await pb.collection('seasons').update(id, {
+				name:                   fd.get('name') as string,
+				year:                   parseInt(fd.get('year') as string),
+				totalBudget:            parseFloat(fd.get('totalBudget') as string),
+				numberOfTournaments:    parseInt(fd.get('numberOfTournaments') as string),
+				franchiseCutPercentage: parseFloat(fd.get('franchiseCutPercentage') as string) || 0,
+				numberOfPlacements:     parseInt(fd.get('numberOfPlacements') as string) || 12,
+				status:                 fd.get('status') as string,
+				notes:                  fd.get('notes') as string,
+			});
+			return { success: true, record };
+		} catch (err: any) {
+			return fail(400, { error: err.message });
+		}
+	},
+
+	deleteSeason: async ({ request, locals }) => {
+		const pb = locals.pb;
+		const fd = await request.formData();
+		const id = fd.get('id') as string;
+		try {
+			await pb.collection('seasons').delete(id);
+			return { success: true };
+		} catch (err: any) {
+			return fail(400, { error: err.message });
+		}
+	},
+
+	// ── Tournament CRUD ───────────────────────────────────────────────────────
 	create: async ({ request, locals }) => {
 		const pb = locals.pb;
 		const formData = await request.formData();
-
+		const seasonRefVal = formData.get('seasonRef') as string;
 		const data = {
-			name: formData.get('name') as string,
-			season: parseInt(formData.get('season') as string),
-			tournamentNumber: formData.get('tournamentNumber')
-				? parseInt(formData.get('tournamentNumber') as string)
-				: undefined,
-			startDate: formData.get('startDate') as string,
-			endDate: formData.get('endDate') as string,
-			location: formData.get('location') as string,
-			venue: formData.get('venue') as string,
-			prizePool: parseFloat(formData.get('prizePool') as string),
-			status: (formData.get('status') as string) || 'scheduled',
-			description: formData.get('description') as string,
-			notes: formData.get('notes') as string
+			name:             formData.get('name') as string,
+			season:           parseInt(formData.get('season') as string),
+			seasonRef:        seasonRefVal || undefined,
+			tournamentNumber: formData.get('tournamentNumber') ? parseInt(formData.get('tournamentNumber') as string) : undefined,
+			startDate:        formData.get('startDate') as string,
+			endDate:          formData.get('endDate') as string,
+			location:         formData.get('location') as string,
+			venue:            formData.get('venue') as string,
+			prizePool:        parseFloat(formData.get('prizePool') as string),
+			status:           (formData.get('status') as string) || 'scheduled',
+			description:      formData.get('description') as string,
+			notes:            formData.get('notes') as string,
 		};
-
 		try {
 			const tournament = await pb.collection('tournaments').create(data);
 			return { success: true, tournament };
 		} catch (error: any) {
-			console.error('Error creating tournament:', error);
 			return fail(400, { error: error.message });
 		}
 	},
@@ -140,28 +179,25 @@ export const actions: Actions = {
 		const pb = locals.pb;
 		const formData = await request.formData();
 		const id = formData.get('id') as string;
-
+		const seasonRefVal = formData.get('seasonRef') as string;
 		const data = {
-			name: formData.get('name') as string,
-			season: parseInt(formData.get('season') as string),
-			tournamentNumber: formData.get('tournamentNumber')
-				? parseInt(formData.get('tournamentNumber') as string)
-				: undefined,
-			startDate: formData.get('startDate') as string,
-			endDate: formData.get('endDate') as string,
-			location: formData.get('location') as string,
-			venue: formData.get('venue') as string,
-			prizePool: parseFloat(formData.get('prizePool') as string),
-			status: formData.get('status') as string,
-			description: formData.get('description') as string,
-			notes: formData.get('notes') as string
+			name:             formData.get('name') as string,
+			season:           parseInt(formData.get('season') as string),
+			seasonRef:        seasonRefVal || undefined,
+			tournamentNumber: formData.get('tournamentNumber') ? parseInt(formData.get('tournamentNumber') as string) : undefined,
+			startDate:        formData.get('startDate') as string,
+			endDate:          formData.get('endDate') as string,
+			location:         formData.get('location') as string,
+			venue:            formData.get('venue') as string,
+			prizePool:        parseFloat(formData.get('prizePool') as string),
+			status:           formData.get('status') as string,
+			description:      formData.get('description') as string,
+			notes:            formData.get('notes') as string,
 		};
-
 		try {
 			const tournament = await pb.collection('tournaments').update(id, data);
 			return { success: true, tournament };
 		} catch (error: any) {
-			console.error('Error updating tournament:', error);
 			return fail(400, { error: error.message });
 		}
 	},

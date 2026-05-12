@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { enhance } from '$app/forms';
 	import { Button } from '$lib/components/ui/button';
 	import { Badge } from '$lib/components/ui/badge';
 	import * as Sheet from '$lib/components/ui/sheet/index.js';
@@ -9,6 +10,8 @@
 
 	let sheetOpen = $state(false);
 	let selectedGoal = $state<any>(null);
+	let updating = $state(false);
+	let updateSuccess = $state(false);
 
 	function openGoalSheet(goal: any) {
 		selectedGoal = goal;
@@ -249,20 +252,77 @@
 					</div>
 				{/if}
 
-				<!-- Progress -->
+				<!-- Progress (editable) -->
 				<div class="bg-slate-800 rounded-lg p-4">
 					<h4 class="text-sm font-medium text-slate-400 mb-3">Progress</h4>
 					<div class="w-full h-4 bg-slate-700 rounded-full overflow-hidden mb-2">
-						<div 
-							class="h-full rounded-full transition-all {progress >= 100 ? 'bg-green-500' : progress >= 50 ? 'bg-blue-500' : 'bg-amber-500'}" 
+						<div
+							class="h-full rounded-full transition-all {progress >= 100 ? 'bg-green-500' : progress >= 50 ? 'bg-blue-500' : 'bg-amber-500'}"
 							style="width: {progress}%"
 						></div>
 					</div>
-					<div class="flex justify-between text-sm">
+					<div class="flex justify-between text-sm mb-4">
 						<span class="text-slate-400">Current: {selectedGoal.currentValue || 0}</span>
 						<span class="text-white font-medium">{progress}%</span>
 						<span class="text-slate-400">Target: {selectedGoal.targetValue || 0}</span>
 					</div>
+
+					<!-- Inline update form -->
+					<form
+						method="POST"
+						action="?/updateProgress"
+						use:enhance={() => {
+							updating = true;
+							updateSuccess = false;
+							return async ({ result, update }) => {
+								updating = false;
+								if (result.type === 'success') {
+									updateSuccess = true;
+									// patch local state so bar updates immediately
+									const u = (result.data as any)?.updated;
+									if (u) {
+										selectedGoal = { ...selectedGoal, currentValue: u.currentValue, status: u.status };
+									}
+									setTimeout(() => updateSuccess = false, 2500);
+								}
+								await update({ reset: false });
+							};
+						}}
+						class="space-y-3"
+					>
+						<input type="hidden" name="id" value={selectedGoal.id} />
+						<div class="grid grid-cols-2 gap-3">
+							<div>
+								<label class="block text-xs text-slate-400 mb-1">Current Value</label>
+								<input
+									name="currentValue"
+									type="number"
+									min="0"
+									step="any"
+									value={selectedGoal.currentValue || 0}
+									class="w-full rounded-lg bg-slate-700 border border-slate-600 px-3 py-1.5 text-white text-sm focus:outline-none focus:ring-2 focus:ring-orange-500"
+								/>
+							</div>
+							<div>
+								<label class="block text-xs text-slate-400 mb-1">Status</label>
+								<select
+									name="status"
+									class="w-full rounded-lg bg-slate-700 border border-slate-600 px-3 py-1.5 text-white text-sm focus:outline-none focus:ring-2 focus:ring-orange-500"
+								>
+									{#each ['Not Started','In Progress','On Track','At Risk','Completed','On Hold'] as s}
+										<option value={s} selected={selectedGoal.status === s}>{s}</option>
+									{/each}
+								</select>
+							</div>
+						</div>
+						<button
+							type="submit"
+							disabled={updating}
+							class="w-full rounded-lg bg-orange-500 hover:bg-orange-600 disabled:opacity-50 text-white text-sm font-semibold py-1.5 transition-colors"
+						>
+							{updating ? 'Saving…' : updateSuccess ? '✅ Saved' : 'Update Progress'}
+						</button>
+					</form>
 				</div>
 
 				<!-- Details Grid -->
