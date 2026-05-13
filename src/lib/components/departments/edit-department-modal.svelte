@@ -25,16 +25,23 @@
 	let isSubmitting = $state(false);
 	let error = $state('');
 
-	// Initialize form data when department changes
+	// Initialize form data when department changes.
+	// department is a DepartmentDetailDTO — field names differ from the raw PB record.
 	$effect(() => {
 		if (department && open) {
 			formData = {
 				name: department.name || '',
 				code: department.code || '',
 				description: department.description || '',
-				department_annual_budget: department.department_annual_budget || 0,
+				// DTO exposes metrics.budget.total; fall back to direct field if raw record passed
+				department_annual_budget:
+					(department as any).department_annual_budget ??
+					department.metrics?.budget?.total ?? 0,
 				status: department.status || 'active',
-				headOfDepartment: department.headOfDepartment || ''
+				// DTO uses headOfDepartmentId; raw record uses headOfDepartment
+				headOfDepartment:
+					department.headOfDepartmentId ||
+					(department as any).headOfDepartment || ''
 			};
 		}
 	});
