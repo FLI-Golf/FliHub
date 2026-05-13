@@ -7,7 +7,7 @@ const ONBOARDING_ROLES = ['pro', 'manager', 'broadcaster'];
 export const load: PageServerLoad = async ({ locals, url }) => {
 	const ctx = await RequestContext.from(locals, url);
 
-	if (!ONBOARDING_ROLES.includes(ctx.role)) {
+	if (!ONBOARDING_ROLES.includes(ctx.role) && ctx.role !== 'admin') {
 		throw redirect(303, '/dashboard');
 	}
 

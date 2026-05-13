@@ -7,8 +7,8 @@ const ONBOARDING_ROLES = ['pro', 'manager', 'broadcaster'] as const;
 export const load: PageServerLoad = async ({ locals, url }) => {
 	const ctx = await RequestContext.from(locals, url);
 
-	// Only pro, manager, broadcaster roles see this page
-	if (!ONBOARDING_ROLES.includes(ctx.role as any)) {
+	// Only pro, manager, broadcaster (and admin previewing) see this page
+	if (!ONBOARDING_ROLES.includes(ctx.role as any) && ctx.role !== 'admin') {
 		throw redirect(303, '/dashboard');
 	}
 
