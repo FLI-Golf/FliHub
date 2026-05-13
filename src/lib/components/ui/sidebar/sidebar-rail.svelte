@@ -22,9 +22,13 @@
 	onclick={sidebar.toggle}
 	title="Toggle Sidebar"
 	class={cn(
-		// Wider hit area (w-6 instead of w-4), visible drag line, hover glow
+		// Only visible and interactive when sidebar is collapsed (state=collapsed)
+		// When expanded, pointer-events-none so scrolling the nav list works normally
 		"absolute inset-y-0 z-20 hidden w-6 -translate-x-1/2 transition-all ease-linear sm:flex",
 		"group-data-[side=left]:-end-3 group-data-[side=right]:start-0",
+		// Invisible + non-interactive while expanded; visible + interactive when collapsed
+		"group-data-[state=expanded]:pointer-events-none group-data-[state=expanded]:opacity-0",
+		"group-data-[state=collapsed]:pointer-events-auto group-data-[state=collapsed]:opacity-100",
 		// The visible line
 		"after:absolute after:inset-y-0 after:start-[calc(50%-1px)] after:w-[3px]",
 		"after:rounded-full after:transition-all after:duration-150",
