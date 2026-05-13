@@ -163,7 +163,8 @@
 				{ title: 'Tournaments', url: '/dashboard/talent/tournaments', icon: Trophy },
 				{ title: 'Special Events', url: '/dashboard/talent/special-events', icon: Medal },
 				{ title: 'Franchise Payouts', url: '/dashboard/talent/franchise-payouts', icon: DollarSign },
-				{ title: 'Pro Payments', url: '/dashboard/talent/payments', icon: Flag }
+				{ title: 'Pro Payments',   url: '/dashboard/talent/payments',       icon: Flag },
+				{ title: 'Payout Testing', url: '/dashboard/talent/payout-testing', icon: Zap },
 			]
 		},
 		{
