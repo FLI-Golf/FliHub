@@ -23,9 +23,9 @@
 		},
 		{
 			value: 'all',
-			label: 'All Phases',
-			sublabel: '',
-			dateRange: '2025 – 2031'
+			label: 'Combined',
+			sublabel: 'Both phases',
+			dateRange: '2026 onward'
 		}
 	];
 </script>
