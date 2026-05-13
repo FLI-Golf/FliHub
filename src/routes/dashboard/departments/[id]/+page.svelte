@@ -252,7 +252,7 @@
 							<p class="text-sm text-muted-foreground mb-1">Total Projects</p>
 							<p class="text-2xl font-bold">{phaseFilteredMetrics.projects.total}</p>
 							<p class="text-xs text-muted-foreground mt-1">
-								{dept.selectedPhase === 'all' ? 'All phases' : dept.selectedPhase === 'phase1' ? 'Phase 1' : dept.selectedPhase === 'phase2' ? 'Phase 2' : 'Phase 3'}
+								{dept.selectedPhase === 'all' ? 'All phases' : dept.selectedPhase === 'phase1' ? 'Phase 1 — Pre-Tournaments' : 'Phase 2 — Tournaments Live'}
 							</p>
 						</div>
 						<div class="flex size-12 items-center justify-center rounded-xl bg-emerald-100 dark:bg-emerald-900/30 transition-transform duration-200 group-hover/card:scale-110">
@@ -298,16 +298,12 @@
 						{/each}
 						<div class="h-px bg-slate-700 my-1"></div>
 						<div class="flex justify-between">
-							<span class="text-slate-400">Phase 1</span>
+							<span class="text-slate-400">Phase 1 — Pre-Tournaments</span>
 							<span class="font-semibold">{metrics.phases.phase1.projectCount}</span>
 						</div>
 						<div class="flex justify-between">
-							<span class="text-slate-400">Phase 2</span>
+							<span class="text-slate-400">Phase 2 — Tournaments Live</span>
 							<span class="font-semibold">{metrics.phases.phase2.projectCount}</span>
-						</div>
-						<div class="flex justify-between">
-							<span class="text-slate-400">Phase 3</span>
-							<span class="font-semibold">{metrics.phases.phase3.projectCount}</span>
 						</div>
 					</div>
 				</div>
@@ -381,7 +377,7 @@
 							<p class="text-sm text-muted-foreground mb-1">Actual Spent</p>
 							<p class="text-2xl font-bold">{formatCurrency(phaseFilteredMetrics.budget.actual)}</p>
 							<p class="text-xs text-muted-foreground mt-1">
-								{dept.selectedPhase === 'all' ? 'All phases' : dept.selectedPhase === 'phase1' ? 'Phase 1' : dept.selectedPhase === 'phase2' ? 'Phase 2' : 'Phase 3'}
+								{dept.selectedPhase === 'all' ? 'All phases' : dept.selectedPhase === 'phase1' ? 'Phase 1 — Pre-Tournaments' : 'Phase 2 — Tournaments Live'}
 							</p>
 						</div>
 						<div class="flex size-12 items-center justify-center rounded-xl {spendPct > 90 ? 'bg-red-100 dark:bg-red-900/30' : spendPct > 70 ? 'bg-yellow-100 dark:bg-yellow-900/30' : 'bg-violet-100 dark:bg-violet-900/30'} transition-transform duration-200 group-hover/card:scale-110">
@@ -536,7 +532,7 @@
 			Financial Overview
 			{#if dept.selectedPhase !== 'all'}
 				<span class="text-lg font-normal text-muted-foreground">
-					- {dept.selectedPhase === 'phase1' ? 'Phase 1' : dept.selectedPhase === 'phase2' ? 'Phase 2' : 'Phase 3'}
+					- {dept.selectedPhase === 'phase1' ? 'Phase 1 — Pre-Tournaments' : 'Phase 2 — Tournaments Live'}
 				</span>
 			{/if}
 		</h2>
@@ -616,7 +612,7 @@
 			Projects ({phaseFilteredProjects.length})
 			{#if dept.selectedPhase !== 'all'}
 				<span class="text-lg font-normal text-muted-foreground">
-					- {dept.selectedPhase === 'phase1' ? 'Phase 1' : dept.selectedPhase === 'phase2' ? 'Phase 2' : 'Phase 3'}
+					- {dept.selectedPhase === 'phase1' ? 'Phase 1 — Pre-Tournaments' : 'Phase 2 — Tournaments Live'}
 				</span>
 			{/if}
 		</h2>

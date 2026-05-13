@@ -9,25 +9,23 @@
 	let { activePhase = 'all', onPhaseChange }: Props = $props();
 
 	const phases = [
-		{ 
-			value: 'phase1', 
+		{
+			value: 'phase1',
 			label: 'Phase 1',
-			dateRange: 'Jan - Sep 2026'
+			sublabel: 'Pre-Tournaments',
+			dateRange: 'Funded Jun 15, 2025'
 		},
-		{ 
-			value: 'phase2', 
+		{
+			value: 'phase2',
 			label: 'Phase 2',
-			dateRange: 'Oct 2026 - Mar 2027'
+			sublabel: 'Tournaments Live',
+			dateRange: '2026 onward'
 		},
-		{ 
-			value: 'phase3', 
-			label: 'Phase 3',
-			dateRange: 'Apr - Dec 2027'
-		},
-		{ 
-			value: 'all', 
+		{
+			value: 'all',
 			label: 'All Phases',
-			dateRange: '2026 - 2027'
+			sublabel: '',
+			dateRange: '2025 – 2031'
 		}
 	];
 </script>
@@ -49,7 +47,7 @@
 				style={activePhase === phase.value ? 'border-bottom: 2px solid hsl(var(--card))' : ''}
 			>
 				<div class="flex flex-col items-start gap-0.5">
-					<span class="font-semibold">{phase.label}</span>
+					<span class="font-semibold">{phase.label}{#if phase.sublabel} — {phase.sublabel}{/if}</span>
 					<span class="text-xs opacity-70">{phase.dateRange}</span>
 				</div>
 				{#if activePhase === phase.value}

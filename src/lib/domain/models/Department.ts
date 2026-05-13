@@ -20,7 +20,7 @@ export interface ProjectSummary {
 	id: string;
 	name: string;
 	status: ProjectStatus;
-	phase: 'phase1' | 'phase2' | 'phase3';
+	phase: 'phase1' | 'phase2';
 	budget: number;
 	actual: number;
 	forecasted: number;
@@ -71,7 +71,6 @@ export interface DepartmentMetrics {
 	phases: {
 		phase1: PhaseMetrics;
 		phase2: PhaseMetrics;
-		phase3: PhaseMetrics;
 	};
 }
 
@@ -112,20 +111,22 @@ export class Department {
 	}
 
 	/** Assign a project to a phase based on fiscal year / name convention */
-	static getProjectPhase(project: ProjectSummary): 'phase1' | 'phase2' | 'phase3' {
+	static getProjectPhase(project: ProjectSummary): 'phase1' | 'phase2' {
 		const name = (project.name || '').toLowerCase();
 		const fy = (project.fiscalYear || '').toLowerCase();
-		if (name.includes('phase 3') || name.includes('phase3') || fy.includes('phase3')) return 'phase3';
-		if (name.includes('phase 2') || name.includes('phase2') || fy.includes('phase2')) return 'phase2';
+		// Phase 2 = Tournaments Live (any project tagged phase2, phase3, or tournament)
+		if (name.includes('phase 2') || name.includes('phase2') || fy.includes('phase2') ||
+		    name.includes('phase 3') || name.includes('phase3') || fy.includes('phase3') ||
+		    name.includes('tournament')) return 'phase2';
 		return 'phase1';
 	}
 
 	/** Full metrics snapshot — computed once, consumed everywhere */
 	computeMetrics(): DepartmentMetrics {
 		const totalBudget = this.effectiveBudget;
-		const projectBudgets = this.projects.reduce((s, p) => s + (p.budget || 0), 0);
-		const actualExpenses = this.projects.reduce((s, p) => s + (p.actual || 0), 0);
-		const forecastedExpenses = this.projects.reduce((s, p) => s + (p.forecasted || 0), 0);
+		const projectBudgets = this.projects.reduce((s, p) => s + Math.max(0, p.budget || 0), 0);
+		const actualExpenses = this.projects.reduce((s, p) => s + Math.max(0, p.actual || 0), 0);
+		const forecastedExpenses = this.projects.reduce((s, p) => s + Math.max(0, p.forecasted || 0), 0);
 
 		const projectsByStatus = {
 			in_progress: 0, planned: 0, completed: 0, draft: 0, cancelled: 0
@@ -151,23 +152,23 @@ export class Department {
 			this.projects.map(p => [p.id, Department.getProjectPhase(p)])
 		);
 
-		const phaseExpenseActual = { phase1: 0, phase2: 0, phase3: 0 };
-		const phaseExpenseForecasted = { phase1: 0, phase2: 0, phase3: 0 };
+		const phaseExpenseActual = { phase1: 0, phase2: 0 };
+		const phaseExpenseForecasted = { phase1: 0, phase2: 0 };
 		for (const e of this.expenses) {
 			const ph = (projectPhaseMap.get(e.projectId ?? '') ?? 'phase1') as keyof typeof phaseExpenseActual;
 			if (e.status === 'approved' || e.status === 'paid') phaseExpenseActual[ph] += e.amount || 0;
 			if (['submitted', 'approved', 'paid'].includes(e.status)) phaseExpenseForecasted[ph] += e.amount || 0;
 		}
 
-		const buildPhase = (phase: 'phase1' | 'phase2' | 'phase3'): PhaseMetrics => {
+		const buildPhase = (phase: 'phase1' | 'phase2'): PhaseMetrics => {
 			const ps = this.projects.filter(p => Department.getProjectPhase(p) === phase);
 			const pCount = ps.length;
 			const pBudget = totalBudget * (pCount / Math.max(this.projects.length, 1));
 			return {
 				projectCount: pCount,
 				budget: pBudget,
-				actual: ps.reduce((s, p) => s + (p.actual || 0), 0) + phaseExpenseActual[phase],
-				forecasted: ps.reduce((s, p) => s + (p.forecasted || 0), 0) + phaseExpenseForecasted[phase]
+				actual: Math.max(0, ps.reduce((s, p) => s + (p.actual || 0), 0) + phaseExpenseActual[phase]),
+				forecasted: Math.max(0, ps.reduce((s, p) => s + (p.forecasted || 0), 0) + phaseExpenseForecasted[phase])
 			};
 		};
 
@@ -195,7 +196,7 @@ export class Department {
 	}
 
 	/** Metrics filtered to a single phase */
-	metricsForPhase(phase: 'phase1' | 'phase2' | 'phase3' | 'all'): DepartmentMetrics {
+	metricsForPhase(phase: 'phase1' | 'phase2' | 'all'): DepartmentMetrics {
 		if (phase === 'all') return this.computeMetrics();
 		const phaseProjects = this.projects.filter(p => Department.getProjectPhase(p) === phase);
 		const phaseExpenses = this.expenses.filter(

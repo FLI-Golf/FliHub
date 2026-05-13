@@ -15,12 +15,12 @@ import type { DepartmentMetrics, PhaseMetrics } from '../models/Department';
 
 const CONTEXT_KEY = Symbol('department');
 
-export type PhaseFilter = 'all' | 'phase1' | 'phase2' | 'phase3';
+export type PhaseFilter = 'all' | 'phase1' | 'phase2';
 
 export class DepartmentProvider {
 	// Reactive state via Svelte 5 runes
 	readonly department = $state<DepartmentDetailDTO | null>(null);
-	selectedPhase = $state<PhaseFilter>('phase1');
+	selectedPhase = $state<PhaseFilter>('all');
 	activeTab = $state<string>('overview');
 	isLoading = $state(false);
 	error = $state<string | null>(null);
