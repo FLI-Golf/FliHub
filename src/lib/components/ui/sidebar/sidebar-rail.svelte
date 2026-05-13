@@ -22,12 +22,20 @@
 	onclick={sidebar.toggle}
 	title="Toggle Sidebar"
 	class={cn(
-		"hover:after:bg-sidebar-border absolute inset-y-0 z-20 hidden w-4 -translate-x-1/2 transition-all ease-linear group-data-[side=left]:-end-4 group-data-[side=right]:start-0 after:absolute after:inset-y-0 after:start-[calc(1/2*100%-1px)] after:w-[2px] sm:flex",
+		// Wider hit area (w-6 instead of w-4), visible drag line, hover glow
+		"absolute inset-y-0 z-20 hidden w-6 -translate-x-1/2 transition-all ease-linear sm:flex",
+		"group-data-[side=left]:-end-3 group-data-[side=right]:start-0",
+		// The visible line
+		"after:absolute after:inset-y-0 after:start-[calc(50%-1px)] after:w-[3px]",
+		"after:rounded-full after:transition-all after:duration-150",
+		"after:bg-sidebar-border hover:after:bg-primary/60 hover:after:w-[4px]",
+		// Cursors
 		"in-data-[side=left]:cursor-w-resize in-data-[side=right]:cursor-e-resize",
 		"[[data-side=left][data-state=collapsed]_&]:cursor-e-resize [[data-side=right][data-state=collapsed]_&]:cursor-w-resize",
-		"hover:group-data-[collapsible=offcanvas]:bg-sidebar group-data-[collapsible=offcanvas]:translate-x-0 group-data-[collapsible=offcanvas]:after:start-full",
-		"[[data-side=left][data-collapsible=offcanvas]_&]:-end-2",
-		"[[data-side=right][data-collapsible=offcanvas]_&]:-start-2",
+		// Offcanvas adjustments
+		"hover:group-data-[collapsible=offcanvas]:bg-sidebar/20 group-data-[collapsible=offcanvas]:translate-x-0 group-data-[collapsible=offcanvas]:after:start-full",
+		"[[data-side=left][data-collapsible=offcanvas]_&]:-end-3",
+		"[[data-side=right][data-collapsible=offcanvas]_&]:-start-3",
 		className
 	)}
 	{...restProps}
