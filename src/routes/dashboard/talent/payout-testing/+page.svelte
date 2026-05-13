@@ -236,53 +236,56 @@
 						{/if}
 					</div>
 
-					<!-- Division tables -->
-					{#each ['MPO', 'FPO'] as division}
-						{@const divRows = t.proBreakdown.filter((r: any) => r.division === division)}
-						{#if divRows.length > 0}
-							<div class="px-5 py-3 bg-slate-900/30">
-								<p class="text-xs font-bold {division === 'MPO' ? 'text-blue-400' : 'text-pink-400'} uppercase tracking-wide mb-2">
-									{division === 'MPO' ? "Men's (MPO)" : "Women's (FPO)"}
-								</p>
-								<div class="overflow-x-auto">
-									<table class="w-full text-xs">
-										<thead>
-											<tr class="text-slate-500 border-b border-slate-800">
-												<th class="text-left py-1.5 pr-3 font-medium">#</th>
-												<th class="text-left py-1.5 pr-3 font-medium">Pro</th>
-												<th class="text-right py-1.5 pr-3 font-medium">Gross</th>
-												<th class="text-right py-1.5 pr-3 font-medium">Mgr%</th>
-												<th class="text-right py-1.5 pr-3 font-medium">Net</th>
-												<th class="text-right py-1.5 pr-3 font-medium">Mgr $</th>
-												<th class="text-right py-1.5 font-medium">Status</th>
-											</tr>
-										</thead>
-										<tbody class="divide-y divide-slate-800/50">
-											{#each divRows as row}
-												<tr class="hover:bg-slate-800/30 transition-colors">
-													<td class="py-1.5 pr-3 font-black {row.placement <= 3 ? 'text-amber-400' : 'text-slate-500'}">#{row.placement}</td>
-													<td class="py-1.5 pr-3">
-														<span class="text-slate-200 font-medium">{row.proName}</span>
-														{#if row.managerName}<span class="text-slate-500 ml-1.5 text-[10px]">· {row.managerName}</span>{/if}
-													</td>
-													<td class="py-1.5 pr-3 text-right text-slate-300">{fmtFull(row.proEarnings)}</td>
-													<td class="py-1.5 pr-3 text-right">
-														{#if row.managerCutPercentage > 0}<span class="text-amber-400">{row.managerCutPercentage}%</span>{:else}<span class="text-slate-600">—</span>{/if}
-													</td>
-													<td class="py-1.5 pr-3 text-right font-semibold text-emerald-300">{fmtFull(row.proPayment?.amount ?? 0)}</td>
-													<td class="py-1.5 pr-3 text-right text-amber-300">{row.mgrPayment ? fmtFull(row.mgrPayment.amount) : '—'}</td>
-													<td class="py-1.5 text-right">
-														{#if row.proPayment}
-															<span class="text-[10px] font-semibold px-1.5 py-0.5 rounded border {statusColor(row.proPayment.status)}">{row.proPayment.status}</span>
-														{/if}
-													</td>
-												</tr>
-											{/each}
-										</tbody>
-									</table>
+					<!-- Results by franchise -->
+					{#each t.byFranchise as group}
+						{@const groupGross = group.rows.reduce((s: number, r: any) => s + (r.proEarnings || 0), 0)}
+						{@const groupMgr   = group.rows.reduce((s: number, r: any) => s + (r.managerEarnings || 0), 0)}
+						{@const groupNet   = groupGross - groupMgr}
+						<div class="border-t border-slate-800">
+							<!-- Franchise header -->
+							<div class="px-5 py-2 bg-slate-900/50 flex items-center justify-between">
+								<div class="flex items-center gap-2">
+									<span class="size-5 rounded bg-purple-900/60 border border-purple-700/50 flex items-center justify-center text-[9px] font-black text-purple-300">{group.rows.length}</span>
+									<span class="text-xs font-bold text-purple-300">{group.franchiseName}</span>
+								</div>
+								<div class="flex items-center gap-4 text-xs">
+									<span class="text-slate-500">Gross <span class="text-slate-300 font-semibold">{fmt(groupGross)}</span></span>
+									{#if groupMgr > 0}<span class="text-slate-500">Mgr <span class="text-amber-300">−{fmt(groupMgr)}</span></span>{/if}
+									<span class="text-slate-500">Net <span class="text-emerald-300 font-bold">{fmt(groupNet)}</span></span>
 								</div>
 							</div>
-						{/if}
+							<!-- Pro rows -->
+							<div class="overflow-x-auto">
+								<table class="w-full text-xs">
+									<tbody class="divide-y divide-slate-800/40">
+										{#each group.rows as row}
+											<tr class="hover:bg-slate-800/20 transition-colors">
+												<td class="py-1.5 pl-5 pr-3 font-black w-10 {row.placement <= 3 ? 'text-amber-400' : 'text-slate-600'}">#{row.placement}</td>
+												<td class="py-1.5 pr-3">
+													<span class="text-slate-200 font-medium">{row.proName}</span>
+													<span class="text-slate-600 ml-1.5 text-[10px]">{row.division}</span>
+												</td>
+												<td class="py-1.5 pr-3 text-right text-slate-300">{fmtFull(row.proEarnings)}</td>
+												<td class="py-1.5 pr-3 text-right">
+													{#if row.managerCutPercentage > 0}
+														<span class="text-amber-400">{row.managerCutPercentage}%</span>
+													{:else}
+														<span class="text-slate-700">—</span>
+													{/if}
+												</td>
+												<td class="py-1.5 pr-3 text-right font-semibold text-emerald-300">{fmtFull(row.netProEarnings)}</td>
+												<td class="py-1.5 pr-3 text-right text-amber-300">{row.mgrPayment ? fmtFull(row.mgrPayment.amount) : '—'}</td>
+												<td class="py-1.5 pr-5 text-right">
+													{#if row.proPayment}
+														<span class="text-[10px] font-semibold px-1.5 py-0.5 rounded border {statusColor(row.proPayment.status)}">{row.proPayment.status}</span>
+													{/if}
+												</td>
+											</tr>
+										{/each}
+									</tbody>
+								</table>
+							</div>
+						</div>
 					{/each}
 
 					<!-- Payment records accordion -->
@@ -292,7 +295,7 @@
 						</p>
 						<div class="space-y-1.5">
 							{#each t.proBreakdown as pro}
-								{@const proKey = tid + pro.proId}
+								{@const proKey = tid + pro.resultId}
 								{@const proOpen = expandedPro === proKey}
 								{@const allProPayments = [pro.proPayment, pro.mgrPayment].filter(Boolean)}
 								{#if allProPayments.length > 0}

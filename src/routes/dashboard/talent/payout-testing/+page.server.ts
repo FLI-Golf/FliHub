@@ -282,7 +282,7 @@ export const load: PageServerLoad = async () => {
 	const [tournaments, allPayments, allResults, workOrders, auditLogs] = await Promise.all([
 		pb.collection('tournaments').getFullList({ sort: 'tournamentNumber' }),
 		pb.collection('pro_payments').getFullList({ sort: '-created', expand: 'pro' }).catch(() => [] as any[]),
-		pb.collection('tournament_results').getFullList({ sort: 'placement', expand: 'pro' }).catch(() => [] as any[]),
+		pb.collection('tournament_results').getFullList({ sort: 'placement', expand: 'pro,franchise' }).catch(() => [] as any[]),
 		pb.collection('work_orders').getFullList({ filter: `source = 'pro_payment'`, sort: '-created' }).catch(() => [] as any[]),
 		pb.collection('payment_audit_log').getFullList({ sort: 'changedAt' }).catch(() => [] as any[]),
 	]);
@@ -298,28 +298,49 @@ export const load: PageServerLoad = async () => {
 		const paymentSum  = payments.reduce((s: number, p: any) => s + (p.amount ?? 0), 0);
 		const mathOk      = payments.length > 0 && Math.abs(paymentSum - (t.prizePool ?? 0)) < 1;
 
-		const proMap: Record<string, any> = {};
+		// Build per-pro breakdown keyed by resultId (not proId) so multi-result pros work
+		const proBreakdown: any[] = [];
 		for (const r of results) {
-			if (!proMap[r.pro]) {
-				proMap[r.pro] = {
-					proId: r.pro, proName: r.expand?.pro?.name ?? r.pro,
-					division: getDivision(r.pro), placement: r.placement,
-					proEarnings: r.proEarnings ?? 0,
-					managerCutPercentage: r.managerCutPercentage ?? 0,
-					proPayment: null, mgrPayment: null,
-				};
-			}
+			const payments_for = { pro: null as any, mgr: null as any };
+			for (const p of proPayments)  { if (p.tournamentResult === r.id) payments_for.pro = p; }
+			for (const p of mgrPayments)  { if (p.tournamentResult === r.id) payments_for.mgr = p; }
+			proBreakdown.push({
+				resultId:             r.id,
+				proId:                r.pro,
+				proName:              r.expand?.pro?.name ?? r.pro,
+				division:             getDivision(r.pro),
+				placement:            r.placement,
+				proEarnings:          r.proEarnings ?? 0,
+				managerEarnings:      r.managerEarnings ?? 0,
+				netProEarnings:       r.netProEarnings ?? (r.proEarnings ?? 0),
+				managerCutPercentage: r.managerCutPercentage ?? 0,
+				franchiseId:          r.franchise ?? '__none__',
+				franchiseName:        r.expand?.franchise?.name ?? 'No Franchise',
+				proPayment:           payments_for.pro,
+				mgrPayment:           payments_for.mgr,
+			});
 		}
-		for (const p of proPayments) { if (proMap[p.pro]) proMap[p.pro].proPayment = p; }
-		for (const p of mgrPayments) { if (proMap[p.pro]) proMap[p.pro].mgrPayment = p; }
+		proBreakdown.sort((a, b) => a.placement - b.placement);
+
+		// Group by franchise
+		const franchiseMap = new Map<string, { franchiseId: string; franchiseName: string; rows: any[] }>();
+		for (const row of proBreakdown) {
+			if (!franchiseMap.has(row.franchiseId)) {
+				franchiseMap.set(row.franchiseId, { franchiseId: row.franchiseId, franchiseName: row.franchiseName, rows: [] });
+			}
+			franchiseMap.get(row.franchiseId)!.rows.push(row);
+		}
+		const byFranchise = Array.from(franchiseMap.values()).sort((a, b) => {
+			const aTotal = a.rows.reduce((s, r) => s + (r.proEarnings || 0), 0);
+			const bTotal = b.rows.reduce((s, r) => s + (r.proEarnings || 0), 0);
+			return bTotal - aTotal;
+		});
 
 		return {
 			tournament: t,
 			results, payments, proPayments, mgrPayments,
-			proBreakdown: Object.values(proMap).sort((a: any, b: any) => {
-				if (a.division !== b.division) return a.division === 'MPO' ? -1 : 1;
-				return a.placement - b.placement;
-			}),
+			proBreakdown,
+			byFranchise,
 			wo, totalPaid, totalPending, paymentSum, mathOk,
 			resultCount: results.length,
 			paymentCount: payments.length,
