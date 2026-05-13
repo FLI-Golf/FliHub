@@ -74,6 +74,24 @@
 		</div>
 	</div>
 
+	<!-- Phase 2 context banner -->
+	<div class="rounded-xl border border-emerald-800/60 bg-emerald-950/30 px-5 py-3 flex items-center gap-4 flex-wrap">
+		<div class="flex items-center gap-2 shrink-0">
+			<span class="size-6 rounded-full bg-emerald-500 text-white text-[10px] font-black flex items-center justify-center">2</span>
+			<span class="text-xs font-bold text-emerald-400 uppercase tracking-wide">Phase 2 — Tournaments Live</span>
+		</div>
+		<div class="flex items-center gap-4 text-xs text-slate-400 flex-wrap">
+			<span>Season 2027 · First tournament <span class="text-white font-semibold">Jan 31, 2027</span></span>
+			<span class="text-slate-600">·</span>
+			<span>6 tournaments · prize pools escalate each event</span>
+			<span class="text-slate-600">·</span>
+			<span>Spending profile changes dramatically from Phase 1 — prize payouts, pro payments &amp; franchise cuts activate</span>
+		</div>
+		<a href="/dashboard/financial-projections" class="ml-auto shrink-0 text-[10px] text-emerald-600 hover:text-emerald-400 transition-colors">
+			View projections →
+		</a>
+	</div>
+
 	<!-- Tab toggle -->
 	<div class="flex gap-2">
 		<button

@@ -228,10 +228,10 @@
 			<div>
 				<p class="text-xs font-bold text-emerald-400 uppercase tracking-wide">Phase 2 — Tournaments Live</p>
 				<p class="text-xl font-black text-white mt-0.5">Revenue Positive 2027</p>
-				<p class="text-xs text-slate-400 mt-1">Spending profile changes dramatically — tournament prize pools, pro payouts, and franchise cuts activate. League revenue covers all operations by 2027. No second raise needed; growth is self-funded from here.</p>
+				<p class="text-xs text-slate-400 mt-1">First tournament Jan 31, 2027. Spending profile changes dramatically — prize pools, pro payouts, and franchise cuts all activate. League revenue covers operations by 2027. No second raise needed; growth is self-funded from here.</p>
 				<div class="flex items-center gap-3 mt-2">
-					<span class="text-[10px] font-semibold text-emerald-300 bg-emerald-950/60 border border-emerald-800 rounded px-2 py-0.5">{fmt(netProfit[2027])} net '27</span>
-					<span class="text-[10px] text-slate-500">{fmt(netProfit[2031])} net by '31</span>
+					<span class="text-[10px] font-semibold text-emerald-300 bg-emerald-950/60 border border-emerald-800 rounded px-2 py-0.5">First tournament Jan 31, 2027</span>
+					<span class="text-[10px] text-slate-500">{fmt(netProfit[2027])} net '27 · {fmt(netProfit[2031])} net by '31</span>
 				</div>
 			</div>
 		</div>

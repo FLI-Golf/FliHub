@@ -119,7 +119,7 @@
 			<div class="mt-2 h-1.5 rounded-full bg-slate-700 overflow-hidden">
 				<div class="h-full rounded-full bg-emerald-500" style="width:{PHASE2_PCT}%"></div>
 			</div>
-			<p class="text-xs text-emerald-300/70 mt-1">Prize pools + pro payouts activate · self-funded from 2027 · {fmtM(REVENUE_FUNDED)} revenue-funded</p>
+			<p class="text-xs text-emerald-300/70 mt-1">First tournament Jan 31, 2027 · prize pools, pro payouts &amp; franchise cuts activate · self-funded from 2027</p>
 		</div>
 	</div>
 

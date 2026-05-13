@@ -19,7 +19,7 @@
 			value: 'phase2',
 			label: 'Phase 2',
 			sublabel: 'Tournaments Live',
-			dateRange: '2026 onward'
+			dateRange: 'Jan 2027 onward'
 		},
 		{
 			value: 'all',
