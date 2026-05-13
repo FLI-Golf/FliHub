@@ -53,7 +53,7 @@ export const load: PageServerLoad = async ({ locals, url, params }) => {
 		// Build a quick-lookup map of pro id → pro record (with manager fields)
 		const prosMap = Object.fromEntries(pros.map((p: any) => [p.id, p]));
 
-		// Enrich each result with manager earnings calculated from the pro's cut %
+		// Enrich each result with manager earnings and division derived from pro gender
 		const enrichedResults = results.items.map((r: any) => {
 			const pro = prosMap[r.pro];
 			const managerCutPct = pro?.managerCutPercentage ?? 0;
@@ -61,8 +61,11 @@ export const load: PageServerLoad = async ({ locals, url, params }) => {
 				? Math.round((r.proEarnings || 0) * (managerCutPct / 100) * 100) / 100
 				: (r.managerEarnings ?? 0);
 			const netProEarnings = (r.proEarnings || 0) - managerEarnings;
+			// Division: use stored value if present, otherwise derive from pro gender
+			const division = r.division || (pro?.gender === 'female' ? 'womens' : 'mens');
 			return {
 				...r,
+				division,
 				managerEarnings,
 				managerCutPercentage: managerCutPct,
 				netProEarnings,
@@ -70,6 +73,20 @@ export const load: PageServerLoad = async ({ locals, url, params }) => {
 				managerEmail: pro?.managerEmail ?? r.managerEmail ?? null,
 			};
 		});
+
+		// Load existing work order for this tournament
+		const workOrder = await pb.collection('work_orders')
+			.getFirstListItem(`projectId = '${params.id}' && source = 'pro_payment'`, {
+				expand: 'qb_entered_by',
+			})
+			.catch(() => null);
+
+		// Load pro_payments for this tournament
+		const proPayments = await pb.collection('pro_payments').getFullList({
+			filter: `tournament = '${params.id}'`,
+			sort: 'recipient,created',
+			expand: 'pro',
+		}).catch(() => [] as any[]);
 
 		return {
 			tournament,
@@ -84,6 +101,8 @@ export const load: PageServerLoad = async ({ locals, url, params }) => {
 			proCut,
 			divisionPurse,
 			franchiseCutPercentage,
+			workOrder,
+			proPayments,
 		};
 	} catch (err) {
 		console.error('Error loading tournament:', err);
@@ -168,8 +187,7 @@ export const actions: Actions = {
 				pro:             proId,
 				tournament:      params.id,
 				tournamentResult: result.id,
-				season:          tournament.seasonRef || undefined,
-				paymentType:     'tournament_winnings',
+				paymentType:     'tournament',
 				grossAmount:     proEarnings,
 				netProAmount:    netProEarnings,
 				managerAmount:   managerEarnings,
@@ -276,6 +294,191 @@ export const actions: Actions = {
 			console.error('Error adding result:', error);
 			return fail(400, { error: error.message });
 		}
+	},
+
+	setManagerCut: async ({ request, locals, params }) => {
+		const pb  = locals.pb;
+		const fd  = await request.formData();
+		const proId     = fd.get('proId') as string;
+		const resultId  = fd.get('resultId') as string;
+		const cutPct    = parseFloat(fd.get('cutPct') as string ?? '0');
+
+		if (!proId || !resultId) return fail(400, { error: 'Missing proId or resultId' });
+
+		// Update the pro record with the manager cut %
+		await pb.collection('talent').update(proId, { managerCutPercentage: cutPct }).catch(() => null);
+
+		// Recalculate earnings from the result
+		const result = await pb.collection('tournament_results').getOne(resultId);
+		const gross  = result.proEarnings ?? 0;
+		const mgrAmt = cutPct > 0 ? Math.round(gross * cutPct) / 100 : 0;
+		const proNet = gross - mgrAmt;
+
+		// Update the result record
+		await pb.collection('tournament_results').update(resultId, {
+			managerCutPercentage: cutPct,
+			managerEarnings:      mgrAmt,
+			netProEarnings:       proNet,
+		});
+
+		// Update the pro_payment record for this result
+		const proPayment = await pb.collection('pro_payments')
+			.getFirstListItem(`tournamentResult = '${resultId}' && recipient = 'pro'`)
+			.catch(() => null);
+		if (proPayment) {
+			await pb.collection('pro_payments').update(proPayment.id, {
+				amount:               proNet,
+				netProAmount:         proNet,
+				managerCutPercentage: cutPct,
+			});
+		}
+
+		// Update or create manager payment record
+		const mgrPayment = await pb.collection('pro_payments')
+			.getFirstListItem(`tournamentResult = '${resultId}' && recipient = 'manager'`)
+			.catch(() => null);
+
+		if (cutPct > 0 && mgrAmt > 0) {
+			const tournament = await pb.collection('tournaments').getOne(params.id);
+			const pro        = await pb.collection('talent').getOne(proId);
+			if (mgrPayment) {
+				await pb.collection('pro_payments').update(mgrPayment.id, {
+					amount:               mgrAmt,
+					managerAmount:        mgrAmt,
+					managerCutPercentage: cutPct,
+					managerName:          pro.managerName ?? '',
+					managerEmail:         pro.managerEmail ?? '',
+				});
+			} else {
+				await pb.collection('pro_payments').create({
+					tournament:           params.id,
+					pro:                  proId,
+					tournamentResult:     resultId,
+					paymentType:          'tournament',
+					recipient:            'manager',
+					amount:               mgrAmt,
+					managerAmount:        mgrAmt,
+					grossAmount:          gross,
+					managerCutPercentage: cutPct,
+					managerName:          pro.managerName ?? '',
+					managerEmail:         pro.managerEmail ?? '',
+					status:               'pending',
+					description:          `Manager cut (${cutPct}%) — ${pro.name} — ${tournament.name}`,
+				});
+			}
+		} else if (mgrPayment) {
+			// Cut set to 0 — remove manager payment
+			await pb.collection('pro_payments').delete(mgrPayment.id).catch(() => null);
+		}
+
+		return { success: true };
+	},
+
+	generateWorkOrder: async ({ locals, params }) => {
+		const pb = locals.pb;
+		const tournament = await pb.collection('tournaments').getOne(params.id);
+
+		// Get all pro_payments for this tournament
+		const payments = await pb.collection('pro_payments').getFullList({
+			filter: `tournament = '${params.id}'`,
+		}).catch(() => [] as any[]);
+
+		if (payments.length === 0) return fail(400, { error: 'No payments to generate work order for' });
+
+		// Total = sum of all pro payments (pros + managers)
+		const totalAmount = payments.reduce((s: number, p: any) => s + (p.amount ?? 0), 0);
+		const paymentIds  = payments.map((p: any) => p.id);
+
+		const dateStr   = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+		const woNumber  = `WO-TOUR-${params.id.slice(-6).toUpperCase()}-${dateStr}`;
+
+		// Check if WO already exists
+		const existing = await pb.collection('work_orders')
+			.getFirstListItem(`projectId = '${params.id}' && source = 'pro_payment'`)
+			.catch(() => null);
+
+		if (existing) {
+			// Update with latest payment list and amount
+			await pb.collection('work_orders').update(existing.id, {
+				proPayment: paymentIds,
+				amount:     totalAmount,
+				notes:      `${payments.length} payment records · updated ${new Date().toISOString().slice(0, 10)}`,
+			});
+			return { success: true, workOrderId: existing.id, updated: true };
+		}
+
+		const proCount = payments.filter((p: any) => p.recipient === 'pro').length;
+		const mgrCount = payments.filter((p: any) => p.recipient === 'manager').length;
+
+		const wo = await pb.collection('work_orders').create({
+			work_order_number: woNumber,
+			source:            'pro_payment',
+			status:            'open',
+			projectId:         params.id,
+			projectName:       tournament.name,
+			description:       `Tournament player payouts — ${tournament.name}`,
+			amount:            totalAmount,
+			proPayment:        paymentIds,
+			notes:             `${payments.length} payment records (${proCount} pros, ${mgrCount} managers) · generated ${new Date().toISOString().slice(0, 10)}`,
+			qb_account:        'Player Payouts',
+			qb_notes:          `FLI Golf ${tournament.name} — ${proCount} pro payments + ${mgrCount} manager cuts. Total: $${totalAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}.`,
+		});
+
+		return { success: true, workOrderId: wo.id, updated: false };
+	},
+
+	markQbEntered: async ({ request, locals, params }) => {
+		const pb  = locals.pb;
+		const fd  = await request.formData();
+		const woId       = fd.get('woId') as string;
+		const qbAccount  = fd.get('qbAccount') as string || 'Player Payouts';
+		const qbNotes    = fd.get('qbNotes') as string || '';
+
+		if (!woId) return fail(400, { error: 'Missing work order ID' });
+
+		await pb.collection('work_orders').update(woId, {
+			status:          'paid',
+			paidDate:        new Date().toISOString().slice(0, 10),
+			qb_account:      qbAccount,
+			qb_notes:        qbNotes,
+			qb_entered_date: new Date().toISOString().slice(0, 10),
+			qb_entered_by:   locals.pb.authStore.record?.id ?? undefined,
+		});
+
+		// Mark all pro_payments as paid
+		const payments = await pb.collection('pro_payments').getFullList({
+			filter: `tournament = '${params.id}' && status = 'pending'`,
+		}).catch(() => [] as any[]);
+
+		await Promise.all(payments.map((p: any) =>
+			pb.collection('pro_payments').update(p.id, {
+				status: 'paid',
+				paidAt: new Date().toISOString().replace('T', ' ').slice(0, 19),
+				paidBy: locals.pb.authStore.record?.id ?? 'admin',
+			})
+		));
+
+		return { success: true, paid: payments.length };
+	},
+
+	clearTestData: async ({ locals, params }) => {
+		const pb = locals.pb;
+		const tournamentId = params.id;
+
+		const [results, payments, wos] = await Promise.all([
+			pb.collection('tournament_results').getFullList({ filter: `tournament = '${tournamentId}'` }).catch(() => [] as any[]),
+			pb.collection('pro_payments').getFullList({ filter: `tournament = '${tournamentId}'` }).catch(() => [] as any[]),
+			pb.collection('work_orders').getFullList({ filter: `projectId = '${tournamentId}' && source = 'pro_payment'` }).catch(() => [] as any[]),
+		]);
+
+		await Promise.all([
+			...results.map((r: any) => pb.collection('tournament_results').delete(r.id).catch(() => null)),
+			...payments.map((p: any) => pb.collection('pro_payments').delete(p.id).catch(() => null)),
+			...wos.map((w: any) => pb.collection('work_orders').delete(w.id).catch(() => null)),
+		]);
+		await pb.collection('tournaments').update(tournamentId, { status: 'scheduled' }).catch(() => null);
+
+		return { success: true, cleared: results.length };
 	},
 
 	deleteResult: async ({ request, locals }) => {
