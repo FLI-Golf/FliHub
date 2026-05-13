@@ -67,39 +67,59 @@
 <div class="flex flex-col gap-8">
 
 	<!-- Page header -->
-	<div>
-		<h1 class="text-3xl font-bold tracking-tight">Dashboard</h1>
-		<p class="text-muted-foreground mt-1">Welcome back, {data.userProfile?.firstName ?? data.user?.email}</p>
+	<div class="flex items-center justify-between flex-wrap gap-3">
+		<div>
+			<h1 class="text-3xl font-bold tracking-tight">Dashboard</h1>
+			<p class="text-muted-foreground mt-1">Welcome back, {data.userProfile?.firstName ?? data.user?.email}</p>
+		</div>
+		<a href="/dashboard/financial-projections" class="text-xs text-slate-500 hover:text-slate-300 transition-colors flex items-center gap-1">
+			<TrendingUp class="size-3" /> Financial Projections
+		</a>
 	</div>
 
-	<!-- Phase context banner -->
-	<div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
-		<!-- Phase 1: Seed Raise -->
+	<!-- Quick Access -->
+	<div class="grid grid-cols-3 sm:grid-cols-6 gap-2">
+		{#each [
+			{ label: 'Departments', href: '/dashboard/departments',  icon: Building2,    color: 'text-blue-400',   bg: 'bg-blue-950/50 border-blue-800/50' },
+			{ label: 'Projects',    href: '/dashboard/projects',     icon: FolderKanban, color: 'text-emerald-400', bg: 'bg-emerald-950/50 border-emerald-800/50' },
+			{ label: 'Expenses',    href: '/dashboard/expenses',     icon: Receipt,      color: 'text-orange-400', bg: 'bg-orange-950/50 border-orange-800/50' },
+			{ label: 'People',      href: '/dashboard/people',       icon: Users,        color: 'text-violet-400', bg: 'bg-violet-950/50 border-violet-800/50' },
+			{ label: 'Sponsors',    href: '/dashboard/sponsors',     icon: Star,         color: 'text-yellow-400', bg: 'bg-yellow-950/50 border-yellow-800/50' },
+			{ label: 'Franchises',  href: '/dashboard/franchises',   icon: Trophy,       color: 'text-rose-400',   bg: 'bg-rose-950/50 border-rose-800/50' },
+		] as link}
+			<a href={link.href}
+				class="group flex flex-col items-center gap-2 rounded-xl border {link.bg} px-2 py-3 text-center hover:brightness-125 transition-all duration-150">
+				<link.icon class="size-5 {link.color} transition-transform group-hover:scale-110" />
+				<span class="text-[11px] font-medium text-slate-300">{link.label}</span>
+			</a>
+		{/each}
+	</div>
+
+	<!-- Phase context banner — 2 phases -->
+	<div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+		<!-- Phase 1: Pre-Tournaments -->
 		<div class="rounded-xl border border-amber-500/30 bg-amber-500/10 p-4">
-			<p class="text-xs font-bold text-amber-400 uppercase tracking-wide mb-1">Phase 1 · 2026 — Seed Raise</p>
-			<p class="text-xl font-black text-white">{fmtM(SEED_RAISE)} raised</p>
+			<div class="flex items-center gap-2 mb-1">
+				<span class="size-5 rounded-full bg-amber-500 text-white text-[10px] font-black flex items-center justify-center shrink-0">1</span>
+				<p class="text-xs font-bold text-amber-400 uppercase tracking-wide">Phase 1 · Pre-Tournaments</p>
+			</div>
+			<p class="text-xl font-black text-white">Funded June 15, 2025</p>
 			<div class="mt-2 h-1.5 rounded-full bg-slate-700 overflow-hidden">
 				<div class="h-full rounded-full bg-amber-500" style="width:{PHASE1_PCT}%"></div>
 			</div>
-			<p class="text-xs text-amber-300/70 mt-1">{PHASE1_PCT}% of {fmtM(TOTAL_BUDGET)} total budget · investment year</p>
+			<p class="text-xs text-amber-300/70 mt-1">{fmtM(SEED_RAISE)} seed raise · {PHASE1_PCT}% of {fmtM(TOTAL_BUDGET)} total · ops, tech, hiring — no payouts</p>
 		</div>
-		<!-- Phase 2: Revenue Positive -->
+		<!-- Phase 2: Tournaments Live -->
 		<div class="rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-4">
-			<p class="text-xs font-bold text-emerald-400 uppercase tracking-wide mb-1">Phase 2 · 2027 — Revenue Positive</p>
-			<p class="text-xl font-black text-white">No second raise</p>
-			<div class="mt-2 h-1.5 rounded-full bg-slate-700 overflow-hidden">
-				<div class="h-full rounded-full bg-emerald-500" style="width:100%"></div>
+			<div class="flex items-center gap-2 mb-1">
+				<span class="size-5 rounded-full bg-emerald-500 text-white text-[10px] font-black flex items-center justify-center shrink-0">2</span>
+				<p class="text-xs font-bold text-emerald-400 uppercase tracking-wide">Phase 2 · Tournaments Live</p>
 			</div>
-			<p class="text-xs text-emerald-300/70 mt-1">Revenue covers operations from 2027 onward</p>
-		</div>
-		<!-- Phase 3: Scale -->
-		<div class="rounded-xl border border-violet-500/30 bg-violet-500/10 p-4">
-			<p class="text-xs font-bold text-violet-400 uppercase tracking-wide mb-1">Phase 3 · 2028–2031 — Scale</p>
-			<p class="text-xl font-black text-white">{fmtM(REVENUE_FUNDED)} revenue-funded</p>
+			<p class="text-xl font-black text-white">Revenue Positive 2027</p>
 			<div class="mt-2 h-1.5 rounded-full bg-slate-700 overflow-hidden">
-				<div class="h-full rounded-full bg-violet-500" style="width:{PHASE2_PCT}%"></div>
+				<div class="h-full rounded-full bg-emerald-500" style="width:{PHASE2_PCT}%"></div>
 			</div>
-			<p class="text-xs text-violet-300/70 mt-1">{PHASE2_PCT}% of total budget · self-funded from operations</p>
+			<p class="text-xs text-emerald-300/70 mt-1">Prize pools + pro payouts activate · self-funded from 2027 · {fmtM(REVENUE_FUNDED)} revenue-funded</p>
 		</div>
 	</div>
 
@@ -208,7 +228,10 @@
 		<!-- Department budget list -->
 		<div class="lg:col-span-2">
 			<div class="flex items-center justify-between mb-3">
-				<h2 class="text-lg font-semibold">Department Budgets</h2>
+				<div>
+					<h2 class="text-lg font-semibold">Departments</h2>
+					<p class="text-xs text-muted-foreground">Active projects first</p>
+				</div>
 				<Button href="/dashboard/departments" variant="ghost" size="sm" class="gap-1 text-xs">
 					View all <ArrowRight class="size-3" />
 				</Button>
@@ -218,6 +241,7 @@
 					{@const used       = pct(dept.actual ?? 0, dept.budget ?? 1)}
 					{@const forecasted = pct(dept.forecasted ?? 0, dept.budget ?? 1)}
 					{@const deptIcon   = getDeptIcon(dept.name)}
+					{@const activeCount = dept.projects.filter((p: any) => p.status === 'in_progress').length}
 					<a href="/dashboard/departments/{dept.id}"
 						class="flex items-start gap-4 px-4 py-4 transition-colors group {i % 2 === 0 ? 'bg-slate-900 hover:bg-slate-800' : 'bg-slate-800/70 hover:bg-slate-700/70'}">
 
@@ -230,7 +254,12 @@
 						<div class="flex-1 min-w-0">
 							<!-- Name + budget numbers -->
 							<div class="flex items-start justify-between gap-2 mb-1">
-								<span class="text-sm font-semibold leading-tight group-hover:text-primary transition-colors">{dept.name}</span>
+								<div class="flex items-center gap-2 min-w-0">
+									<span class="text-sm font-semibold leading-tight group-hover:text-primary transition-colors truncate">{dept.name}</span>
+									{#if activeCount > 0}
+										<span class="shrink-0 text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">{activeCount} active</span>
+									{/if}
+								</div>
 								<div class="text-right shrink-0">
 									<span class="text-sm font-bold tabular-nums">{fmt(dept.actual ?? 0)}</span>
 									<span class="text-xs text-muted-foreground"> / {fmt(dept.budget ?? 0)}</span>
@@ -335,28 +364,5 @@
 		</div>
 	</div>
 
-	<!-- Quick nav -->
-	<div>
-		<h2 class="text-lg font-semibold mb-3">Quick Access</h2>
-		<div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-			{#each [
-				{ label: 'Departments', href: '/dashboard/departments', icon: Building2, color: 'text-blue-600', bg: 'bg-blue-100 dark:bg-blue-900/30' },
-				{ label: 'Projects', href: '/dashboard/projects', icon: FolderKanban, color: 'text-emerald-600', bg: 'bg-emerald-100 dark:bg-emerald-900/30' },
-				{ label: 'Expenses', href: '/dashboard/expenses', icon: Receipt, color: 'text-orange-600', bg: 'bg-orange-100 dark:bg-orange-900/30' },
-				{ label: 'People', href: '/dashboard/people', icon: Users, color: 'text-violet-600', bg: 'bg-violet-100 dark:bg-violet-900/30' },
-				{ label: 'Sponsors', href: '/dashboard/sponsors', icon: Star, color: 'text-yellow-600', bg: 'bg-yellow-100 dark:bg-yellow-900/30' },
-				{ label: 'Franchises', href: '/dashboard/franchises', icon: Trophy, color: 'text-rose-600', bg: 'bg-rose-100 dark:bg-rose-900/30' }
-			] as link}
-				<a href={link.href}
-					class="group flex flex-col items-center gap-2 rounded-xl border p-4 text-center
-						hover:border-primary/50 hover:bg-muted/50 hover:shadow-sm transition-all duration-150">
-					<div class="size-10 rounded-xl {link.bg} flex items-center justify-center transition-transform group-hover:scale-110">
-						<link.icon class="size-5 {link.color}" />
-					</div>
-					<span class="text-xs font-medium">{link.label}</span>
-				</a>
-			{/each}
-		</div>
-	</div>
 
 </div>
