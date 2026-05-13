@@ -163,7 +163,8 @@
 				{ title: 'Tournaments', url: '/dashboard/talent/tournaments', icon: Trophy },
 				{ title: 'Special Events', url: '/dashboard/talent/special-events', icon: Medal },
 				{ title: 'Franchise Payouts', url: '/dashboard/talent/franchise-payouts', icon: DollarSign },
-				{ title: 'Pro Payments', url: '/dashboard/talent/payments', icon: Flag }
+				{ title: 'Pro Payments',   url: '/dashboard/talent/payments',       icon: Flag },
+				{ title: 'Payout Testing', url: '/dashboard/talent/payout-testing', icon: Zap },
 			]
 		},
 		{
@@ -245,10 +246,14 @@
 
 <script lang="ts">
 	import * as Sidebar from '$lib/components/ui/sidebar/index.js';
+	import { useSidebar } from '$lib/components/ui/sidebar/context.svelte.js';
 	import type { ComponentProps } from 'svelte';
 	import { page } from '$app/stores';
+	import { X, PanelLeft } from 'lucide-svelte';
 
 	let { ref = $bindable(null), ...restProps }: ComponentProps<typeof Sidebar.Root> = $props();
+
+	const sidebar = useSidebar();
 
 	const isActive = (url: string) => $page.url.pathname === url;
 
@@ -286,19 +291,33 @@
 
 <Sidebar.Root {...restProps} bind:ref>
 	<!-- Brand header -->
-	<Sidebar.Header>
-		<a href="/dashboard" class="flex items-center gap-3 px-4 py-4 border-b border-sidebar-border hover:opacity-80 transition-opacity">
-			<div class="flex size-10 items-center justify-center rounded-xl bg-gradient-to-br from-emerald-500 to-blue-600 text-white shadow-lg shrink-0">
-				<span class="text-lg font-black tracking-tighter">F</span>
-			</div>
-			<div class="flex flex-col min-w-0">
-				<span class="text-base font-bold tracking-tight truncate">FliHub</span>
-				<span class="text-[10px] text-muted-foreground uppercase tracking-widest font-medium">Business OS</span>
-			</div>
-		</a>
+	<Sidebar.Header class="shrink-0">
+		<div class="flex items-center justify-between px-4 py-4 border-b border-sidebar-border">
+			<a href="/dashboard" class="flex items-center gap-3 hover:opacity-80 transition-opacity min-w-0">
+				<div class="flex size-10 items-center justify-center rounded-xl bg-gradient-to-br from-emerald-500 to-blue-600 text-white shadow-lg shrink-0">
+					<span class="text-lg font-black tracking-tighter">F</span>
+				</div>
+				<div class="flex flex-col min-w-0">
+					<span class="text-base font-bold tracking-tight truncate">FliHub</span>
+					<span class="text-[10px] text-muted-foreground uppercase tracking-widest font-medium">Business OS</span>
+				</div>
+			</a>
+			<!-- Mobile close button inside the sheet -->
+			{#if sidebar.isMobile}
+				<button
+					type="button"
+					onclick={() => sidebar.toggle()}
+					aria-label="Close navigation"
+					class="ml-2 shrink-0 flex items-center justify-center size-9 rounded-lg hover:bg-muted transition-colors text-muted-foreground"
+				>
+					<X class="size-5" />
+				</button>
+			{/if}
+		</div>
 	</Sidebar.Header>
 
-	<Sidebar.Content class="px-2 py-2 gap-0">
+	<!-- flex-1 + min-h-0 + overflow-y-auto ensures the nav scrolls independently -->
+	<Sidebar.Content class="px-2 py-2 gap-0 flex-1 min-h-0 overflow-y-auto overscroll-contain">
 		{#each visibleGroups as group (group.id)}
 			{@const visibleItems = group.items.filter(canSeeItem)}
 			{#if visibleItems.length > 0}
@@ -370,3 +389,16 @@
 
 	<Sidebar.Rail />
 </Sidebar.Root>
+
+<!-- Mobile FAB: fixed bottom-left, only when sidebar is closed on mobile -->
+{#if sidebar.isMobile && !sidebar.openMobile}
+	<button
+		type="button"
+		onclick={() => sidebar.toggle()}
+		aria-label="Open navigation"
+		class="fixed bottom-6 left-4 z-50 flex items-center gap-2 rounded-full bg-slate-900 border border-slate-700 shadow-xl shadow-black/40 px-4 py-3 text-sm font-semibold text-white active:scale-95 transition-transform duration-100"
+	>
+		<PanelLeft class="size-5 shrink-0" />
+		<span>Menu</span>
+	</button>
+{/if}

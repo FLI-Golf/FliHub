@@ -81,7 +81,7 @@ export const load: PageServerLoad = async ({ locals, url, params }) => {
 	} catch { /* non-fatal */ }
 
 	const allocatedBudget = department.metrics?.budget?.allocated ?? 0;
-	const totalExpensed2 = paid + approved + submitted + draft + reimbPaid + reimbApproved + reimbSubmitted;
+	const totalExpensed2 = Math.max(0, paid + approved + submitted + draft + reimbPaid + reimbApproved + reimbSubmitted);
 	const unallocated = Math.max(0, allocatedBudget - totalExpensed2 - inTasks);
 	const pct = (v: number) => allocatedBudget > 0 ? Math.min(100, (v / allocatedBudget) * 100) : 0;
 

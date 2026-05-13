@@ -1,7 +1,7 @@
 <script lang="ts">
 	import type { PageData } from './$types';
 	import Card from '$lib/components/ui/card.svelte';
-	import { TrendingUp, TrendingDown, DollarSign, BarChart3, Info, ChevronRight, Activity, Target } from 'lucide-svelte';
+	import { TrendingUp, TrendingDown, DollarSign, BarChart3, Info, ChevronRight, Activity, Target, Settings } from 'lucide-svelte';
 
 	let { data }: { data: PageData } = $props();
 	const live = $derived(data?.liveData ?? null);
@@ -110,8 +110,9 @@
 	function pct(v: number, max: number) { return `${Math.round((v / max) * 100)}%`; }
 	function fmtPct(n: number) { return `${n >= 0 ? '' : ''}${n.toFixed(2)}%`; }
 
-	let selectedYear = $state(2028);
-	const sel = $derived(selectedYear);
+	let selectedYear    = $state(2028);
+	const sel           = $derived(selectedYear);
+	let showPhaseSettings = $state(false);
 </script>
 
 <svelte:head><title>Financial Projections - FliHub</title></svelte:head>
@@ -119,38 +120,119 @@
 <div class="flex flex-col gap-6">
 
 	<!-- Header -->
-	<div>
-		<h1 class="text-3xl font-bold mb-1">Financial Projections</h1>
-		<p class="text-muted-foreground">FLI Golf P&amp;L · FY 2026–2031 · Funded June 15, 2026</p>
+	<div class="flex items-start justify-between flex-wrap gap-3">
+		<div>
+			<h1 class="text-3xl font-bold mb-1">Financial Projections</h1>
+			<p class="text-muted-foreground">FLI Golf P&amp;L · FY 2026–2031 · Funded June 15, 2025</p>
+		</div>
+		<button
+			type="button"
+			onclick={() => showPhaseSettings = !showPhaseSettings}
+			class="flex items-center gap-2 text-xs px-3 py-1.5 rounded-lg border border-slate-700 bg-slate-800/60 hover:bg-slate-800 text-slate-300 transition-colors"
+		>
+			<Settings class="size-3.5" />
+			Phase Settings
+		</button>
 	</div>
 
-	<!-- Phase context banner -->
-	<div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
-		<!-- Phase 1 -->
-		<div class="rounded-xl border border-amber-800/60 bg-amber-950/30 px-4 py-3 flex items-start gap-3">
-			<span class="size-6 rounded-full bg-amber-500 text-white text-xs font-black flex items-center justify-center shrink-0 mt-0.5">1</span>
+	<!-- Phase Settings panel (collapsible) -->
+	{#if showPhaseSettings}
+		<div class="rounded-xl border border-slate-700 bg-slate-800/40 p-5">
+			<div class="flex items-center justify-between mb-4">
+				<h2 class="text-sm font-semibold text-slate-200 flex items-center gap-2">
+					<Settings class="size-4 text-slate-400" /> Phase Settings
+				</h2>
+				<button type="button" onclick={() => showPhaseSettings = false} class="text-slate-500 hover:text-slate-300 transition-colors text-xs">Close</button>
+			</div>
+			<div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+				<!-- Phase 1 settings -->
+				<div class="rounded-lg border border-amber-800/50 bg-amber-950/20 p-4 space-y-3">
+					<div class="flex items-center gap-2">
+						<span class="size-5 rounded-full bg-amber-500 text-white text-[10px] font-black flex items-center justify-center shrink-0">1</span>
+						<p class="text-xs font-bold text-amber-400 uppercase tracking-wide">Phase 1 — Pre-Tournaments</p>
+					</div>
+					<div class="grid grid-cols-2 gap-3 text-xs">
+						<div>
+							<p class="text-slate-500 mb-1">Start Date</p>
+							<p class="font-semibold text-slate-200">June 15, 2025</p>
+							<p class="text-slate-600 text-[10px] mt-0.5">Funding received</p>
+						</div>
+						<div>
+							<p class="text-slate-500 mb-1">End Date</p>
+							<p class="font-semibold text-slate-200">First Tournament</p>
+							<p class="text-slate-600 text-[10px] mt-0.5">TBD — 2026</p>
+						</div>
+						<div>
+							<p class="text-slate-500 mb-1">Seed Raise</p>
+							<p class="font-semibold text-amber-300">$7.5M</p>
+						</div>
+						<div>
+							<p class="text-slate-500 mb-1">Spend Profile</p>
+							<p class="font-semibold text-slate-200">Ops, tech, hiring</p>
+							<p class="text-slate-600 text-[10px] mt-0.5">No tournament payouts</p>
+						</div>
+					</div>
+				</div>
+				<!-- Phase 2 settings -->
+				<div class="rounded-lg border border-emerald-800/50 bg-emerald-950/20 p-4 space-y-3">
+					<div class="flex items-center gap-2">
+						<span class="size-5 rounded-full bg-emerald-500 text-white text-[10px] font-black flex items-center justify-center shrink-0">2</span>
+						<p class="text-xs font-bold text-emerald-400 uppercase tracking-wide">Phase 2 — Tournaments Live</p>
+					</div>
+					<div class="grid grid-cols-2 gap-3 text-xs">
+						<div>
+							<p class="text-slate-500 mb-1">Start Date</p>
+							<p class="font-semibold text-slate-200">First Tournament</p>
+							<p class="text-slate-600 text-[10px] mt-0.5">2026 season</p>
+						</div>
+						<div>
+							<p class="text-slate-500 mb-1">Revenue Positive</p>
+							<p class="font-semibold text-emerald-300">2027</p>
+							<p class="text-slate-600 text-[10px] mt-0.5">{fmt(netProfit[2027])} net</p>
+						</div>
+						<div>
+							<p class="text-slate-500 mb-1">New Spend</p>
+							<p class="font-semibold text-slate-200">Tournament payouts</p>
+							<p class="text-slate-600 text-[10px] mt-0.5">Prize pools, pro payments</p>
+						</div>
+						<div>
+							<p class="text-slate-500 mb-1">Self-Funded From</p>
+							<p class="font-semibold text-emerald-300">2027 onward</p>
+							<p class="text-slate-600 text-[10px] mt-0.5">No further raise needed</p>
+						</div>
+					</div>
+				</div>
+			</div>
+			<p class="text-[10px] text-slate-600 mt-3">Phase boundaries drive the spending model — tournament payouts, franchise cuts, and pro payments only activate in Phase 2.</p>
+		</div>
+	{/if}
+
+	<!-- Phase context banner — 2 phases -->
+	<div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+		<!-- Phase 1: Pre-Tournaments -->
+		<div class="rounded-xl border border-amber-800/60 bg-amber-950/30 px-5 py-4 flex items-start gap-3">
+			<span class="size-7 rounded-full bg-amber-500 text-white text-xs font-black flex items-center justify-center shrink-0 mt-0.5">1</span>
 			<div>
-				<p class="text-xs font-bold text-amber-400 uppercase tracking-wide">2026 — Seed Raise</p>
-				<p class="text-lg font-black text-white">$7.5M raised</p>
-				<p class="text-xs text-slate-400 mt-0.5">Launch operations, infrastructure, first season. Investment year — net loss expected.</p>
+				<p class="text-xs font-bold text-amber-400 uppercase tracking-wide">Phase 1 — Pre-Tournaments</p>
+				<p class="text-xl font-black text-white mt-0.5">Funded June 15, 2025</p>
+				<p class="text-xs text-slate-400 mt-1">$7.5M seed raise covers operations, technology, and infrastructure build-out. Spending is entirely pre-revenue — no tournament payouts, no franchise cuts. Investment year with expected net loss.</p>
+				<div class="flex items-center gap-3 mt-2">
+					<span class="text-[10px] font-semibold text-amber-300 bg-amber-950/60 border border-amber-800 rounded px-2 py-0.5">$7.5M raised</span>
+					<span class="text-[10px] text-slate-500">{fmt(netProfit[2026])} net 2026</span>
+				</div>
 			</div>
 		</div>
-		<!-- Revenue bridge -->
-		<div class="rounded-xl border border-emerald-800/60 bg-emerald-950/30 px-4 py-3 flex items-start gap-3">
-			<span class="size-6 rounded-full bg-emerald-600 text-white text-xs font-black flex items-center justify-center shrink-0 mt-0.5">2</span>
+		<!-- Phase 2: Tournaments Live -->
+		<div class="rounded-xl border border-emerald-800/60 bg-emerald-950/30 px-5 py-4 flex items-start gap-3">
+			<span class="size-7 rounded-full bg-emerald-500 text-white text-xs font-black flex items-center justify-center shrink-0 mt-0.5">2</span>
 			<div>
-				<p class="text-xs font-bold text-emerald-400 uppercase tracking-wide">2027 — Revenue Positive</p>
-				<p class="text-lg font-black text-white">{fmt(netProfit[2027])} net</p>
-				<p class="text-xs text-slate-400 mt-0.5">League revenue covers operations. No second raise needed — growth self-funded from here.</p>
-			</div>
-		</div>
-		<!-- Long-term -->
-		<div class="rounded-xl border border-violet-800/60 bg-violet-950/30 px-4 py-3 flex items-start gap-3">
-			<span class="size-6 rounded-full bg-violet-600 text-white text-xs font-black flex items-center justify-center shrink-0 mt-0.5">3</span>
-			<div>
-				<p class="text-xs font-bold text-violet-400 uppercase tracking-wide">2028–2031 — Scale</p>
-				<p class="text-lg font-black text-white">{fmt(netProfit[2031])} net by '31</p>
-				<p class="text-xs text-slate-400 mt-0.5">Remaining {fmt(14_638_300 - 7_500_000)} operational budget funded entirely from league revenue.</p>
+				<p class="text-xs font-bold text-emerald-400 uppercase tracking-wide">Phase 2 — Tournaments Live</p>
+				<p class="text-xl font-black text-white mt-0.5">Revenue Positive 2027</p>
+				<p class="text-xs text-slate-400 mt-1">First tournament Jan 31, 2027. Spending profile changes dramatically — prize pools, pro payouts, and franchise cuts all activate. League revenue covers operations by 2027. No second raise needed; growth is self-funded from here.</p>
+				<div class="flex items-center gap-3 mt-2">
+					<span class="text-[10px] font-semibold text-emerald-300 bg-emerald-950/60 border border-emerald-800 rounded px-2 py-0.5">First tournament Jan 31, 2027</span>
+					<span class="text-[10px] text-slate-500">{fmt(netProfit[2027])} net '27 · {fmt(netProfit[2031])} net by '31</span>
+				</div>
 			</div>
 		</div>
 	</div>
@@ -469,46 +551,37 @@
 				<div class="space-y-4">
 					{#each [
 						{
-							year: 2026,
-							phase: 'Seed Raise & Launch',
+							num: '1',
+							period: '2025–2026',
+							phase: 'Pre-Tournaments',
 							color: 'border-amber-500 bg-amber-950/20',
 							badge: 'bg-amber-500',
 							items: [
+								{ label: 'Funded',             value: 'June 15, 2025' },
 								{ label: 'Capital raised',     value: '$7.5M seed round' },
-								{ label: 'Revenue',            value: fmt(sales[2026]) },
 								{ label: 'Net position',       value: fmt(netProfit[2026]), neg: true },
-								{ label: 'Use of funds',       value: 'Ops, tech, first season' },
+								{ label: 'Spend profile',      value: 'Ops, tech, hiring — no payouts' },
 							]
 						},
 						{
-							year: 2027,
-							phase: 'Revenue Positive',
+							num: '2',
+							period: '2026 onward',
+							phase: 'Tournaments Live',
 							color: 'border-emerald-500 bg-emerald-950/20',
 							badge: 'bg-emerald-500',
 							items: [
-								{ label: 'Revenue',            value: fmt(sales[2027]) },
-								{ label: 'Net profit',         value: fmt(netProfit[2027]), pos: true },
-								{ label: 'Gross margin',       value: fmtPct(grossMargin(2027)) },
-								{ label: 'Milestone',          value: 'No further raise needed' },
-							]
-						},
-						{
-							year: 2031,
-							phase: 'Full Scale',
-							color: 'border-violet-500 bg-violet-950/20',
-							badge: 'bg-violet-500',
-							items: [
-								{ label: 'Revenue',            value: fmt(sales[2031]) },
-								{ label: 'Net profit',         value: fmt(netProfit[2031]), pos: true },
-								{ label: 'Net margin',         value: fmtPct(netMargin(2031)) },
-								{ label: 'Cumulative net',     value: '~$163M (2027–2031)' },
+								{ label: 'Revenue positive',   value: '2027 — ' + fmt(netProfit[2027]), pos: true },
+								{ label: 'New spend',          value: 'Prize pools, pro & franchise payouts' },
+								{ label: 'Self-funded from',   value: '2027 — no further raise' },
+								{ label: '2031 net profit',    value: fmt(netProfit[2031]), pos: true },
 							]
 						},
 					] as stage}
 						<div class="rounded-xl border-l-4 {stage.color} px-4 py-3">
 							<div class="flex items-center gap-2 mb-2">
-								<span class="size-5 rounded-full {stage.badge} text-white text-[10px] font-black flex items-center justify-center shrink-0">{stage.year.toString().slice(2)}</span>
-								<span class="text-sm font-bold text-white">{stage.year} — {stage.phase}</span>
+								<span class="size-5 rounded-full {stage.badge} text-white text-[10px] font-black flex items-center justify-center shrink-0">{stage.num}</span>
+								<span class="text-sm font-bold text-white">Phase {stage.num} — {stage.phase}</span>
+								<span class="text-xs text-slate-500">{stage.period}</span>
 							</div>
 							<div class="grid grid-cols-2 sm:grid-cols-4 gap-x-4 gap-y-1">
 								{#each stage.items as item}

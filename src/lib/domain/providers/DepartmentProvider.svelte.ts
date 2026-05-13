@@ -15,7 +15,7 @@ import type { DepartmentMetrics, PhaseMetrics } from '../models/Department';
 
 const CONTEXT_KEY = Symbol('department');
 
-export type PhaseFilter = 'all' | 'phase1' | 'phase2' | 'phase3';
+export type PhaseFilter = 'all' | 'phase1' | 'phase2';
 
 export class DepartmentProvider {
 	// Reactive state via Svelte 5 runes

@@ -82,7 +82,14 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 					forecasted: p.project_forecasted_expenses ?? 0,
 				}))
 			};
-		}).sort((a, b) => b.budget - a.budget);
+		}).sort((a, b) => {
+			// Active projects first, then by project count desc, then budget desc
+			const aActive = a.projects.filter((p: any) => p.status === 'in_progress').length;
+			const bActive = b.projects.filter((p: any) => p.status === 'in_progress').length;
+			if (bActive !== aActive) return bActive - aActive;
+			if (b.projectCount !== a.projectCount) return b.projectCount - a.projectCount;
+			return b.budget - a.budget;
+		});
 	
 		return {
 			user: locals.pb.authStore.model,

@@ -244,12 +244,12 @@
 		<div>
 			<div class="flex items-center gap-2 mb-1">
 				<span class="inline-flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded">
-					<Zap class="size-3" /> Phase 1 · Pre-Raise
+					<Zap class="size-3" /> Phase 1 · Pre-Tournaments
 				</span>
 			</div>
 			<h1 class="text-2xl font-bold tracking-tight">Active Projects</h1>
 			<p class="text-sm text-muted-foreground mt-1">
-				{projects.length} projects in flight right now — everything else is planned for post-raise execution.
+				{projects.length} projects in flight right now — everything else activates when tournaments go live.
 			</p>
 		</div>
 		<div class="flex items-center gap-2 shrink-0">
@@ -283,7 +283,7 @@
 			{#if headerExpanded}
 				<div class="text-xs text-yellow-200/70 leading-relaxed mt-3 pl-9 space-y-2">
 					<p>
-						This page shows only the projects currently marked <span class="font-semibold text-yellow-300">in progress</span> — the workstreams that matter right now on the path to getting FLI Golf off the ground. The <span class="font-semibold text-yellow-300">Combined Budget</span> card reflects the total capital committed to these active projects, and the <span class="font-semibold text-yellow-300">Unallocated</span> card shows how much of the seed raise is still available to deploy.
+						This page shows only the projects currently marked <span class="font-semibold text-yellow-300">in progress</span> — the workstreams that matter right now in Phase 1 (Pre-Tournaments). The <span class="font-semibold text-yellow-300">Combined Budget</span> card reflects the total capital committed to these active projects, and the <span class="font-semibold text-yellow-300">Unallocated</span> card shows how much of the funded capital is still available to deploy.
 					</p>
 					<p>
 						Use the <span class="font-semibold text-yellow-300">Set Raise Amount</span> button to update the total capital received as the raise progresses. The Unallocated figure updates automatically — it is always raise amount minus combined project budgets.
@@ -861,7 +861,7 @@
 
 	<!-- Footer note -->
 	<p class="text-xs text-muted-foreground text-center pb-2">
-		19 projects remain <span class="font-medium text-slate-400">planned</span> — they activate after the $7.5M seed raise closes.
+		19 projects remain <span class="font-medium text-slate-400">planned</span> — they activate when Phase 2 (Tournaments Live) begins Jan 31, 2027.
 		<a href="/dashboard/use-of-proceeds" class="text-primary hover:underline ml-1">View Use of Proceeds →</a>
 	</p>
 

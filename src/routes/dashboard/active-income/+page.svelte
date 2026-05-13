@@ -71,7 +71,7 @@
 			</div>
 			<h1 class="text-2xl font-bold tracking-tight">Active Income</h1>
 			<p class="text-sm text-muted-foreground mt-1">
-				Sponsorship LOIs, franchise pipeline, and revenue committed toward the $7.5M seed raise.
+				Sponsorship LOIs, franchise pipeline, and revenue committed toward Phase 1 operations.
 			</p>
 		</div>
 		<Button href="/dashboard/sponsors" variant="outline" size="sm" class="gap-1.5 shrink-0">

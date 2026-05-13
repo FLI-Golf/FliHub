@@ -274,7 +274,11 @@
 						Every Operation.
 					</span>
 				</h1>
-				<p class="text-xl text-muted-foreground mb-10 max-w-2xl mx-auto leading-relaxed">
+				<!-- Mission statement -->
+				<p class="text-lg sm:text-xl font-semibold text-foreground mb-4 max-w-3xl mx-auto leading-snug">
+					FLI Golf is not a disc golf league — it is the first sport built specifically for gender equality, betting, media and live entertainment from day one.
+				</p>
+				<p class="text-base text-muted-foreground mb-10 max-w-2xl mx-auto leading-relaxed">
 					FliHub unifies project management, budgets, expenses, sponsors, vendors, people, and league operations into a single business operating system.
 				</p>
 				<div class="flex flex-col sm:flex-row gap-4 justify-center">

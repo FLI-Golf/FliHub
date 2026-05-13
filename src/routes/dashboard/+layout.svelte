@@ -6,7 +6,7 @@
 	import * as Breadcrumb from '$lib/components/ui/breadcrumb/index.js';
 	import { Separator } from '$lib/components/ui/separator/index.js';
 	import * as DropdownMenu from '$lib/components/ui/dropdown-menu/index.js';
-	import { ChevronDown, User, LogOut, Settings } from 'lucide-svelte';
+	import { ChevronDown, User, LogOut, Settings, PanelLeft } from 'lucide-svelte';
 	import { page } from '$app/stores';
 
 	export let data: LayoutData;
@@ -74,7 +74,8 @@
 	<Sidebar.Inset>
 		<header class="flex h-14 shrink-0 items-center gap-2 border-b bg-card/80 backdrop-blur-sm sticky top-0 z-10">
 			<div class="flex items-center gap-3 px-4 flex-1 min-w-0">
-				<Sidebar.Trigger class="-ms-1 hover:bg-muted rounded-md transition-colors" />
+				<!-- Larger tap target on mobile -->
+				<Sidebar.Trigger class="-ms-1 size-9 hover:bg-muted rounded-md transition-colors" />
 				<Separator orientation="vertical" class="h-5 opacity-50" />
 				<Breadcrumb.Root>
 					<Breadcrumb.List>
