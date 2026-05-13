@@ -88,6 +88,24 @@ export const load: PageServerLoad = async ({ locals, url, params }) => {
 			expand: 'pro',
 		}).catch(() => [] as any[]);
 
+		// Load expenses linked to this tournament's work order
+		const woNumber = workOrder?.work_order_number ?? '';
+		const expenses = woNumber
+			? await pb.collection('expenses').getFullList({
+				filter: `work_order_number = '${woNumber}'`,
+				sort:   'created',
+			}).catch(() => [] as any[])
+			: [];
+
+		// Load approvals for those expenses
+		const expenseIds = expenses.map((e: any) => e.id);
+		const approvals = expenseIds.length
+			? await pb.collection('approvals').getFullList({
+				filter: expenseIds.map((id: string) => `expenseId = '${id}'`).join(' || '),
+				sort:   'requestedDate',
+			}).catch(() => [] as any[])
+			: [];
+
 		return {
 			tournament,
 			seasonRecord,
@@ -103,6 +121,8 @@ export const load: PageServerLoad = async ({ locals, url, params }) => {
 			franchiseCutPercentage,
 			workOrder,
 			proPayments,
+			expenses,
+			approvals,
 		};
 	} catch (err) {
 		console.error('Error loading tournament:', err);
@@ -294,6 +314,179 @@ export const actions: Actions = {
 			console.error('Error adding result:', error);
 			return fail(400, { error: error.message });
 		}
+	},
+
+	swapPlacements: async ({ request, locals }) => {
+		const pb  = locals.pb;
+		const fd  = await request.formData();
+		const srcId        = fd.get('srcId') as string;
+		const tgtId        = fd.get('tgtId') as string;
+		const srcPlacement = parseInt(fd.get('srcPlacement') as string);
+		const tgtPlacement = parseInt(fd.get('tgtPlacement') as string);
+
+		if (!srcId || !tgtId || isNaN(srcPlacement) || isNaN(tgtPlacement))
+			return fail(400, { error: 'Invalid swap parameters' });
+
+		await Promise.all([
+			pb.collection('tournament_results').update(srcId, { placement: tgtPlacement }),
+			pb.collection('tournament_results').update(tgtId, { placement: srcPlacement }),
+		]);
+
+		return { success: true };
+	},
+
+	// Bulk apply manager cuts from the overlay modal
+	applyManagerCuts: async ({ request, locals, params }) => {
+		const pb  = locals.pb;
+		const fd  = await request.formData();
+		const raw = fd.get('cuts') as string;
+		if (!raw) return fail(400, { error: 'Missing cuts data' });
+
+		let cuts: Array<{ resultId: string; cutPct: number; managerName: string; managerEmail: string }>;
+		try { cuts = JSON.parse(raw); } catch { return fail(400, { error: 'Invalid cuts JSON' }); }
+
+		const tournament = await pb.collection('tournaments').getOne(params.id);
+
+		for (const cut of cuts) {
+			const result = await pb.collection('tournament_results').getOne(cut.resultId).catch(() => null);
+			if (!result) continue;
+
+			const gross   = result.proEarnings ?? 0;
+			const mgrAmt  = cut.cutPct > 0 ? Math.round(gross * cut.cutPct) / 100 : 0;
+			const proNet  = gross - mgrAmt;
+
+			// Update talent record
+			await pb.collection('talent').update(result.pro, {
+				managerCutPercentage: cut.cutPct,
+				managerName:          cut.managerName,
+				managerEmail:         cut.managerEmail,
+			}).catch(() => null);
+
+			// Update result record
+			await pb.collection('tournament_results').update(cut.resultId, {
+				managerCutPercentage: cut.cutPct,
+				managerEarnings:      mgrAmt,
+				netProEarnings:       proNet,
+			});
+
+			// Update pro payment
+			const proPayment = await pb.collection('pro_payments')
+				.getFirstListItem(`tournamentResult = '${cut.resultId}' && recipient = 'pro'`)
+				.catch(() => null);
+			if (proPayment) {
+				await pb.collection('pro_payments').update(proPayment.id, {
+					amount:               proNet,
+					netProAmount:         proNet,
+					managerCutPercentage: cut.cutPct,
+				});
+			}
+
+			// Manager payment: create / update / delete
+			const mgrPayment = await pb.collection('pro_payments')
+				.getFirstListItem(`tournamentResult = '${cut.resultId}' && recipient = 'manager'`)
+				.catch(() => null);
+
+			if (cut.cutPct > 0 && mgrAmt > 0) {
+				const pro = await pb.collection('talent').getOne(result.pro).catch(() => null);
+				if (mgrPayment) {
+					await pb.collection('pro_payments').update(mgrPayment.id, {
+						amount:               mgrAmt,
+						managerAmount:        mgrAmt,
+						managerCutPercentage: cut.cutPct,
+						managerName:          cut.managerName,
+						managerEmail:         cut.managerEmail,
+					});
+				} else {
+					await pb.collection('pro_payments').create({
+						tournament:           params.id,
+						pro:                  result.pro,
+						tournamentResult:     cut.resultId,
+						paymentType:          'tournament',
+						recipient:            'manager',
+						amount:               mgrAmt,
+						managerAmount:        mgrAmt,
+						grossAmount:          gross,
+						managerCutPercentage: cut.cutPct,
+						managerName:          cut.managerName,
+						managerEmail:         cut.managerEmail,
+						status:               'pending',
+						description:          `Manager cut (${cut.cutPct}%) — ${pro?.name ?? result.pro} — ${tournament.name}`,
+					});
+				}
+			} else if (mgrPayment) {
+				await pb.collection('pro_payments').delete(mgrPayment.id).catch(() => null);
+			}
+		}
+
+		return { success: true, applied: cuts.length };
+	},
+
+	// Generate expense + approval records for all pro payments
+	generateExpenses: async ({ locals, params }) => {
+		const pb = locals.pb;
+		const tournament = await pb.collection('tournaments').getOne(params.id);
+
+		const payments = await pb.collection('pro_payments').getFullList({
+			filter: `tournament = '${params.id}'`,
+			expand: 'pro',
+		}).catch(() => [] as any[]);
+
+		if (payments.length === 0) return fail(400, { error: 'No payments to generate expenses for' });
+
+		// Get existing work order number
+		const wo = await pb.collection('work_orders')
+			.getFirstListItem(`projectId = '${params.id}' && source = 'pro_payment'`)
+			.catch(() => null);
+
+		const woNumber   = wo?.work_order_number ?? '';
+		const today      = new Date().toISOString().slice(0, 10);
+		const submittedBy = locals.pb.authStore.record?.id ?? undefined;
+
+		const createdExpenseIds: string[] = [];
+
+		for (const p of payments) {
+			// Skip if expense already exists for this payment
+			const existing = await pb.collection('expenses')
+				.getFirstListItem(`work_order_number = '${woNumber}' && description ~ '${p.id}'`)
+				.catch(() => null);
+			if (existing) continue;
+
+			const proName    = p.expand?.pro?.name ?? p.pro;
+			const gender     = p.expand?.pro?.gender ?? 'male';
+			const isMgr      = p.recipient === 'manager';
+			const category   = isMgr
+				? (gender === 'female' ? 'Expenses/FPO (Female)' : 'Expenses/MPO (Male)')
+				: (gender === 'female' ? 'Expenses/FPO (Female)' : 'Expenses/MPO (Male)');
+
+			const description = isMgr
+				? `Manager cut — ${p.managerName || 'Manager'} (${p.managerCutPercentage}%) for ${proName} — ${tournament.name}`
+				: `Player payment — ${proName} — ${tournament.name}`;
+
+			const expense = await pb.collection('expenses').create({
+				description,
+				amount:      p.amount,
+				category,
+				status:      'submitted',
+				date:        today,
+				notes:       `Payment ID: ${p.id} | Tournament: ${tournament.name} | Recipient: ${p.recipient} | ${p.description ?? ''}`,
+				work_order_number: woNumber,
+				...(submittedBy ? { submittedBy } : {}),
+			});
+			createdExpenseIds.push(expense.id);
+
+			// Create approval record
+			await pb.collection('approvals').create({
+				entityType:    'expense',
+				entityId:      expense.id,
+				expenseId:     expense.id,
+				status:        'pending',
+				requestedDate: today,
+				amount:        p.amount,
+				...(submittedBy ? { requestedBy: submittedBy } : {}),
+			}).catch(() => null);
+		}
+
+		return { success: true, created: createdExpenseIds.length };
 	},
 
 	setManagerCut: async ({ request, locals, params }) => {
