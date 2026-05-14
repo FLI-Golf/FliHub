@@ -50,6 +50,23 @@
 	const openEditModal = (t: any) => { editingTournament = t; showCreateModal = true; };
 	const closeModal = () => { showCreateModal = false; editingTournament = null; };
 
+	// Season 1 = franchiseCutPercentage === 0; pre-fill venue for new tournaments
+	const SEASON1_LOCATION = 'Arizona';
+	const SEASON1_VENUE    = 'Turf Paradise';
+
+	let modalSeasonId = $state<string>('');
+	const modalSeason = $derived(data.seasonRecords.find((s: any) => s.id === modalSeasonId));
+	const isSeason1Modal = $derived((modalSeason?.franchiseCutPercentage ?? 1) === 0);
+
+	$effect(() => {
+		if (showCreateModal && !editingTournament) {
+			// Default to the active/most-recent season
+			modalSeasonId = data.activeSeasonRecord?.id ?? data.seasonRecords[0]?.id ?? '';
+		} else if (showCreateModal && editingTournament) {
+			modalSeasonId = editingTournament.seasonRef ?? '';
+		}
+	});
+
 	// Map tournament number → scheduled purse from the season budget
 	const purseByNumber = $derived(
 		Object.fromEntries(
@@ -107,21 +124,21 @@
 	{#if activeTab === 'tournaments'}
 	<!-- Filters -->
 	<div class="bg-slate-800 rounded-lg border border-slate-700 p-4">
-		<div class="flex gap-4">
+		<div class="flex gap-4 flex-wrap items-end">
 			<div>
 				<label class="text-sm font-medium text-slate-300">Season</label>
 				<select
 					class="mt-1 block w-full rounded-md border border-slate-600 bg-slate-700 text-slate-100 px-3 py-2"
 					onchange={(e) => {
-						const s = e.currentTarget.value;
-						window.location.href = s
-							? `/dashboard/talent/tournaments?season=${s}`
-							: '/dashboard/talent/tournaments';
+						const p = new URLSearchParams(window.location.search);
+						const v = e.currentTarget.value;
+						if (v) p.set('season', v); else p.delete('season');
+						window.location.href = `/dashboard/talent/tournaments${p.toString() ? '?' + p.toString() : ''}`;
 					}}
 				>
 					<option value="">All Seasons</option>
 					{#each data.seasonRecords as s}
-						<option value={s.id} selected={data.currentSeasonId === s.id}>{s.name} ({s.year})</option>
+						<option value={s.id} selected={data.currentSeasonId === s.id}>{s.name}</option>
 					{/each}
 				</select>
 			</div>
@@ -130,10 +147,10 @@
 				<select
 					class="mt-1 block w-full rounded-md border border-slate-600 bg-slate-700 text-slate-100 px-3 py-2"
 					onchange={(e) => {
-						const s = e.currentTarget.value;
-						window.location.href = s
-							? `/dashboard/talent/tournaments?status=${s}`
-							: '/dashboard/talent/tournaments';
+						const p = new URLSearchParams(window.location.search);
+						const v = e.currentTarget.value;
+						if (v) p.set('status', v); else p.delete('status');
+						window.location.href = `/dashboard/talent/tournaments${p.toString() ? '?' + p.toString() : ''}`;
 					}}
 				>
 					<option value="">All Statuses</option>
@@ -141,6 +158,26 @@
 					<option value="in_progress" selected={data.currentStatus === 'in_progress'}>In Progress</option>
 					<option value="completed"   selected={data.currentStatus === 'completed'}>Completed</option>
 					<option value="cancelled"   selected={data.currentStatus === 'cancelled'}>Cancelled</option>
+				</select>
+			</div>
+			<div>
+				<label class="text-sm font-medium text-slate-300">Sort</label>
+				<select
+					class="mt-1 block w-full rounded-md border border-slate-600 bg-slate-700 text-slate-100 px-3 py-2"
+					onchange={(e) => {
+						const p = new URLSearchParams(window.location.search);
+						const v = e.currentTarget.value;
+						if (v) p.set('sort', v); else p.delete('sort');
+						window.location.href = `/dashboard/talent/tournaments${p.toString() ? '?' + p.toString() : ''}`;
+					}}
+				>
+					<option value=""        selected={!data.currentSort}>Date Ascending</option>
+					<option value="number"  selected={data.currentSort === 'number'}># Ascending</option>
+					<option value="-number" selected={data.currentSort === '-number'}># Descending</option>
+					<option value="date"    selected={data.currentSort === 'date'}>Date Ascending</option>
+					<option value="-date"   selected={data.currentSort === '-date'}>Date Descending</option>
+					<option value="name"    selected={data.currentSort === 'name'}>Name A–Z</option>
+					<option value="-name"   selected={data.currentSort === '-name'}>Name Z–A</option>
 				</select>
 			</div>
 		</div>
@@ -330,7 +367,21 @@
 			</div>
 
 			{#if cfg.franchiseCutPercentage === 0}
-				<p class="text-xs text-emerald-400 mt-3">★ Franchise cut waived this season — 100% of prize pool goes to pros.</p>
+				<div class="mt-3 flex items-center gap-4 flex-wrap">
+					<p class="text-xs text-emerald-400">★ Franchise cut waived this season — 100% of prize pool goes to pros.</p>
+					<form method="POST" action="?/bulkUpdateLocation" use:enhance={() => {
+						return async ({ update }) => { await update(); };
+					}}>
+						<input type="hidden" name="seasonId"  value={s.id} />
+						<input type="hidden" name="location"  value="Arizona" />
+						<input type="hidden" name="venue"     value="Turf Paradise" />
+						<button type="submit"
+							onclick={(e) => { if (!confirm('Set location to Arizona / Turf Paradise on all tournaments in this season?')) e.preventDefault(); }}
+							class="text-xs px-3 py-1.5 rounded-lg bg-slate-700 hover:bg-slate-600 text-slate-300 border border-slate-600 transition-colors">
+							📍 Set all to Turf Paradise, AZ
+						</button>
+					</form>
+				</div>
 			{/if}
 		</div>
 	{/each}
@@ -458,9 +509,10 @@
 					<div class="grid grid-cols-2 gap-4">
 						<div>
 							<label class="block text-sm font-medium mb-1">Season *</label>
-							<select name="seasonRef" required class="w-full rounded-md border border-gray-300 px-3 py-2">
+							<select name="seasonRef" required class="w-full rounded-md border border-gray-300 px-3 py-2"
+								onchange={(e) => { modalSeasonId = e.currentTarget.value; }}>
 								{#each data.seasonRecords as s}
-									<option value={s.id} selected={editingTournament?.seasonRef === s.id}>{s.name} ({s.year})</option>
+									<option value={s.id} selected={modalSeasonId === s.id}>{s.name}</option>
 								{/each}
 							</select>
 							<input type="hidden" name="season" value={editingTournament?.season || new Date().getFullYear()} />
@@ -504,7 +556,7 @@
 							<input
 								type="text"
 								name="location"
-								value={editingTournament?.location || ''}
+								value={editingTournament?.location || (isSeason1Modal ? SEASON1_LOCATION : '')}
 								class="w-full rounded-md border border-gray-300 px-3 py-2"
 							/>
 						</div>
@@ -513,7 +565,7 @@
 							<input
 								type="text"
 								name="venue"
-								value={editingTournament?.venue || ''}
+								value={editingTournament?.venue || (isSeason1Modal ? SEASON1_VENUE : '')}
 								class="w-full rounded-md border border-gray-300 px-3 py-2"
 							/>
 						</div>

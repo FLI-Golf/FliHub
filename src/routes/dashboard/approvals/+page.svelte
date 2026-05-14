@@ -112,6 +112,31 @@
 		return list;
 	});
 
+	// Group filtered approvals by work order number (from linked expense)
+	const byWorkOrder = $derived.by(() => {
+		const map = new Map<string, { key: string; label: string; approvals: any[] }>();
+		for (const a of filtered) {
+			const wo    = a.expand?.expenseId?.work_order_number ?? '';
+			const label = wo || 'Other';
+			if (!map.has(label)) map.set(label, { key: label, label, approvals: [] });
+			map.get(label)!.approvals.push(a);
+		}
+		// Sort: work-order groups first (alphabetical), then "Other"
+		return Array.from(map.values()).sort((a, b) => {
+			if (a.key === 'Other') return 1;
+			if (b.key === 'Other') return -1;
+			return a.key.localeCompare(b.key);
+		});
+	});
+
+	// Track which groups are expanded (all collapsed by default)
+	let expandedGroups = $state<Set<string>>(new Set());
+	const toggleGroup = (key: string) => {
+		const next = new Set(expandedGroups);
+		if (next.has(key)) next.delete(key); else next.add(key);
+		expandedGroups = next;
+	};
+
 	const isAdmin    = $derived(data.userProfile?.role === 'admin');
 	const isLeader   = $derived(data.userProfile?.role === 'leader');
 	const canApprove = $derived(isAdmin || isLeader);
@@ -188,36 +213,49 @@
 
 		<!-- Test data panel (admin only) — moved below header -->
 
-		<!-- Quorum setting -->
-		{#if canApprove}
-			<div class="flex items-center gap-2 bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 shrink-0">
-				<Users class="size-4 text-slate-400 shrink-0" />
-				<span class="text-sm text-slate-400">Required approvals:</span>
-				{#if editingQuorum}
+	</div>
+
+	<!-- Quorum setting banner — always visible, edit restricted to admins -->
+	{#if true}
+		<div class="rounded-xl border border-blue-800/50 bg-blue-950/30 px-5 py-4 flex items-center gap-4 flex-wrap">
+			<div class="flex items-center gap-3 flex-1">
+				<Users class="size-5 text-blue-400 shrink-0" />
+				<div>
+					<p class="text-sm font-semibold text-blue-200">Approval Quorum</p>
+					<p class="text-xs text-blue-300/70">Number of admins required to approve each expense before it is processed</p>
+				</div>
+			</div>
+			{#if editingQuorum}
+				<div class="flex items-center gap-2">
 					<input
 						type="number" min="1" max="10"
 						bind:value={quorumInput}
-						class="w-14 text-center rounded-md border border-slate-600 bg-slate-900 text-slate-100 text-sm px-2 py-0.5 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+						class="w-16 text-center rounded-md border border-blue-600 bg-slate-900 text-slate-100 text-sm px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-500"
 					/>
-					<button
-						type="button"
-						onclick={saveQuorum}
-						disabled={savingQuorum}
-						class="text-xs font-semibold px-2 py-1 rounded bg-emerald-600 hover:bg-emerald-500 text-white transition-colors disabled:opacity-50"
-					>
-						{#if savingQuorum}<Loader2 class="size-3 animate-spin" />{:else}Save{/if}
+					<button type="button" onclick={saveQuorum} disabled={savingQuorum}
+						class="text-xs font-semibold px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white transition-colors disabled:opacity-50">
+						{#if savingQuorum}<Loader2 class="size-3 animate-spin inline mr-1" />{/if}Save
 					</button>
-					<button type="button" onclick={() => { editingQuorum = false; quorumInput = String(data.quorum); quorumError = ''; }} class="text-xs text-slate-500 hover:text-slate-300">Cancel</button>
+					<button type="button" onclick={() => { editingQuorum = false; quorumInput = String(data.quorum); quorumError = ''; }}
+						class="text-xs text-slate-400 hover:text-slate-200 transition-colors">Cancel</button>
 					{#if quorumError}<span class="text-xs text-red-400">{quorumError}</span>{/if}
-				{:else}
-					<span class="text-lg font-bold text-emerald-400">{data.quorum}</span>
-					<button type="button" onclick={() => { editingQuorum = true; quorumInput = String(data.quorum); }} class="text-slate-500 hover:text-slate-300 transition-colors" title="Edit quorum">
-						<Settings2 class="size-3.5" />
+				</div>
+			{:else}
+				<div class="flex items-center gap-3">
+					<div class="text-center">
+						<span class="text-3xl font-black text-blue-300">{data.quorum}</span>
+						<p class="text-xs text-blue-400/70">required</p>
+					</div>
+					<button type="button" onclick={() => { editingQuorum = true; quorumInput = String(data.quorum); }}
+
+						class="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg border border-blue-700/60 text-blue-300 hover:bg-blue-900/40 transition-colors">
+						<Settings2 class="size-3.5" /> Edit
 					</button>
-				{/if}
-			</div>
-		{/if}
-	</div>
+				</div>
+
+			{/if}
+		</div>
+	{/if}
 
 	<!-- Test data panel -->
 	{#if isAdmin}
@@ -424,18 +462,49 @@
 		</div>
 	{/if}
 
-	<!-- List -->
+	<!-- List grouped by work order -->
 	<div class="space-y-4">
 		{#if filtered.length === 0}
 			<Card class="p-10 text-center text-muted-foreground">No approval requests found</Card>
 		{:else}
-			{#each filtered as approval (approval.id)}
+			{#each byWorkOrder as group (group.key)}
+				{@const groupPending  = group.approvals.filter((a: any) => a.status === 'pending').length}
+				{@const groupApproved = group.approvals.filter((a: any) => a.status === 'approved').length}
+				{@const groupTotal    = group.approvals.reduce((s: number, a: any) => s + (a.amount || 0), 0)}
+				{@const isOpen        = expandedGroups.has(group.key)}
+				<div class="rounded-xl border border-slate-700 overflow-hidden">
+					<!-- Group header -->
+					<button type="button" onclick={() => toggleGroup(group.key)}
+						class="w-full flex items-center justify-between px-5 py-4 bg-slate-800 hover:bg-slate-700/60 transition-colors text-left group">
+						<div class="flex items-center gap-3 flex-1 min-w-0">
+							<span class="font-mono text-xs text-slate-400 shrink-0">{group.label}</span>
+							<div class="flex items-center gap-2 flex-wrap">
+								{#if groupPending > 0}
+									<span class="text-xs px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-400 border border-amber-500/30">{groupPending} pending</span>
+								{/if}
+								{#if groupApproved > 0}
+									<span class="text-xs px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">{groupApproved} approved</span>
+								{/if}
+							</div>
+						</div>
+						<div class="flex items-center gap-4 shrink-0">
+							<span class="text-sm font-semibold text-emerald-300">{fmt(groupTotal)}</span>
+							<span class="text-xs text-slate-500 group-hover:text-slate-300 transition-colors">{isOpen ? '▲' : '▼'}</span>
+						</div>
+					</button>
+
+					<!-- Group cards -->
+					{#if isOpen}
+						<div class="divide-y divide-slate-700/50 bg-slate-900/30">
+							{#each group.approvals as approval (approval.id)}
 				{@const Icon      = typeIcon(approval.entityType)}
 				{@const voteCount = approval.voteCount ?? 0}
 				{@const quorum    = data.quorum ?? 2}
 				{@const votePct   = Math.min(100, (voteCount / quorum) * 100)}
 				{@const msg       = actionMessages[approval.id]}
-				<Card class="p-6">
+				{@const expense   = approval.expand?.expenseId}
+				{@const isMgrCut  = expense?.description?.startsWith('Manager cut')}
+				<div class="p-5 hover:bg-slate-800/40 transition-colors">
 					<div class="flex items-start justify-between gap-4">
 						<!-- Left: icon + details -->
 						<div class="flex items-start gap-4 flex-1 min-w-0">
@@ -444,12 +513,30 @@
 							</div>
 
 							<div class="flex-1 min-w-0">
-								<div class="flex items-center gap-2 mb-3 flex-wrap">
-									<h3 class="font-semibold capitalize">{approval.entityType} Approval</h3>
-									<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium {statusColor(approval.status)}">
+								<div class="flex items-center gap-2 mb-1 flex-wrap">
+									<h3 class="font-semibold text-slate-100 truncate">
+										{expense?.description ?? `${approval.entityType} Approval`}
+									</h3>
+									<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium shrink-0 {statusColor(approval.status)}">
 										{approval.status.replace('_', ' ')}
 									</span>
 								</div>
+
+								{#if expense}
+									<div class="flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-slate-500 mb-3">
+										{#if expense.work_order_number}
+											<span class="font-mono text-slate-400">{expense.work_order_number}</span>
+										{/if}
+										{#if expense.category}
+											<span>· {expense.category}</span>
+										{/if}
+										{#if isMgrCut}
+											<span class="text-amber-500">· Manager cut</span>
+										{:else}
+											<span class="text-emerald-500">· Player payment</span>
+										{/if}
+									</div>
+								{/if}
 
 								<div class="grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm mb-4">
 									<div class="flex items-center gap-2 text-muted-foreground">
@@ -542,7 +629,11 @@
 							</div>
 						{/if}
 					</div>
-				</Card>
+							</div>
+						{/each}
+						</div>
+					{/if}
+				</div>
 			{/each}
 		{/if}
 	</div>

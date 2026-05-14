@@ -12,13 +12,23 @@
 	let generatingWO       = $state(false);
 	let markingQb          = $state(false);
 	let showQbForm         = $state(false);
+	let showPayoutTable    = $state(false); // collapsed by default
+	let showResultsHelp    = $state(false);
 
 	// Per-pro inline manager cut editing (row-level)
 	let mgrEdits = $state<Record<string, { editing: boolean; cutPct: number; saving: boolean }>>({});
-	const getMgrEdit = (resultId: string, defaultPct: number) => {
-		if (!mgrEdits[resultId]) mgrEdits[resultId] = { editing: false, cutPct: defaultPct, saving: false };
-		return mgrEdits[resultId];
-	};
+
+	// Pre-initialise edit state for all results so getMgrEdit never writes inside a derived/template
+	$effect(() => {
+		for (const r of data.results) {
+			if (!mgrEdits[r.id]) {
+				mgrEdits[r.id] = { editing: false, cutPct: r.managerCutPercentage ?? 0, saving: false };
+			}
+		}
+	});
+
+	const getMgrEdit = (resultId: string, defaultPct: number) =>
+		mgrEdits[resultId] ?? { editing: false, cutPct: defaultPct, saving: false };
 
 	// Manager cut overlay modal — shows all pros at once
 	let showMgrOverlay  = $state(false);
@@ -100,7 +110,15 @@
 				map.get(fid)!.results.push(r);
 			}
 			for (const g of map.values()) g.results.sort((a, b) => a.placement - b.placement);
-			return Array.from(map.values()).sort((a, b) => {
+			const groups = Array.from(map.values());
+			// Use franchiseRank if any result has it set, otherwise fall back to earnings
+			const hasRank = groups.some(g => g.results.some(r => r.franchiseRank > 0));
+			return groups.sort((a, b) => {
+				if (hasRank) {
+					const aRank = a.results.find(r => r.franchiseRank > 0)?.franchiseRank ?? 9999;
+					const bRank = b.results.find(r => r.franchiseRank > 0)?.franchiseRank ?? 9999;
+					return aRank - bRank;
+				}
 				const aTotal = a.results.reduce((s, r) => s + (r.proEarnings || 0), 0);
 				const bTotal = b.results.reduce((s, r) => s + (r.proEarnings || 0), 0);
 				return bTotal - aTotal;
@@ -118,12 +136,75 @@
 	const pendingCount  = $derived((data.proPayments ?? []).filter((p: any) => p.status === 'pending').length);
 	const paidCount     = $derived((data.proPayments ?? []).filter((p: any) => p.status === 'paid').length);
 
-	let expandedFranchise = $state<string | null>(null);
-	let expandedPayout    = $state<number | null>(null);
-	const toggleFranchise = (id: string) => expandedFranchise = expandedFranchise === id ? null : id;
-	const togglePayout    = (n: number)  => expandedPayout    = expandedPayout    === n  ? null : n;
+	let expandedFranchises = $state<Set<string>>(new Set());
+	let expandedPayout     = $state<number | null>(null);
 
-	// Drag-to-reorder state
+
+
+	const toggleFranchise = (id: string) => {
+		const next = new Set(expandedFranchises);
+		if (next.has(id)) next.delete(id); else next.add(id);
+		expandedFranchises = next;
+	};
+	const togglePayout = (n: number) => expandedPayout = expandedPayout === n ? null : n;
+
+	// Franchise drag-to-reorder — client-side only until Save Order is clicked
+	let franchiseOrder      = $state<typeof byFranchise>([]);
+	let franchiseOrderDirty = $state(false);
+	let franchiseSaving     = $state(false);
+	let dragFranchiseId     = $state<string | null>(null);
+	let dragOverFranchiseId = $state<string | null>(null);
+
+	// Sync franchiseOrder from server data on load — never overwrite unsaved drag changes
+	let franchiseOrderInitialised = false;
+	$effect(() => {
+		// Touch byFranchise to subscribe; only sync before first user interaction
+		const snapshot = [...byFranchise];
+		if (!franchiseOrderInitialised) {
+			franchiseOrder = snapshot;
+			franchiseOrderDirty = false;
+			franchiseOrderInitialised = true;
+		}
+	});
+
+	function onFranchiseDragStart(e: DragEvent, fid: string) {
+		dragFranchiseId = fid;
+		if (e.dataTransfer) { e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', fid); }
+	}
+	function onFranchiseDragOver(e: DragEvent, fid: string) {
+		e.preventDefault();
+		if (e.dataTransfer) e.dataTransfer.dropEffect = 'move';
+		dragOverFranchiseId = fid;
+	}
+	function onFranchiseDragEnd() { dragFranchiseId = null; dragOverFranchiseId = null; }
+
+	function onFranchiseDrop(e: DragEvent, targetFid: string) {
+		e.preventDefault();
+		if (!dragFranchiseId || dragFranchiseId === targetFid) { onFranchiseDragEnd(); return; }
+
+		// Reorder client-side only
+		const next = [...franchiseOrder];
+		const fromIdx = next.findIndex(g => g.franchiseId === dragFranchiseId);
+		const toIdx   = next.findIndex(g => g.franchiseId === targetFid);
+		const [moved] = next.splice(fromIdx, 1);
+		next.splice(toIdx, 0, moved);
+		franchiseOrder = next;
+		franchiseOrderDirty = true;
+		onFranchiseDragEnd();
+	}
+
+	async function saveFranchiseOrder() {
+		franchiseSaving = true;
+		const order = franchiseOrder.map(g => g.franchiseId);
+		const fd = new FormData();
+		fd.append('order', JSON.stringify(order));
+		await fetch('?/reorderFranchises', { method: 'POST', body: fd });
+		franchiseSaving = false;
+		franchiseOrderDirty = false;
+		location.reload();
+	}
+
+	// Result drag-to-reorder state
 	let dragResultId  = $state<string | null>(null);
 	let dragOverId    = $state<string | null>(null);
 	let reorderSaving = $state(false);
@@ -280,85 +361,73 @@
 			{/if}
 		</div>
 
-		<!-- Interactive placement payout accordion -->
+		<!-- Placement Payouts table -->
 		<div class="border-t border-slate-700 pt-4">
-			<h3 class="font-semibold mb-3 text-slate-200">
-				Placement Payouts — Per Division
-				<span class="text-xs font-normal text-slate-400 ml-2">(click a row to see breakdown · every team gets a cheque)</span>
-			</h3>
+			<button type="button" onclick={() => showPayoutTable = !showPayoutTable}
+				class="w-full flex items-center justify-between px-4 py-3 rounded-lg border border-slate-600 bg-slate-700/40 hover:bg-slate-700/70 transition-colors text-left group mb-3">
+				<div class="flex items-center gap-3">
+					<span class="text-base font-bold text-slate-100">Placement Payouts</span>
+					<span class="text-xs text-slate-400">view a breakdown for each payout per tournament position</span>
+				</div>
+				<span class="text-xs font-semibold px-2.5 py-1 rounded-md bg-slate-600 group-hover:bg-slate-500 text-slate-200 transition-colors shrink-0">
+					{showPayoutTable ? '▲ hide' : '▼ show'}
+				</span>
+			</button>
+		{#if showPayoutTable}
 			<div class="space-y-1">
 				{#each data.payoutStructure as payout}
-					{@const isOpen = expandedPayout === payout.placement}
 					{@const topThree = payout.placement <= 3}
-					<div class="rounded-lg border {topThree ? 'border-slate-600' : 'border-slate-700/60'} overflow-hidden">
-						<!-- Summary row -->
-						<button
-							type="button"
-							onclick={() => togglePayout(payout.placement)}
-							class="w-full flex items-center justify-between px-4 py-2.5 text-sm transition-colors hover:bg-slate-700/50 {topThree ? 'bg-slate-700/30' : 'bg-slate-800/30'} text-left"
-						>
-							<span class="font-semibold text-slate-200 w-20 shrink-0">{placementLabel(payout.placement)}</span>
-							<div class="flex items-center gap-6 ml-auto">
-								<span class="font-bold text-emerald-300">{formatCurrency(payout.amount)}</span>
-								{#if !noFranchiseCut}
-									<span class="text-xs text-purple-300 hidden sm:inline">Franchise: {formatCurrency(payout.franchiseAmount)}</span>
-									<span class="text-xs text-slate-300 hidden sm:inline">Total: {formatCurrency(payout.totalAmount)}</span>
-								{/if}
-								<span class="text-slate-500 text-xs w-4">{isOpen ? '▲' : '▼'}</span>
-							</div>
-						</button>
-
-						<!-- Expanded breakdown -->
-						{#if isOpen}
-							{@const resultAtPlacement = data.results.filter(r => r.placement === payout.placement)}
-							<div class="border-t border-slate-700 px-4 py-3 bg-slate-800/60 space-y-2">
-								<div class="flex flex-wrap gap-x-6 gap-y-1 text-xs">
-									<span class="text-slate-400">Gross per division: <span class="text-emerald-300 font-semibold">{formatCurrency(payout.amount)}</span></span>
-									{#if !noFranchiseCut}
-										<span class="text-slate-400">Franchise cut: <span class="text-purple-300 font-semibold">−{formatCurrency(payout.franchiseAmount)}</span></span>
-									{/if}
-									<span class="text-slate-400">% of purse: <span class="text-blue-300 font-semibold">{((payout.amount / data.divisionPurse) * 100).toFixed(1)}%</span></span>
-								</div>
-								{#if resultAtPlacement.length > 0}
-									<div class="flex flex-wrap gap-2 pt-1">
-										{#each resultAtPlacement as r}
-											<span class="text-xs px-2 py-0.5 rounded border border-slate-600 bg-slate-700/50 text-slate-300">
-												{r.expand?.pro?.name ?? r.pro} · {r.expand?.franchise?.name ?? ''}
-												{#if r.managerCutPercentage > 0}<span class="text-amber-400"> · {r.managerCutPercentage}% mgr</span>{/if}
-											</span>
-										{/each}
-									</div>
-								{/if}
-							</div>
+					{@const franchiseTotal = payout.amount * 2}
+					{@const resultAtPlacement = data.results.filter(r => r.placement === payout.placement)}
+					<div class="flex items-center justify-between px-4 py-2.5 rounded-lg text-sm {topThree ? 'bg-slate-700/30 border border-slate-600' : 'bg-slate-800/30 border border-slate-700/60'}">
+						<span class="font-semibold text-slate-200 w-20 shrink-0">{placementLabel(payout.placement)}</span>
+						{#if resultAtPlacement.length > 0}
+							<span class="text-xs text-slate-400 flex-1 truncate px-2">
+								{resultAtPlacement.map(r => r.expand?.franchise?.name ?? '').filter(Boolean).filter((v, i, a) => a.indexOf(v) === i).join(', ')}
+							</span>
+						{:else}
+							<span class="flex-1"></span>
 						{/if}
+						<span class="font-bold text-emerald-300">{formatCurrency(franchiseTotal)}</span>
 					</div>
 				{/each}
 
 				<!-- Totals row -->
 				<div class="flex items-center justify-between px-4 py-2.5 rounded-lg bg-slate-700/50 border border-slate-600 text-sm font-semibold mt-1">
 					<span class="text-slate-300">Total</span>
-					<div class="flex items-center gap-6">
-						<span class="text-emerald-300">{formatCurrency(data.payoutStructure.reduce((s, p) => s + p.amount, 0))}</span>
-						{#if !noFranchiseCut}
-							<span class="text-purple-300 hidden sm:inline">{formatCurrency(data.payoutStructure.reduce((s, p) => s + p.franchiseAmount, 0))}</span>
-							<span class="text-slate-100 hidden sm:inline">{formatCurrency(data.payoutStructure.reduce((s, p) => s + p.totalAmount, 0))}</span>
-						{/if}
-						<span class="w-4"></span>
-					</div>
+					<span class="text-emerald-300">{formatCurrency(data.payoutStructure.reduce((s, p) => s + p.amount * 2, 0))}</span>
 				</div>
 			</div>
 			<p class="text-xs text-slate-500 mt-2">
-				* Amounts shown are per division (Men's and Women's each receive the same schedule).
+				* Franchise total = Men's + Women's division combined.
 				{#if noFranchiseCut}Season 1: franchise cut waived — pros receive 100% of the purse.{/if}
 			</p>
+		{/if}
 		</div>
-	</div>
 
 	<!-- Results by Franchise -->
 	<div class="bg-slate-800 border border-slate-700 rounded-xl overflow-hidden">
 		<div class="border-b border-slate-700">
 			<div class="flex items-center justify-between px-5 py-3 gap-2 flex-wrap">
-				<p class="font-semibold text-slate-200 text-sm">Results by Franchise ({data.results.length})</p>
+				<div class="flex items-center gap-2">
+					<p class="font-semibold text-slate-200 text-sm">Results by Franchise ({data.results.length})</p>
+					{#if franchiseOrderDirty}
+						<button type="button" onclick={saveFranchiseOrder} disabled={franchiseSaving}
+							class="flex items-center gap-1 text-xs px-2.5 py-1 rounded-lg bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white font-semibold transition-colors">
+							{#if franchiseSaving}<Loader2 class="size-3 animate-spin" />{/if}
+							Save Order
+						</button>
+						<button type="button" onclick={() => { franchiseOrder = [...byFranchise]; franchiseOrderDirty = false; franchiseOrderInitialised = true; }}
+							class="text-xs px-2 py-1 rounded-lg border border-slate-600 text-slate-400 hover:text-slate-200 transition-colors">
+							Reset
+						</button>
+					{/if}
+				</div>
+					<button type="button" onclick={() => showResultsHelp = !showResultsHelp}
+						class="text-[10px] px-2 py-0.5 rounded border border-slate-600 text-slate-500 hover:text-slate-300 hover:border-slate-500 transition-colors select-none">
+						{showResultsHelp ? 'hide help' : '?'}
+					</button>
+				</div>
 				<div class="flex items-center gap-2">
 					{#if data.results.length > 0}
 						<button type="button" onclick={initOverlay}
@@ -366,35 +435,58 @@
 							<Users class="size-3.5" /> Manager Cuts
 						</button>
 					{/if}
-					<Button onclick={() => (showAddResultModal = true)} size="sm" variant="outline">+ Add Result</Button>
+					<Button onclick={saveFranchiseOrder} disabled={franchiseSaving} size="sm" variant="outline">
+					{#if franchiseSaving}<Loader2 class="size-3 animate-spin mr-1" />{/if}
+					Update Payouts
+				</Button>
 				</div>
 			</div>
 		</div>
+
+		{#if showResultsHelp}
+			<div class="border-b border-slate-700 bg-slate-900/60 px-5 py-4 text-xs text-slate-400">
+				<p class="font-semibold text-slate-300 mb-2">How to use this list</p>
+				<ul class="space-y-1.5">
+					<li>▸ <span class="text-slate-300">Click a franchise row</span> to expand and see individual pro results.</li>
+					<li>▸ <span class="text-slate-300">Drag the ⠿ handle</span> on any pro row to swap placement numbers with another row.</li>
+					<li>▸ <span class="text-slate-300">Click the % button</span> on a pro row to edit their manager cut inline.</li>
+					<li>▸ <span class="text-slate-300">Manager Cuts</span> opens a bulk overlay to set manager name, email, and cut % for all pros at once.</li>
+					<li>▸ Franchises are ranked by total gross earnings. Pros within each franchise are sorted by placement.</li>
+				</ul>
+			</div>
+		{/if}
+
+
 
 		{#if data.results.length === 0}
 			<div class="text-center py-12 text-slate-500">No results yet. Add results to see payouts.</div>
 		{:else}
 			<div class="divide-y divide-slate-700/50">
-				{#each byFranchise as group, gi}
+				{#each franchiseOrder as group, gi}
 					{@const groupTotal = group.results.reduce((s, r) => s + (r.proEarnings || 0), 0)}
 					{@const groupMgr   = group.results.reduce((s, r) => s + (r.managerEarnings || 0), 0)}
 					{@const groupNet   = groupTotal - groupMgr}
-					{@const isOpen     = expandedFranchise === group.franchiseId}
+					{@const isOpen     = expandedFranchises.has(group.franchiseId)}
 
 					<div>
 						<!-- Franchise header: drag handle | rank | name | toggle -->
-						<div class="flex items-stretch hover:bg-slate-700/20 transition-colors">
+						<div class="flex items-stretch transition-colors {dragOverFranchiseId === group.franchiseId && dragFranchiseId !== group.franchiseId ? 'border-t-2 border-blue-500 bg-blue-950/10' : 'hover:bg-slate-700/20'} {dragFranchiseId === group.franchiseId ? 'opacity-40' : ''}"
+							ondragover={(e) => onFranchiseDragOver(e, group.franchiseId)}
+							ondragleave={() => dragOverFranchiseId = null}
+							ondrop={(e) => onFranchiseDrop(e, group.franchiseId)}>
 
-							<!-- Drag handle (franchise reorder) -->
-							<div class="flex items-center px-3 cursor-grab active:cursor-grabbing text-slate-600 hover:text-slate-400 shrink-0 select-none"
-								title="Drag to reorder franchise">
+							<!-- Drag handle -->
+							<div class="flex items-center px-3 cursor-grab active:cursor-grabbing shrink-0 select-none text-slate-500 hover:text-slate-300 transition-colors"
+								draggable="true"
+								ondragstart={(e) => onFranchiseDragStart(e, group.franchiseId)}
+								ondragend={onFranchiseDragEnd}>
 								<svg class="size-4" fill="currentColor" viewBox="0 0 20 20">
 									<path d="M7 2a2 2 0 1 0 .001 4.001A2 2 0 0 0 7 2zm6 0a2 2 0 1 0 .001 4.001A2 2 0 0 0 13 2zM7 8a2 2 0 1 0 .001 4.001A2 2 0 0 0 7 8zm6 0a2 2 0 1 0 .001 4.001A2 2 0 0 0 13 8zM7 14a2 2 0 1 0 .001 4.001A2 2 0 0 0 7 14zm6 0a2 2 0 1 0 .001 4.001A2 2 0 0 0 13 14z"/>
 								</svg>
 							</div>
 
 							<!-- Rank number -->
-							<div class="flex items-center w-8 shrink-0 text-slate-500 font-black text-sm select-none">
+							<div class="flex items-center w-6 shrink-0 text-slate-500 font-black text-sm select-none">
 								{gi + 1}
 							</div>
 
@@ -436,7 +528,10 @@
 									{@const netAmt   = result.netProEarnings || gross}
 									{@const edit     = getMgrEdit(result.id, mgrPct)}
 
-									<div class="transition-colors {isDragOver ? 'border-t-2 border-blue-500 bg-blue-950/10' : ''} {dragResultId === result.id ? 'opacity-40' : ''}">
+									<div class="transition-colors {isDragOver ? 'border-t-2 border-blue-500 bg-blue-950/10' : ''} {dragResultId === result.id ? 'opacity-40' : ''}"
+										ondragover={(e) => onDragOver(e, result.id)}
+										ondragleave={() => dragOverId = null}
+										ondrop={(e) => onDrop(e, result.id)}>
 										<div class="flex items-stretch">
 
 											<!-- Result drag handle -->
@@ -444,24 +539,34 @@
 												draggable="true"
 												ondragstart={(e) => onDragStart(e, result.id)}
 												ondragend={onDragEnd}>
-												<svg class="size-3.5 text-slate-700 hover:text-slate-500" fill="currentColor" viewBox="0 0 20 20">
+												<svg class="size-3.5 text-slate-500 hover:text-slate-300" fill="currentColor" viewBox="0 0 20 20">
 													<path d="M7 2a2 2 0 1 0 .001 4.001A2 2 0 0 0 7 2zm6 0a2 2 0 1 0 .001 4.001A2 2 0 0 0 13 2zM7 8a2 2 0 1 0 .001 4.001A2 2 0 0 0 7 8zm6 0a2 2 0 1 0 .001 4.001A2 2 0 0 0 13 8zM7 14a2 2 0 1 0 .001 4.001A2 2 0 0 0 7 14zm6 0a2 2 0 1 0 .001 4.001A2 2 0 0 0 13 14z"/>
 												</svg>
 											</div>
 
-											<!-- Placement number -->
-											<div class="flex items-center w-8 shrink-0 font-black text-xs {result.placement <= 3 ? 'text-amber-400' : 'text-slate-600'} select-none"
-												ondragover={(e) => onDragOver(e, result.id)}
-												ondragleave={() => dragOverId = null}
-												ondrop={(e) => onDrop(e, result.id)}>
-												#{result.placement}
+											<!-- Placement number — editable -->
+											<div class="flex items-center w-12 shrink-0 select-none">
+												<input
+													type="number"
+													min="1"
+													value={result.placement}
+													onclick={(e) => e.stopPropagation()}
+													onkeydown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); }}
+													onblur={async (e) => {
+														const val = parseInt((e.target as HTMLInputElement).value);
+														if (!val || val === result.placement) return;
+														const fd = new FormData();
+														fd.append('resultId', result.id);
+														fd.append('placement', String(val));
+														await fetch('?/setPlacement', { method: 'POST', body: fd });
+														location.reload();
+													}}
+													class="w-10 bg-transparent font-black text-xs text-center {result.placement <= 3 ? 'text-amber-400' : 'text-slate-500'} border border-transparent hover:border-slate-600 focus:border-blue-500 focus:bg-slate-800 focus:text-slate-100 rounded px-1 py-0.5 outline-none transition-colors"
+												/>
 											</div>
 
-											<!-- Row content (drop zone) -->
-											<div class="flex-1 py-3 pr-5"
-												ondragover={(e) => onDragOver(e, result.id)}
-												ondragleave={() => dragOverId = null}
-												ondrop={(e) => onDrop(e, result.id)}>
+											<!-- Row content -->
+											<div class="flex-1 py-3 pr-5">
 												<div class="flex items-center gap-3 flex-wrap">
 
 											<!-- Pro name + division -->
@@ -701,7 +806,14 @@
 						{data.approvals?.filter((a: any) => a.status === 'approved').length ?? 0} approved ·
 						{data.approvals?.filter((a: any) => a.status === 'pending').length ?? 0} pending
 					{:else}
-						Generate expenses after setting manager cuts and creating the work order
+						{@const hasCuts = (data.results ?? []).some((r: any) => (r.managerCutPercentage ?? 0) > 0)}
+						{@const hasWO   = !!data.workOrder}
+						{@const hasPmts = (data.proPayments ?? []).length > 0 || (data.results ?? []).length > 0}
+						<span class="flex flex-col gap-0.5">
+							<span class="{hasCuts ? 'text-emerald-400' : 'text-slate-500'}">{hasCuts ? '✅' : '❌'} Manager cuts set</span>
+							<span class="{hasWO   ? 'text-emerald-400' : 'text-slate-500'}">{hasWO   ? '✅' : '❌'} Work order created</span>
+							<span class="{hasPmts ? 'text-emerald-400' : 'text-slate-500'}">{hasPmts ? '✅' : '❌'} Pro payments generated</span>
+						</span>
 					{/if}
 				</p>
 			</div>
@@ -715,7 +827,7 @@
 						return async ({ update }) => { await update(); };
 					}}>
 						<button type="submit"
-							disabled={!data.workOrder || (data.proPayments ?? []).length === 0}
+							disabled={!data.workOrder || ((data.proPayments ?? []).length === 0 && (data.results ?? []).length === 0)}
 							class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-600 hover:bg-slate-500 disabled:opacity-40 border border-slate-500 text-white text-xs font-semibold transition-colors"
 							title={!data.workOrder ? 'Generate work order first' : ''}>
 							<FileText class="size-3.5" /> Generate Expense Approvals
