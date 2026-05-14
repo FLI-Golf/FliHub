@@ -1,4 +1,5 @@
 import { RequestContext } from '$lib/infra/RequestContext';
+import { getAdminPocketBase } from '$lib/infra/pocketbase/pbClient';
 import type { PageServerLoad, Actions } from './$types';
 import { TournamentResultRepo } from '$lib/infra/pocketbase/repositories';
 import { error, fail } from '@sveltejs/kit';
@@ -84,7 +85,7 @@ export const load: PageServerLoad = async ({ locals, url, params }) => {
 		// Load pro_payments for this tournament
 		const proPayments = await pb.collection('pro_payments').getFullList({
 			filter: `tournament = '${params.id}'`,
-			sort: 'recipient,created',
+			sort: 'recipient',
 			expand: 'pro',
 		}).catch(() => [] as any[]);
 
@@ -93,7 +94,7 @@ export const load: PageServerLoad = async ({ locals, url, params }) => {
 		const expenses = woNumber
 			? await pb.collection('expenses').getFullList({
 				filter: `work_order_number = '${woNumber}'`,
-				sort:   'created',
+				sort:   'date',
 			}).catch(() => [] as any[])
 			: [];
 
@@ -316,6 +317,98 @@ export const actions: Actions = {
 		}
 	},
 
+	reorderFranchises: async ({ request, locals, params }) => {
+		const pb = locals.pb;
+		const fd = await request.formData();
+		const raw = fd.get('order') as string;
+		if (!raw) return fail(400, { error: 'Missing order' });
+
+		let franchiseIds: string[];
+		try { franchiseIds = JSON.parse(raw); } catch { return fail(400, { error: 'Invalid order JSON' }); }
+
+		// Load tournament + season for payout calculation
+		const tournament = await pb.collection('tournaments').getOne(params.id);
+		let seasonRecord: any = null;
+		if (tournament.seasonRef) {
+			seasonRecord = await pb.collection('seasons').getOne(tournament.seasonRef).catch(() => null);
+		}
+		const franchiseCutPct = seasonRecord?.franchiseCutPercentage ?? tournament.franchiseCutPercentage ?? 0;
+		const numberOfPlacements = seasonRecord?.numberOfPlacements ?? 12;
+		const { proCut } = calculateFranchisePayout(tournament.prizePool, franchiseCutPct);
+		const divisionPurse = proCut / 2;
+		const payoutStructure = calculatePlacementPayouts(divisionPurse, numberOfPlacements, franchiseCutPct);
+
+		// Build placement → payout amount lookup
+		const payoutByPlacement: Record<number, number> = {};
+		for (const p of payoutStructure) payoutByPlacement[p.placement] = p.amount;
+
+		// Load all results + pro records for manager cut
+		const [all, pros] = await Promise.all([
+			pb.collection('tournament_results').getFullList({ filter: `tournament = '${params.id}'` }),
+			pb.collection('talent').getFullList({ fields: 'id,managerCutPercentage' }),
+		]);
+		const mgrPctById: Record<string, number> = Object.fromEntries(pros.map((p: any) => [p.id, p.managerCutPercentage ?? 0]));
+
+		const updates: Promise<any>[] = [];
+		franchiseIds.forEach((fid, idx) => {
+			const placement = idx + 1;
+			const proEarnings = payoutByPlacement[placement] ?? 0;
+			for (const r of all) {
+				if (r.franchise === fid) {
+					const mgrPct = mgrPctById[r.pro] ?? r.managerCutPercentage ?? 0;
+					const managerEarnings = mgrPct > 0 ? Math.round(proEarnings * (mgrPct / 100) * 100) / 100 : 0;
+					const franchiseEarnings = proEarnings * (franchiseCutPct / 100);
+					updates.push(pb.collection('tournament_results').update(r.id, {
+						franchiseRank:    placement,
+						placement,
+						proEarnings,
+						franchiseEarnings,
+						managerEarnings,
+						netProEarnings:   proEarnings - managerEarnings,
+					}));
+				}
+			}
+		});
+		await Promise.all(updates);
+		return { success: true };
+	},
+
+	setPlacement: async ({ request, locals, params }) => {
+		const pb  = locals.pb;
+		const fd  = await request.formData();
+		const resultId   = fd.get('resultId') as string;
+		const newPlacement = parseInt(fd.get('placement') as string);
+
+		if (!resultId || isNaN(newPlacement) || newPlacement < 1)
+			return fail(400, { error: 'Invalid placement' });
+
+		// Load all results for this tournament to shift others
+		const all = await pb.collection('tournament_results').getFullList({
+			filter: `tournament = '${params.id}'`,
+			sort: 'placement',
+		});
+
+		const moving = all.find((r: any) => r.id === resultId);
+		if (!moving) return fail(404, { error: 'Result not found' });
+
+		const oldPlacement = moving.placement;
+		if (oldPlacement === newPlacement) return { success: true };
+
+		// Shift results between old and new position to fill the gap
+		const updates: Promise<any>[] = [];
+		for (const r of all) {
+			if (r.id === resultId) {
+				updates.push(pb.collection('tournament_results').update(r.id, { placement: newPlacement }));
+			} else if (oldPlacement < newPlacement && r.placement > oldPlacement && r.placement <= newPlacement) {
+				updates.push(pb.collection('tournament_results').update(r.id, { placement: r.placement - 1 }));
+			} else if (oldPlacement > newPlacement && r.placement >= newPlacement && r.placement < oldPlacement) {
+				updates.push(pb.collection('tournament_results').update(r.id, { placement: r.placement + 1 }));
+			}
+		}
+		await Promise.all(updates);
+		return { success: true };
+	},
+
 	swapPlacements: async ({ request, locals }) => {
 		const pb  = locals.pb;
 		const fd  = await request.formData();
@@ -423,7 +516,7 @@ export const actions: Actions = {
 
 	// Generate expense + approval records for all pro payments
 	generateExpenses: async ({ locals, params }) => {
-		const pb = locals.pb;
+		const pb = await getAdminPocketBase();
 		const tournament = await pb.collection('tournaments').getOne(params.id);
 
 		const payments = await pb.collection('pro_payments').getFullList({
@@ -440,7 +533,23 @@ export const actions: Actions = {
 
 		const woNumber   = wo?.work_order_number ?? '';
 		const today      = new Date().toISOString().slice(0, 10);
-		const submittedBy = locals.pb.authStore.record?.id ?? undefined;
+
+		// Resolve user_profile id for requestedBy (approvals relation points to user_profiles)
+		const userId = locals.pb.authStore.record?.id ?? '';
+		let submittedBy: string | undefined;
+		if (userId) {
+			const profiles = await pb.collection('user_profiles').getFullList({
+				filter: `userId = '${userId}'`, fields: 'id'
+			}).catch(() => [] as any[]);
+			submittedBy = profiles[0]?.id;
+		}
+		// Fall back to first admin profile if no session
+		if (!submittedBy) {
+			const admins = await pb.collection('user_profiles').getFullList({
+				filter: `role = 'admin'`, fields: 'id', perPage: 1
+			}).catch(() => [] as any[]);
+			submittedBy = admins[0]?.id;
+		}
 
 		const createdExpenseIds: string[] = [];
 

@@ -14,6 +14,18 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 
 	const seasonId = url.searchParams.get('season');
 	const status   = url.searchParams.get('status');
+	const sortParam = url.searchParams.get('sort') ?? '';
+
+	const sortMap: Record<string, string> = {
+		'number':  'tournamentNumber',
+		'-number': '-tournamentNumber',
+		'date':    'startDate',
+		'-date':   '-startDate',
+		'name':    'name',
+		'-name':   '-name',
+	};
+
+	const sort = sortMap[sortParam] ?? 'startDate';
 
 	try {
 		// Load all season records
@@ -30,27 +42,18 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 				seasonRecords.find((s: any) => s.status === 'active') ?? seasonRecords[0];
 		}
 
-		// Load tournaments filtered by season relation or status
-		let tournaments;
-		if (seasonId) {
-			tournaments = await tournamentRepo.findAll({
-				filter: `seasonRef = '${seasonId}'`,
-				sort: 'tournamentNumber',
-				expand: 'seasonRef',
-			});
-		} else if (status) {
-			tournaments = await tournamentRepo.findAll({
-				filter: `status = '${status}'`,
-				sort: '-startDate',
-				expand: 'seasonRef',
-			});
-		} else {
-			tournaments = await tournamentRepo.findAll({
-				sort: '-season,-tournamentNumber',
-				expand: 'seasonRef',
-				perPage: 100,
-			});
-		}
+		// Build filter
+		const filters: string[] = [];
+		if (seasonId) filters.push(`seasonRef = '${seasonId}'`);
+		if (status)   filters.push(`status = '${status}'`);
+
+		// Load tournaments
+		const tournaments = await tournamentRepo.findAll({
+			filter: filters.join(' && '),
+			sort,
+			expand: 'seasonRef',
+			perPage: 100,
+		});
 
 		// Build purse schedule for the active season
 		let seasonPurseSchedule: Array<{ tournamentNumber: number; totalPurse: number; mensPurse: number; womensPurse: number }> = [];
@@ -70,8 +73,9 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 			tournaments: tournaments.items,
 			seasonRecords,
 			activeSeasonRecord,
-			currentSeasonId: seasonId,
+			currentSeasonId: seasonId ?? activeSeasonRecord?.id ?? null,
 			currentStatus: status,
+			currentSort: sortParam,
 			seasonBudget,
 			seasonFranchiseCut,
 			seasonProCut,
@@ -85,6 +89,7 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 			activeSeasonRecord: null,
 			currentSeasonId: null,
 			currentStatus: null,
+			currentSort: null,
 			seasonBudget: 0,
 			seasonFranchiseCut: 0,
 			seasonProCut: 0,
@@ -199,6 +204,27 @@ export const actions: Actions = {
 			return { success: true, tournament };
 		} catch (error: any) {
 			return fail(400, { error: error.message });
+		}
+	},
+
+	bulkUpdateLocation: async ({ request, locals }) => {
+		const pb = locals.pb;
+		const fd = await request.formData();
+		const seasonId = fd.get('seasonId') as string;
+		const location = fd.get('location') as string;
+		const venue    = fd.get('venue') as string;
+		try {
+			const tournaments = await pb.collection('tournaments').getFullList({
+				filter: `seasonRef = '${seasonId}'`,
+			});
+			await Promise.all(
+				tournaments.map((t: any) =>
+					pb.collection('tournaments').update(t.id, { location, venue })
+				)
+			);
+			return { success: true, updated: tournaments.length };
+		} catch (err: any) {
+			return fail(400, { error: err.message });
 		}
 	},
 
