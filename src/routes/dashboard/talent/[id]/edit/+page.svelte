@@ -9,8 +9,8 @@
 
 	const talent = $derived(data.talent);
 
-	const TALENT_TYPES = ['player', 'broadcaster', 'commentator', 'analyst'];
-	const STATUSES = ['active', 'inactive', 'retired'];
+	const TALENT_TYPES = ['player', 'broadcaster', 'commentator', 'analyst', 'manager'];
+	const STATUSES = ['primary_pro', 'reserve_pro', 'active', 'inactive', 'retired'];
 	const GENDERS = ['male', 'female', 'other'];
 
 	let showDeleteConfirm = $state(false);

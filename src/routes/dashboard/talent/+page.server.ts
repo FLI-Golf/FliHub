@@ -12,7 +12,7 @@ interface TalentRecord {
 	avatar?: string;
 	status: string;
 	gender?: string;
-	talentType: ('player' | 'broadcaster' | 'commentator' | 'analyst')[];
+	talentType: ('player' | 'broadcaster' | 'commentator' | 'analyst' | 'manager')[];
 	// Player-specific fields
 	worldRanking?: number;
 	country?: string;
@@ -72,6 +72,14 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 		
 		const talentFilter = talentFilters.length > 0 ? talentFilters.join(' && ') : '';
 
+		// broadcaster_profiles uses its own status values (active/inactive) — only
+		// pass the filter through when the selected status is compatible.
+		const broadcasterStatusValues = ['active', 'inactive', 'retired'];
+		const broadcasterProfileFilter =
+			statusFilter && broadcasterStatusValues.includes(statusFilter)
+				? `status = '${statusFilter}'`
+				: '';
+
 		// Fetch talent and broadcaster_profiles
 		const [allTalentRecords, broadcasterProfiles, tournaments, pendingPayments, overduePayments, allResults] = await Promise.all([
 			pb.collection('talent').getFullList({ 
@@ -80,7 +88,7 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 			}),
 			pb.collection('broadcaster_profiles').getFullList({
 				sort: 'name',
-				filter: statusFilter ? `status = '${statusFilter}'` : ''
+				filter: broadcasterProfileFilter
 			}).catch(() => []), // May not exist yet
 			tournamentRepo.findAll({ sort: '-season,-tournamentNumber', perPage: 100 }),
 			paymentRepo.findPending(),
@@ -145,7 +153,11 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 				avatar: avatarUrl,
 				status: record.status,
 				gender: record.gender,
-				talentType: record.talentType || ['player'],
+				talentType: Array.isArray(record.talentType)
+					? record.talentType
+					: record.talentType
+					? [record.talentType]
+					: ['player'],
 				worldRanking: record.worldRanking,
 				country: record.country,
 				nickname: record.nickname,
@@ -185,7 +197,7 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 			},
 			overallStats: {
 				totalTalent: talent.length,
-				activeTalent: talent.filter(t => t.status === 'active').length,
+				activeTalent: talent.filter(t => ['active', 'primary_pro', 'reserve_pro'].includes(t.status)).length,
 				totalPlayers: players.length,
 				totalBroadcasters: broadcasters.length,
 				totalCommentators: commentators.length,

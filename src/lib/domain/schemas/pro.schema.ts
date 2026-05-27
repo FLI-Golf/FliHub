@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-export const ProStatusEnum = z.enum(['active', 'inactive', 'retired']);
+export const ProStatusEnum = z.enum(['active', 'inactive', 'retired', 'primary_pro', 'reserve_pro']);
 export const ProGenderEnum = z.enum(['male', 'female', 'other']);
 
 export const ProSchema = z.object({
@@ -54,5 +54,7 @@ export type ProGender = z.infer<typeof ProGenderEnum>;
 export const STATUS_LABELS: Record<ProStatus, string> = {
 	active: 'Active',
 	inactive: 'Inactive',
-	retired: 'Retired'
+	retired: 'Retired',
+	primary_pro: 'Primary Pro',
+	reserve_pro: 'Reserve Pro'
 };

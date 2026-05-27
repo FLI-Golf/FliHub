@@ -48,7 +48,7 @@
 				t.nickname?.toLowerCase().includes(query) ||
 				t.email?.toLowerCase().includes(query) ||
 				t.franchise?.name?.toLowerCase().includes(query) ||
-				t.role?.toLowerCase().includes(query) ||
+				t.talentType?.some(tt => tt.toLowerCase().includes(query)) ||
 				t.country?.toLowerCase().includes(query)
 			);
 		}
@@ -66,8 +66,8 @@
 					bVal = b.name?.toLowerCase() || '';
 					break;
 				case 'role':
-					aVal = a.role || '';
-					bVal = b.role || '';
+					aVal = a.talentType?.[0] || '';
+					bVal = b.talentType?.[0] || '';
 					break;
 				case 'franchise':
 					aVal = a.franchise?.name?.toLowerCase() || 'zzz'; // Put null at end
@@ -123,7 +123,10 @@
 	const getStatusColor = (status: string) => {
 		switch (status) {
 			case 'active':
+			case 'primary_pro':
 				return 'bg-green-600 text-white';
+			case 'reserve_pro':
+				return 'bg-yellow-600 text-white';
 			case 'inactive':
 				return 'bg-gray-600 text-white';
 			case 'retired':
@@ -143,6 +146,8 @@
 				return 'bg-cyan-600 text-white';
 			case 'analyst':
 				return 'bg-blue-600 text-white';
+			case 'manager':
+				return 'bg-teal-600 text-white';
 			default:
 				return 'bg-gray-600 text-white';
 		}
@@ -158,6 +163,8 @@
 				return 'Commentator';
 			case 'analyst':
 				return 'Analyst';
+			case 'manager':
+				return 'Manager';
 			default:
 				return type;
 		}
@@ -266,6 +273,8 @@
 					onchange={(e) => applyFilters({ status: e.currentTarget.value || null })}
 				>
 					<option value="">All Statuses</option>
+					<option value="primary_pro">Primary Pro</option>
+					<option value="reserve_pro">Reserve Pro</option>
 					<option value="active">Active</option>
 					<option value="inactive">Inactive</option>
 					<option value="retired">Retired</option>
@@ -296,6 +305,7 @@
 					<option value="broadcaster">Broadcasters</option>
 					<option value="commentator">Commentators</option>
 					<option value="analyst">Analysts</option>
+					<option value="manager">Managers</option>
 				</select>
 			</div>
 			<div>
