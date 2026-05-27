@@ -6,8 +6,8 @@
 
 	let { data, form }: { data: PageData; form: ActionData } = $props();
 
-	const TALENT_TYPES = ['player', 'broadcaster', 'commentator', 'analyst'];
-	const STATUSES = ['active', 'inactive', 'retired'];
+	const TALENT_TYPES = ['player', 'broadcaster', 'commentator', 'analyst', 'manager'];
+	const STATUSES = ['primary_pro', 'reserve_pro', 'active', 'inactive', 'retired'];
 	const GENDERS = ['male', 'female', 'other'];
 
 	const INPUT = 'w-full rounded-md border border-gray-600 px-3 py-2 bg-gray-700 text-white placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm';
