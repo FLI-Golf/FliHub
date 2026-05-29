@@ -65,7 +65,8 @@
 		'/dashboard/welcome': 'Welcome',
 		'/dashboard/onboarding': 'Onboarding',
 		'/dashboard/player-profile': 'Player Profile',
-		'/dashboard/settings': 'Settings'
+		'/dashboard/settings': 'Settings',
+		'/dashboard/income': 'Income Pipeline'
 	};
 
 	$: currentLabel = routeLabels[$page.url.pathname] ?? 'Dashboard';

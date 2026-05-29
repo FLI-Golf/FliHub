@@ -23,7 +23,8 @@
 		onselect
 	}: Props = $props();
 
-	// Per-card dropdown open state
+	// ── Dropdown move ─────────────────────────────────────────────────────────
+
 	let openMenuId = $state<string | null>(null);
 
 	function toggleMenu(id: string, e: MouseEvent) {
@@ -40,19 +41,70 @@
 	}
 
 	function handleCardClick(item: PipelineCardItem) {
-		if (item.href) return; // let the <a> handle it
+		if (item.href) return;
 		onselect?.(item);
 	}
 
-	// Close menu on outside click
 	function handleWindowClick() {
 		openMenuId = null;
+	}
+
+	// ── Drag-and-drop ─────────────────────────────────────────────────────────
+
+	let dragOverColumn = $state(false);
+
+	function onDragStart(item: PipelineCardItem, e: DragEvent) {
+		if (!e.dataTransfer) return;
+		e.dataTransfer.effectAllowed = 'move';
+		e.dataTransfer.setData('text/plain', JSON.stringify({ id: item.id, fromStage: item.status }));
+	}
+
+	function onDragOver(e: DragEvent) {
+		e.preventDefault();
+		if (e.dataTransfer) e.dataTransfer.dropEffect = 'move';
+		dragOverColumn = true;
+	}
+
+	function onDragLeave(e: DragEvent) {
+		const related = e.relatedTarget as HTMLElement | null;
+		const col = e.currentTarget as HTMLElement;
+		if (!col.contains(related)) dragOverColumn = false;
+	}
+
+	function onDrop(e: DragEvent) {
+		e.preventDefault();
+		dragOverColumn = false;
+		if (!e.dataTransfer) return;
+
+		let payload: { id: string; fromStage: string };
+		try {
+			payload = JSON.parse(e.dataTransfer.getData('text/plain'));
+		} catch {
+			return;
+		}
+
+		if (payload.fromStage === stage.key) return;
+
+		// Emit a move event — the parent resolves the full item by id
+		const syntheticItem: PipelineCardItem = {
+			id: payload.id,
+			status: payload.fromStage,
+			title: ''
+		};
+		onmove?.({ item: syntheticItem, from: payload.fromStage as any, to: stage.key as any });
 	}
 </script>
 
 <svelte:window onclick={handleWindowClick} />
 
-<div class="flex-shrink-0 {columnWidth}">
+<!-- svelte-ignore a11y_no_static_element_interactions -->
+<div
+	class="flex-shrink-0 {columnWidth} rounded-xl transition-all
+	       {dragOverColumn ? 'ring-2 ring-emerald-500/50 bg-emerald-950/20' : ''}"
+	ondragover={onDragOver}
+	ondragleave={onDragLeave}
+	ondrop={onDrop}
+>
 	<!-- Column header -->
 	<div class="flex items-center justify-between mb-2 px-1">
 		<span class="text-xs font-semibold uppercase tracking-wide text-slate-400">{stage.label}</span>
@@ -65,7 +117,12 @@
 	<div class="space-y-2 min-h-16">
 		{#each items as item (item.id)}
 			{@const isLink = !!item.href}
-			<div class="relative">
+			<!-- svelte-ignore a11y_no_static_element_interactions -->
+			<div
+				class="relative"
+				draggable={!!onmove}
+				ondragstart={(e) => onDragStart(item, e)}
+			>
 				<!-- svelte-ignore a11y_no_static_element_interactions -->
 				<svelte:element
 					this={isLink ? 'a' : 'div'}
@@ -73,6 +130,7 @@
 					onclick={isLink ? undefined : () => handleCardClick(item)}
 					class="block p-3 rounded-xl border border-slate-700 bg-slate-800/70
 					       hover:bg-slate-700/80 hover:border-slate-600 transition-all group
+					       {onmove ? 'cursor-grab active:cursor-grabbing select-none' : ''}
 					       {!isLink && onselect ? 'cursor-pointer' : ''}"
 				>
 					<div class="flex items-start justify-between gap-2 mb-1.5">
@@ -82,7 +140,6 @@
 						{#if isLink}
 							<ChevronRight class="size-3.5 text-slate-500 group-hover:text-slate-300 shrink-0 mt-0.5 transition-colors" />
 						{:else if onmove && allStages.length > 1}
-							<!-- Move button -->
 							<button
 								onclick={(e) => toggleMenu(item.id, e)}
 								class="shrink-0 mt-0.5 text-slate-500 hover:text-slate-200 transition-colors"
@@ -139,8 +196,8 @@
 		{/each}
 
 		{#if items.length === 0}
-			<div class="rounded-xl border border-dashed border-slate-700 p-3 text-center">
-				<p class="text-xs text-slate-600">Empty</p>
+			<div class="rounded-xl border border-dashed {dragOverColumn ? 'border-emerald-500/50' : 'border-slate-700'} p-3 text-center transition-colors">
+				<p class="text-xs text-slate-600">Drop here</p>
 			</div>
 		{/if}
 	</div>

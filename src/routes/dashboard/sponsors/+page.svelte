@@ -3,6 +3,9 @@
 	import Card from '$lib/components/ui/card.svelte';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import { Plus, MapPin, Clock, ChevronRight } from 'lucide-svelte';
+	import { PipelineBoard } from '$lib/pipeline';
+	import type { PipelineBoardConfig, PipelineCardItem, PipelineMoveEvent } from '$lib/pipeline/types';
+	import { invalidateAll } from '$app/navigation';
 	import {
 		PIPELINE_STAGES, CLOSED_STAGES,
 		SPONSOR_STATUS_LABELS, SPONSOR_STATUS_COLORS,
@@ -59,6 +62,57 @@
 		sponsors: byStatus[s] ?? []
 	})));
 
+	// ── PipelineBoard config ──────────────────────────────────────────────────
+
+	const boardConfig = $derived<PipelineBoardConfig>({
+		columnWidth: 'w-60',
+		stages: PIPELINE_STAGES.map(s => ({
+			key: s,
+			label: SPONSOR_STATUS_LABELS[s] ?? s,
+			colorClass: SPONSOR_STATUS_COLORS[s] ?? ''
+		})),
+		terminalStages: CLOSED_STAGES.map(s => ({
+			key: s,
+			label: SPONSOR_STATUS_LABELS[s as keyof typeof SPONSOR_STATUS_LABELS] ?? s,
+			colorClass: SPONSOR_STATUS_COLORS[s as keyof typeof SPONSOR_STATUS_COLORS] ?? ''
+		}))
+	});
+
+	const boardItems = $derived<PipelineCardItem[]>(
+		(data.sponsors ?? []).map((s: any) => ({
+			id: s.id,
+			title: s.companyName,
+			subtitle: s.primaryContactName || s.location || undefined,
+			status: s.status,
+			href: `/dashboard/sponsors/${s.id}`,
+			badge: {
+				label: SPONSOR_TIER_LABELS[s.tier as keyof typeof SPONSOR_TIER_LABELS] ?? s.tier,
+				colorClass: SPONSOR_TIER_COLORS[s.tier as keyof typeof SPONSOR_TIER_COLORS] ?? 'bg-slate-700 text-slate-300 border-slate-600'
+			},
+			meta: s.annualCommitment ? `${fmt(s.annualCommitment)}/yr` : undefined
+		}))
+	);
+
+	let moving = $state(false);
+
+	async function handleMove(e: PipelineMoveEvent) {
+		if (moving) return;
+		moving = true;
+		try {
+			const res = await fetch(`/api/sponsors/${e.item.id}`, {
+				method: 'PATCH',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ status: e.to })
+			});
+			if (!res.ok) throw new Error('Failed to update stage');
+			await invalidateAll();
+		} catch (err) {
+			console.error('Stage move failed:', err);
+		} finally {
+			moving = false;
+		}
+	}
+
 	// Franchise track — sponsors with franchiseInterest=true, grouped by franchiseTrackStatus
 	const franchiseTrackSponsors = $derived(
 		(data.sponsors ?? []).filter((s: any) => s.franchiseInterest)
@@ -83,12 +137,53 @@
 	<div class="flex items-center justify-between">
 		<div>
 			<h1 class="text-3xl font-bold tracking-tight">Sponsor Pipeline</h1>
-			<p class="text-muted-foreground mt-1">Track every sponsor from first contact to signed contract</p>
+			<p class="text-muted-foreground mt-1">Manage every sponsor from first contact through to active partnership and renewal</p>
 		</div>
 		<Button onclick={() => showAdd = true} class="gap-2 bg-emerald-600 hover:bg-emerald-700 text-white">
 			<Plus class="size-4" /> Add Sponsor
 		</Button>
 	</div>
+
+	<!-- Process guide -->
+	<Card class="p-5 bg-slate-800/40 border-slate-700">
+		<div class="space-y-4">
+			<div class="flex items-start gap-3">
+				<div class="p-1.5 rounded-lg bg-emerald-900/50 border border-emerald-700/50 shrink-0 mt-0.5">
+					<svg class="size-4 text-emerald-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+				</div>
+				<div>
+					<h3 class="text-sm font-semibold text-slate-200 mb-1">Optimal Sponsor Process</h3>
+					<p class="text-xs text-slate-400 leading-relaxed">
+						Each sponsor moves through a 6-stage pipeline. Drag cards between columns or use the ⋮ menu to advance a stage.
+						Sponsors pursuing franchise ownership run a parallel <span class="text-violet-300 font-medium">Franchise Acquisition Track</span> below — they stay in their sponsorship tier while the franchise deal progresses independently.
+					</p>
+				</div>
+			</div>
+
+			<div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-2">
+				{#each [
+					{ stage: 'Prospect', color: 'border-slate-600 text-slate-300', desc: 'Identified target. Research tier fit, decision-maker, and gaming/sports alignment. Add to pipeline with estimated annual commitment.' },
+					{ stage: 'Outreach', color: 'border-blue-700/60 text-blue-300', desc: 'First contact made. Send sponsor deck, schedule intro call. Log follow-up date so nothing falls through.' },
+					{ stage: 'Negotiating', color: 'border-yellow-700/60 text-yellow-300', desc: 'Deck delivered, interest confirmed. Negotiate tier, activation rights, and payment schedule. Loop in Legal for contract drafting.' },
+					{ stage: 'Contracted', color: 'border-orange-700/60 text-orange-300', desc: 'Agreement signed. Create sponsor payment schedule in Payments & Income. Assign QuickBooks invoice numbers to each installment.' },
+					{ stage: 'Active', color: 'border-emerald-700/60 text-emerald-300', desc: 'Payments flowing. Deliver activation commitments — signage, broadcast mentions, event presence. Track payments received in the Income pipeline.' },
+					{ stage: 'Renewed', color: 'border-violet-700/60 text-violet-300', desc: 'Contract renewed for next season. Update annual commitment and reset payment schedule. Flag franchise interest if applicable.' },
+				] as s}
+					<div class="p-2.5 rounded-lg border {s.color} bg-slate-900/50">
+						<p class="text-[11px] font-semibold {s.color.split(' ')[1]} mb-1">{s.stage}</p>
+						<p class="text-[10px] text-slate-500 leading-relaxed">{s.desc}</p>
+					</div>
+				{/each}
+			</div>
+
+			<p class="text-[10px] text-slate-500 border-t border-slate-700 pt-3">
+				<span class="text-slate-400 font-medium">Payment tracking:</span> Once a sponsor reaches <span class="font-mono text-orange-300">contracted</span>, go to
+				<a href="/dashboard/payments" class="text-emerald-400 hover:text-emerald-300 underline underline-offset-2">Payments &amp; Income</a>
+				to create the payment schedule. Each installment gets a QuickBooks invoice number — Ina uses this as the memo reference for reconciliation.
+				Sponsor payments received are tracked in the <a href="/dashboard/income" class="text-emerald-400 hover:text-emerald-300 underline underline-offset-2">Income Pipeline</a>.
+			</p>
+		</div>
+	</Card>
 
 	<!-- Revenue KPIs -->
 	{#if m}
@@ -118,51 +213,18 @@
 
 	<!-- Pipeline board -->
 	<div>
-		<h2 class="text-lg font-semibold mb-3 text-slate-200">Sales Pipeline</h2>
-		<div class="flex gap-3 overflow-x-auto pb-3">
-			{#each pipelineCols as col}
-				<div class="flex-shrink-0 w-60">
-					<div class="flex items-center justify-between mb-2 px-1">
-						<span class="text-xs font-semibold uppercase tracking-wide text-slate-400">{col.label}</span>
-						<span class="text-xs font-bold text-slate-300 bg-slate-700 rounded-full px-2 py-0.5">{col.sponsors.length}</span>
-					</div>
-					<div class="space-y-2 min-h-20">
-						{#each col.sponsors as sponsor}
-							<a href="/dashboard/sponsors/{sponsor.id}"
-								class="block p-3 rounded-xl border border-slate-700 bg-slate-800/70 hover:bg-slate-700/80 hover:border-slate-600 transition-all group">
-								<div class="flex items-start justify-between gap-2 mb-2">
-									<p class="text-sm font-semibold text-slate-100 leading-tight line-clamp-2">{sponsor.companyName}</p>
-									<ChevronRight class="size-3.5 text-slate-500 group-hover:text-slate-300 shrink-0 mt-0.5 transition-colors" />
-								</div>
-								<div class="flex flex-wrap gap-1 mb-2">
-									<span class="text-[10px] px-1.5 py-0.5 rounded border font-medium {SPONSOR_TIER_COLORS[sponsor.tier] ?? 'bg-slate-700 text-slate-300 border-slate-600'}">
-										{SPONSOR_TIER_LABELS[sponsor.tier] ?? sponsor.tier}
-									</span>
-									{#if sponsor.franchiseInterest}
-										<span class="text-[10px] px-1.5 py-0.5 rounded border bg-violet-900/50 text-violet-300 border-violet-700 font-medium">Franchise</span>
-									{/if}
-								</div>
-								{#if sponsor.annualCommitment}
-									<p class="text-xs font-bold text-emerald-400">{fmt(sponsor.annualCommitment)}/yr</p>
-								{/if}
-								{#if sponsor.location}
-									<p class="text-[10px] text-slate-500 flex items-center gap-1 mt-1">
-										<MapPin class="size-2.5" />{sponsor.location}
-									</p>
-								{/if}
-								{#if sponsor.nextFollowUpDate}
-									<p class="text-[10px] text-cyan-400 flex items-center gap-1 mt-1">
-										<Clock class="size-2.5" />Follow up {fmtDate(sponsor.nextFollowUpDate)}
-									</p>
-								{/if}
-							</a>
-						{:else}
-							<div class="rounded-xl border border-dashed border-slate-700 p-4 text-center text-xs text-slate-600">No sponsors</div>
-						{/each}
-					</div>
-				</div>
-			{/each}
+		<div class="flex items-center gap-3 mb-3">
+			<h2 class="text-lg font-semibold text-slate-200">Sales Pipeline</h2>
+			{#if moving}
+				<span class="text-xs text-slate-400 animate-pulse">Saving…</span>
+			{/if}
+			<span class="text-xs text-slate-500">Drag cards between columns or use the ⋮ menu to move stages</span>
 		</div>
+		<PipelineBoard
+			config={boardConfig}
+			items={boardItems}
+			onmove={handleMove}
+		/>
 	</div>
 
 	<!-- Franchise Acquisition Track -->
@@ -180,70 +242,34 @@
 				<p class="text-sm text-slate-500 text-center">No sponsors on the franchise track yet. Enable <span class="font-mono text-slate-400">Franchise Interest</span> on a sponsor record to add them here.</p>
 			</Card>
 		{:else}
-			<div class="flex gap-3 overflow-x-auto pb-3">
-				{#each franchiseTrackCols as col}
-					<div class="flex-shrink-0 w-60">
-						<div class="flex items-center justify-between mb-2 px-1">
-							<span class="text-xs font-semibold uppercase tracking-wide text-slate-400">{col.label}</span>
-							<span class="text-xs font-bold text-slate-300 bg-slate-700 rounded-full px-2 py-0.5">{col.sponsors.length}</span>
-						</div>
-						<div class="space-y-2 min-h-20">
-							{#each col.sponsors as sponsor}
-								<a href="/dashboard/sponsors/{sponsor.id}"
-									class="block p-3 rounded-xl border border-violet-800/50 bg-violet-950/30 hover:bg-violet-900/40 hover:border-violet-700 transition-all group">
-									<div class="flex items-start justify-between gap-2 mb-2">
-										<p class="text-sm font-semibold text-slate-100 leading-tight line-clamp-2">{sponsor.companyName}</p>
-										<ChevronRight class="size-3.5 text-slate-500 group-hover:text-violet-300 shrink-0 mt-0.5 transition-colors" />
-									</div>
-									<div class="flex flex-wrap gap-1 mb-1.5">
-										<span class="text-[10px] px-1.5 py-0.5 rounded border font-medium {SPONSOR_TIER_COLORS[sponsor.tier] ?? 'bg-slate-700 text-slate-300 border-slate-600'}">
-											{SPONSOR_TIER_LABELS[sponsor.tier] ?? sponsor.tier}
-										</span>
-										<span class="text-[10px] px-1.5 py-0.5 rounded border font-medium {SPONSOR_STATUS_COLORS[sponsor.status] ?? ''}">
-											{SPONSOR_STATUS_LABELS[sponsor.status] ?? sponsor.status}
-										</span>
-									</div>
-									{#if sponsor.annualCommitment}
-										<p class="text-xs font-bold text-emerald-400">{fmt(sponsor.annualCommitment)}/yr</p>
-									{/if}
-									{#if sponsor.location}
-										<p class="text-[10px] text-slate-500 flex items-center gap-1 mt-1">
-											<MapPin class="size-2.5" />{sponsor.location}
-										</p>
-									{/if}
-									{#if sponsor.franchiseTrackDate}
-										<p class="text-[10px] text-violet-400 flex items-center gap-1 mt-1">
-											<Clock class="size-2.5" />In stage since {fmtDate(sponsor.franchiseTrackDate)}
-										</p>
-									{/if}
-								</a>
-							{:else}
-								<div class="rounded-xl border border-dashed border-violet-900/50 p-4 text-center text-xs text-slate-600">Empty</div>
-							{/each}
-						</div>
-					</div>
-				{/each}
-			</div>
+			{@const franchiseBoardConfig = {
+				columnWidth: 'w-60',
+				stages: FRANCHISE_TRACK_STAGES.map(s => ({
+					key: s,
+					label: FRANCHISE_TRACK_LABELS[s] ?? s,
+					colorClass: FRANCHISE_TRACK_COLORS[s] ?? ''
+				})),
+				terminalStages: []
+			}}
+			{@const franchiseBoardItems = franchiseTrackSponsors.map((s: any) => ({
+				id: s.id,
+				title: s.companyName,
+				subtitle: s.location || undefined,
+				status: s.franchiseTrackStatus ?? 'franchise_interest',
+				href: `/dashboard/sponsors/${s.id}`,
+				badge: {
+					label: SPONSOR_TIER_LABELS[s.tier as keyof typeof SPONSOR_TIER_LABELS] ?? s.tier,
+					colorClass: SPONSOR_TIER_COLORS[s.tier as keyof typeof SPONSOR_TIER_COLORS] ?? 'bg-slate-700 text-slate-300 border-slate-600'
+				},
+				meta: s.annualCommitment ? `${fmt(s.annualCommitment)}/yr` : undefined
+			}))}
+			<PipelineBoard
+				config={franchiseBoardConfig}
+				items={franchiseBoardItems}
+				showTerminal={false}
+			/>
 		{/if}
 	</div>
-
-	<!-- Closed -->
-	{#if Object.values(CLOSED_STAGES).some(s => (byStatus[s] ?? []).length > 0)}
-	<Card class="p-5 bg-slate-800/40 border-slate-700">
-		<h2 class="text-sm font-semibold text-slate-400 uppercase tracking-wide mb-3">Closed</h2>
-		<div class="flex flex-wrap gap-2">
-			{#each CLOSED_STAGES as stage}
-				{#each (byStatus[stage] ?? []) as sponsor}
-					<a href="/dashboard/sponsors/{sponsor.id}"
-						class="flex items-center gap-2 px-3 py-2 rounded-lg border border-slate-700 bg-slate-800 hover:bg-slate-700 transition-colors">
-						<span class="text-xs font-medium text-slate-200">{sponsor.companyName}</span>
-						<span class="text-[10px] px-1.5 py-0.5 rounded border font-medium {SPONSOR_STATUS_COLORS[stage]}">{SPONSOR_STATUS_LABELS[stage]}</span>
-					</a>
-				{/each}
-			{/each}
-		</div>
-	</Card>
-	{/if}
 
 	<!-- Tier pricing reference -->
 	<Card class="p-5 bg-slate-800/40 border-slate-700">
