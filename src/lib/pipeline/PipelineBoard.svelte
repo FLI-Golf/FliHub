@@ -7,6 +7,10 @@
 	 *
 	 * The parent is responsible for persisting moves (call your API, then
 	 * invalidateAll() or update local state).
+	 *
+	 * Supports both drag-and-drop (HTML5) and the dropdown move menu.
+	 * On drag-drop the column emits a synthetic item with only {id, status}.
+	 * This board resolves the full item from the items array before forwarding.
 	 */
 	import PipelineStageColumn from './PipelineStageColumn.svelte';
 	import type { PipelineBoardConfig, PipelineCardItem, PipelineMoveEvent } from './types';
@@ -45,6 +49,18 @@
 
 	// All stages for the move dropdown (active only — don't move into terminal from board)
 	const allActiveStages = $derived(config.stages);
+
+	// Intercept move events from columns — resolve the full item by id when
+	// the event came from a drag-drop (title will be empty string).
+	function handleMove(e: PipelineMoveEvent) {
+		if (e.item.title === '') {
+			const full = items.find(i => i.id === e.item.id);
+			if (!full) return;
+			onmove?.({ ...e, item: full });
+		} else {
+			onmove?.(e);
+		}
+	}
 </script>
 
 <!-- Active pipeline board -->
@@ -55,7 +71,7 @@
 			items={byStage[stage.key] ?? []}
 			allStages={allActiveStages}
 			columnWidth={colWidth}
-			{onmove}
+			onmove={handleMove}
 			{onselect}
 		/>
 	{/each}
@@ -72,7 +88,7 @@
 					items={byStage[stage.key] ?? []}
 					allStages={[...allActiveStages, ...config.terminalStages!]}
 					columnWidth={colWidth}
-					{onmove}
+					onmove={handleMove}
 					{onselect}
 				/>
 			{/each}
