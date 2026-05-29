@@ -4,7 +4,7 @@
 	import { Badge } from '$lib/components/ui/badge';
 	import * as Sheet from '$lib/components/ui/sheet/index.js';
 	import type { PageData } from './$types';
-	import { Target, Plus, TrendingUp, CheckCircle, Clock, Pause, Calendar, Flag, X } from 'lucide-svelte';
+	import { Target, Plus, TrendingUp, CheckCircle, Clock, Pause, Calendar, Flag, X, ListTodo, AlertCircle } from 'lucide-svelte';
 
 	let { data }: { data: PageData } = $props();
 
@@ -151,6 +151,7 @@
 							<th class="px-4 py-3 text-left text-sm font-medium text-gray-300">Deadline</th>
 							<th class="px-4 py-3 text-center text-sm font-medium text-gray-300">Progress</th>
 							<th class="px-4 py-3 text-center text-sm font-medium text-gray-300">Priority</th>
+
 							<th class="px-4 py-3 text-center text-sm font-medium text-gray-300">Status</th>
 							<th class="px-4 py-3 text-center text-sm font-medium text-gray-300">Actions</th>
 						</tr>
@@ -190,6 +191,19 @@
 								</td>
 								<td class="px-4 py-3 text-center">
 									<Badge class={getStatusColor(goal.status)}>{goal.status}</Badge>
+								</td>
+								<td class="px-4 py-3 text-center">
+									{#if goal.taskCount?.total > 0}
+										<span class="inline-flex items-center gap-1 text-xs text-slate-400">
+											<ListTodo class="size-3.5" />
+											{goal.taskCount.completed}/{goal.taskCount.total}
+											{#if goal.taskCount.needsApproval > 0}
+												<AlertCircle class="size-3 text-yellow-400" />
+											{/if}
+										</span>
+									{:else}
+										<span class="text-xs text-slate-600">—</span>
+									{/if}
 								</td>
 								<td class="px-4 py-3 text-center">
 									<Button 
@@ -359,6 +373,39 @@
 						<p class="text-white font-medium">{selectedGoal.currentValue || 0} / {selectedGoal.targetValue || 0}</p>
 					</div>
 				</div>
+
+				<!-- Task summary -->
+				{#if selectedGoal.taskCount}
+					<div class="pt-4 border-t border-slate-700">
+						<div class="flex items-center justify-between mb-2">
+							<div class="flex items-center gap-2 text-slate-300 text-sm font-medium">
+								<ListTodo class="size-4" />
+								Tasks
+							</div>
+							<a href="/dashboard/marketing-goals/{selectedGoal.id}#tasks"
+								class="text-xs text-emerald-400 hover:underline">View all</a>
+						</div>
+						<div class="flex items-center gap-3 text-sm">
+							<span class="text-slate-400">
+								<span class="text-white font-semibold">{selectedGoal.taskCount.completed}</span>
+								/ {selectedGoal.taskCount.total} done
+							</span>
+							{#if selectedGoal.taskCount.needsApproval > 0}
+								<span class="flex items-center gap-1 text-yellow-400 text-xs">
+									<AlertCircle class="size-3.5" />
+									{selectedGoal.taskCount.needsApproval} need approval
+								</span>
+							{/if}
+						</div>
+						{#if selectedGoal.taskCount.total > 0}
+							<div class="mt-2 h-1.5 rounded-full bg-slate-700 overflow-hidden">
+								<div class="h-full rounded-full bg-emerald-500 transition-all"
+								     style="width: {Math.round((selectedGoal.taskCount.completed / selectedGoal.taskCount.total) * 100)}%">
+								</div>
+							</div>
+						{/if}
+					</div>
+				{/if}
 
 				<!-- Actions -->
 				<div class="flex gap-3 pt-4 border-t border-slate-700">

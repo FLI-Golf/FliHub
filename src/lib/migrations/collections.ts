@@ -1016,6 +1016,52 @@ export const collections = [
 		deleteRule: null
 	},
 
+	// ─── Goal tasks ───────────────────────────────────────────────────────────
+	// Tasks attached to a marketing goal. Move through todo → in_progress →
+	// needs_approval → approved → expense_created → work_order → completed.
+	{
+		name: 'goal_tasks',
+		type: 'base',
+		schema: [
+			{ name: 'goalId',        type: 'text',   required: true,  options: { max: 255 } },
+			{ name: 'title',         type: 'text',   required: true,  options: { max: 500 } },
+			{ name: 'description',   type: 'text',   required: false },
+			{
+				name: 'status',
+				type: 'select',
+				required: true,
+				options: {
+					maxSelect: 1,
+					values: ['todo','in_progress','needs_approval','approved','expense_created','work_order','completed','cancelled']
+				}
+			},
+			{
+				name: 'priority',
+				type: 'select',
+				required: false,
+				options: { maxSelect: 1, values: ['low','medium','high','urgent'] }
+			},
+			{ name: 'dueDate',       type: 'date',   required: false },
+			{ name: 'estimatedCost', type: 'number', required: false },
+			{ name: 'actualCost',    type: 'number', required: false },
+			{ name: 'assignedTo',    type: 'text',   required: false, options: { max: 255 } },
+			{ name: 'notes',         type: 'text',   required: false },
+			// Approval tracking
+			{ name: 'approvalId',    type: 'text',   required: false, options: { max: 255 } },
+			{ name: 'approvedBy',    type: 'text',   required: false, options: { max: 255 } },
+			{ name: 'approvedAt',    type: 'date',   required: false },
+			// Downstream links
+			{ name: 'expenseId',     type: 'text',   required: false, options: { max: 255 } },
+			{ name: 'workOrderId',   type: 'text',   required: false, options: { max: 255 } },
+			{ name: 'createdBy',     type: 'text',   required: false, options: { max: 255 } }
+		],
+		listRule: '@request.auth.id != ""',
+		viewRule: '@request.auth.id != ""',
+		createRule: '@request.auth.id != ""',
+		updateRule: '@request.auth.id != ""',
+		deleteRule: '@request.auth.id != ""'
+	},
+
 	// ─── Sponsor activity log ─────────────────────────────────────────────────
 	{
 		name: 'sponsor_activity',
@@ -1100,6 +1146,90 @@ export const collections = [
 			{ name: 'itemId',       type: 'text',   required: true,  options: { max: 100 } },
 			{ name: 'checkedBy',    type: 'text',   required: false, options: { max: 255 } },
 			{ name: 'checkedAt',    type: 'date',   required: false }
+		],
+		listRule: '@request.auth.id != ""',
+		viewRule: '@request.auth.id != ""',
+		createRule: '@request.auth.id != ""',
+		updateRule: '@request.auth.id != ""',
+		deleteRule: '@request.auth.id != ""'
+	},
+
+	// ─── Scoreboards ──────────────────────────────────────────────────────────
+	{
+		name: 'scoreboards',
+		type: 'base',
+		schema: [
+			{ name: 'name',          type: 'text',   required: true,  options: { max: 500 } },
+			{ name: 'location',      type: 'text',   required: false, options: { max: 500 } },
+			{
+				name: 'displayType',
+				type: 'select',
+				required: true,
+				options: { maxSelect: 1, values: ['led','static','digital','hybrid'] }
+			},
+			{
+				name: 'stage',
+				type: 'select',
+				required: true,
+				options: {
+					maxSelect: 1,
+					values: ['concept','design','vendor_quote','approval','procurement',
+					         'fabrication','installation','testing','live','maintenance','cancelled']
+				}
+			},
+			{ name: 'widthFt',       type: 'number', required: false },
+			{ name: 'heightFt',      type: 'number', required: false },
+			{ name: 'vendorName',    type: 'text',   required: false, options: { max: 255 } },
+			{ name: 'quotedCost',    type: 'number', required: false },
+			{ name: 'approvedBudget',type: 'number', required: false },
+			{ name: 'actualCost',    type: 'number', required: false },
+			{ name: 'installDate',   type: 'date',   required: false },
+			{ name: 'warrantyExpiry',type: 'date',   required: false },
+			{ name: 'description',   type: 'text',   required: false },
+			{ name: 'notes',         type: 'text',   required: false },
+			// Downstream links
+			{ name: 'approvalId',    type: 'text',   required: false, options: { max: 255 } },
+			{ name: 'workOrderId',   type: 'text',   required: false, options: { max: 255 } },
+			{ name: 'expenseId',     type: 'text',   required: false, options: { max: 255 } },
+			{ name: 'createdBy',     type: 'text',   required: false, options: { max: 255 } }
+		],
+		listRule: '@request.auth.id != ""',
+		viewRule: '@request.auth.id != ""',
+		createRule: '@request.auth.id != ""',
+		updateRule: '@request.auth.id != ""',
+		deleteRule: null
+	},
+
+	// ─── Scoreboard vendor quotes ─────────────────────────────────────────────
+	{
+		name: 'scoreboard_vendor_quotes',
+		type: 'base',
+		schema: [
+			{ name: 'scoreboardId',  type: 'text',   required: true,  options: { max: 255 } },
+			{ name: 'vendorName',    type: 'text',   required: true,  options: { max: 255 } },
+			{ name: 'amount',        type: 'number', required: true  },
+			{ name: 'leadTimeDays',  type: 'number', required: false },
+			{ name: 'notes',         type: 'text',   required: false },
+			{ name: 'selected',      type: 'bool',   required: false },
+			{ name: 'submittedBy',   type: 'text',   required: false, options: { max: 255 } }
+		],
+		listRule: '@request.auth.id != ""',
+		viewRule: '@request.auth.id != ""',
+		createRule: '@request.auth.id != ""',
+		updateRule: '@request.auth.id != ""',
+		deleteRule: '@request.auth.id != ""'
+	},
+
+	// ─── Scoreboard install checklist ─────────────────────────────────────────
+	{
+		name: 'scoreboard_checklist',
+		type: 'base',
+		schema: [
+			{ name: 'scoreboardId', type: 'text', required: true,  options: { max: 255 } },
+			{ name: 'itemId',       type: 'text', required: true,  options: { max: 100 } },
+			{ name: 'phase',        type: 'text', required: false, options: { max: 50 } },
+			{ name: 'checkedBy',    type: 'text', required: false, options: { max: 255 } },
+			{ name: 'checkedAt',    type: 'date', required: false }
 		],
 		listRule: '@request.auth.id != ""',
 		viewRule: '@request.auth.id != ""',

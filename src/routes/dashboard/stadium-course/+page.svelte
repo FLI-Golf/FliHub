@@ -12,8 +12,17 @@
 		Zap,
 		Package,
 		HardHat,
-		Settings
+		Settings,
+		Monitor,
+		AlertCircle
 	} from 'lucide-svelte';
+	import { Button } from '$lib/components/ui/button';
+	import type { PageData } from './$types';
+
+	let { data }: { data: PageData } = $props();
+
+	const fmt$ = (n: number) =>
+		new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 0 }).format(n ?? 0);
 
 	// ── Top-level budget ──────────────────────────────────────────────────────
 
@@ -451,6 +460,96 @@
 				</tbody>
 			</table>
 		</div>
+	</Card>
+
+	<!-- ── Scoreboards ──────────────────────────────────────────────────────── -->
+	<Card class="p-6 bg-slate-800/40 border-slate-700">
+		<div class="flex items-center justify-between mb-5">
+			<div class="flex items-center gap-3">
+				<Monitor class="size-5 text-emerald-400" />
+				<div>
+					<h2 class="text-lg font-semibold text-slate-100">Scoreboards</h2>
+					<p class="text-xs text-slate-500 mt-0.5">Physical display boards — concept through live operation</p>
+				</div>
+			</div>
+			<Button href="/dashboard/stadium-course/scoreboards"
+				class="gap-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm">
+				<Monitor class="size-4" /> Manage Pipeline
+			</Button>
+		</div>
+
+		{#if data.scoreboardStats.total === 0}
+			<div class="rounded-xl border border-dashed border-slate-700 p-8 text-center">
+				<Monitor class="size-8 text-slate-600 mx-auto mb-3" />
+				<p class="text-slate-400 text-sm">No scoreboards yet.</p>
+				<p class="text-slate-600 text-xs mt-1 mb-4">Initiate a scoreboard project to track it through procurement and installation.</p>
+				<Button href="/dashboard/stadium-course/scoreboards"
+					class="gap-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm">
+					<Monitor class="size-4" /> Start a Scoreboard Project
+				</Button>
+			</div>
+		{:else}
+			<!-- Stats strip -->
+			<div class="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
+				<div class="rounded-xl border border-slate-700 bg-slate-800/60 p-3 text-center">
+					<p class="text-2xl font-bold text-slate-100">{data.scoreboardStats.total}</p>
+					<p class="text-xs text-slate-500 mt-0.5">Total</p>
+				</div>
+				<div class="rounded-xl border border-emerald-800/50 bg-emerald-950/30 p-3 text-center">
+					<p class="text-2xl font-bold text-emerald-300">{data.scoreboardStats.live}</p>
+					<p class="text-xs text-emerald-600 mt-0.5">Live</p>
+				</div>
+				<div class="rounded-xl border border-slate-700 bg-slate-800/60 p-3 text-center">
+					<p class="text-2xl font-bold text-blue-300">{data.scoreboardStats.inProgress}</p>
+					<p class="text-xs text-slate-500 mt-0.5">In Progress</p>
+				</div>
+				<div class="rounded-xl border border-slate-700 bg-slate-800/60 p-3 text-center">
+					<p class="text-lg font-bold text-slate-100">{fmt$(data.scoreboardStats.totalBudget)}</p>
+					<p class="text-xs text-slate-500 mt-0.5">Budget Committed</p>
+				</div>
+			</div>
+
+			{#if data.scoreboardStats.needsApproval > 0}
+				<div class="flex items-center gap-2 p-3 rounded-lg bg-yellow-950/40 border border-yellow-800/50 text-yellow-300 text-sm mb-4">
+					<AlertCircle class="size-4 shrink-0" />
+					{data.scoreboardStats.needsApproval} scoreboard{data.scoreboardStats.needsApproval !== 1 ? 's' : ''} awaiting procurement approval
+					<a href="/dashboard/stadium-course/scoreboards" class="ml-auto text-xs underline hover:no-underline">Review →</a>
+				</div>
+			{/if}
+
+			<!-- Scoreboard list preview (top 5) -->
+			<div class="space-y-1.5">
+				{#each (data.scoreboards ?? []).slice(0, 5) as sb (sb.id)}
+					<a href="/dashboard/stadium-course/scoreboards/{sb.id}"
+						class="flex items-center gap-3 px-3 py-2.5 rounded-lg border border-slate-700
+						       bg-slate-800/60 hover:bg-slate-700/60 hover:border-slate-600 transition-all group">
+						<Monitor class="size-4 text-slate-500 group-hover:text-emerald-400 shrink-0 transition-colors" />
+						<span class="flex-1 text-sm font-medium text-slate-200 truncate">{sb.name}</span>
+						{#if sb.location}
+							<span class="text-xs text-slate-500 truncate hidden sm:block">{sb.location}</span>
+						{/if}
+						<span class="text-[10px] px-1.5 py-0.5 rounded border font-medium shrink-0
+						            {sb.stage === 'live' ? 'bg-emerald-900/40 text-emerald-400 border-emerald-700'
+						              : sb.stage === 'approval' ? 'bg-yellow-900/40 text-yellow-400 border-yellow-700'
+						              : 'bg-slate-700 text-slate-400 border-slate-600'}">
+							{sb.stage.replace('_', ' ')}
+						</span>
+						{#if sb.quotedCost || sb.approvedBudget}
+							<span class="text-xs text-slate-500 shrink-0">
+								{fmt$(sb.approvedBudget ?? sb.quotedCost)}
+							</span>
+						{/if}
+						<ChevronRight class="size-4 text-slate-600 group-hover:text-slate-300 shrink-0 transition-colors" />
+					</a>
+				{/each}
+				{#if (data.scoreboards ?? []).length > 5}
+					<a href="/dashboard/stadium-course/scoreboards"
+						class="block text-center text-xs text-slate-500 hover:text-slate-300 py-2 transition-colors">
+						View all {data.scoreboards.length} scoreboards →
+					</a>
+				{/if}
+			</div>
+		{/if}
 	</Card>
 
 </div>
