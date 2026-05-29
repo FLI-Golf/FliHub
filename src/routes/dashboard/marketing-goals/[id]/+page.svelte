@@ -8,7 +8,7 @@
 		ArrowLeft, Target, Calendar, TrendingUp, Flag,
 		Plus, X, CheckCircle2, Clock, AlertCircle,
 		ChevronDown, ChevronUp, DollarSign, FileText,
-		Hammer, ClipboardCheck, Circle, ArrowRight
+		Hammer, ClipboardCheck, Circle, ArrowRight, Zap
 	} from 'lucide-svelte';
 
 	let { data }: { data: PageData } = $props();
@@ -104,7 +104,7 @@
 	let showNewTask = $state(false);
 	let newBusy = $state(false);
 	let newErr = $state('');
-	let newForm = $state({ title: '', description: '', priority: 'medium', dueDate: '', estimatedCost: '', notes: '' });
+	let newForm = $state({ title: '', description: '', priority: 'medium', dueDate: '', estimatedCost: '', progressContribution: '', notes: '' });
 
 	async function submitNewTask(e: SubmitEvent) {
 		e.preventDefault();
@@ -114,11 +114,15 @@
 			const res = await fetch(`/api/marketing-goals/${goal.id}/tasks`, {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ ...newForm, estimatedCost: newForm.estimatedCost ? Number(newForm.estimatedCost) : null })
+				body: JSON.stringify({
+					...newForm,
+					estimatedCost:        newForm.estimatedCost        ? Number(newForm.estimatedCost)        : null,
+					progressContribution: newForm.progressContribution ? Number(newForm.progressContribution) : null
+				})
 			});
 			if (!res.ok) { const d = await res.json().catch(() => ({})); throw new Error(d.message ?? 'Failed'); }
 			showNewTask = false;
-			newForm = { title: '', description: '', priority: 'medium', dueDate: '', estimatedCost: '', notes: '' };
+			newForm = { title: '', description: '', priority: 'medium', dueDate: '', estimatedCost: '', progressContribution: '', notes: '' };
 			await invalidateAll();
 			tasks = data.tasks ?? [];
 			taskStats = data.taskStats;
@@ -205,7 +209,18 @@
 	<!-- Progress bar -->
 	<div class="bg-gray-800 p-6 rounded-xl border border-gray-700">
 		<div class="flex items-center justify-between mb-3">
-			<h3 class="text-base font-semibold text-white">Progress</h3>
+			<div class="flex items-center gap-2">
+				<h3 class="text-base font-semibold text-white">Progress</h3>
+				{#if goal.progressMode === 'task_driven'}
+					<span class="text-[10px] px-1.5 py-0.5 rounded border font-medium bg-emerald-900/40 text-emerald-400 border-emerald-700">
+						Task-driven
+					</span>
+				{:else}
+					<span class="text-[10px] px-1.5 py-0.5 rounded border font-medium bg-slate-700 text-slate-400 border-slate-600">
+						Manual
+					</span>
+				{/if}
+			</div>
 			<span class="text-sm font-bold {progress >= 100 ? 'text-green-400' : progress >= 50 ? 'text-blue-400' : 'text-amber-400'}">
 				{progress}%
 			</span>
@@ -220,6 +235,14 @@
 			<span class="text-white">Current: {goal.currentValue ?? 0}</span>
 			<span>Target: {goal.targetValue ?? 0}</span>
 		</div>
+		{#if goal.progressMode === 'task_driven'}
+			{@const totalContrib = tasks.filter((t: any) => t.progressContribution).reduce((s: number, t: any) => s + (t.progressContribution ?? 0), 0)}
+			{@const doneContrib  = tasks.filter((t: any) => t.status === 'completed' && t.progressContribution).reduce((s: number, t: any) => s + (t.progressContribution ?? 0), 0)}
+			<p class="text-xs text-slate-500 mt-2">
+				Tasks contribute <span class="text-slate-300">{doneContrib}</span> of <span class="text-slate-300">{totalContrib}</span> possible units
+				· baseline <span class="text-slate-300">{goal.progressBaseline ?? 0}</span>
+			</p>
+		{/if}
 	</div>
 
 	<!-- ── Tasks section ──────────────────────────────────────────────────── -->
@@ -364,6 +387,18 @@
 									{#if task.approvedAt}
 										<div><span class="text-slate-500">Approved:</span> <span class="text-emerald-400">{fmtShort(task.approvedAt)}</span></div>
 									{/if}
+									{#if task.progressContribution}
+										<div class="flex items-center gap-1">
+											<TrendingUp class="size-3 text-emerald-400 shrink-0" />
+											<span class="text-slate-500">Contributes:</span>
+											<span class="text-emerald-400 font-semibold">+{task.progressContribution}</span>
+											{#if task.status === 'completed'}
+												<span class="text-emerald-600 text-[10px]">✓ applied</span>
+											{:else}
+												<span class="text-slate-600 text-[10px]">on completion</span>
+											{/if}
+										</div>
+									{/if}
 								</div>
 
 								<!-- Linked records -->
@@ -495,9 +530,16 @@
 						<input bind:value={newForm.dueDate} type="date" class={INPUT} />
 					</div>
 				</div>
-				<div>
-					<label class={LABEL}>Estimated Cost ($)</label>
-					<input bind:value={newForm.estimatedCost} type="number" min="0" class={INPUT} placeholder="0" />
+				<div class="grid grid-cols-2 gap-3">
+					<div>
+						<label class={LABEL}>Estimated Cost ($)</label>
+						<input bind:value={newForm.estimatedCost} type="number" min="0" class={INPUT} placeholder="0" />
+					</div>
+					<div>
+						<label class={LABEL}>Progress Contribution</label>
+						<input bind:value={newForm.progressContribution} type="number" min="0" class={INPUT} placeholder="0" />
+						<p class="text-[10px] text-slate-500 mt-1">Added to goal value on completion</p>
+					</div>
 				</div>
 				<div>
 					<label class={LABEL}>Notes</label>

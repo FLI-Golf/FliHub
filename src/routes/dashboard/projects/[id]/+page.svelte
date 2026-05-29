@@ -23,7 +23,8 @@
 		Edit,
 		Plus,
 		X,
-		Receipt
+		Receipt,
+		Link
 	} from 'lucide-svelte';
 	
 	let { data }: { data: PageData } = $props();
@@ -316,6 +317,19 @@
 					<div class="flex justify-between">
 						<span class="text-muted-foreground">Department</span>
 						<span class="font-medium">{project.expand.department.name}</span>
+					</div>
+				{/if}
+
+				{#if project.expand?.campaignId}
+					<div class="flex justify-between items-center">
+						<span class="text-muted-foreground">Campaign</span>
+						<a
+							href="/dashboard/campaigns"
+							class="inline-flex items-center gap-1 text-sm font-medium text-violet-400 hover:text-violet-300 transition-colors"
+						>
+							<Link class="size-3.5 shrink-0" />
+							{project.expand.campaignId.name}
+						</a>
 					</div>
 				{/if}
 				{#if project.expand?.approvedBy}

@@ -14,7 +14,7 @@ import type { RequestHandler } from './$types';
 
 const ALLOWED_FIELDS = [
 	'title', 'description', 'status', 'priority', 'dueDate',
-	'estimatedCost', 'actualCost', 'assignedTo', 'notes'
+	'estimatedCost', 'actualCost', 'assignedTo', 'notes', 'progressContribution'
 ];
 
 export const PATCH: RequestHandler = async ({ params, request, locals, url }) => {
@@ -96,11 +96,75 @@ export const PATCH: RequestHandler = async ({ params, request, locals, url }) =>
 		}
 
 		const updated = await ctx.pb.collection('goal_tasks').update(params.taskId, patch);
+
+		// ── Recalculate goal progress when completion status changes ──────────
+		// Triggered when: status moves to/from 'completed', OR progressContribution changes.
+		const completionChanged =
+			newStatus === 'completed' ||
+			(current.status === 'completed' && newStatus && newStatus !== 'completed');
+		const contributionChanged = 'progressContribution' in patch;
+
+		if (completionChanged || contributionChanged) {
+			await recalculateGoalProgress(ctx.pb, params.id);
+		}
+
 		return json(updated);
 	} catch (err: any) {
 		return json({ message: err?.response?.message ?? err?.message ?? 'Failed' }, { status: 500 });
 	}
 };
+
+/**
+ * Recalculate a goal's currentValue from its completed tasks.
+ *
+ * Strategy:
+ *   - Load the goal's baselineValue (stored separately) and all completed tasks
+ *     that have a progressContribution set.
+ *   - Sum contributions → add to baseline → write back to currentValue.
+ *   - If no tasks have contributions, leave currentValue unchanged (manual mode).
+ *   - Also updates the goal's progressMode field so the UI can show which mode is active.
+ */
+async function recalculateGoalProgress(pb: any, goalId: string) {
+	try {
+		const [goal, allTasks] = await Promise.all([
+			pb.collection('marketing_goals').getOne(goalId),
+			pb.collection('goal_tasks').getFullList({
+				filter: `goalId = "${goalId}"`
+			})
+		]);
+
+		// Only tasks with a progressContribution value set participate
+		const contributing = allTasks.filter(
+			(t: any) => t.progressContribution != null && t.progressContribution !== 0
+		);
+
+		if (contributing.length === 0) {
+			// No tasks drive progress — leave currentValue as-is (manual mode)
+			await pb.collection('marketing_goals').update(goalId, {
+				progressMode: 'manual'
+			}).catch(() => {});
+			return;
+		}
+
+		// Sum contributions from completed tasks only
+		const completedContribution = contributing
+			.filter((t: any) => t.status === 'completed')
+			.reduce((sum: number, t: any) => sum + (t.progressContribution ?? 0), 0);
+
+		// Baseline: the value before any tasks contributed (stored on first switch to task-driven)
+		const baseline = goal.progressBaseline ?? 0;
+		const newValue = baseline + completedContribution;
+
+		await pb.collection('marketing_goals').update(goalId, {
+			currentValue:  newValue,
+			progressMode:  'task_driven',
+			// Store baseline on first switch so manual edits aren't lost
+			progressBaseline: goal.progressBaseline ?? goal.currentValue ?? 0
+		}).catch(() => {});
+	} catch {
+		// Non-fatal — progress recalc failure shouldn't break the task update
+	}
+}
 
 export const DELETE: RequestHandler = async ({ params, locals, url }) => {
 	const ctx = await RequestContext.from(locals, url);

@@ -544,7 +544,7 @@
 		},
 		{
 			collection: 'projects',
-			description: 'The primary unit of work in Operations. A project can be a tournament, an activation (sponsor event or fan experience), a general event, or a marketing campaign. Each project has its own budget tracked through three numbers: project_budget (the approved envelope), project_forecasted_expenses (what is expected to be spent based on tasks and pending expenses), and project_actual_expenses (what has actually been paid). The gap between forecasted and actual is the uncommitted forecast — visible as the purple segment on the department budget bar. Budget mode controls whether the project budget is fixed, capped, or auto-derived from tasks.',
+			description: 'The primary unit of work in Operations. A project can be a tournament, an activation (sponsor event or fan experience), a general event, or a marketing campaign. Each project has its own budget tracked through three numbers: project_budget (the approved envelope), project_forecasted_expenses (what is expected to be spent based on tasks and pending expenses), and project_actual_expenses (what has actually been paid). Campaign-type projects can be linked to a campaigns record via campaignId — this is required for goal_task expenses to roll up to the department budget (chain: goal_task → goal → campaign → project → department).',
 			fields: [
 				{ name: 'name', type: 'text', description: 'Project name as it appears in dashboards and reports.' },
 				{ name: 'description', type: 'text', description: 'What the project is and what it is meant to achieve.' },
@@ -554,9 +554,10 @@
 				{ name: 'endDate', type: 'date', description: 'Last day of the project. Must be on or after startDate.' },
 				{ name: 'fiscalYear', type: 'text', description: 'Fiscal year this project belongs to (e.g. "2026"). Used to group projects in budget reports.' },
 				{ name: 'project_budget', type: 'number', description: 'Approved budget for this project — sum of task budgets, or set manually. This is the authoritative planned spend number.' },
-				{ name: 'project_actual_expenses', type: 'number', description: 'Sum of all approved and paid expenses on this project. Written by the system as expenses are approved.' },
+				{ name: 'project_actual_expenses', type: 'number', description: 'Sum of all approved and paid expenses on this project. Written by the system as expenses are approved. Clamped to 0 — never negative.' },
 				{ name: 'project_forecasted_expenses', type: 'number', description: 'Optional manual forecast of expected total spend. Useful when actual tasks are not yet fully defined.' },
 				{ name: 'department', type: 'relation', relatesTo: 'departments', description: 'The department that owns this project. The project budget rolls up to the department total.' },
+				{ name: 'campaignId', type: 'relation', relatesTo: 'campaigns', description: 'For campaign-type projects: the campaigns record this project executes. Required to attribute goal_task expenses to this project\'s department in the budget rollup.' },
 				{ name: 'vendors', type: 'relation', relatesTo: 'vendors', description: 'Vendors engaged on this project. Multiple vendors can be linked; each can also be referenced on individual expense records.' },
 				{ name: 'approvedBy', type: 'relation', relatesTo: 'user_profiles', description: 'The user who approved this project and its budget. Required before status can move past planned.' },
 				{ name: 'notes', type: 'text', description: 'Free-form notes — scope changes, decisions, or context not captured elsewhere.' }
@@ -565,7 +566,8 @@
 				{ to: 'tasks', type: 'one-to-many', description: 'Tasks that make up the project work — their budgets and hours roll up to project totals' },
 				{ to: 'expenses', type: 'one-to-many', description: 'Expenses charged to this project — their approved amounts update project_actual_expenses' },
 				{ to: 'vendors', type: 'many-to-many', description: 'Vendors engaged on this project' },
-				{ to: 'departments', type: 'many-to-one', description: 'The department this project belongs to — project budget rolls up to department total' }
+				{ to: 'departments', type: 'many-to-one', description: 'The department this project belongs to — project budget rolls up to department total' },
+				{ to: 'campaigns', type: 'many-to-one', description: 'The campaign this project executes — required for goal_task expense attribution to reach the department' }
 			]
 		},
 		{
@@ -618,24 +620,27 @@
 		},
 		{
 			collection: 'approvals',
-			description: 'Tracks approval requests for expenses, projects, and other entities that require sign-off before proceeding. An approval record links to the entity being approved (via entityType + entityId), the person who requested it, and the assigned approver. Status moves from pending → approved or rejected. Approved and rejected dates are recorded for audit purposes.',
+			description: 'Multi-voter quorum approval pipeline for expenses, projects, and goal tasks. An approval record links to the entity being approved (via entityType + entityId). Multiple admins/leaders can vote — once the vote count reaches the configured quorum (default: 2, stored in settings.approval_quorum), the approval is finalized and side effects fire automatically. For expenses: a work order is generated and project_actual_expenses is incremented. For projects: status moves to in_progress. For goal_tasks: a work order is generated (WO-{GOALCODE}-{NNNN}) and the linked expense is stamped.',
 			fields: [
-				{ name: 'entityType', type: 'select', description: 'The type of record being approved: expense, project, reimbursement, or other.' },
+				{ name: 'entityType', type: 'select', description: 'The type of record being approved: expense, project, or goal_task. Determines which side effects fire when quorum is reached.' },
 				{ name: 'entityId', type: 'text', description: 'The ID of the record being approved. Combined with entityType to look up the source record.' },
-				{ name: 'status', type: 'select', description: 'pending (awaiting review), approved (cleared), rejected (denied). Rejected records return to the submitter for revision.' },
+				{ name: 'status', type: 'select', description: 'pending (awaiting quorum), approved (quorum reached), rejected (denied), revision_requested.' },
 				{ name: 'requestedBy', type: 'relation', relatesTo: 'user_profiles', description: 'The team member who submitted the approval request.' },
-				{ name: 'approver', type: 'relation', relatesTo: 'user_profiles', description: 'The manager or admin assigned to review and approve this request.' },
+				{ name: 'approver', type: 'relation', relatesTo: 'user_profiles', description: 'The last user who cast a vote. Updated on each vote.' },
+				{ name: 'approvers', type: 'json', description: 'JSON array of user_profile IDs who have voted. The system checks this to prevent duplicate votes and to determine when quorum is reached.' },
 				{ name: 'requestedDate', type: 'date', description: 'Date the approval was requested.' },
-				{ name: 'reviewedDate', type: 'date', description: 'Date the approver acted on the request (approved or rejected).' },
-				{ name: 'comments', type: 'editor', description: 'Reviewer notes — reason for rejection, conditions of approval, or general feedback.' },
-				{ name: 'amount', type: 'number', description: 'Dollar amount associated with the approval request, if applicable.' },
+				{ name: 'reviewedDate', type: 'date', description: 'Date quorum was reached and the approval was finalized.' },
+				{ name: 'comments', type: 'editor', description: 'System-written summary on quorum (e.g. "Quorum reached — approved by 2 approvers. Work Order: WO-MKTG-0012"). Also used for reviewer notes.' },
+				{ name: 'amount', type: 'number', description: 'Dollar amount associated with the approval request. Sourced from the entity\'s estimatedCost or expense amount.' },
 				{ name: 'projectId', type: 'relation', relatesTo: 'projects', description: 'The project this approval is associated with, if applicable.' },
 				{ name: 'expenseId', type: 'relation', relatesTo: 'expenses', description: 'The expense record being approved, if entityType is expense.' }
 			],
 			relationships: [
-				{ to: 'user_profiles', type: 'many-to-one', description: 'Requester and approver are both user_profiles records' },
+				{ to: 'user_profiles', type: 'many-to-one', description: 'Requester and all voters are user_profiles records' },
 				{ to: 'projects', type: 'many-to-one', description: 'Optional link to the project this approval relates to' },
-				{ to: 'expenses', type: 'one-to-one', description: 'The expense record being approved' }
+				{ to: 'expenses', type: 'one-to-one', description: 'The expense record being approved (entityType = expense)' },
+				{ to: 'goal_tasks', type: 'one-to-one', description: 'The goal task being approved (entityType = goal_task)' },
+				{ to: 'work_orders', type: 'one-to-one', description: 'Work order created when quorum is reached for expense or goal_task approvals' }
 			]
 		},
 		{
@@ -698,6 +703,79 @@
 		}
 	];
 	
+	// Marketing system relationships
+	const marketingRelationships = [
+		{
+			collection: 'marketing_goals',
+			description: 'High-level marketing objectives with quantitative progress tracking. Each goal has a target metric (e.g. "Total Followers"), a current value, and a target value. Progress can be driven manually (user edits currentValue directly) or automatically via task contributions (progressMode = task_driven). When task-driven, currentValue is recalculated as progressBaseline + sum of progressContribution from all completed goal_tasks. Goals link to campaigns via the campaign\'s goalId field, and campaign projects link back via campaignId — forming the full chain: goal → campaign → project → department.',
+			fields: [
+				{ name: 'goalName', type: 'text', description: 'Goal display name (e.g. "Grow Social Following to 50K"). Required.' },
+				{ name: 'description', type: 'text', description: 'What this goal is and why it matters.' },
+				{ name: 'category', type: 'select', description: 'Brand Awareness, Lead Generation, Revenue Growth, Engagement, Retention, or Other. Used for filtering and grouping.' },
+				{ name: 'targetMetric', type: 'text', description: 'The unit being measured (e.g. "Total Followers", "Email Subscribers"). Displayed alongside currentValue / targetValue.' },
+				{ name: 'currentValue', type: 'number', description: 'Current progress toward the target. In manual mode, edited directly. In task_driven mode, written by the system as goal_tasks are completed.' },
+				{ name: 'targetValue', type: 'number', description: 'The number to reach for this goal to be considered complete.' },
+				{ name: 'progressMode', type: 'select', description: 'manual (user edits currentValue directly) or task_driven (system recalculates from completed goal_tasks). Written by the system — do not edit manually.' },
+				{ name: 'progressBaseline', type: 'number', description: 'The value of currentValue at the moment the goal switched to task_driven mode. Task contributions are added on top of this baseline. Stored by the system on first switch.' },
+				{ name: 'status', type: 'select', description: 'Not Started, In Progress, On Track, At Risk, Completed, On Hold.' },
+				{ name: 'priority', type: 'select', description: 'High, Medium, Low.' },
+				{ name: 'deadline', type: 'date', description: 'Target completion date.' }
+			],
+			relationships: [
+				{ to: 'goal_tasks', type: 'one-to-many', description: 'Tasks that execute this goal — completed tasks with progressContribution drive currentValue in task_driven mode' },
+				{ to: 'campaigns', type: 'one-to-many', description: 'Campaigns serving this goal — linked via campaign.goalId' }
+			]
+		},
+		{
+			collection: 'goal_tasks',
+			description: 'Execution tasks attached to a marketing goal. Each task moves through a 7-stage approval pipeline: pending → needs_approval → approved → expense_created → work_order → completed → cancelled. When a task reaches needs_approval, an approvals record is created automatically. When the approval reaches quorum, a work_orders record is generated (WO-{GOALCODE}-{NNNN}) and any linked expense is stamped with the work order number. When a task is completed, the parent goal\'s currentValue is recalculated if progressContribution is set.',
+			fields: [
+				{ name: 'goalId', type: 'relation', relatesTo: 'marketing_goals', description: 'The goal this task belongs to.' },
+				{ name: 'title', type: 'text', description: 'Task title. Required.' },
+				{ name: 'description', type: 'text', description: 'What needs to be done.' },
+				{ name: 'status', type: 'select', description: 'pending → needs_approval → approved → expense_created → work_order → completed → cancelled. Stage transitions trigger side effects (approval creation, work order generation, progress recalculation).' },
+				{ name: 'priority', type: 'select', description: 'low, medium, high, urgent.' },
+				{ name: 'dueDate', type: 'date', description: 'Task due date.' },
+				{ name: 'assignedTo', type: 'text', description: 'Name or identifier of the person responsible.' },
+				{ name: 'estimatedCost', type: 'number', description: 'Expected cost of this task. Used as the approval amount when needs_approval is triggered.' },
+				{ name: 'actualCost', type: 'number', description: 'Actual cost incurred. Used when creating the expense record.' },
+				{ name: 'progressContribution', type: 'number', description: 'The amount added to the parent goal\'s currentValue when this task is completed. Only applies when goal.progressMode = task_driven.' },
+				{ name: 'approvalId', type: 'text', description: 'ID of the approvals record created when status moves to needs_approval. Written by the system.' },
+				{ name: 'approvedBy', type: 'text', description: 'User ID of the approver. Written by the system on approval.' },
+				{ name: 'approvedAt', type: 'date', description: 'Timestamp of approval. Written by the system.' },
+				{ name: 'expenseId', type: 'text', description: 'ID of the expenses record created when status moves to expense_created. Written by the system.' },
+				{ name: 'workOrderId', type: 'text', description: 'Work order number (e.g. WO-MKTG-0012) assigned when the approval reaches quorum. Written by the system.' },
+				{ name: 'notes', type: 'text', description: 'Internal notes.' }
+			],
+			relationships: [
+				{ to: 'marketing_goals', type: 'many-to-one', description: 'Parent goal — task completion recalculates goal.currentValue when progressContribution is set' },
+				{ to: 'approvals', type: 'one-to-one', description: 'Approval record created when status = needs_approval' },
+				{ to: 'expenses', type: 'one-to-one', description: 'Expense record created when status = expense_created' },
+				{ to: 'work_orders', type: 'one-to-one', description: 'Work order created when the approval reaches quorum' }
+			]
+		},
+		{
+			collection: 'campaigns',
+			description: 'Marketing campaigns — digital, print, event, or brand activations. A campaign is the execution vehicle for a marketing goal: it has its own budget and spend tracking, a lifecycle status, and links to the goal it serves (goalId) and the media assets produced for it. Campaign-type projects link back to a campaign via project.campaignId, forming the full attribution chain: goal → campaign → project → department. This chain is what allows goal_task expenses to be attributed to a department budget.',
+			fields: [
+				{ name: 'name', type: 'text', description: 'Campaign display name.' },
+				{ name: 'description', type: 'editor', description: 'Campaign brief, objectives, and scope.' },
+				{ name: 'type', type: 'select', description: 'Marketing, Brand Awareness, Event, Product Launch, or other classification.' },
+				{ name: 'status', type: 'select', description: 'Planning → Active → Paused → Completed → Cancelled.' },
+				{ name: 'startDate', type: 'date', description: 'Campaign start date.' },
+				{ name: 'endDate', type: 'date', description: 'Campaign end date.' },
+				{ name: 'budget', type: 'number', description: 'Approved spend budget for this campaign.' },
+				{ name: 'actualSpend', type: 'number', description: 'Actual spend to date. Updated as expenses are approved.' },
+				{ name: 'goalId', type: 'relation', relatesTo: 'marketing_goals', description: 'The marketing goal this campaign serves. When set, the campaign card links directly to the goal detail page. Required for goal_task expenses to roll up to a department.' }
+			],
+			relationships: [
+				{ to: 'marketing_goals', type: 'many-to-one', description: 'The goal this campaign serves — set goalId to activate the attribution chain' },
+				{ to: 'projects', type: 'one-to-many', description: 'Campaign-type projects linked via project.campaignId — their budgets and expenses roll up through this campaign to the department' },
+				{ to: 'media_assets', type: 'one-to-many', description: 'Media assets produced for this campaign' }
+			]
+		}
+	];
+
 	// Legal & IP system relationships
 	const legalRelationships = [
 		{
@@ -927,6 +1005,7 @@
 			{#each [
 				{ id: 'financial', label: 'Financial' },
 				{ id: 'operations', label: 'Operations' },
+				{ id: 'marketing', label: 'Marketing' },
 				{ id: 'sales', label: 'Sales' },
 				{ id: 'league', label: 'League' },
 				{ id: 'prize-money', label: 'Prize Money' },
@@ -1820,6 +1899,138 @@
 					</div>
 				</div>
 			</Card>
+		</div>
+	{/if}
+
+	{#if activeTab === 'marketing'}
+		<div class="space-y-6">
+
+			<!-- Overview -->
+			<Card class="p-6">
+				<div class="space-y-5">
+					<div>
+						<h2 class="text-xl font-bold">Marketing System Overview</h2>
+						<p class="text-sm text-muted-foreground mt-1">
+							How marketing goals, campaigns, and tasks connect — and how spend flows back to department budgets.
+						</p>
+					</div>
+
+					<!-- Attribution chain -->
+					<div class="p-4 bg-violet-950/40 border border-violet-700/50 rounded-lg text-sm text-violet-200 space-y-2">
+						<p class="font-semibold text-violet-300">Full attribution chain — goal task spend reaches the department budget</p>
+						<div class="flex flex-wrap items-center gap-2 font-mono text-xs">
+							{#each [
+								{ label: 'Goal', sub: 'objective', color: 'bg-violet-900/60 border-violet-600' },
+								{ label: '→', color: '' },
+								{ label: 'Campaign', sub: 'goalId', color: 'bg-pink-900/60 border-pink-600' },
+								{ label: '→', color: '' },
+								{ label: 'Project', sub: 'campaignId', color: 'bg-blue-900/60 border-blue-600' },
+								{ label: '→', color: '' },
+								{ label: 'Department', sub: 'budget rollup', color: 'bg-emerald-900/60 border-emerald-600' },
+							] as h}
+								{#if h.sub}
+									<div class="flex flex-col items-center gap-0.5 px-3 py-1.5 rounded-lg border {h.color}">
+										<span class="font-bold">{h.label}</span>
+										<span class="text-[10px] opacity-70">{h.sub}</span>
+									</div>
+								{:else}
+									<span class="text-violet-500 text-base">{h.label}</span>
+								{/if}
+							{/each}
+						</div>
+						<p class="text-xs text-violet-300/80 pt-1">
+							Set <code class="font-mono bg-black/30 px-1 rounded">campaign.goalId</code> and <code class="font-mono bg-black/30 px-1 rounded">project.campaignId</code> to activate the full chain. Without both links, goal task expenses are unattributed in the department rollup.
+						</p>
+					</div>
+
+					<!-- Goal task pipeline -->
+					<div>
+						<h3 class="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-3">Goal Task Pipeline — 7 Stages</h3>
+						<div class="flex flex-wrap items-center gap-2 text-xs font-mono">
+							{#each [
+								{ label: 'pending', color: 'bg-slate-700/50 border-slate-600 text-slate-200', note: 'Created' },
+								{ label: '→', color: '', note: '' },
+								{ label: 'needs_approval', color: 'bg-amber-900/40 border-amber-700/50 text-amber-200', note: 'Approval created' },
+								{ label: '→', color: '', note: '' },
+								{ label: 'approved', color: 'bg-blue-900/40 border-blue-700/50 text-blue-200', note: 'WO generated' },
+								{ label: '→', color: '', note: '' },
+								{ label: 'expense_created', color: 'bg-violet-900/40 border-violet-700/50 text-violet-200', note: 'Expense record' },
+								{ label: '→', color: '', note: '' },
+								{ label: 'work_order', color: 'bg-cyan-900/40 border-cyan-700/50 text-cyan-200', note: 'WO linked' },
+								{ label: '→', color: '', note: '' },
+								{ label: 'completed', color: 'bg-emerald-900/40 border-emerald-700/50 text-emerald-200', note: 'Progress updated' },
+							] as s}
+								{#if s.note}
+									<div class="flex flex-col items-center gap-0.5 px-2 py-1 rounded border {s.color}">
+										<span>{s.label}</span>
+										<span class="text-[9px] opacity-60">{s.note}</span>
+									</div>
+								{:else}
+									<span class="text-slate-500">{s.label}</span>
+								{/if}
+							{/each}
+						</div>
+						<p class="text-xs text-muted-foreground mt-2">
+							When <strong>needs_approval</strong> is triggered, an <code class="font-mono bg-black/30 px-1 rounded">approvals</code> record is created automatically.
+							When the approval reaches quorum, a <code class="font-mono bg-black/30 px-1 rounded">work_orders</code> record is generated (<code class="font-mono bg-black/30 px-1 rounded">WO-{'{GOALCODE}'}-{'{NNNN}'}</code>).
+							When <strong>completed</strong>, the parent goal's <code class="font-mono bg-black/30 px-1 rounded">currentValue</code> is recalculated if <code class="font-mono bg-black/30 px-1 rounded">progressContribution</code> is set.
+						</p>
+					</div>
+
+					<!-- Progress modes -->
+					<div>
+						<h3 class="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-3">Goal Progress Modes</h3>
+						<div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+							{#each [
+								{ mode: 'manual', color: 'bg-slate-800 border-slate-600', title: 'Manual', desc: 'User edits currentValue directly via the inline form. No task contributions are tracked. Default mode.' },
+								{ mode: 'task_driven', color: 'bg-emerald-950/40 border-emerald-700/50', title: 'Task-Driven', desc: 'currentValue = progressBaseline + sum of progressContribution from all completed goal_tasks. Switched automatically when any task has a progressContribution set.' },
+							] as m}
+								<div class="p-3 rounded-lg border {m.color}">
+									<p class="text-sm font-semibold font-mono">{m.mode}</p>
+									<p class="text-xs text-muted-foreground mt-1">{m.desc}</p>
+								</div>
+							{/each}
+						</div>
+					</div>
+				</div>
+			</Card>
+
+			<!-- Collection detail cards -->
+			{#each marketingRelationships as rel}
+				<Card class="p-6">
+					<div class="space-y-4">
+						<div>
+							<h3 class="text-lg font-bold font-mono">{rel.collection}</h3>
+							<p class="text-sm text-muted-foreground mt-1">{rel.description}</p>
+						</div>
+						<div>
+							<h4 class="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2">Fields</h4>
+							<div class="space-y-1.5">
+								{#each rel.fields as field}
+									<div class="flex gap-3 text-sm">
+										<code class="font-mono text-violet-300 shrink-0 w-48">{field.name}</code>
+										<span class="text-xs px-1.5 py-0.5 rounded bg-slate-700 text-slate-300 shrink-0 self-start">{field.type}</span>
+										<span class="text-muted-foreground text-xs">{field.description}</span>
+									</div>
+								{/each}
+							</div>
+						</div>
+						<div>
+							<h4 class="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2">Relationships</h4>
+							<div class="space-y-1.5">
+								{#each rel.relationships as r}
+									<div class="flex gap-3 text-sm">
+										<code class="font-mono text-pink-300 shrink-0 w-48">{r.to}</code>
+										<span class="text-xs px-1.5 py-0.5 rounded bg-slate-700 text-slate-300 shrink-0 self-start">{r.type}</span>
+										<span class="text-muted-foreground text-xs">{r.description}</span>
+									</div>
+								{/each}
+							</div>
+						</div>
+					</div>
+				</Card>
+			{/each}
+
 		</div>
 	{/if}
 

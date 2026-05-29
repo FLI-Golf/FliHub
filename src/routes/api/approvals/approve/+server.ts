@@ -164,6 +164,82 @@ export const POST: RequestHandler = async ({ locals, request }) => {
 					status: 'in_progress',
 					approvedBy: userProfile.id,
 				}).catch((e: any) => console.warn('project update failed:', e.message));
+
+			} else if (approval.entityType === 'goal_task') {
+				// ── goal_task quorum pipeline ─────────────────────────────────
+				// Mirrors the expense pipeline: generate WO number, create work_orders
+				// record, update linked expense if present, flag the task as approved.
+
+				const goalTask = await pb.collection('goal_tasks').getOne(approval.entityId).catch(() => null) as any;
+				const goal = goalTask?.goalId
+					? await pb.collection('marketing_goals').getOne(goalTask.goalId).catch(() => null) as any
+					: null;
+
+				// Generate WO number using goal name as code (e.g. WO-MKTG-0012)
+				const goalCode = goal
+					? goal.goalName
+						.replace(/[^a-zA-Z\s]/g, '')
+						.split(/\s+/)
+						.filter(Boolean)
+						.map((w: string) => w[0].toUpperCase())
+						.join('')
+						.slice(0, 6) || 'GOAL'
+					: 'GOAL';
+
+				const allWOs = await pb.collection('work_orders').getFullList({
+					fields: 'work_order_number', sort: '-created'
+				}).catch(() => []) as any[];
+				const seq = allWOs.length + 1;
+				workOrderNumber = `WO-${goalCode}-${String(seq).padStart(4, '0')}`;
+
+				updatePayload.comments = `<p>Quorum reached — approved by ${voteCount} ${voteCount === 1 ? 'approver' : 'approvers'}. Work Order: ${workOrderNumber}</p>`;
+
+				// Create work_orders record
+				try {
+					await pb.collection('work_orders').create({
+						work_order_number: workOrderNumber,
+						expenseId:    goalTask?.expenseId || '',
+						taskId:       '',
+						projectId:    '',
+						projectCode:  goalCode,
+						projectName:  goal?.goalName || '',
+						approvedBy:   userProfile.id,
+						expense:      goalTask?.expenseId || null,
+						task:         null,
+						project:      null,
+						approver:     userProfile.id,
+						submittedBy:  goalTask?.assignedTo || null,
+						description:  goalTask?.description || goalTask?.title || '',
+						amount:       goalTask?.actualCost ?? goalTask?.estimatedCost ?? 0,
+						approvedDate: new Date().toISOString(),
+						source:       'goal_task',
+						status:       'open',
+					});
+					console.log(`✅ Work order ${workOrderNumber} created for goal_task ${approval.entityId}`);
+				} catch (e: any) {
+					console.error('❌ work_order create failed (goal_task):', e.message, JSON.stringify(e.data ?? {}));
+				}
+
+				// Update linked expense if one was created during task pipeline
+				if (goalTask?.expenseId) {
+					await pb.collection('expenses').update(goalTask.expenseId, {
+						status:            'approved',
+						approvedBy:        userProfile.id,
+						approvedDate:      new Date().toISOString(),
+						work_order_number: workOrderNumber,
+					}).catch((e: any) => console.warn('goal_task expense update failed:', e.message));
+				}
+
+				// Mark the goal task as approved with WO reference
+				if (goalTask) {
+					await pb.collection('goal_tasks').update(approval.entityId, {
+						status:            'approved',
+						approvedBy:        userProfile.id,
+						approvedAt:        new Date().toISOString(),
+						workOrderId:       workOrderNumber,
+					}).catch((e: any) => console.warn('goal_task update failed:', e.message));
+				}
+
 			} else {
 				updatePayload.comments = `<p>Quorum reached — approved by ${voteCount} ${voteCount === 1 ? 'approver' : 'approvers'}.</p>`;
 			}

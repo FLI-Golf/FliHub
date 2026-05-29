@@ -531,6 +531,18 @@ export const collections = [
 				name: 'marketingMix',
 				type: 'text',
 				required: false
+			},
+			// Progress tracking — added to support task-driven progress
+			{
+				name: 'progressMode',
+				type: 'select',
+				required: false,
+				options: { maxSelect: 1, values: ['manual', 'task_driven'] }
+			},
+			{
+				name: 'progressBaseline',
+				type: 'number',
+				required: false
 			}
 		],
 		indexes: ['CREATE INDEX idx_marketing_goals_status ON marketing_goals (status)'],
@@ -1042,10 +1054,13 @@ export const collections = [
 				options: { maxSelect: 1, values: ['low','medium','high','urgent'] }
 			},
 			{ name: 'dueDate',       type: 'date',   required: false },
-			{ name: 'estimatedCost', type: 'number', required: false },
-			{ name: 'actualCost',    type: 'number', required: false },
-			{ name: 'assignedTo',    type: 'text',   required: false, options: { max: 255 } },
-			{ name: 'notes',         type: 'text',   required: false },
+			{ name: 'estimatedCost',        type: 'number', required: false },
+			{ name: 'actualCost',           type: 'number', required: false },
+			{ name: 'assignedTo',           type: 'text',   required: false, options: { max: 255 } },
+			{ name: 'notes',                type: 'text',   required: false },
+			// When this task is marked completed, add this value to the goal's currentValue.
+			// Leave null to have no effect on progress (task is purely operational).
+			{ name: 'progressContribution', type: 'number', required: false },
 			// Approval tracking
 			{ name: 'approvalId',    type: 'text',   required: false, options: { max: 255 } },
 			{ name: 'approvedBy',    type: 'text',   required: false, options: { max: 255 } },
