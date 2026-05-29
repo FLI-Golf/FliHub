@@ -1014,5 +1014,97 @@ export const collections = [
 		createRule: '@request.auth.id != ""',
 		updateRule: '@request.auth.id != ""',
 		deleteRule: null
+	},
+
+	// ─── Sponsor activity log ─────────────────────────────────────────────────
+	{
+		name: 'sponsor_activity',
+		type: 'base',
+		schema: [
+			{ name: 'sponsorId',  type: 'text',   required: true,  options: { max: 255 } },
+			{
+				name: 'type',
+				type: 'select',
+				required: true,
+				options: {
+					maxSelect: 1,
+					values: ['note', 'call', 'email', 'meeting', 'stage_change', 'payment', 'contract', 'other']
+				}
+			},
+			{ name: 'note',      type: 'text',   required: false },
+			{ name: 'createdBy', type: 'text',   required: false, options: { max: 255 } }
+		],
+		listRule: '@request.auth.id != ""',
+		viewRule: '@request.auth.id != ""',
+		createRule: '@request.auth.id != ""',
+		updateRule: '@request.auth.id != ""',
+		deleteRule: '@request.auth.id != ""'
+	},
+
+	// ─── Content production pipeline ─────────────────────────────────────────
+	{
+		name: 'content_production',
+		type: 'base',
+		schema: [
+			{ name: 'title',           type: 'text',   required: true,  options: { max: 500 } },
+			{
+				name: 'contentType',
+				type: 'select',
+				required: true,
+				options: { maxSelect: 1, values: ['youtube','instagram','tiktok','podcast','documentary','promo','interview','highlight','other'] }
+			},
+			{
+				name: 'stage',
+				type: 'select',
+				required: true,
+				options: { maxSelect: 1, values: ['brief','shoot','edit','approval','published','paid','cancelled'] }
+			},
+			{ name: 'description',     type: 'text',   required: false },
+			{ name: 'talent',          type: 'relation', required: false, options: { collectionId: 'talent', maxSelect: 10 } },
+			{ name: 'assignedTo',      type: 'text',   required: false, options: { max: 255 } },
+			{ name: 'dueDate',         type: 'date',   required: false },
+			{ name: 'budget',          type: 'number', required: false },
+			{ name: 'actualCost',      type: 'number', required: false },
+			{ name: 'requiresApproval',type: 'bool',   required: false },
+			{
+				name: 'approvalStatus',
+				type: 'select',
+				required: false,
+				options: { maxSelect: 1, values: ['pending','approved','rejected'] }
+			},
+			{ name: 'approvedBy',      type: 'text',   required: false, options: { max: 255 } },
+			{ name: 'approvedAt',      type: 'date',   required: false },
+			{ name: 'publishedUrl',    type: 'url',    required: false },
+			{
+				name: 'paymentStatus',
+				type: 'select',
+				required: false,
+				options: { maxSelect: 1, values: ['unpaid','pending','paid'] }
+			},
+			{ name: 'notes',           type: 'text',   required: false },
+			{ name: 'createdBy',       type: 'text',   required: false, options: { max: 255 } }
+		],
+		listRule: '@request.auth.id != ""',
+		viewRule: '@request.auth.id != ""',
+		createRule: '@request.auth.id != ""',
+		updateRule: '@request.auth.id != ""',
+		deleteRule: null
+	},
+
+	// ─── Tournament ops checklist ─────────────────────────────────────────────
+	{
+		name: 'tournament_ops_checklist',
+		type: 'base',
+		schema: [
+			{ name: 'tournamentId', type: 'text',   required: true,  options: { max: 255 } },
+			{ name: 'itemId',       type: 'text',   required: true,  options: { max: 100 } },
+			{ name: 'checkedBy',    type: 'text',   required: false, options: { max: 255 } },
+			{ name: 'checkedAt',    type: 'date',   required: false }
+		],
+		listRule: '@request.auth.id != ""',
+		viewRule: '@request.auth.id != ""',
+		createRule: '@request.auth.id != ""',
+		updateRule: '@request.auth.id != ""',
+		deleteRule: '@request.auth.id != ""'
 	}
 ];

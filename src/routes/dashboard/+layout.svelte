@@ -34,6 +34,7 @@
 		'/dashboard/league': 'League Overview',
 		'/dashboard/talent': 'Talent Management',
 		'/dashboard/talent/tournaments': 'Tournaments',
+		'/dashboard/events': 'Events',
 		'/dashboard/talent/special-events': 'Special Events',
 		'/dashboard/talent/franchise-payouts': 'Franchise Payouts',
 		'/dashboard/talent/payments': 'Pro Payments',

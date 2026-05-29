@@ -278,6 +278,10 @@
 		</div>
 		<div class="flex gap-2">
 			<Button href="/dashboard/talent/tournaments">← Back</Button>
+			<Button href="/dashboard/talent/tournaments/{data.tournament.id}/ops" variant="outline"
+				class="gap-1.5 border-slate-600 text-slate-300 hover:bg-slate-700">
+				⚙ Ops
+			</Button>
 			<Button onclick={() => (showAddResultModal = true)}>Add Result</Button>
 		</div>
 	</div>
