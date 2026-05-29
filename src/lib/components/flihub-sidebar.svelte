@@ -42,7 +42,8 @@
 		PenLine,
 		ClipboardList,
 		BadgeCheck,
-		Zap
+		Zap,
+		Monitor
 	} from 'lucide-svelte';
 
 	type NavItem = {
@@ -221,6 +222,7 @@
 				{ title: 'On-Course Branding', url: '/dashboard/on-course-branding', icon: Flag, roles: ['admin'] },
 				{ title: 'Advertising', url: '/dashboard/advertising', icon: Megaphone, roles: ['admin'] },
 				{ title: 'Stadium Course #1', url: '/dashboard/stadium-course', icon: Hammer, roles: ['admin'] },
+				{ title: 'Scoreboards', url: '/dashboard/stadium-course/scoreboards', icon: Monitor, roles: ['admin'] },
 				{ title: 'Sponsorship Revenue', url: '/dashboard/sponsorship-revenue', icon: Star, roles: ['admin'] },
 				{ title: 'Bag Licensing', url: '/dashboard/bag-licensing', icon: ShoppingBag, roles: ['admin'] },
 				{ title: 'Disc Licensing', url: '/dashboard/disc-licensing', icon: Disc3, roles: ['admin'] },

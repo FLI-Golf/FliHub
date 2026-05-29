@@ -32,6 +32,24 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 		.getFullList({ sort: 'goalName' })
 		.catch(() => []);
 
+	// Attach task counts per goal (non-fatal)
+	const allTasks = await pb.collection('goal_tasks')
+		.getFullList({ fields: 'goalId,status' })
+		.catch(() => []);
+
+	const taskCountByGoal: Record<string, { total: number; completed: number; needsApproval: number }> = {};
+	for (const t of allTasks as any[]) {
+		if (!taskCountByGoal[t.goalId]) taskCountByGoal[t.goalId] = { total: 0, completed: 0, needsApproval: 0 };
+		taskCountByGoal[t.goalId].total++;
+		if (t.status === 'completed') taskCountByGoal[t.goalId].completed++;
+		if (t.status === 'needs_approval') taskCountByGoal[t.goalId].needsApproval++;
+	}
+
+	const goalsWithTasks = (marketingGoals as any[]).map(g => ({
+		...g,
+		taskCount: taskCountByGoal[g.id] ?? { total: 0, completed: 0, needsApproval: 0 }
+	}));
+
 	const stats = {
 		total: marketingGoals.length,
 		byStatus: {
@@ -51,5 +69,5 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 		if (g.category) stats.byCategory[g.category] = (stats.byCategory[g.category] ?? 0) + 1;
 	}
 
-	return { marketingGoals, stats };
+	return { marketingGoals: goalsWithTasks, stats };
 };
