@@ -5,7 +5,7 @@
 	import {
 		Megaphone, DollarSign, BarChart3, Target,
 		ArrowRight, Calendar, TrendingUp, CheckCircle2,
-		Clock, AlertCircle, ChevronDown, Images, Star
+		Clock, AlertCircle, ChevronDown, Images, Star, Link
 	} from 'lucide-svelte';
 
 	let { data }: { data: PageData } = $props();
@@ -175,6 +175,18 @@
 								<p class="text-xs text-muted-foreground">/ {fmt(campaign.budget)}</p>
 							</div>
 						</div>
+
+						<!-- Linked goal badge -->
+						{#if campaign.linkedGoal}
+							<a
+								href="/dashboard/marketing-goals/{campaign.linkedGoal.id}"
+								class="inline-flex items-center gap-1.5 mb-3 text-[10px] font-medium px-2 py-1 rounded border bg-violet-500/10 border-violet-500/30 text-violet-300 hover:bg-violet-500/20 transition-colors"
+								onclick={(e) => e.stopPropagation()}
+							>
+								<Link class="size-3 shrink-0" />
+								Goal: {campaign.linkedGoal.goalName}
+							</a>
+						{/if}
 
 						<!-- Description collapsible -->
 						{#if campaign.description}

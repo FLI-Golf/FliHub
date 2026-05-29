@@ -7,7 +7,7 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 	try {
 		
 		const [projects, departments, tasks] = await Promise.all([
-			pb.collection('projects').getFullList({ sort: '-id' }).catch(() => []),
+			pb.collection('projects').getFullList({ sort: '-id', expand: 'campaignId' }).catch(() => []),
 			pb.collection('departments').getFullList({ sort: 'name' }).catch(() => []),
 			pb.collection('tasks').getFullList({ fields: 'projectId,task_actual_cost,task_budget' }).catch(() => [])
 		]);
@@ -20,10 +20,18 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 			}
 		}
 	
-		// Enrich projects with computed actual expenses from tasks
+		// Enrich projects with computed actual expenses from tasks.
+		// Use task-derived cost when tasks exist for the project; fall back to the
+		// stored field only when no tasks are found (key absent from map).
+		// Clamp to 0 — negative stored values are data artifacts, not real spend.
 		const enrichedProjects = projects.map((p: any) => ({
 			...p,
-			project_actual_expenses: taskCostByProject[p.id] || p.project_actual_expenses || 0
+			project_actual_expenses: Math.max(
+				0,
+				p.id in taskCostByProject
+					? taskCostByProject[p.id]
+					: (p.project_actual_expenses ?? 0)
+			)
 		}));
 	
 		// Calculate stats

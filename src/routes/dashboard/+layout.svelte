@@ -64,7 +64,8 @@
 		'/dashboard/league-licensing': 'League Licensing',
 		'/dashboard/welcome': 'Welcome',
 		'/dashboard/onboarding': 'Onboarding',
-		'/dashboard/player-profile': 'Player Profile'
+		'/dashboard/player-profile': 'Player Profile',
+		'/dashboard/settings': 'Settings'
 	};
 
 	$: currentLabel = routeLabels[$page.url.pathname] ?? 'Dashboard';
@@ -130,9 +131,11 @@
 								<span>Profile</span>
 							</a>
 						</DropdownMenu.Item>
-						<DropdownMenu.Item class="gap-2 cursor-pointer">
-							<Settings class="size-4 text-muted-foreground" />
-							<span>Settings</span>
+						<DropdownMenu.Item class="gap-2 cursor-pointer p-0">
+							<a href="/dashboard/settings" class="flex items-center gap-2 w-full px-2 py-1.5">
+								<Settings class="size-4 text-muted-foreground" />
+								<span>Settings</span>
+							</a>
 						</DropdownMenu.Item>
 						<DropdownMenu.Separator />
 						<div class="px-1 pb-1">

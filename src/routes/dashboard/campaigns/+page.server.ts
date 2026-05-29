@@ -7,7 +7,7 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 
 	try {
 		const [campaigns, mediaAssets, marketingGoals] = await Promise.all([
-			pb.collection('campaigns').getFullList({ sort: '-created' }).catch(() => []),
+			pb.collection('campaigns').getFullList({ sort: '-created', expand: 'goalId' }).catch(() => []),
 			pb.collection('media_assets').getFullList({ fields: 'id,title,asset_type,campaign,file,collectionId' }).catch(() => []),
 			pb.collection('marketing_goals').getFullList({ sort: 'priority,deadline' }).catch(() => []),
 		]);
@@ -26,6 +26,7 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 			...c,
 			assets: assetsByCampaign[c.id] ?? [],
 			budgetPct: c.budget > 0 ? Math.min(100, (c.actualSpend / c.budget) * 100) : 0,
+			linkedGoal: c.expand?.goalId ?? null,
 		}));
 
 		// Summary stats

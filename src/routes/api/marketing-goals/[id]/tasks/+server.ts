@@ -27,16 +27,17 @@ export const POST: RequestHandler = async ({ params, request, locals, url }) => 
 
 	try {
 		const record = await ctx.pb.collection('goal_tasks').create({
-			goalId:        params.id,
-			title:         body.title.trim(),
-			description:   body.description ?? '',
-			status:        'todo',
-			priority:      body.priority ?? 'medium',
-			dueDate:       body.dueDate ?? null,
-			estimatedCost: body.estimatedCost ? Number(body.estimatedCost) : null,
-			notes:         body.notes ?? '',
-			assignedTo:    body.assignedTo ?? '',
-			createdBy:     ctx.userId
+			goalId:               params.id,
+			title:                body.title.trim(),
+			description:          body.description ?? '',
+			status:               'todo',
+			priority:             body.priority ?? 'medium',
+			dueDate:              body.dueDate ?? null,
+			estimatedCost:        body.estimatedCost ? Number(body.estimatedCost) : null,
+			progressContribution: body.progressContribution ? Number(body.progressContribution) : null,
+			notes:                body.notes ?? '',
+			assignedTo:           body.assignedTo ?? '',
+			createdBy:            ctx.userId
 		});
 		return json(record, { status: 201 });
 	} catch (err: any) {

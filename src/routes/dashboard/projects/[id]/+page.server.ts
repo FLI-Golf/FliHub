@@ -22,7 +22,7 @@ export const load: PageServerLoad = async ({ locals, url, params }) => {
 		// Then try to expand relations
 		try {
 			project = await pb.collection('projects').getOne(params.id, {
-				expand: 'department,approvedBy,vendors'
+				expand: 'department,approvedBy,vendors,campaignId'
 			});
 			console.log('Project loaded with expand:', project.name);
 		} catch (expandErr: any) {
@@ -87,6 +87,18 @@ export const load: PageServerLoad = async ({ locals, url, params }) => {
 		console.log('Tasks count:', tasks.length);
 		console.log('Vendors count:', allVendors.length);
 		
+		// Clamp project_actual_expenses — negative stored values are data artifacts.
+		// Use the sum of approved/paid expenses as the authoritative actual spend.
+		const actualFromExpenses = Array.isArray(expenses)
+			? expenses
+				.filter((e: any) => e.status === 'approved' || e.status === 'paid')
+				.reduce((sum: number, e: any) => sum + (e.amount || 0), 0)
+			: 0;
+		project = {
+			...project,
+			project_actual_expenses: Math.max(0, actualFromExpenses || project.project_actual_expenses || 0)
+		};
+
 		return {
 			project,
 			expenses,

@@ -4,7 +4,7 @@
 	import { Badge } from '$lib/components/ui/badge';
 	import * as Sheet from '$lib/components/ui/sheet/index.js';
 	import type { PageData } from './$types';
-	import { Target, Plus, TrendingUp, CheckCircle, Clock, Pause, Calendar, Flag, X, ListTodo, AlertCircle } from 'lucide-svelte';
+	import { Target, Plus, TrendingUp, CheckCircle, Clock, Pause, Calendar, Flag, X, ListTodo, AlertCircle, Zap } from 'lucide-svelte';
 
 	let { data }: { data: PageData } = $props();
 
@@ -184,6 +184,7 @@
 											></div>
 										</div>
 										<span class="text-sm text-gray-300">{progress}%</span>
+
 									</div>
 								</td>
 								<td class="px-4 py-3 text-center">
@@ -269,6 +270,7 @@
 				<!-- Progress (editable) -->
 				<div class="bg-slate-800 rounded-lg p-4">
 					<h4 class="text-sm font-medium text-slate-400 mb-3">Progress</h4>
+
 					<div class="w-full h-4 bg-slate-700 rounded-full overflow-hidden mb-2">
 						<div
 							class="h-full rounded-full transition-all {progress >= 100 ? 'bg-green-500' : progress >= 50 ? 'bg-blue-500' : 'bg-amber-500'}"
