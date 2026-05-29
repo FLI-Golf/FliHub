@@ -4,7 +4,7 @@
 	import { Button } from '$lib/components/ui/button';
 	import Card from '$lib/components/ui/card.svelte';
 	import type { PageData, ActionData } from './$types';
-	import { ArrowLeft, Pencil, Trash2, Plus, CheckCircle2, Clock, AlertCircle, DollarSign, Calendar, MapPin, Users, TrendingUp, X, Upload, FileText, Image, Loader2 } from 'lucide-svelte';
+	import { ArrowLeft, Pencil, Trash2, Plus, CheckCircle2, Clock, AlertCircle, DollarSign, Calendar, MapPin, Users, TrendingUp, X, Upload, FileText, Image, Loader2, MessageSquare, Phone, Mail, Video, ArrowRightLeft, CreditCard, ScrollText } from 'lucide-svelte';
 	import {
 		PIPELINE_STAGES, SPONSOR_STATUS_LABELS, SPONSOR_STATUS_COLORS,
 		SPONSOR_TIER_LABELS, SPONSOR_TIER_COLORS, SPONSOR_TIER_PRICING, isActivePayer,
@@ -170,6 +170,69 @@
 
 	const INPUT = 'w-full rounded-lg border border-slate-600 bg-slate-700 text-slate-100 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 placeholder:text-slate-500';
 	const LABEL = 'block text-xs font-medium text-slate-400 mb-1';
+
+	// ── Activity log ──────────────────────────────────────────────────────────
+	const ACTIVITY_TYPE_LABELS: Record<string, string> = {
+		note: 'Note', call: 'Call', email: 'Email', meeting: 'Meeting',
+		stage_change: 'Stage Change', payment: 'Payment', contract: 'Contract', other: 'Other'
+	};
+	const ACTIVITY_TYPE_COLORS: Record<string, string> = {
+		note:         'bg-slate-700 text-slate-300 border-slate-600',
+		call:         'bg-blue-900/50 text-blue-300 border-blue-700',
+		email:        'bg-cyan-900/50 text-cyan-300 border-cyan-700',
+		meeting:      'bg-purple-900/50 text-purple-300 border-purple-700',
+		stage_change: 'bg-yellow-900/50 text-yellow-300 border-yellow-700',
+		payment:      'bg-emerald-900/50 text-emerald-300 border-emerald-700',
+		contract:     'bg-orange-900/50 text-orange-300 border-orange-700',
+		other:        'bg-slate-700 text-slate-400 border-slate-600'
+	};
+
+	let activityEntries = $state<any[]>(data.activity ?? []);
+	let activityType    = $state('note');
+	let activityNote    = $state('');
+	let activityBusy    = $state(false);
+	let activityErr     = $state('');
+
+	async function addActivity(e: SubmitEvent) {
+		e.preventDefault();
+		if (!activityNote.trim()) return;
+		activityBusy = true; activityErr = '';
+		try {
+			const res = await fetch(`/api/sponsors/${s?.id}/activity`, {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ type: activityType, note: activityNote.trim() })
+			});
+			if (!res.ok) { const d = await res.json().catch(() => ({})); throw new Error(d.message ?? 'Failed'); }
+			const entry = await res.json();
+			activityEntries = [entry, ...activityEntries];
+			activityNote = '';
+		} catch (err: any) {
+			activityErr = err.message ?? 'Failed to log activity';
+		} finally {
+			activityBusy = false;
+		}
+	}
+
+	async function deleteActivity(entryId: string) {
+		if (!confirm('Delete this activity entry?')) return;
+		const res = await fetch(`/api/sponsors/${s?.id}/activity/${entryId}`, { method: 'DELETE' });
+		if (res.ok) activityEntries = activityEntries.filter((e) => e.id !== entryId);
+	}
+
+	function fmtRelative(dateStr: string) {
+		if (!dateStr) return '';
+		const d = new Date(dateStr);
+		const diff = Date.now() - d.getTime();
+		const mins = Math.floor(diff / 60000);
+		if (mins < 1) return 'just now';
+		if (mins < 60) return `${mins}m ago`;
+		const hrs = Math.floor(mins / 60);
+		if (hrs < 24) return `${hrs}h ago`;
+		const days = Math.floor(hrs / 24);
+		if (days < 7) return `${days}d ago`;
+		return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+	}
 </script>
 
 <svelte:head><title>{s?.companyName ?? 'Sponsor'} — FliHub</title></svelte:head>
@@ -642,6 +705,62 @@
 
 	</div> <!-- end right column -->
 	</div> <!-- end two-column wrapper -->
+
+	<!-- Activity Log -->
+	<Card class="p-5 bg-slate-800/40 border-slate-700">
+		<h2 class="text-base font-semibold text-slate-100 mb-4 flex items-center gap-2">
+			<ScrollText class="size-4 text-slate-400" /> Activity Log
+		</h2>
+
+		<!-- Add entry form -->
+		<form onsubmit={addActivity} class="flex gap-2 mb-5">
+			<select bind:value={activityType}
+				class="rounded-lg border border-slate-600 bg-slate-700 text-slate-100 px-2 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 shrink-0">
+				{#each Object.entries(ACTIVITY_TYPE_LABELS) as [val, label]}
+					<option value={val}>{label}</option>
+				{/each}
+			</select>
+			<input
+				bind:value={activityNote}
+				placeholder="Add a note, call log, or update…"
+				class="flex-1 rounded-lg border border-slate-600 bg-slate-700 text-slate-100 px-3 py-2 text-sm
+				       focus:outline-none focus:ring-2 focus:ring-emerald-500 placeholder:text-slate-500"
+			/>
+			<button type="submit" disabled={activityBusy || !activityNote.trim()}
+				class="px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium
+				       disabled:opacity-50 disabled:cursor-not-allowed transition-colors shrink-0">
+				{activityBusy ? '…' : 'Log'}
+			</button>
+		</form>
+
+		{#if activityErr}
+			<p class="text-sm text-red-400 mb-3">{activityErr}</p>
+		{/if}
+
+		<!-- Timeline -->
+		{#if activityEntries.length === 0}
+			<p class="text-sm text-slate-500 text-center py-6">No activity logged yet.</p>
+		{:else}
+			<div class="space-y-2">
+				{#each activityEntries as entry (entry.id)}
+					<div class="flex items-start gap-3 group">
+						<span class="text-[10px] px-1.5 py-0.5 rounded border font-medium shrink-0 mt-0.5
+						            {ACTIVITY_TYPE_COLORS[entry.type] ?? 'bg-slate-700 text-slate-400 border-slate-600'}">
+							{ACTIVITY_TYPE_LABELS[entry.type] ?? entry.type}
+						</span>
+						<p class="flex-1 text-sm text-slate-300 leading-snug">{entry.note}</p>
+						<span class="text-[10px] text-slate-600 shrink-0 mt-0.5 whitespace-nowrap">
+							{fmtRelative(entry.created)}
+						</span>
+						<button onclick={() => deleteActivity(entry.id)}
+							class="opacity-0 group-hover:opacity-100 transition-opacity text-slate-600 hover:text-red-400 shrink-0">
+							<X class="size-3.5" />
+						</button>
+					</div>
+				{/each}
+			</div>
+		{/if}
+	</Card>
 
 </div>
 

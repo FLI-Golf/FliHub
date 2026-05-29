@@ -1,0 +1,369 @@
+/**
+ * Seed script for the event pipeline.
+ *
+ * Creates a representative set of events covering every type:
+ *   - Appearance (multi-talent, below approval threshold → direct pay)
+ *   - Clinic (single talent, above threshold → approval pipeline)
+ *   - Media (single talent, requiresApproval forced)
+ *   - Promotional (two players, manager cut)
+ *   - Content Creation (single broadcaster)
+ *   - Tournament Broadcast (3 broadcasters, season bonus tracking)
+ *
+ * Each event gets talent assignments, tasks, and generated payments.
+ *
+ * Run:   npx tsx scripts/seed-events.ts
+ * Clear: npx tsx scripts/seed-events.ts --clear
+ * Reset: npx tsx scripts/seed-events.ts --reset   (clear then seed)
+ */
+
+import * as dotenv from 'dotenv';
+dotenv.config();
+import PocketBase from 'pocketbase';
+
+const PB_URL = (process.env.POCKETBASE_URL ?? 'http://127.0.0.1:8090').replace(/\/$/, '');
+const pb = new PocketBase(PB_URL);
+pb.autoCancellation(false);
+
+// ── Real talent IDs from the DB ──────────────────────────────────────────────
+const T = {
+	gannon:    'caxypp9fv95sf0n', // player
+	ricky:     'jzhlpxvrtg5cqkd', // player
+	eagle:     'u64edbgz387b9wb', // player
+	paige:     'y0sqz8izif7ydax', // player
+	kristin:   '4a7zof0wdg376pv', // player
+	catrina:   'ziblxn00eqcxz0u', // player
+	paul_u:    '7g75nzujxwz3s7r', // broadcaster
+	kona:      'bxsq87nz5aqxunv', // broadcaster
+	brad:      'pzaau2h1r5yeuij', // broadcaster
+	brodie:    'b0r4zi2j1aso8c8', // broadcaster
+	kevin:     '70c06glx02o54zd', // broadcaster
+};
+
+const SEASON_ID = 't9yegq2db2sml8j'; // Season 2027
+
+// ── Auth ─────────────────────────────────────────────────────────────────────
+async function auth() {
+	await pb.collection('_superusers').authWithPassword(
+		process.env.POCKETBASE_ADMIN_EMAIL!,
+		process.env.POCKETBASE_ADMIN_PASSWORD!
+	);
+	console.log('✓ Authenticated\n');
+}
+
+// ── Clear all seed data ───────────────────────────────────────────────────────
+async function clearSeedData() {
+	console.log('Clearing seed event data...');
+
+	// Delete in dependency order
+	for (const col of ['event_payments', 'event_tasks', 'event_talent']) {
+		const records = await pb.collection(col).getFullList({ fields: 'id' }).catch(() => []);
+		for (const r of records) {
+			await pb.collection(col).delete(r.id).catch(() => {});
+		}
+		console.log(`  Deleted ${records.length} ${col} records`);
+	}
+
+	// Only delete events created by this seed (tagged with notes containing [seed])
+	const events = await pb.collection('special_events').getFullList({
+		filter: 'notes ~ "[seed]"',
+		fields: 'id,name'
+	}).catch(() => []);
+	for (const e of events) {
+		await pb.collection('special_events').delete(e.id).catch(() => {});
+	}
+	console.log(`  Deleted ${events.length} seed events\n`);
+}
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+async function createEvent(data: Record<string, unknown>) {
+	return pb.collection('special_events').create({
+		...data,
+		notes: `${data.notes ?? ''} [seed]`.trim()
+	});
+}
+
+async function assignTalent(eventId: string, talentId: string, role: string, rateOverride: number | null, status = 'confirmed') {
+	const event = await pb.collection('special_events').getOne(eventId);
+	const confirmedRate = rateOverride ?? event.defaultRate ?? 0;
+	return pb.collection('event_talent').create({
+		event: eventId, talent: talentId, role,
+		rateOverride, confirmedRate, status,
+		bonusEligible: false, bonusEarned: false
+	});
+}
+
+async function addTask(eventId: string, data: Record<string, unknown>) {
+	return pb.collection('event_tasks').create({
+		event: eventId, status: 'todo', checklist: [], ...data
+	});
+}
+
+async function generatePayments(eventId: string) {
+	const event = await pb.collection('special_events').getOne(eventId);
+	const confirmedTalent = await pb.collection('event_talent').getFullList({
+		filter: `event = '${eventId}' && (status = 'confirmed' || status = 'completed')`,
+		expand: 'talent'
+	});
+
+	const existing = await pb.collection('event_payments').getFullList({
+		filter: `event = '${eventId}' && status != 'cancelled'`, fields: 'talent'
+	});
+	const alreadyPaid = new Set(existing.map((p: any) => p.talent));
+	const approvalThreshold = event.approvalThreshold ?? 500;
+	const isBroadcast = event.eventType === 'tournament_broadcast';
+
+	let created = 0;
+	for (const et of confirmedTalent) {
+		if (alreadyPaid.has(et.talent)) continue;
+		const amount = et.confirmedRate ?? event.defaultRate ?? 0;
+		const talent = et.expand?.talent;
+		const managerCut = talent?.managerCutPercentage ?? 0;
+		const managerAmount = managerCut > 0 ? Math.round(amount * (managerCut / 100) * 100) / 100 : 0;
+		const needsApproval = event.requiresApproval || amount > approvalThreshold;
+		const status = needsApproval ? 'approval_required' : 'pending';
+		const approvalRoute = needsApproval ? 'approval_pipeline' : 'direct';
+
+		// Bonus eligibility for broadcast events
+		let bonusEligible = false;
+		if (isBroadcast && event.season && event.bonusThreshold) {
+			const seasonEvents = await pb.collection('special_events').getFullList({
+				filter: `season = '${event.season}' && eventType = 'tournament_broadcast'`, fields: 'id'
+			});
+			const ids = seasonEvents.map((e: any) => e.id);
+			if (ids.length > 0) {
+				const attended = await pb.collection('event_talent').getList(1, 1, {
+					filter: `talent = '${et.talent}' && (status = 'confirmed' || status = 'completed') && (${ids.map((id: string) => `event = '${id}'`).join(' || ')})`
+				});
+				bonusEligible = attended.totalItems >= event.bonusThreshold;
+				if (bonusEligible !== et.bonusEligible) {
+					await pb.collection('event_talent').update(et.id, { bonusEligible });
+				}
+			}
+		}
+
+		await pb.collection('event_payments').create({
+			event: eventId, eventTalent: et.id, talent: et.talent,
+			paymentType: isBroadcast ? 'broadcast_fee' : 'appearance_fee',
+			amount, status, approvalRoute, recipient: 'talent',
+			managerCutPercentage: managerCut, managerAmount, isBonus: false
+		});
+
+		if (managerAmount > 0) {
+			await pb.collection('event_payments').create({
+				event: eventId, eventTalent: et.id, talent: et.talent,
+				paymentType: isBroadcast ? 'broadcast_fee' : 'appearance_fee',
+				amount: managerAmount,
+				status: event.requiresApproval || managerAmount > approvalThreshold ? 'approval_required' : 'pending',
+				approvalRoute: event.requiresApproval || managerAmount > approvalThreshold ? 'approval_pipeline' : 'direct',
+				recipient: 'manager',
+				description: `Manager cut for ${talent?.name ?? et.talent}`,
+				isBonus: false
+			});
+		}
+
+		if (bonusEligible && !et.bonusEarned && event.bonusAmount) {
+			const seasonEvents = await pb.collection('special_events').getFullList({
+				filter: `season = '${event.season}' && eventType = 'tournament_broadcast'`, fields: 'id'
+			}).catch(() => []);
+			const sIds = seasonEvents.map((e: any) => e.id);
+			const existingBonus = sIds.length > 0
+				? await pb.collection('event_payments').getList(1, 1, {
+					filter: `talent = '${et.talent}' && isBonus = true && status != 'cancelled' && (${sIds.map((id: string) => `event = '${id}'`).join(' || ')})`
+				}).catch(() => ({ totalItems: 0 }))
+				: { totalItems: 0 };
+
+			if (existingBonus.totalItems === 0) {
+				await pb.collection('event_payments').create({
+					event: eventId, eventTalent: et.id, talent: et.talent,
+					paymentType: 'bonus', amount: event.bonusAmount,
+					status: 'approval_required', approvalRoute: 'approval_pipeline',
+					recipient: 'talent',
+					description: `Attendance bonus — completed ${event.bonusThreshold} events`,
+					isBonus: true
+				});
+			}
+		}
+		created++;
+	}
+	return created;
+}
+
+// ── Seed ──────────────────────────────────────────────────────────────────────
+async function seed() {
+	console.log('Seeding event pipeline test data...\n');
+
+	// ── 1. APPEARANCE — Children's Hospital (2 players, below threshold → direct) ──
+	console.log('1. Appearance — Children\'s Hospital');
+	const appearance = await createEvent({
+		name: "Children's Hospital Appearance",
+		eventType: 'appearance',
+		eventDate: '2027-03-15 00:00:00.000Z',
+		location: 'Phoenix Children\'s Hospital, Phoenix AZ',
+		status: 'scheduled',
+		defaultRate: 300,
+		budget: 700,
+		approvalThreshold: 500,
+		requiresApproval: false,
+		description: '<p>Two players visit the pediatric ward for a 2-hour appearance. Bring discs for giveaway.</p>'
+	});
+	await assignTalent(appearance.id, T.gannon, 'player', null);
+	await assignTalent(appearance.id, T.eagle, 'player', null);
+	await addTask(appearance.id, { title: 'Confirm hospital contact', priority: 'high', dueDate: '2027-03-01 00:00:00.000Z' });
+	await addTask(appearance.id, { title: 'Order 20 discs for giveaway', priority: 'medium', hasCost: true, estimatedCost: 180, requiresApproval: false });
+	await addTask(appearance.id, { title: 'Send travel itinerary to players', priority: 'medium', dueDate: '2027-03-10 00:00:00.000Z' });
+	const ap = await generatePayments(appearance.id);
+	console.log(`   ✓ Created — ${ap} payments (direct, below $500 threshold)\n`);
+
+	// ── 2. CLINIC — Disc Golf Clinic (single player, above threshold → approval) ──
+	console.log('2. Clinic — Youth Disc Golf Clinic');
+	const clinic = await createEvent({
+		name: 'Youth Disc Golf Clinic — Scottsdale',
+		eventType: 'clinic',
+		eventDate: '2027-04-05 00:00:00.000Z',
+		location: 'Chaparral Park, Scottsdale AZ',
+		status: 'scheduled',
+		defaultRate: 750,
+		budget: 1000,
+		approvalThreshold: 500,
+		requiresApproval: false,
+		description: '<p>3-hour instructional clinic for youth players aged 10–18. Ricky leads drills and Q&A.</p>'
+	});
+	await assignTalent(clinic.id, T.ricky, 'player', null);
+	await addTask(clinic.id, { title: 'Book park permit', priority: 'urgent', hasCost: true, estimatedCost: 75, requiresApproval: false });
+	await addTask(clinic.id, { title: 'Prepare clinic curriculum', priority: 'high' });
+	await addTask(clinic.id, { title: 'Arrange equipment (baskets, discs)', priority: 'medium', hasCost: true, estimatedCost: 200, requiresApproval: true });
+	const cp = await generatePayments(clinic.id);
+	console.log(`   ✓ Created — ${cp} payments (approval required, $750 > $500 threshold)\n`);
+
+	// ── 3. MEDIA — Interview / Photo Shoot (requiresApproval forced) ──
+	console.log('3. Media — Magazine Photo Shoot');
+	const media = await createEvent({
+		name: 'Disc Golf World Magazine Shoot',
+		eventType: 'media',
+		eventDate: '2027-04-20 00:00:00.000Z',
+		location: 'Sedona, AZ',
+		status: 'scheduled',
+		defaultRate: 400,
+		budget: 600,
+		approvalThreshold: 500,
+		requiresApproval: true,
+		description: '<p>Full-day photo shoot for DGW cover feature. Paige and Kristin confirmed.</p>'
+	});
+	await assignTalent(media.id, T.paige, 'player', null);
+	await assignTalent(media.id, T.kristin, 'player', 450); // rate override
+	await addTask(media.id, { title: 'Coordinate with photographer', priority: 'high' });
+	await addTask(media.id, { title: 'Arrange hair/makeup', priority: 'medium', hasCost: true, estimatedCost: 250, requiresApproval: true });
+	await addTask(media.id, { title: 'Review and approve final images', priority: 'low' });
+	const mp = await generatePayments(media.id);
+	console.log(`   ✓ Created — ${mp} payments (all approval required — forced on event)\n`);
+
+	// ── 4. PROMOTIONAL — Disc Golf Expo Booth (two players, one with manager cut) ──
+	console.log('4. Promotional — Disc Golf Expo Booth');
+	// Temporarily set a manager cut on Gannon for this test
+	await pb.collection('talent').update(T.gannon, { managerCutPercentage: 15, managerName: 'Scott Buhr', managerEmail: 'scott.buhr@test.com' });
+	const promo = await createEvent({
+		name: 'FLI Golf Expo Booth — Las Vegas',
+		eventType: 'promotional',
+		eventDate: '2027-05-10 00:00:00.000Z',
+		location: 'Las Vegas Convention Center, NV',
+		status: 'scheduled',
+		defaultRate: 500,
+		budget: 1200,
+		approvalThreshold: 500,
+		requiresApproval: false,
+		description: '<p>2-day expo appearance. Players sign autographs and demo discs at the FLI booth.</p>'
+	});
+	await assignTalent(promo.id, T.gannon, 'player', null);
+	await assignTalent(promo.id, T.catrina, 'player', null);
+	await addTask(promo.id, { title: 'Ship booth materials', priority: 'high', hasCost: true, estimatedCost: 350, requiresApproval: true });
+	await addTask(promo.id, { title: 'Print promotional materials', priority: 'medium', hasCost: true, estimatedCost: 120, requiresApproval: false });
+	await addTask(promo.id, { title: 'Book hotel for players', priority: 'high', hasCost: true, estimatedCost: 400, requiresApproval: true });
+	const pp = await generatePayments(promo.id);
+	console.log(`   ✓ Created — ${pp} payments (includes manager split for Gannon)\n`);
+
+	// ── 5. CONTENT CREATION — YouTube Series Episode ──
+	console.log('5. Content Creation — YouTube Episode');
+	const content = await createEvent({
+		name: 'FLI Golf YouTube Series — Episode 3',
+		eventType: 'content_creation',
+		eventDate: '2027-05-25 00:00:00.000Z',
+		location: 'Fountain Hills, AZ',
+		status: 'draft',
+		defaultRate: 200,
+		budget: 500,
+		approvalThreshold: 500,
+		requiresApproval: false,
+		description: '<p>Brodie hosts a course vlog with two pros. Raw footage due within 48hrs.</p>'
+	});
+	await assignTalent(content.id, T.brodie, 'broadcaster', null);
+	await assignTalent(content.id, T.eagle, 'player', 150); // lower rate for player cameo
+	await addTask(content.id, { title: 'Scout filming locations', priority: 'medium' });
+	await addTask(content.id, { title: 'Arrange drone operator', priority: 'high', hasCost: true, estimatedCost: 300, requiresApproval: true });
+	await addTask(content.id, { title: 'Edit and upload video', priority: 'high' });
+	// No payments generated yet — event is still draft
+	console.log(`   ✓ Created — no payments (event is draft)\n`);
+
+	// ── 6. TOURNAMENT BROADCAST — 3 events in season, bonus at 3 ──
+	console.log('6. Tournament Broadcast — Season series (3 events, bonus at 3)');
+
+	const broadcastBase = {
+		eventType: 'tournament_broadcast',
+		season: SEASON_ID,
+		defaultRate: 600,
+		budget: 2500,
+		approvalThreshold: 500,
+		requiresApproval: false,
+		bonusAmount: 500,
+		bonusThreshold: 3,
+		description: '<p>Live broadcast coverage. Broadcasters cover commentary, analysis, and social media.</p>'
+	};
+
+	const bc1 = await createEvent({ ...broadcastBase, name: 'FLI Open Broadcast — Round 1', eventDate: '2027-06-01 00:00:00.000Z', location: 'Phoenix, AZ', status: 'completed' });
+	const bc2 = await createEvent({ ...broadcastBase, name: 'FLI Open Broadcast — Round 2', eventDate: '2027-06-02 00:00:00.000Z', location: 'Phoenix, AZ', status: 'completed' });
+	const bc3 = await createEvent({ ...broadcastBase, name: 'FLI Open Broadcast — Finals', eventDate: '2027-06-03 00:00:00.000Z', location: 'Phoenix, AZ', status: 'scheduled' });
+
+	// Paul and Kona do all 3 → bonus eligible. Brad only does 2 → not eligible.
+	for (const bcId of [bc1.id, bc2.id, bc3.id]) {
+		await assignTalent(bcId, T.paul_u, 'broadcaster', null, bcId === bc3.id ? 'confirmed' : 'completed');
+		await assignTalent(bcId, T.kona, 'broadcaster', null, bcId === bc3.id ? 'confirmed' : 'completed');
+	}
+	// Brad only on first two
+	await assignTalent(bc1.id, T.brad, 'broadcaster', null, 'completed');
+	await assignTalent(bc2.id, T.brad, 'broadcaster', null, 'completed');
+
+	// Tasks on the finals event
+	await addTask(bc3.id, { title: 'Set up broadcast equipment', priority: 'urgent', dueDate: '2027-06-03 00:00:00.000Z' });
+	await addTask(bc3.id, { title: 'Coordinate with tournament director', priority: 'high' });
+	await addTask(bc3.id, { title: 'Prepare graphics package', priority: 'medium', hasCost: true, estimatedCost: 400, requiresApproval: true });
+
+	// Generate payments for all 3 broadcast events
+	const bp1 = await generatePayments(bc1.id);
+	const bp2 = await generatePayments(bc2.id);
+	const bp3 = await generatePayments(bc3.id);
+	console.log(`   ✓ Created 3 broadcast events`);
+	console.log(`     Round 1: ${bp1} payments`);
+	console.log(`     Round 2: ${bp2} payments`);
+	console.log(`     Finals:  ${bp3} payments (Paul & Kona should be bonus eligible)\n`);
+
+	console.log('── Seed complete ──────────────────────────────────────────────');
+	console.log('Events created: 8 (1 appearance, 1 clinic, 1 media, 1 promo, 1 content, 3 broadcast)');
+	console.log('To clear: npx tsx scripts/seed-events.ts --clear');
+}
+
+// ── Entry point ───────────────────────────────────────────────────────────────
+const args = process.argv.slice(2);
+
+auth().then(async () => {
+	if (args.includes('--clear')) {
+		await clearSeedData();
+		console.log('Done.');
+	} else if (args.includes('--reset')) {
+		await clearSeedData();
+		await seed();
+	} else {
+		await seed();
+	}
+}).catch(err => {
+	console.error('Fatal:', err.message);
+	process.exit(1);
+});

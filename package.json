@@ -23,7 +23,14 @@
     "test:restore": "tsx scripts/restore-from-seed-backup.ts latest",
     "test:flow": "npm run test:backup && npm run test:seed:quick",
     "seed:all": "tsx scripts/seed-all.ts",
-    "seed:departments": "tsx scripts/seed-departments.ts"
+    "seed:departments": "tsx scripts/seed-departments.ts",
+    "test:pipelines": "tsx scripts/test-pipelines.ts",
+    "test:pipelines:keep": "tsx scripts/test-pipelines.ts --keep",
+    "test:pipelines:engine": "tsx scripts/test-pipelines.ts --suite=engine",
+    "test:pipelines:onboarding": "tsx scripts/test-pipelines.ts --suite=onboarding",
+    "test:pipelines:sponsor": "tsx scripts/test-pipelines.ts --suite=sponsor",
+    "test:pipelines:tournament": "tsx scripts/test-pipelines.ts --suite=tournament",
+    "test:pipelines:content": "tsx scripts/test-pipelines.ts --suite=content"
   },
   "repository": {
     "type": "git",

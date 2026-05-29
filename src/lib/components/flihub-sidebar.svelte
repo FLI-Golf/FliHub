@@ -93,7 +93,8 @@
 			items: [
 				{ title: 'Welcome', url: '/dashboard/welcome', icon: PartyPopper, roles: ['pro', 'manager', 'broadcaster'] },
 				{ title: 'Documents & Signing', url: '/dashboard/onboarding', icon: FileText, roles: ['pro', 'manager', 'broadcaster'] },
-				{ title: 'Player Profile', url: '/dashboard/player-profile', icon: ClipboardList, roles: ['pro', 'manager', 'broadcaster'] }
+				{ title: 'Player Profile', url: '/dashboard/player-profile', icon: ClipboardList, roles: ['pro', 'manager', 'broadcaster'] },
+				{ title: 'Onboarding Pipeline', url: '/dashboard/onboarding/admin', icon: FolderKanban, roles: ['admin', 'leader'] }
 			]
 		},
 		{
@@ -146,7 +147,8 @@
 				{ title: 'Work Orders', url: '/dashboard/work-orders', icon: ClipboardList },
 				{ title: 'Reimbursements', url: '/dashboard/reimbursements', icon: Wallet },
 				{ title: 'Reimbursements Admin', url: '/dashboard/reimbursements/admin', icon: ShieldCheck, roles: ['admin', 'leader'] },
-				{ title: 'Media', url: '/dashboard/media', icon: Images }
+				{ title: 'Media', url: '/dashboard/media', icon: Images },
+				{ title: 'Content Pipeline', url: '/dashboard/content', icon: FolderKanban }
 			]
 		},
 		{
@@ -161,6 +163,7 @@
 				{ title: 'League Overview', url: '/dashboard/league', icon: Award },
 				{ title: 'Talent Management', url: '/dashboard/talent', icon: UserCircle },
 				{ title: 'Tournaments', url: '/dashboard/talent/tournaments', icon: Trophy },
+				{ title: 'Events', url: '/dashboard/events', icon: PartyPopper },
 				{ title: 'Special Events', url: '/dashboard/talent/special-events', icon: Medal },
 				{ title: 'Franchise Payouts', url: '/dashboard/talent/franchise-payouts', icon: DollarSign },
 				{ title: 'Pro Payments',   url: '/dashboard/talent/payments',       icon: Flag },
@@ -238,7 +241,8 @@
 			items: [
 				{ title: 'Import Data', url: '/dashboard/import', icon: Upload, roles: ['admin'] },
 				{ title: 'Schema Guide', url: '/dashboard/schema-guide', icon: Network, roles: ['admin'] },
-				{ title: 'Admin Panel', url: '/dashboard/admin', icon: ShieldCheck, roles: ['admin'] }
+				{ title: 'Admin Panel', url: '/dashboard/admin', icon: ShieldCheck, roles: ['admin'] },
+				{ title: '[TEMP] Pipeline Tests', url: '/dashboard/pipeline-tests', icon: Zap, roles: ['admin'] }
 			]
 		}
 	];
