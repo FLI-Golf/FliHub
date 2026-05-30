@@ -233,7 +233,7 @@
 	<!-- Header -->
 	<header class="sticky top-0 z-50 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
 		<div class="container mx-auto px-6 py-4 flex items-center justify-between">
-			<div class="flex items-center gap-3">
+			<a href="/" class="flex items-center gap-3 hover:opacity-80 transition-opacity">
 				<div class="flex size-10 items-center justify-center rounded-xl bg-gradient-to-br from-green-500 to-emerald-600 shadow-lg">
 					<span class="text-xl font-black text-white">F</span>
 				</div>
@@ -241,17 +241,16 @@
 					<span class="text-lg font-bold tracking-tight leading-none">FliHub</span>
 					<span class="text-[10px] text-muted-foreground uppercase tracking-widest">Business OS</span>
 				</div>
-			</div>
+			</a>
 			<nav class="hidden md:flex items-center gap-6 text-sm text-muted-foreground">
 				<a href="#features" class="hover:text-foreground transition-colors">Features</a>
 				<a href="#modules" class="hover:text-foreground transition-colors">Modules</a>
-				<a href="#cta" class="hover:text-foreground transition-colors">Get Started</a>
 			</nav>
 			<div class="flex items-center gap-3">
-				<Button href="/auth/login" variant="ghost" class="font-medium">Login</Button>
-				<Button href="/auth/register" class="gap-2 font-semibold bg-green-600 hover:bg-green-700 text-white shadow-lg shadow-green-600/20">
-					Get Started <ArrowRight class="size-4" />
+				<Button href="#cta" class="gap-2 font-semibold bg-green-600 hover:bg-green-700 text-white shadow-lg shadow-green-600/20">
+					<ArrowRight class="size-4" /> Get Started
 				</Button>
+				<Button href="/auth/login" variant="ghost" class="font-medium">Login</Button>
 			</div>
 		</div>
 	</header>
@@ -281,12 +280,9 @@
 				<p class="text-base text-muted-foreground mb-10 max-w-2xl mx-auto leading-relaxed">
 					FliHub unifies project management, budgets, expenses, sponsors, vendors, people, and league operations into a single business operating system.
 				</p>
-				<div class="flex flex-col sm:flex-row gap-4 justify-center">
-					<Button href="/auth/register" size="lg" class="gap-2 font-bold text-base bg-green-600 hover:bg-green-700 text-white shadow-xl shadow-green-600/25 px-8">
+				<div class="flex justify-center">
+					<Button href="#cta" size="lg" class="gap-2 font-bold text-base bg-green-600 hover:bg-green-700 text-white shadow-xl shadow-green-600/25 px-8">
 						Start Now <ArrowRight class="size-5" />
-					</Button>
-					<Button href="/auth/login" size="lg" variant="outline" class="gap-2 font-semibold text-base border-2 px-8">
-						Sign In
 					</Button>
 				</div>
 			</div>
@@ -430,7 +426,7 @@
 	<!-- CTA -->
 	<section id="cta" class="border-t bg-muted/20">
 		<div class="container mx-auto px-6 py-24">
-			<div class="max-w-3xl mx-auto text-center">
+			<div class="max-w-4xl mx-auto text-center">
 				<div class="inline-flex size-20 items-center justify-center rounded-3xl bg-gradient-to-br from-green-500 to-emerald-600 shadow-2xl shadow-green-500/30 mb-8">
 					<span class="text-4xl font-black text-white">F</span>
 				</div>
@@ -440,14 +436,37 @@
 				<p class="text-xl text-muted-foreground mb-10 leading-relaxed">
 					Join the team already using FliHub to manage projects, track budgets, coordinate sponsors, and operate at scale.
 				</p>
-				<div class="flex flex-col sm:flex-row gap-4 justify-center">
-					<Button href="/auth/register" size="lg" class="gap-2 font-bold text-base bg-green-600 hover:bg-green-700 text-white shadow-xl shadow-green-600/25 px-10">
-						Create Account <ArrowRight class="size-5" />
-					</Button>
-					<Button href="/auth/login" size="lg" variant="outline" class="gap-2 font-semibold text-base border-2 px-10">
-						Login to Dashboard
-					</Button>
+
+				<!-- Two-path CTA -->
+				<div class="grid grid-cols-1 sm:grid-cols-2 gap-4 max-w-2xl mx-auto mb-6">
+					<!-- Team member path -->
+					<div class="rounded-2xl border-2 border-green-500/30 bg-green-500/5 p-6 text-left">
+						<div class="size-10 rounded-xl bg-green-500/20 flex items-center justify-center mb-3">
+							<Briefcase class="size-5 text-green-400" />
+						</div>
+						<h3 class="font-bold text-white mb-1">FLI Golf Team</h3>
+						<p class="text-sm text-muted-foreground mb-4">Staff, managers, and league operators — access the full FliHub dashboard.</p>
+						<Button href="/auth/register" size="sm" class="w-full gap-2 font-semibold bg-green-600 hover:bg-green-700 text-white">
+							Team Sign Up <ArrowRight class="size-3.5" />
+						</Button>
+					</div>
+
+					<!-- Vendor / bidder path -->
+					<div class="rounded-2xl border-2 border-orange-500/30 bg-orange-500/5 p-6 text-left">
+						<div class="size-10 rounded-xl bg-orange-500/20 flex items-center justify-center mb-3">
+							<Package class="size-5 text-orange-400" />
+						</div>
+						<h3 class="font-bold text-white mb-1">Vendor / Supplier</h3>
+						<p class="text-sm text-muted-foreground mb-4">Register as a vendor to browse open projects and submit competitive bids.</p>
+						<Button href="/auth/register/vendor" size="sm" class="w-full gap-2 font-semibold bg-orange-600 hover:bg-orange-700 text-white">
+							Register as Vendor <ArrowRight class="size-3.5" />
+						</Button>
+					</div>
 				</div>
+
+				<Button href="/auth/login" size="lg" variant="outline" class="gap-2 font-semibold text-base border-2 px-10">
+					Login to Dashboard
+				</Button>
 			</div>
 		</div>
 	</section>

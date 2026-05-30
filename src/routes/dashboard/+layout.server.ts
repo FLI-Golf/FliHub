@@ -1,3 +1,5 @@
+import { redirect } from '@sveltejs/kit';
+import { VENDOR_ROLE } from '$env/static/private';
 import { RequestContext } from '$lib/infra/RequestContext';
 import type { LayoutServerLoad } from './$types';
 
@@ -5,6 +7,11 @@ export const load: LayoutServerLoad = async ({ locals, url }) => {
 	try {
 		const ctx = await RequestContext.from(locals, url);
 		const { pb, profile } = ctx;
+
+		// Vendor-role users belong in the vendor portal, not the internal dashboard
+		if (profile?.role === VENDOR_ROLE) {
+			throw redirect(303, '/vendor/dashboard');
+		}
 
 		let userDepartment = null;
 		if (profile?.role === 'leader' && profile?.id) {
