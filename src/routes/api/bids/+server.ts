@@ -1,15 +1,23 @@
 /**
- * POST /api/bids — submit a new bid from a vendor
+ * POST /api/bids — submit a new bid from a vendor (multipart to support file attachments)
  */
 import { json } from '@sveltejs/kit';
-import { RequestContext } from '$lib/infra/RequestContext';
+import { getAdminPocketBase } from '$lib/infra/pocketbase/pbClient';
 import type { RequestHandler } from './$types';
 
-export const POST: RequestHandler = async ({ locals, url, request }) => {
-	const ctx  = await RequestContext.from(locals, url);
-	const body = await request.json().catch(() => ({})) as Record<string, any>;
+export const POST: RequestHandler = async ({ locals, request }) => {
+	const isValid = locals?.pb?.authStore?.isValid ?? false;
+	if (!isValid) return json({ message: 'Unauthorized' }, { status: 401 });
 
-	const { projectId, vendorId, amount, timeline, scope } = body;
+	const formData = await request.formData().catch(() => null);
+	if (!formData) return json({ message: 'Invalid form data' }, { status: 400 });
+
+	const projectId = formData.get('projectId') as string;
+	const vendorId  = formData.get('vendorId')  as string;
+	const amount    = formData.get('amount')    as string;
+	const timeline  = formData.get('timeline')  as string;
+	const scope     = formData.get('scope')     as string;
+	const files     = formData.getAll('attachments') as File[];
 
 	if (!projectId || !vendorId) {
 		return json({ message: 'projectId and vendorId are required' }, { status: 400 });
@@ -18,26 +26,35 @@ export const POST: RequestHandler = async ({ locals, url, request }) => {
 		return json({ message: 'Scope of work is required' }, { status: 400 });
 	}
 
-	// Prevent duplicate bids from the same vendor on the same project
-	const existing = await ctx.pb.collection('bids').getFullList({
-		filter: `projectId = "${projectId}" && vendorId = "${vendorId}"`,
-		fields: 'id',
-	}).catch(() => []);
+	const pb = await getAdminPocketBase();
 
-	if (existing.length > 0) {
+	// Prevent duplicate bids
+	const existing = await pb.collection('bids').getList(1, 1, {
+		filter: `projectId="${projectId}"&&vendorId="${vendorId}"`,
+		fields: 'id',
+	}).catch(() => ({ items: [] }));
+
+	if (existing.items.length > 0) {
 		return json({ message: 'You have already submitted a bid for this project.' }, { status: 409 });
 	}
 
 	try {
-		const bid = await ctx.pb.collection('bids').create({
-			projectId,
-			vendorId,
-			amount:      amount ? Number(amount) : null,
-			timeline:    timeline ?? '',
-			scope:       scope.trim(),
-			status:      'submitted',
-			submittedAt: new Date().toISOString(),
-		});
+		const payload = new FormData();
+		payload.append('projectId',   projectId);
+		payload.append('vendorId',    vendorId);
+		payload.append('amount',      amount ? String(Number(amount)) : '');
+		payload.append('timeline',    timeline ?? '');
+		payload.append('scope',       scope.trim());
+		payload.append('status',      'submitted');
+		payload.append('submittedAt', new Date().toISOString());
+
+		for (const file of files) {
+			if (file && file.size > 0) {
+				payload.append('attachments', file);
+			}
+		}
+
+		const bid = await pb.collection('bids').create(payload);
 		return json(bid, { status: 201 });
 	} catch (err: any) {
 		return json({ message: err?.message ?? 'Failed to submit bid' }, { status: 500 });

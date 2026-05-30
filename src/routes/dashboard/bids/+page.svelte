@@ -40,7 +40,7 @@
 		{ key: 'awarded',      label: 'Awarded',      colorClass: 'bg-emerald-900/40 text-emerald-300 border-emerald-700/50' },
 	];
 	const TERMINAL = [
-		{ key: 'rejected', label: 'Not Selected', colorClass: 'bg-slate-700/40 text-slate-400 border-slate-600/50' },
+		{ key: 'not_selected', label: 'Not Selected', colorClass: 'bg-slate-700/40 text-slate-400 border-slate-600/50' },
 	];
 
 	const boardConfig: PipelineBoardConfig = {

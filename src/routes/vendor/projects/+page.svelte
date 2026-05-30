@@ -1,7 +1,7 @@
 <script lang="ts">
 	import type { PageData } from './$types';
 	import { invalidateAll } from '$app/navigation';
-	import { FolderOpen, DollarSign, Calendar, ArrowRight, CheckCircle2, X, Send } from 'lucide-svelte';
+	import { FolderOpen, DollarSign, Calendar, CheckCircle2, X, Send, Paperclip, ChevronDown, ChevronUp, Trash2 } from 'lucide-svelte';
 
 	let { data }: { data: PageData } = $props();
 
@@ -17,19 +17,48 @@
 	}
 
 	// ── Bid modal ─────────────────────────────────────────────────────────────
-	let bidProject  = $state<any>(null);
-	let bidAmount   = $state('');
-	let bidTimeline = $state('');
-	let bidScope    = $state('');
-	let bidSaving   = $state(false);
-	let bidErr      = $state('');
+	let bidProject      = $state<any>(null);
+	let bidAmount       = $state('');
+	let bidTimeline     = $state('');
+	let bidScope        = $state('');
+	let bidSaving       = $state(false);
+	let bidErr          = $state('');
+	let attachmentsOpen = $state(false);
+	let attachedFiles   = $state<File[]>([]);
+	let fileInput       = $state<HTMLInputElement | null>(null);
 
 	function openBid(project: any) {
-		bidProject  = project;
-		bidAmount   = '';
-		bidTimeline = '';
-		bidScope    = '';
-		bidErr      = '';
+		bidProject      = project;
+		bidAmount       = '';
+		bidTimeline     = '';
+		bidScope        = '';
+		bidErr          = '';
+		attachmentsOpen = false;
+		attachedFiles   = [];
+	}
+
+	function onFileChange(e: Event) {
+		const input = e.target as HTMLInputElement;
+		const picked = Array.from(input.files ?? []);
+		// Deduplicate by name, cap at 5
+		const existing = new Set(attachedFiles.map(f => f.name));
+		for (const f of picked) {
+			if (!existing.has(f.name) && attachedFiles.length < 5) {
+				attachedFiles = [...attachedFiles, f];
+				existing.add(f.name);
+			}
+		}
+		input.value = '';
+	}
+
+	function removeFile(name: string) {
+		attachedFiles = attachedFiles.filter(f => f.name !== name);
+	}
+
+	function fmtFileSize(bytes: number) {
+		if (bytes < 1024) return `${bytes} B`;
+		if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+		return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 	}
 
 	async function submitBid(e: SubmitEvent) {
@@ -38,20 +67,20 @@
 		bidSaving = true;
 		bidErr    = '';
 		try {
-			const res = await fetch('/api/bids', {
-				method:  'POST',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({
-					projectId: bidProject.id,
-					vendorId:  vendor.id,
-					amount:    Number(bidAmount) || null,
-					timeline:  bidTimeline,
-					scope:     bidScope,
-				}),
-			});
+			const fd = new FormData();
+			fd.append('projectId', bidProject.id);
+			fd.append('vendorId',  vendor.id);
+			fd.append('amount',    bidAmount);
+			fd.append('timeline',  bidTimeline);
+			fd.append('scope',     bidScope);
+			for (const file of attachedFiles) {
+				fd.append('attachments', file);
+			}
+
+			const res = await fetch('/api/bids', { method: 'POST', body: fd });
 			if (!res.ok) {
-				const e = await res.json().catch(() => ({}));
-				throw new Error(e.message ?? 'Failed to submit bid');
+				const data = await res.json().catch(() => ({}));
+				throw new Error(data.message ?? 'Failed to submit bid');
 			}
 			bidProject = null;
 			await invalidateAll();
@@ -194,9 +223,76 @@
 					class="{INPUT} resize-none"></textarea>
 			</div>
 
+			<!-- Collapsible attachments -->
+			<div class="rounded-xl border border-slate-700 overflow-hidden">
+				<button
+					type="button"
+					onclick={() => attachmentsOpen = !attachmentsOpen}
+					class="w-full flex items-center justify-between px-4 py-3 bg-slate-800/60 hover:bg-slate-800 transition-colors text-sm"
+				>
+					<span class="flex items-center gap-2 font-medium text-slate-300">
+						<Paperclip class="size-4 text-slate-400" />
+						Attachments
+						{#if attachedFiles.length > 0}
+							<span class="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-orange-500/20 text-orange-300 border border-orange-500/30">
+								{attachedFiles.length}
+							</span>
+						{/if}
+					</span>
+					{#if attachmentsOpen}
+						<ChevronUp class="size-4 text-slate-500" />
+					{:else}
+						<ChevronDown class="size-4 text-slate-500" />
+					{/if}
+				</button>
+
+				{#if attachmentsOpen}
+					<div class="px-4 py-4 space-y-3 border-t border-slate-700 bg-slate-900/40">
+						<p class="text-xs text-slate-500">Add photos, portfolios, quotes, or supporting documents. Max 5 files, 10 MB each.</p>
+
+						<!-- File list -->
+						{#if attachedFiles.length > 0}
+							<ul class="space-y-2">
+								{#each attachedFiles as file}
+									<li class="flex items-center justify-between gap-3 px-3 py-2 rounded-lg bg-slate-800 border border-slate-700">
+										<div class="flex items-center gap-2 min-w-0">
+											<Paperclip class="size-3.5 text-slate-400 shrink-0" />
+											<span class="text-xs text-slate-300 truncate">{file.name}</span>
+											<span class="text-[10px] text-slate-500 shrink-0">{fmtFileSize(file.size)}</span>
+										</div>
+										<button type="button" onclick={() => removeFile(file.name)}
+											class="text-slate-600 hover:text-red-400 transition-colors shrink-0">
+											<Trash2 class="size-3.5" />
+										</button>
+									</li>
+								{/each}
+							</ul>
+						{/if}
+
+						{#if attachedFiles.length < 5}
+							<button
+								type="button"
+								onclick={() => fileInput?.click()}
+								class="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl border border-dashed border-slate-600 hover:border-orange-500/50 hover:bg-orange-500/5 text-slate-400 hover:text-orange-300 text-xs font-medium transition-colors"
+							>
+								<Paperclip class="size-3.5" /> Choose files
+							</button>
+							<input
+								bind:this={fileInput}
+								type="file"
+								multiple
+								accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.zip"
+								onchange={onFileChange}
+								class="hidden"
+							/>
+						{/if}
+					</div>
+				{/if}
+			</div>
+
 			<div class="bg-slate-800/50 border border-slate-700 rounded-xl p-4 text-xs text-slate-400 space-y-1">
 				<p class="font-semibold text-slate-300">What happens next?</p>
-				<p>Your bid is submitted as <span class="text-blue-300">Submitted</span> and reviewed by the FLI Golf operations team.</p>
+				<p>Your bid is submitted as <span class="text-blue-300">Pending</span> and reviewed by the FLI Golf operations team.</p>
 				<p>Shortlisted vendors will be contacted directly. You can track your bid status in <a href="/vendor/bids" class="text-orange-400 hover:underline">My Bids</a>.</p>
 			</div>
 
