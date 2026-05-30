@@ -39,6 +39,7 @@ export class DepartmentRepo implements IDepartmentRepository {
 				id: r.id,
 				name: r.name,
 				status: r.status,
+				biddingOpen: r.biddingOpen ?? false,
 				phase: Department.getProjectPhase({
 					id: r.id, name: r.name, status: r.status, phase: 'phase1',
 					budget: r.project_budget ?? 0,

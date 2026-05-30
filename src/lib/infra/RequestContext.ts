@@ -98,28 +98,43 @@ export class RequestContext {
 
 	/**
 	 * Factory — call at the top of every +page.server.ts load function.
-	 * Redirects to /auth/login if the session is invalid.
+	 *
+	 * Automatically:
+	 *   - Redirects unauthenticated requests to /auth/login
+	 *   - Redirects vendor-role users to /vendor/dashboard (they have their own portal)
 	 */
 	static async from(
 		locals: App.Locals,
 		url?: URL
 	): Promise<RequestContext> {
-		const userId = (locals?.pb?.authStore?.model?.id ?? '') as string;
+		const isValid = locals?.pb?.authStore?.isValid ?? false;
+		const userId  = (locals?.pb?.authStore?.model?.id ?? '') as string;
+
+		if (!isValid || !userId) {
+			const returnTo = url ? `?redirect=${encodeURIComponent(url.pathname)}` : '';
+			throw redirect(303, `/auth/login${returnTo}`);
+		}
+
 		const pb = await getAdminPocketBase();
 
 		let profile: UserProfile | null = null;
-		if (userId) {
-			try {
-				const records = await pb.collection('user_profiles').getFullList({
-					filter: `userId = "${userId}"`,
-					fields: 'id,userId,role,firstName,lastName,vendorId,proReference'
-				});
-				profile = (records[0] as UserProfile) ?? null;
-			} catch {
-				// profile stays null
-			}
+		try {
+			const records = await pb.collection('user_profiles').getFullList({
+				filter: `userId = "${userId}"`,
+				fields: 'id,userId,role,firstName,lastName,vendorId,proReference'
+			});
+			profile = (records[0] as unknown as UserProfile) ?? null;
+		} catch {
+			// profile stays null
 		}
 
-		return new RequestContext(pb, userId, profile, url ?? new URL('http://localhost'));
+		const ctx = new RequestContext(pb, userId, profile, url ?? new URL('http://localhost'));
+
+		// Vendor-role users belong in the vendor portal — block all /dashboard access
+		if (ctx.isVendor) {
+			throw redirect(303, '/vendor/dashboard');
+		}
+
+		return ctx;
 	}
 }

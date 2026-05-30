@@ -27,7 +27,8 @@
 		CheckCircle2,
 		Circle,
 		Clock,
-		AlertCircle
+		AlertCircle,
+		Send
 	} from 'lucide-svelte';
 
 	let { data }: { data: PageData } = $props();
@@ -81,6 +82,31 @@
 	let expandedProjects  = $state<Record<string, boolean>>({});
 	function toggleProject(id: string) {
 		expandedProjects = { ...expandedProjects, [id]: !expandedProjects[id] };
+	}
+
+	// Bidding open toggle — optimistic UI, patched via API
+	let biddingState = $state<Record<string, boolean>>(
+		Object.fromEntries((data.department?.projects ?? []).map((p: any) => [p.id, p.biddingOpen ?? false]))
+	);
+	let biddingLoading = $state<Record<string, boolean>>({});
+
+	async function toggleBidding(projectId: string) {
+		if (biddingLoading[projectId]) return;
+		const next = !biddingState[projectId];
+		biddingState    = { ...biddingState,    [projectId]: next };
+		biddingLoading  = { ...biddingLoading,  [projectId]: true };
+		try {
+			await fetch(`/api/projects/${projectId}/bidding`, {
+				method:  'PATCH',
+				headers: { 'Content-Type': 'application/json' },
+				body:    JSON.stringify({ biddingOpen: next }),
+			});
+		} catch {
+			// Revert on failure
+			biddingState = { ...biddingState, [projectId]: !next };
+		} finally {
+			biddingLoading = { ...biddingLoading, [projectId]: false };
+		}
 	}
 
 	const fmt = (n: number) =>
@@ -622,42 +648,56 @@
 					{@const tasks = tasksByProject[project.id] ?? []}
 					{@const isExpanded = !!expandedProjects[project.id]}
 					<Card class="overflow-hidden p-0 border-slate-700">
-						<!-- Project header row -->
+					<!-- Project header row -->
+					<div class="w-full flex items-center gap-4 px-5 py-4 bg-slate-800/60 hover:bg-slate-800 transition-colors">
 						<button
 							type="button"
 							onclick={() => toggleProject(project.id)}
-							class="w-full flex items-center gap-4 px-5 py-4 bg-slate-800/60 hover:bg-slate-800 transition-colors text-left"
+							class="flex items-center gap-3 flex-1 min-w-0 text-left"
 						>
 							{#if isExpanded}
 								<ChevronDown class="size-4 text-slate-400 shrink-0" />
 							{:else}
 								<ChevronRight class="size-4 text-slate-400 shrink-0" />
 							{/if}
-							<div class="flex-1 min-w-0">
-								<a
-									href="/dashboard/projects/{project.id}"
-									onclick={(e) => e.stopPropagation()}
-									class="font-semibold text-slate-100 hover:text-blue-400 transition-colors"
-								>{project.name}</a>
-							</div>
-							<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium capitalize shrink-0
-								{project.status === 'in_progress' ? 'bg-blue-900/50 text-blue-300 border border-blue-700/50' :
-								 project.status === 'completed'   ? 'bg-emerald-900/50 text-emerald-300 border border-emerald-700/50' :
-								 project.status === 'planned'     ? 'bg-yellow-900/50 text-yellow-300 border border-yellow-700/50' :
-								 'bg-slate-700/50 text-slate-400 border border-slate-600/50'}">
-								{project.status.replace('_', ' ')}
-							</span>
-							<div class="text-right shrink-0 hidden sm:block">
-								<p class="text-xs text-slate-500">Budget</p>
-								<p class="text-sm font-semibold text-slate-200">{fmt(project.budget || 0)}</p>
-							</div>
-							<div class="text-right shrink-0 hidden sm:block">
-								<p class="text-xs text-slate-500">Tasks</p>
-								<p class="text-sm font-semibold text-slate-300">{tasks.length}</p>
-							</div>
+							<a
+								href="/dashboard/projects/{project.id}"
+								onclick={(e) => e.stopPropagation()}
+								class="font-semibold text-slate-100 hover:text-blue-400 transition-colors truncate"
+							>{project.name}</a>
 						</button>
+						<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium capitalize shrink-0
+							{project.status === 'in_progress' ? 'bg-blue-900/50 text-blue-300 border border-blue-700/50' :
+							 project.status === 'completed'   ? 'bg-emerald-900/50 text-emerald-300 border border-emerald-700/50' :
+							 project.status === 'planned'     ? 'bg-yellow-900/50 text-yellow-300 border border-yellow-700/50' :
+							 'bg-slate-700/50 text-slate-400 border border-slate-600/50'}">
+							{project.status.replace('_', ' ')}
+						</span>
+						<div class="text-right shrink-0 hidden sm:block">
+							<p class="text-xs text-slate-500">Budget</p>
+							<p class="text-sm font-semibold text-slate-200">{fmt(project.budget || 0)}</p>
+						</div>
+						<div class="text-right shrink-0 hidden sm:block">
+							<p class="text-xs text-slate-500">Tasks</p>
+							<p class="text-sm font-semibold text-slate-300">{tasks.length}</p>
+						</div>
+						<button
+							type="button"
+							onclick={() => toggleBidding(project.id)}
+							disabled={biddingLoading[project.id]}
+							title={biddingState[project.id] ? 'Close bidding' : 'Open for bids'}
+							class="shrink-0 flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold border transition-all
+								{biddingState[project.id]
+									? 'bg-orange-500/15 text-orange-300 border-orange-500/30 hover:bg-orange-500/25'
+									: 'bg-slate-700/40 text-slate-500 border-slate-600/40 hover:bg-slate-700 hover:text-slate-300'}
+								disabled:opacity-50"
+						>
+							<Send class="size-3" />
+							{biddingState[project.id] ? 'Bids Open' : 'Open Bids'}
+						</button>
+					</div>
 
-						<!-- Task rows -->
+					<!-- Task rows -->
 						{#if isExpanded}
 							{#if tasks.length === 0}
 								<p class="px-5 py-3 text-sm text-slate-500 border-t border-slate-700">No tasks for this project.</p>

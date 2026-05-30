@@ -1,12 +1,12 @@
 /**
  * PATCH /api/bids/[id] — advance bid stage (admin only)
- * Valid transitions: submitted → under_review → shortlisted → awarded | rejected
+ * Valid transitions: submitted → under_review → shortlisted → awarded | not_selected
  */
 import { json } from '@sveltejs/kit';
 import { RequestContext } from '$lib/infra/RequestContext';
 import type { RequestHandler } from './$types';
 
-const VALID_STATUSES = ['submitted', 'under_review', 'shortlisted', 'awarded', 'rejected'] as const;
+const VALID_STATUSES = ['submitted', 'under_review', 'shortlisted', 'awarded', 'not_selected'] as const;
 
 export const PATCH: RequestHandler = async ({ locals, url, params, request }) => {
 	const ctx  = await RequestContext.from(locals, url);
@@ -34,12 +34,12 @@ export const PATCH: RequestHandler = async ({ locals, url, params, request }) =>
 			...extra,
 		});
 
-		// If awarded, link vendor to the project
+		// If awarded, append vendor to the project's vendors relation
 		if (status === 'awarded') {
 			const full = await ctx.pb.collection('bids').getOne(params.id, { fields: 'projectId,vendorId' });
 			await ctx.pb.collection('projects').update(full.projectId, {
-				vendors: { '+': [full.vendorId] }
-			}).catch(() => {}); // non-fatal if projects.vendors is not a multi-relation
+				'vendors+': [full.vendorId],
+			}).catch(() => {});
 		}
 
 		return json(bid);
