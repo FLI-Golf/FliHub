@@ -42,7 +42,6 @@
 			headers: { 'Content-Type': 'application/json' },
 			body: JSON.stringify({
 				qb_transaction_id: f.txnId,
-				qb_entered_by:     f.enteredBy || null,
 				qb_entered_date:   f.enteredDate,
 				qb_account:        f.account,
 				qb_notes:          f.notes,
@@ -100,10 +99,26 @@
 
 	function generatePDF(wo: any) {
 		const fmt2 = (n: number) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(n ?? 0);
-		const d = (s: string) => { try { return new Date(s).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }); } catch { return s || '—'; } };
+		const d = (s: string) => {
+			if (!s) return '—';
+			try {
+				const dt = new Date(s);
+				if (isNaN(dt.getTime())) return s;
+				return dt.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+			} catch { return s; }
+		};
+		const dt = (s: string) => {
+			if (!s) return '—';
+			try {
+				const dt = new Date(s);
+				if (isNaN(dt.getTime())) return s;
+				return dt.toLocaleString('en-US', { month: 'long', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' });
+			} catch { return s; }
+		};
 
 		const isReimb   = wo.source === 'reimbursement';
 		const isExpense = wo.source === 'expense';
+		const isBid     = wo.source === 'bid';
 
 		const claimItems = (wo._claimItems ?? []).map((item: any) => `
 			<tr>
@@ -130,6 +145,7 @@
   .badge-open { background: #fefcbf; color: #744210; }
   .badge-reimb { background: #e9d8fd; color: #553c9a; }
   .badge-expense { background: #bee3f8; color: #2a4365; }
+  .badge-bid { background: #feebc8; color: #7b341e; }
   .section { margin-bottom: 24px; }
   .section-title { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: #718096; border-bottom: 1px solid #e2e8f0; padding-bottom: 6px; margin-bottom: 12px; }
   .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
@@ -160,7 +176,7 @@
     <div style="margin-top:4px">
       <span class="badge ${wo.status === 'paid' ? 'badge-paid' : 'badge-open'}">${wo.status}</span>
       &nbsp;
-      <span class="badge ${isReimb ? 'badge-reimb' : 'badge-expense'}">${isReimb ? 'Reimbursement' : 'Expense'}</span>
+      <span class="badge ${isReimb ? 'badge-reimb' : isBid ? 'badge-bid' : 'badge-expense'}">${isReimb ? 'Reimbursement' : isBid ? 'Bid Award' : 'Expense'}</span>
     </div>
     <div style="color:#718096;font-size:11px;margin-top:6px">Generated ${new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}</div>
   </div>
@@ -186,6 +202,16 @@
     <div class="chain-step"><strong>3. Payment</strong>Marked paid · ${d(wo.paidDate)}</div>
     <span class="arrow">→</span>
     <div class="chain-step"><strong>4. Work Order</strong>${wo.work_order_number} created for QuickBooks</div>
+    ` : isBid ? `
+    <div class="chain-step"><strong>1. Bid Submitted</strong>${userName(wo._submittedBy)} submitted bid from ${wo._vendor?.name || '—'}</div>
+    <span class="arrow">→</span>
+    <div class="chain-step"><strong>2. Shortlisted</strong>Bid moved to shortlist for committee review</div>
+    <span class="arrow">→</span>
+    <div class="chain-step"><strong>3. Quorum Vote</strong>${wo._approvalVoters?.length ? wo._approvalVoters.length + ' voter(s) approved' : 'Approved by committee'}</div>
+    <span class="arrow">→</span>
+    <div class="chain-step"><strong>4. Awarded</strong>Bid awarded · ${d(wo._bid?.awardedAt)}</div>
+    <span class="arrow">→</span>
+    <div class="chain-step"><strong>5. Work Order</strong>${wo.work_order_number} created for QuickBooks</div>
     ` : `
     <div class="chain-step"><strong>1. Submission</strong>${userName(wo._submittedBy)} submitted an expense</div>
     <span class="arrow">→</span>
@@ -210,6 +236,50 @@
     <div class="field" style="margin-top:8px"><label>Approved Date</label><span>${d(wo.approvedDate)}</span></div>
   </div>
 </div>
+
+${isBid && wo._vendor ? `
+<div class="section">
+  <div class="section-title">Vendor</div>
+  <div class="grid3">
+    <div class="field"><label>Company</label><span>${wo._vendor.name || '—'}</span></div>
+    <div class="field"><label>Contact</label><span>${wo._vendor.contactName || '—'}</span></div>
+    <div class="field"><label>Email</label><span>${wo._vendor.email || '—'}</span></div>
+  </div>
+  ${(wo._vendor.phone || wo._vendor.address || wo._vendor.website) ? `
+  <div class="grid3" style="margin-top:10px">
+    <div class="field"><label>Phone</label><span>${wo._vendor.phone || '—'}</span></div>
+    <div class="field"><label>Address</label><span>${wo._vendor.address || '—'}</span></div>
+    <div class="field"><label>Website</label><span>${wo._vendor.website || '—'}</span></div>
+  </div>` : ''}
+</div>` : ''}
+
+${isBid && wo._bid ? `
+<div class="section">
+  <div class="section-title">Bid Details</div>
+  <div class="grid3">
+    <div class="field"><label>Bid Amount</label><span style="font-size:18px;font-weight:800;color:#276749">${fmt2(wo._bid.amount)}</span></div>
+    <div class="field"><label>Timeline</label><span>${wo._bid.timeline || '—'}</span></div>
+    <div class="field"><label>Submitted</label><span>${d(wo._bid.submittedAt)}</span></div>
+  </div>
+  ${wo._bid.scope ? `<div class="note" style="margin-top:12px"><strong>Scope:</strong> ${wo._bid.scope}</div>` : ''}
+  ${wo._bid.notes ? `<div class="note" style="margin-top:8px">${wo._bid.notes}</div>` : ''}
+</div>` : ''}
+
+${isBid && wo._approvalVoters?.length ? `
+<div class="section">
+  <div class="section-title">Approval Voters (${wo._approvalVoters.length})</div>
+  <table>
+    <thead><tr><th>Name</th><th>Email</th><th>Role</th></tr></thead>
+    <tbody>
+      ${wo._approvalVoters.map((v: any) => `
+      <tr>
+        <td style="padding:6px 8px;border-bottom:1px solid #e2e8f0">${[v.firstName, v.lastName].filter(Boolean).join(' ') || v.email || '—'}</td>
+        <td style="padding:6px 8px;border-bottom:1px solid #e2e8f0">${v.email || '—'}</td>
+        <td style="padding:6px 8px;border-bottom:1px solid #e2e8f0">${v.role || '—'}</td>
+      </tr>`).join('')}
+    </tbody>
+  </table>
+</div>` : ''}
 
 ${wo._project || wo._task ? `
 <div class="section">
@@ -247,6 +317,17 @@ ${isExpense && wo._expense ? `
     <div class="field"><label>Description</label><span>${wo._expense?.description || '—'}</span></div>
     <div class="field"><label>Category</label><span>${wo._expense?.category || '—'}</span></div>
     <div class="field"><label>Date</label><span>${d(wo._expense?.date)}</span></div>
+  </div>
+  ${wo._expense?.notes ? `<div class="note" style="margin-top:12px">${wo._expense.notes.replace(/<[^>]*>/g,'')}</div>` : ''}
+</div>` : ''}
+
+${isBid && wo._expense ? `
+<div class="section">
+  <div class="section-title">Linked Expense</div>
+  <div class="grid3">
+    <div class="field"><label>Description</label><span>${wo._expense?.description || '—'}</span></div>
+    <div class="field"><label>Category</label><span>${wo._expense?.category || '—'}</span></div>
+    <div class="field"><label>Status</label><span>${wo._expense?.status || '—'}</span></div>
   </div>
   ${wo._expense?.notes ? `<div class="note" style="margin-top:12px">${wo._expense.notes.replace(/<[^>]*>/g,'')}</div>` : ''}
 </div>` : ''}
@@ -616,9 +697,10 @@ ${wo.notes ? `
 													class="w-full rounded-md border border-slate-600 bg-slate-900 text-slate-100 px-3 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500 [color-scheme:dark]" />
 											</div>
 											<div>
+
+
 												<label class="block text-[10px] font-semibold uppercase tracking-wide text-slate-400 mb-1">Entered By</label>
-												<input bind:value={f.enteredBy} placeholder="Name or user ID"
-													class="w-full rounded-md border border-slate-600 bg-slate-900 text-slate-100 px-3 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500 placeholder:text-slate-600" />
+												<p class="text-xs text-slate-400 px-3 py-1.5 rounded-md border border-slate-700 bg-slate-800/50">You (set automatically)</p>
 											</div>
 										</div>
 										<div>

@@ -394,6 +394,46 @@ Or via dashboard:
 - Validation message
 - No changes made
 
+## Bid Approval Pipeline
+
+When a bid is dragged to **Awarded** in the Bid Pipeline:
+
+1. The bid's `awardedAt` timestamp is recorded and `status` set to `awarded`.
+2. A draft expense is created automatically (`status: submitted`).
+3. A pending approval (`entityType: bid`) is raised, linked to both the bid and the expense via `bidId` / `expenseId`.
+4. The user is redirected to `/dashboard/approvals` to vote.
+
+On quorum (2 approvers):
+- The linked expense is marked `approved`.
+- No PO or work order is generated — the approval is the authorisation record.
+
+After 5 minutes in `awarded` status, the bid is automatically moved to `closed` by a server-side cron job (see below).
+
+---
+
+## PocketBase Hooks (`pb_hooks/`)
+
+Server-side logic that runs inside the PocketBase process on Railway is stored in `pb_hooks/`. These files are **not** deployed by the SvelteKit app — they must be copied to the PocketBase data directory on the Railway instance.
+
+### `auto_close_bids.pb.js`
+
+Runs every minute via `cronAdd`. Finds any bid with `status = 'awarded'` whose `awardedAt` is more than 5 minutes in the past and sets `status = 'closed'`.
+
+### Deploying hooks to Railway
+
+1. Open the Railway dashboard and navigate to the PocketBase service.
+2. Go to **Settings → Volumes** and note the mount path (typically `/pb_data`).
+3. Use the Railway CLI or the built-in shell to copy the file:
+   ```bash
+   # From your local machine with Railway CLI installed
+   railway run --service pocketbase cp pb_hooks/auto_close_bids.pb.js /pb_data/../pb_hooks/auto_close_bids.pb.js
+   ```
+   Or use the Railway shell tab to upload the file directly.
+4. PocketBase watches `pb_hooks/` and reloads automatically on UNIX — no restart needed.
+5. Verify the cron registered by checking **PocketBase Admin → Logs** for `auto_close_awarded_bids` entries after the next minute boundary.
+
+> **Note:** `pb_hooks/` must sit next to the PocketBase executable, not inside `pb_data/`. The exact path depends on how the Railway service is configured. Check the Dockerfile or start command to confirm the working directory.
+
 ## Future Enhancements
 
 1. **Comments on Approval** - Allow custom comments when approving/rejecting

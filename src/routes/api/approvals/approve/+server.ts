@@ -22,7 +22,6 @@ export const POST: RequestHandler = async ({ locals, request }) => {
 
 	// Use admin client for all DB writes so auth state never blocks work order creation
 	const pb = await getAdminPocketBase();
-	console.log('[approve] admin pb auth valid:', pb.authStore.isValid, 'token length:', pb.authStore.token?.length ?? 0);
 
 	try {
 		const profiles = await pb.collection('user_profiles').getFullList({
@@ -164,6 +163,75 @@ export const POST: RequestHandler = async ({ locals, request }) => {
 					status: 'in_progress',
 					approvedBy: userProfile.id,
 				}).catch((e: any) => console.warn('project update failed:', e.message));
+
+			} else if (approval.entityType === 'bid') {
+				// Quorum reached: approve the linked expense, generate a Work Order number,
+				// create a work_order record, and update project actual expenses.
+
+				const bid = await pb.collection('bids').getOne(approval.entityId, {
+					expand: 'projectId,vendorId',
+				}).catch(() => null) as any;
+
+				const expense = approval.expenseId
+					? await pb.collection('expenses').getOne(approval.expenseId).catch(() => null) as any
+					: null;
+
+				const project = bid?.expand?.projectId ?? null;
+				const vendor  = bid?.expand?.vendorId  ?? null;
+
+				// Generate Work Order number: WO-{CODE}-{NNNN}
+				const projectCode = project ? deriveProjectCode(project.name) : 'VND';
+				const allWOs = await pb.collection('work_orders').getFullList({
+					fields: 'work_order_number', sort: '-created',
+				}).catch(() => []) as any[];
+				const seq = allWOs.length + 1;
+				workOrderNumber = `WO-${projectCode}-${String(seq).padStart(4, '0')}`;
+
+				// Approve the expense and stamp PO number
+				if (expense) {
+					await pb.collection('expenses').update(expense.id, {
+						status:            'approved',
+						approvedBy:        userProfile.id,
+						approvedDate:      new Date().toISOString(),
+						work_order_number: workOrderNumber,
+					}).catch((e: any) => console.warn('bid expense update failed:', e.message));
+				}
+
+				// Create work_order / PO record
+				try {
+					await pb.collection('work_orders').create({
+						work_order_number: workOrderNumber,
+						source:            'bid',
+						status:            'open',
+						bidId:             approval.entityId,
+						vendorId:          bid?.vendorId  ?? null,
+						projectId:         bid?.projectId ?? '',
+						project:           bid?.projectId ?? null,
+						projectName:       project?.name  ?? '',
+						projectCode:       deriveProjectCode(project?.name ?? ''),
+						expenseId:         expense?.id ?? '',
+						expense:           expense?.id ?? null,
+						approver:          userProfile.id,
+						approvedBy:        userProfile.id,
+						submittedBy:       userProfile.id,
+						description:       `Vendor PO — ${vendor?.name ?? 'Vendor'}: ${bid?.scope ?? ''}`.slice(0, 500),
+						amount:            bid?.amount ?? expense?.amount ?? 0,
+						approvedDate:      new Date().toISOString(),
+						notes:             bid?.notes ?? '',
+					});
+					console.log(`✅ Work order ${workOrderNumber} created for bid ${approval.entityId}`);
+				} catch (e: any) {
+					console.error('❌ work_order create failed (bid):', e.message, JSON.stringify(e.data ?? {}));
+				}
+
+				// Update project actual expenses
+				if (project && (bid?.amount ?? 0) > 0) {
+					await pb.collection('projects').update(project.id, {
+						project_actual_expenses: (project.project_actual_expenses ?? 0) + (bid.amount ?? 0),
+					}).catch((e: any) => console.warn('project actual update failed:', e.message));
+				}
+
+				updatePayload.comments = `<p>Quorum reached — approved by ${voteCount} ${voteCount === 1 ? 'approver' : 'approvers'}. Work Order: ${workOrderNumber}</p>`;
 
 			} else if (approval.entityType === 'goal_task') {
 				// ── goal_task quorum pipeline ─────────────────────────────────
