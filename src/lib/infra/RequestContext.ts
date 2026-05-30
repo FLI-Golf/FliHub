@@ -23,7 +23,8 @@
 
 import type PocketBase from 'pocketbase';
 import { redirect } from '@sveltejs/kit';
-import { VENDOR_ROLE } from '$env/static/private';
+import { env } from '$env/dynamic/private';
+const VENDOR_ROLE = env.VENDOR_ROLE ?? 'vendor';
 import { getAdminPocketBase } from './pocketbase/pbClient';
 
 export type UserRole = 'admin' | 'sales' | 'leader' | 'vendor' | 'pro' | 'franchise_owner' | 'broadcaster' | 'manager' | 'league_owner';

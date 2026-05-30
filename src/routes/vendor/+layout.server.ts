@@ -1,5 +1,6 @@
 import { redirect } from '@sveltejs/kit';
-import { VENDOR_ROLE } from '$env/static/private';
+import { env } from '$env/dynamic/private';
+const VENDOR_ROLE = env.VENDOR_ROLE ?? 'vendor';
 import { getAdminPocketBase } from '$lib/infra/pocketbase/pbClient';
 import type { LayoutServerLoad } from './$types';
 
