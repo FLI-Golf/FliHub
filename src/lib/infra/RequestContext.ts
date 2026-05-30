@@ -23,6 +23,7 @@
 
 import type PocketBase from 'pocketbase';
 import { redirect } from '@sveltejs/kit';
+import { VENDOR_ROLE } from '$env/static/private';
 import { getAdminPocketBase } from './pocketbase/pbClient';
 
 export type UserRole = 'admin' | 'sales' | 'leader' | 'vendor' | 'pro' | 'franchise_owner' | 'broadcaster' | 'manager' | 'league_owner';
@@ -68,6 +69,11 @@ export class RequestContext {
 		return this.role === 'admin';
 	}
 
+	/** True when the user is a vendor-portal-only account */
+	get isVendor(): boolean {
+		return this.role === (VENDOR_ROLE as UserRole);
+	}
+
 	get displayName(): string {
 		if (this.profile?.firstName) {
 			return `${this.profile.firstName} ${this.profile.lastName ?? ''}`.trim();
@@ -76,10 +82,14 @@ export class RequestContext {
 	}
 
 	/**
-	 * Throws a 303 redirect to /dashboard if the current user's role
-	 * is not in the allowed list.
+	 * Throws a 303 redirect if the current user's role is not in the allowed list.
+	 * Vendor-role users are always redirected to /vendor/dashboard unless
+	 * VENDOR_ROLE is explicitly included in the allowed list.
 	 */
 	requireRole(...allowed: UserRole[]): void {
+		if (this.isVendor && !allowed.includes(VENDOR_ROLE as UserRole)) {
+			throw redirect(303, '/vendor/dashboard');
+		}
 		if (!allowed.includes(this.role)) {
 			throw redirect(303, '/dashboard');
 		}

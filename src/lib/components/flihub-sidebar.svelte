@@ -44,7 +44,8 @@
 		BadgeCheck,
 		Zap,
 		Monitor,
-		ArrowDownLeft
+		ArrowDownLeft,
+		Send
 	} from 'lucide-svelte';
 
 	type NavItem = {
@@ -145,6 +146,7 @@
 				{ title: 'Tasks', url: '/dashboard/tasks', icon: ListTodo },
 				{ title: 'Expenses', url: '/dashboard/expenses', icon: Receipt },
 				{ title: 'Vendors', url: '/dashboard/vendors', icon: Store },
+				{ title: 'Bid Pipeline', url: '/dashboard/bids', icon: Send, roles: ['admin', 'leader'] },
 				{ title: 'Approvals', url: '/dashboard/approvals', icon: CheckSquare },
 				{ title: 'Work Orders', url: '/dashboard/work-orders', icon: ClipboardList },
 				{ title: 'Reimbursements', url: '/dashboard/reimbursements', icon: Wallet },
