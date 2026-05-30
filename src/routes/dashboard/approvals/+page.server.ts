@@ -8,9 +8,9 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 	try {
 		const [approvals, settings, draftExpenses] = await Promise.all([
 			pb.collection('approvals').getFullList({
-				expand: 'requestedBy,approver,expenseId',
+				expand: 'requestedBy,approver,expenseId,bidId',
 				sort: '-requestedDate'
-			}).catch(() => []),
+			}).catch((err: any) => { console.error('[approvals load] fetch failed:', err?.message); return []; }),
 			pb.collection('settings').getFullList({ fields: 'id,key,value,label' }).catch(() => []),
 			pb.collection('expenses').getFullList({
 				filter: `status="draft"`,
@@ -18,6 +18,7 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 			}).catch(() => []),
 		]);
 
+		console.log('[approvals load] fetched', (approvals as any[]).length, 'approvals');
 		const userProfiles = await pb.collection('user_profiles').getFullList({
 			filter: `userId = "${userId}"`
 		}).catch(() => []);

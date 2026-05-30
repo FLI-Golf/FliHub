@@ -1,6 +1,6 @@
 <script lang="ts">
 	import type { PageData } from './$types';
-	import { invalidateAll } from '$app/navigation';
+	import { invalidateAll, goto } from '$app/navigation';
 	import Card from '$lib/components/ui/card.svelte';
 	import { PipelineBoard } from '$lib/pipeline';
 	import type { PipelineBoardConfig, PipelineCardItem, PipelineMoveEvent } from '$lib/pipeline/types';
@@ -41,6 +41,7 @@
 	];
 	const TERMINAL = [
 		{ key: 'not_selected', label: 'Not Selected', colorClass: 'bg-slate-700/40 text-slate-400 border-slate-600/50' },
+		{ key: 'closed',       label: 'Closed',       colorClass: 'bg-slate-800/60 text-slate-500 border-slate-700/40' },
 	];
 
 	const boardConfig: PipelineBoardConfig = {
@@ -49,17 +50,36 @@
 		terminalStages: TERMINAL,
 	};
 
+	const approvalBadge: Record<string, { label: string; colorClass: string }> = {
+		pending:  { label: '⏳ Awaiting Approval', colorClass: 'bg-yellow-900/40 text-yellow-300 border-yellow-700/50' },
+		approved: { label: '✓ Approved',           colorClass: 'bg-emerald-900/40 text-emerald-300 border-emerald-700/50' },
+		rejected: { label: '✗ Rejected',           colorClass: 'bg-red-900/40 text-red-300 border-red-700/50' },
+	};
+
 	const boardItems = $derived<PipelineCardItem[]>(
-		filtered.map((b: any) => ({
-			id:       b.id,
-			title:    b.expand?.vendorId?.name ?? 'Unknown Vendor',
-			subtitle: b.expand?.projectId?.name ?? 'Unknown Project',
-			status:   b.status,
-			badge:    b.expand?.vendorId?.category
-				? { label: b.expand.vendorId.category, colorClass: 'bg-slate-700 text-slate-300 border-slate-600' }
-				: undefined,
-			meta:     b.amount ? fmt(b.amount) + (b.timeline ? ` · ${b.timeline}` : '') : b.timeline ?? undefined,
-		}))
+		filtered.map((b: any) => {
+			const po             = (data.poByBid       as Record<string, string>)?.[b.id];
+			const approvalStatus = (data.approvalByBid as Record<string, string>)?.[b.id];
+			const amountStr      = b.amount   ? fmt(b.amount)       : '';
+			const timelineStr    = b.timeline ? `· ${b.timeline}`   : '';
+			const poStr          = po         ? `· ${po}`           : '';
+
+			// For awarded bids show approval state; otherwise show vendor category
+			const badge = b.status === 'awarded' && approvalStatus
+				? approvalBadge[approvalStatus]
+				: b.expand?.vendorId?.category
+					? { label: b.expand.vendorId.category, colorClass: 'bg-slate-700 text-slate-300 border-slate-600' }
+					: undefined;
+
+			return {
+				id:       b.id,
+				title:    b.expand?.vendorId?.name ?? 'Unknown Vendor',
+				subtitle: b.expand?.projectId?.name ?? 'Unknown Project',
+				status:   b.status,
+				badge,
+				meta:     [amountStr, timelineStr, poStr].filter(Boolean).join(' ') || undefined,
+			};
+		})
 	);
 
 	// ── Stage advance ─────────────────────────────────────────────────────────
@@ -85,15 +105,26 @@
 	async function patchBid(id: string, status: string, notes?: string) {
 		moving = true;
 		try {
+			console.log('[patchBid] fetching PATCH /api/bids/' + id, { status, notes });
 			const res = await fetch(`/api/bids/${id}`, {
 				method:  'PATCH',
 				headers: { 'Content-Type': 'application/json' },
 				body: JSON.stringify({ status, ...(notes ? { notes } : {}) }),
 			});
-			if (!res.ok) throw new Error('Failed');
-			await invalidateAll();
+			console.log('[patchBid] response status:', res.status, res.statusText);
+			const data = await res.json().catch(() => ({}));
+			console.log('[patchBid] response body:', JSON.stringify(data));
+			if (!res.ok) {
+				console.error('bid patch failed:', res.status, data);
+				throw new Error(data.message ?? 'Failed');
+			}
+			if (status === 'awarded') {
+				await goto('/dashboard/approvals');
+			} else {
+				await invalidateAll();
+			}
 		} catch (err) {
-			console.error('bid patch failed:', err);
+			console.error('bid patch error:', err);
 		} finally {
 			moving = false;
 		}
@@ -103,8 +134,13 @@
 		e.preventDefault();
 		if (!noteModal) return;
 		noteSaving = true;
-		await patchBid(noteModal.bid.id, noteModal.toStage, noteText);
+		const bidId   = noteModal.bid.id;
+		const toStage = noteModal.toStage;
+		const notes   = noteText;
 		noteModal  = null;
+		noteText   = '';
+		console.log('[submitNote] calling patchBid', bidId, toStage);
+		await patchBid(bidId, toStage, notes);
 		noteSaving = false;
 	}
 </script>
@@ -171,7 +207,7 @@
 	<div class="bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl w-full max-w-md">
 		<div class="flex items-center justify-between px-6 py-5 border-b border-slate-800">
 			<div>
-				<h2 class="text-lg font-bold text-white">Award Bid</h2>
+				<h2 class="text-lg font-bold text-white">Award Bid & Create Approval</h2>
 				<p class="text-xs text-slate-400 mt-0.5">
 					{noteModal.bid.expand?.vendorId?.name} — {noteModal.bid.expand?.projectId?.name}
 				</p>
@@ -182,17 +218,17 @@
 		</div>
 		<form onsubmit={submitNote} class="p-6 space-y-4">
 			<div class="bg-emerald-900/20 border border-emerald-700/40 rounded-xl p-4 text-sm text-emerald-300">
-				Awarding this bid will link <strong>{noteModal.bid.expand?.vendorId?.name}</strong> to the project as a vendor.
+				Awarding this bid will link <strong>{noteModal.bid.expand?.vendorId?.name}</strong> to the project and raise a pending approval. Once approved, a Work Order is created to track the vendor spend.
 			</div>
 			<div>
-				<label class="block text-xs font-semibold text-slate-400 uppercase tracking-wide mb-1.5">Award Notes (optional)</label>
+				<label class="block text-xs font-semibold text-slate-400 uppercase tracking-wide mb-1.5">Notes (optional)</label>
 				<textarea bind:value={noteText} rows="3" placeholder="Reason for selection, next steps, contract details…"
 					class="w-full rounded-xl border border-slate-700 bg-slate-800 text-white px-4 py-2.5 text-sm focus:outline-none focus:border-emerald-500 placeholder:text-slate-500 resize-none"></textarea>
 			</div>
 			<div class="flex gap-3">
 				<button type="submit" disabled={noteSaving}
 					class="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-semibold transition-colors disabled:opacity-50">
-					<CheckCircle2 class="size-4" /> {noteSaving ? 'Awarding…' : 'Confirm Award'}
+					<CheckCircle2 class="size-4" /> {noteSaving ? 'Awarding…' : 'Create Approval'}
 				</button>
 				<button type="button" onclick={() => noteModal = null}
 					class="px-4 py-2.5 rounded-xl border border-slate-700 text-slate-300 hover:bg-slate-800 text-sm transition-colors">
