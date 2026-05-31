@@ -73,6 +73,7 @@
 			columnWidth={colWidth}
 			onmove={handleMove}
 			{onselect}
+			isSuccess={stage.isSuccess ?? false}
 		/>
 	{/each}
 </div>

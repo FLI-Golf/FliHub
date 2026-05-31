@@ -2,7 +2,7 @@
 	import type { PageData } from './$types';
 	import Card from '$lib/components/ui/card.svelte';
 	import { Button } from '$lib/components/ui/button/index.js';
-	import { Plus, MapPin, Clock, ChevronRight } from 'lucide-svelte';
+	import { Plus, MapPin, Clock, ChevronRight, FileText, CheckCircle2 } from 'lucide-svelte';
 	import { PipelineBoard } from '$lib/pipeline';
 	import type { PipelineBoardConfig, PipelineCardItem, PipelineMoveEvent } from '$lib/pipeline/types';
 	import { invalidateAll } from '$app/navigation';
@@ -79,24 +79,100 @@
 	});
 
 	const boardItems = $derived<PipelineCardItem[]>(
-		(data.sponsors ?? []).map((s: any) => ({
-			id: s.id,
-			title: s.companyName,
-			subtitle: s.primaryContactName || s.location || undefined,
-			status: s.status,
-			href: `/dashboard/sponsors/${s.id}`,
-			badge: {
-				label: SPONSOR_TIER_LABELS[s.tier as keyof typeof SPONSOR_TIER_LABELS] ?? s.tier,
-				colorClass: SPONSOR_TIER_COLORS[s.tier as keyof typeof SPONSOR_TIER_COLORS] ?? 'bg-slate-700 text-slate-300 border-slate-600'
-			},
-			meta: s.annualCommitment ? `${fmt(s.annualCommitment)}/yr` : undefined
-		}))
+		(data.sponsors ?? []).map((s: any) => {
+			const rep = s.expand?.assignedTo;
+			const repLabel = rep ? ([rep.firstName, rep.lastName].filter(Boolean).join(' ') || rep.email) : null;
+			return {
+				id: s.id,
+				title: s.companyName,
+				subtitle: s.primaryContactName || s.location || undefined,
+				status: s.status,
+				href: `/dashboard/sponsors/${s.id}`,
+				badge: {
+					label: SPONSOR_TIER_LABELS[s.tier as keyof typeof SPONSOR_TIER_LABELS] ?? s.tier,
+					colorClass: SPONSOR_TIER_COLORS[s.tier as keyof typeof SPONSOR_TIER_COLORS] ?? 'bg-slate-700 text-slate-300 border-slate-600'
+				},
+				tags: repLabel ? [{ label: `👤 ${repLabel}`, colorClass: 'bg-slate-700/60 text-slate-400 border-slate-600/50' }] : [],
+				meta: s.annualCommitment ? `${fmt(s.annualCommitment)}/yr` : undefined
+			};
+		})
 	);
 
 	let moving = $state(false);
 
+	// ── Contracted confirmation modal ─────────────────────────────────────────
+	let pendingMove = $state<PipelineMoveEvent | null>(null);
+	let contractConfirming = $state(false);
+	let contractErr = $state('');
+	let poAmount = $state('');
+	let poYear = $state(String(new Date().getFullYear()));
+	let poDescription = $state('');
+
+	const pendingSponsor = $derived(
+		pendingMove ? (data.sponsors ?? []).find((s: any) => s.id === pendingMove!.item.id) ?? null : null
+	);
+
+	function cancelContractMove() {
+		pendingMove = null;
+		contractErr = '';
+		poAmount = '';
+		poYear = String(new Date().getFullYear());
+		poDescription = '';
+	}
+
+	async function confirmContractMove() {
+		if (!pendingMove) return;
+		contractConfirming = true;
+		contractErr = '';
+		try {
+			// 1. Move sponsor to contracted
+			const moveRes = await fetch(`/api/sponsors/${pendingMove.item.id}`, {
+				method: 'PATCH',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ status: pendingMove.to })
+			});
+			if (!moveRes.ok) throw new Error('Failed to update stage');
+
+			// 2. Kick off collections — create a draft PO
+			const amount = poAmount ? Number(poAmount) : (pendingSponsor?.annualCommitment ?? 0);
+			if (amount > 0) {
+				const poRes = await fetch(`/api/sponsors/${pendingMove.item.id}/purchase-order`, {
+					method: 'POST',
+					headers: { 'Content-Type': 'application/json' },
+					body: JSON.stringify({
+						amount,
+						year: Number(poYear),
+						description: poDescription || undefined
+					})
+				});
+				if (!poRes.ok) {
+					const body = await poRes.json().catch(() => ({}));
+					throw new Error(body.message ?? 'Failed to create Purchase Order');
+				}
+			}
+
+			cancelContractMove();
+			await invalidateAll();
+		} catch (err: any) {
+			contractErr = err.message ?? 'Something went wrong';
+		} finally {
+			contractConfirming = false;
+		}
+	}
+
 	async function handleMove(e: PipelineMoveEvent) {
 		if (moving) return;
+
+		// Intercept moves into "contracted" for confirmation + PO creation
+		if (e.to === 'contracted') {
+			const sponsor = (data.sponsors ?? []).find((s: any) => s.id === e.item.id) as any;
+			poAmount = sponsor?.annualCommitment ? String(sponsor.annualCommitment) : '';
+			poYear = String(new Date().getFullYear());
+			poDescription = '';
+			pendingMove = e;
+			return;
+		}
+
 		moving = true;
 		try {
 			const res = await fetch(`/api/sponsors/${e.item.id}`, {
@@ -308,6 +384,100 @@
 	</Card>
 
 </div>
+
+<!-- Contracted Confirmation Modal -->
+{#if pendingMove}
+<div class="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4" role="dialog" aria-modal="true">
+	<div class="bg-slate-900 border border-orange-700/60 rounded-2xl shadow-2xl w-full max-w-lg">
+		<!-- Header -->
+		<div class="flex items-center gap-3 p-6 border-b border-slate-700">
+			<div class="p-2 rounded-lg bg-orange-900/50 border border-orange-700/50 shrink-0">
+				<FileText class="size-5 text-orange-400" />
+			</div>
+			<div>
+				<h2 class="text-lg font-semibold text-slate-100">Mark as Contracted</h2>
+				<p class="text-xs text-slate-400 mt-0.5">
+					{pendingSponsor?.companyName ?? 'This sponsor'} will move to <span class="text-orange-300 font-mono">contracted</span> and a draft Purchase Order will be created.
+				</p>
+			</div>
+			<button onclick={cancelContractMove} class="ml-auto text-slate-400 hover:text-slate-100 transition-colors" aria-label="Close">
+				<svg class="size-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+			</button>
+		</div>
+
+		<div class="p-6 space-y-5">
+			{#if contractErr}
+				<p class="text-sm text-red-400 bg-red-900/30 border border-red-700 rounded-lg px-3 py-2">{contractErr}</p>
+			{/if}
+
+			<!-- Pre-flight checklist -->
+			<div class="space-y-2">
+				<p class="text-xs font-semibold text-slate-400 uppercase tracking-wide">Before proceeding, confirm:</p>
+				{#each [
+					'Signed contract or LOI is on file',
+					'Annual commitment amount is agreed',
+					'Payment schedule has been discussed',
+					'Sponsor contact details are up to date'
+				] as item}
+					<div class="flex items-start gap-2.5 text-sm text-slate-300">
+						<CheckCircle2 class="size-4 text-orange-400 shrink-0 mt-0.5" />
+						<span>{item}</span>
+					</div>
+				{/each}
+			</div>
+
+			<!-- PO details -->
+			<div class="rounded-xl border border-slate-700 bg-slate-800/50 p-4 space-y-3">
+				<p class="text-xs font-semibold text-slate-400 uppercase tracking-wide flex items-center gap-1.5">
+					<FileText class="size-3.5" /> Draft Purchase Order
+				</p>
+				<div class="grid grid-cols-2 gap-3">
+					<div>
+						<label class={LABEL}>Amount ($) *</label>
+						<input
+							bind:value={poAmount}
+							type="number"
+							min="1"
+							required
+							class={INPUT}
+							placeholder={pendingSponsor?.annualCommitment ? String(pendingSponsor.annualCommitment) : '0'}
+						/>
+					</div>
+					<div>
+						<label class={LABEL}>Year</label>
+						<input bind:value={poYear} type="number" min="2024" max="2030" class={INPUT} />
+					</div>
+				</div>
+				<div>
+					<label class={LABEL}>Description (optional)</label>
+					<input
+						bind:value={poDescription}
+						class={INPUT}
+						placeholder="Sponsorship agreement — {pendingSponsor?.companyName ?? ''} ({poYear})"
+					/>
+				</div>
+				<p class="text-[10px] text-slate-500">A draft PO will be created. You can review and send it from the sponsor's detail page.</p>
+			</div>
+		</div>
+
+		<!-- Actions -->
+		<div class="flex justify-end gap-3 px-6 pb-6">
+			<Button type="button" variant="outline" onclick={cancelContractMove} class="border-slate-600 text-slate-300" disabled={contractConfirming}>
+				Cancel
+			</Button>
+			<Button
+				type="button"
+				onclick={confirmContractMove}
+				disabled={contractConfirming || !poAmount || Number(poAmount) <= 0}
+				class="gap-2 bg-orange-600 hover:bg-orange-700 text-white disabled:opacity-50"
+			>
+				<FileText class="size-4" />
+				{contractConfirming ? 'Processing…' : 'Confirm & Start Collections'}
+			</Button>
+		</div>
+	</div>
+</div>
+{/if}
 
 <!-- Add Sponsor Modal -->
 {#if showAdd}

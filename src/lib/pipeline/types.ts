@@ -19,6 +19,8 @@ export interface PipelineStageConfig<TStatus extends string = string> {
 	icon?: any;
 	/** If true, this stage is a terminal/closed state (shown separately) */
 	terminal?: boolean;
+	/** If true, renders the drop zone with a success/completion visual treatment */
+	isSuccess?: boolean;
 }
 
 // ── Card item ─────────────────────────────────────────────────────────────────

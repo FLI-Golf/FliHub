@@ -5,11 +5,10 @@ import type { PageServerLoad } from './$types';
 export const load: PageServerLoad = async ({ locals, url }) => {
 	await RequestContext.from(locals, url);
 
-	const workOrders = await adminFetch('work_orders', {
-		filter: 'source=bid',
+	const purchaseOrders = await adminFetch('sponsor_purchase_orders', {
 		sort:   '-created',
-		expand: 'vendorId,project,bidId',
-	});
+		expand: 'sponsorId,createdBy,assignedTo',
+	}).catch(() => []);
 
-	return { workOrders };
+	return { purchaseOrders };
 };
