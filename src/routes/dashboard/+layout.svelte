@@ -69,7 +69,7 @@
 		'/dashboard/settings': 'Settings',
 		'/dashboard/income':           'Income Pipeline',
 		'/dashboard/bids':             'Bid Pipeline',
-		'/dashboard/purchase-orders':  'Work Orders'
+		'/dashboard/purchase-orders':  'Purchase Orders'
 	};
 
 	$: currentLabel = routeLabels[$page.url.pathname] ?? 'Dashboard';

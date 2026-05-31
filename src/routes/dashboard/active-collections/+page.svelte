@@ -25,7 +25,7 @@
 		{ key: 'acknowledged', label: 'Acknowledged', colorClass: 'bg-violet-900/40 text-violet-300 border-violet-700/50' },
 		{ key: 'invoiced',     label: 'Invoiced',     colorClass: 'bg-amber-900/40 text-amber-300 border-amber-700/50' },
 		{ key: 'partial',      label: 'Partial Paid', colorClass: 'bg-orange-900/40 text-orange-300 border-orange-700/50' },
-		{ key: 'paid',         label: 'Paid ✓',       colorClass: 'bg-emerald-900/40 text-emerald-300 border-emerald-700/50' },
+		{ key: 'paid',         label: 'Paid ✓',       colorClass: 'bg-emerald-900/40 text-emerald-300 border-emerald-700/50', isSuccess: true },
 	];
 	const TERMINAL = [
 		{ key: 'overdue',   label: 'Overdue',    colorClass: 'bg-red-900/40 text-red-300 border-red-700/50' },
@@ -66,6 +66,10 @@
 	let noteText  = $state('');
 	let noteSaving = $state(false);
 
+	// Post-paid success state — holds WO number + sponsor info for the follow-up prompt
+	let paidResult = $state<{ woNumber: string; sponsorId: string; sponsorName: string; sponsorStatus: string } | null>(null);
+	let activating = $state(false);
+
 	// Stages that need a confirmation modal before advancing
 	const CONFIRM_STAGES = new Set(['paid', 'overdue', 'disputed', 'write_off', 'bad_debt']);
 
@@ -91,11 +95,40 @@
 			});
 			const body = await res.json().catch(() => ({}));
 			if (!res.ok) throw new Error(body.message ?? `Error ${res.status}`);
+
+			// On paid, the API returns the created WO — surface it to the user
+			if (status === 'paid' && body.wo?.work_order_number) {
+				const po = pos.find((p: any) => p.id === id);
+				const sponsor = po?._sponsor ?? po?.expand?.sponsorId ?? null;
+				paidResult = {
+					woNumber:      body.wo.work_order_number,
+					sponsorId:     typeof po?.sponsorId === 'string' ? po.sponsorId : (po?.sponsorId?.id ?? sponsor?.id ?? ''),
+					sponsorName:   sponsor?.companyName ?? 'Sponsor',
+					sponsorStatus: sponsor?.status ?? '',
+				};
+			}
+
 			await invalidateAll();
 		} catch (err: any) {
 			alert(err.message);
 		} finally {
 			moving = false;
+		}
+	}
+
+	async function activateSponsor() {
+		if (!paidResult?.sponsorId) return;
+		activating = true;
+		try {
+			await fetch(`/api/sponsors/${paidResult.sponsorId}`, {
+				method:  'PATCH',
+				headers: { 'Content-Type': 'application/json' },
+				body:    JSON.stringify({ status: 'active' }),
+			});
+			await invalidateAll();
+		} finally {
+			activating = false;
+			paidResult = null;
 		}
 	}
 
@@ -462,6 +495,60 @@
 		{/if}
 	</div>
 </div>
+
+<!-- ── Post-paid success modal ────────────────────────────────────────────── -->
+{#if paidResult}
+<div class="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4" role="dialog" aria-modal="true">
+	<div class="bg-slate-900 border border-emerald-700/60 rounded-2xl shadow-2xl w-full max-w-md">
+		<div class="p-6 text-center space-y-4">
+			<!-- Icon -->
+			<div class="mx-auto size-14 rounded-full bg-emerald-900/50 border border-emerald-700/50 flex items-center justify-center">
+				<CheckCircle2 class="size-7 text-emerald-400" />
+			</div>
+
+			<div>
+				<h2 class="text-lg font-semibold text-slate-100">Payment Confirmed</h2>
+				<p class="text-sm text-slate-400 mt-1">
+					A Work Order has been created and all linked payments marked received.
+				</p>
+			</div>
+
+			<!-- WO callout -->
+			<div class="rounded-xl border border-emerald-700/40 bg-emerald-900/20 px-4 py-3 text-left space-y-1">
+				<p class="text-[10px] font-semibold text-emerald-400 uppercase tracking-wide">Work Order Created</p>
+				<p class="font-mono font-bold text-emerald-300 text-base">{paidResult.woNumber}</p>
+				<p class="text-xs text-slate-400">Visible in <a href="/dashboard/work-orders" class="text-emerald-400 hover:underline">Work Orders</a></p>
+			</div>
+
+			<!-- Sponsor status prompt — only show if still contracted -->
+			{#if paidResult.sponsorStatus === 'contracted'}
+				<div class="rounded-xl border border-slate-700 bg-slate-800/50 px-4 py-3 text-left space-y-2">
+					<p class="text-xs font-semibold text-slate-300">Next step</p>
+					<p class="text-xs text-slate-400 leading-relaxed">
+						<span class="font-medium text-slate-200">{paidResult.sponsorName}</span> is still marked
+						<span class="font-mono text-orange-300">contracted</span>. Now that payment is confirmed,
+						move them to <span class="font-mono text-emerald-300">active</span> to reflect the live partnership.
+					</p>
+					<button
+						onclick={activateSponsor}
+						disabled={activating}
+						class="w-full mt-1 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold transition-colors disabled:opacity-50"
+					>
+						{activating ? 'Updating…' : `Move ${paidResult.sponsorName} → Active`}
+					</button>
+				</div>
+			{/if}
+
+			<button
+				onclick={() => paidResult = null}
+				class="w-full py-2 rounded-lg border border-slate-600 text-slate-300 text-sm hover:bg-slate-700 transition-colors"
+			>
+				{paidResult.sponsorStatus === 'contracted' ? 'Skip — keep as Contracted' : 'Done'}
+			</button>
+		</div>
+	</div>
+</div>
+{/if}
 
 <!-- ── Stage advance confirmation modal ──────────────────────────────────── -->
 {#if noteModal}

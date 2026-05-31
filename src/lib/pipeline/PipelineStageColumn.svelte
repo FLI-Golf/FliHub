@@ -12,6 +12,8 @@
 		onmove?: (e: PipelineMoveEvent) => void;
 		/** Emitted when the card itself is clicked (if no href) */
 		onselect?: (item: PipelineCardItem) => void;
+		/** Highlight this column as a success/completion drop target */
+		isSuccess?: boolean;
 	}
 
 	let {
@@ -20,7 +22,8 @@
 		allStages,
 		columnWidth = 'w-56',
 		onmove,
-		onselect
+		onselect,
+		isSuccess = false,
 	}: Props = $props();
 
 	// ── Dropdown move ─────────────────────────────────────────────────────────
@@ -100,7 +103,7 @@
 <!-- svelte-ignore a11y_no_static_element_interactions -->
 <div
 	class="flex-shrink-0 {columnWidth} rounded-xl transition-all
-	       {dragOverColumn ? 'ring-2 ring-emerald-500/50 bg-emerald-950/20' : ''}"
+	       {dragOverColumn ? 'ring-2 ring-emerald-500/50 bg-emerald-950/20' : isSuccess ? 'ring-1 ring-emerald-700/30 bg-emerald-950/10' : ''}"
 	ondragover={onDragOver}
 	ondragleave={onDragLeave}
 	ondrop={onDrop}
@@ -196,8 +199,17 @@
 		{/each}
 
 		{#if items.length === 0}
-			<div class="rounded-xl border border-dashed {dragOverColumn ? 'border-emerald-500/50' : 'border-slate-700'} p-3 text-center transition-colors">
-				<p class="text-xs text-slate-600">Drop here</p>
+			<div class="rounded-xl border border-dashed
+				{dragOverColumn
+					? 'border-emerald-500/60 bg-emerald-950/30'
+					: isSuccess
+						? 'border-emerald-700/50 bg-emerald-950/20'
+						: 'border-slate-700'}
+				p-4 text-center transition-colors min-h-20 flex flex-col items-center justify-center gap-1">
+				{#if isSuccess}
+					<svg class="size-4 {dragOverColumn ? 'text-emerald-400' : 'text-emerald-700'} transition-colors" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+				{/if}
+				<p class="text-xs {dragOverColumn ? 'text-emerald-400' : isSuccess ? 'text-emerald-700' : 'text-slate-600'} transition-colors">Drop here</p>
 			</div>
 		{/if}
 	</div>

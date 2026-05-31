@@ -137,6 +137,7 @@ export const PATCH: RequestHandler = async ({ locals, url, params, request }) =>
 			work_order_number: woNumber,
 			source:            'sponsor',
 			sponsorId:         po.sponsorId,
+			poId:              po.id,
 			amount:            body.amount ?? po.amount,
 			description:       po.description || `Sponsorship payment — ${sponsor?.companyName ?? ''} (${po.year ?? ''})`,
 			status:            'open',
