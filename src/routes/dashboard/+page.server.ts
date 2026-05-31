@@ -62,13 +62,17 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 			const actual     = dProjects.reduce((s: number, p: any) => s + (p.project_actual_expenses ?? 0), 0);
 			const forecasted = dProjects.reduce((s: number, p: any) => s + (p.project_forecasted_expenses ?? 0), 0);
 			const budgeted   = dProjects.reduce((s: number, p: any) => s + (p.project_budget ?? 0), 0);
+			// Use whichever is larger: the department's own budget field or the sum of
+			// its projects' budgets. Prevents a stale/low department_annual_budget from
+			// producing a nonsensical >100% spent figure.
+			const budget = Math.max(d.department_annual_budget ?? 0, budgeted);
 			return {
 				id: d.id,
 				name: d.name,
 				description: d.description ?? '',
 				status: d.status ?? 'active',
 
-				budget: d.department_annual_budget ?? 0,
+				budget,
 				actual,
 				forecasted,
 				budgeted,
