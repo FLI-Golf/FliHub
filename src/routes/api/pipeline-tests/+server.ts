@@ -114,23 +114,27 @@ async function suiteOnboarding(r: TestRunner, pb: any) {
 		r.assert(talent.length > 0, 'Need at least one talent record');
 		talentId = talent[0].id;
 
-		const payload = { userId: talentId, pipelineStage: 'documents_sent', welcomeSeen: false, documentsInitialed: false, contractSigned: false, profileCompleted: false };
-
-		// Fetch all records and match in JS — avoids filter errors when the
-		// collection schema doesn't have userId indexed as a filterable field
-		const all = await pb.collection('onboarding_status').getFullList()
-			.catch((e: any) => { throw new Error(`onboarding_status not readable: ${e?.message}`); });
-		const existing = (all as any[]).find((r: any) => r.userId === talentId);
-
-		if (existing) {
-			const updated = await pb.collection('onboarding_status').update(existing.id, payload)
-				.catch((e: any) => { throw new Error(`onboarding_status update failed: ${e?.message ?? JSON.stringify(e?.data ?? e)}`); });
-			r.assert(!!updated?.id, 'Update must return a record');
-		} else {
-			const created = await pb.collection('onboarding_status').create(payload)
-				.catch((e: any) => { throw new Error(`onboarding_status create failed: ${e?.message ?? JSON.stringify(e?.data ?? e)}`); });
-			r.assert(!!created?.id, 'Create must return a record');
+		// Probe the schema: create a record and verify the userId field is persisted.
+		// If the collection has no schema fields defined in PocketBase, the payload
+		// is silently dropped and the returned record will have no userId.
+		const probe = await pb.collection('onboarding_status').create({ userId: talentId })
+			.catch((e: any) => { throw new Error(`onboarding_status create failed: ${e?.message ?? JSON.stringify(e?.data ?? e)}`); });
+		if (!probe.userId) {
+			// Clean up the empty record before failing
+			await pb.collection('onboarding_status').delete(probe.id).catch(() => {});
+			throw new Error(
+				'onboarding_status collection has no schema fields in PocketBase — ' +
+				'userId was not persisted. Add the required fields (userId, pipelineStage, ' +
+				'welcomeSeen, documentsInitialed, contractSigned, profileCompleted) to the ' +
+				'collection schema in the PocketBase admin UI.'
+			);
 		}
+
+		// Schema is good — write the full payload
+		await pb.collection('onboarding_status').update(probe.id, {
+			pipelineStage: 'documents_sent', welcomeSeen: false,
+			documentsInitialed: false, contractSigned: false, profileCompleted: false
+		}).catch((e: any) => { throw new Error(`onboarding_status update failed: ${e?.message}`); });
 	});
 
 	await r.test('onboarding_status record readable by admin', async () => {
@@ -138,14 +142,18 @@ async function suiteOnboarding(r: TestRunner, pb: any) {
 		const all = await pb.collection('onboarding_status').getFullList()
 			.catch((e: any) => { throw new Error(`onboarding_status not readable: ${e?.message}`); });
 		const match = (all as any[]).find((r: any) => r.userId === talentId);
-		r.assert(!!match, 'Must find onboarding_status record for this talent');
+		r.assert(!!match, 'Must find onboarding_status record — if this fails, check that the collection schema has a userId field in PocketBase');
 	});
 
 	r.cleanup.push(async () => {
 		if (!talentId) return;
 		const all = await pb.collection('onboarding_status').getFullList().catch(() => []);
-		for (const rec of (all as any[]).filter((r: any) => r.userId === talentId)) {
-			await pb.collection('onboarding_status').delete(rec.id).catch(() => {});
+		// Match by userId field if schema exists, otherwise clean up any records
+		// created during this test run that have no userId (schema-less probe records)
+		for (const rec of all as any[]) {
+			if (rec.userId === talentId || (!rec.userId && rec.id)) {
+				await pb.collection('onboarding_status').delete(rec.id).catch(() => {});
+			}
 		}
 	});
 }
