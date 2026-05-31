@@ -239,8 +239,8 @@
 			</div>
 			<Card class="overflow-hidden">
 				{#each deptBudgets.slice(0, 8) as dept, i}
-					{@const used       = pct(dept.actual ?? 0, dept.budget ?? 1)}
-					{@const forecasted = pct(dept.forecasted ?? 0, dept.budget ?? 1)}
+					{@const used       = pct(dept.actual ?? 0, dept.budget || 0)}
+					{@const forecasted = pct(dept.forecasted ?? 0, dept.budget || 0)}
 					{@const deptIcon   = getDeptIcon(dept.name)}
 					{@const activeCount = dept.projects.filter((p: any) => p.status === 'in_progress').length}
 					<a href="/dashboard/departments/{dept.id}"
