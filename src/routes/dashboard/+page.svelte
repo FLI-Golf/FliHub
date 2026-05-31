@@ -78,14 +78,15 @@
 	</div>
 
 	<!-- Quick Access -->
-	<div class="grid grid-cols-3 sm:grid-cols-6 gap-2">
+	<div class="grid grid-cols-4 sm:grid-cols-7 gap-2">
 		{#each [
-			{ label: 'Departments', href: '/dashboard/departments',  icon: Building2,    color: 'text-blue-400',   bg: 'bg-blue-950/50 border-blue-800/50' },
-			{ label: 'Projects',    href: '/dashboard/projects',     icon: FolderKanban, color: 'text-emerald-400', bg: 'bg-emerald-950/50 border-emerald-800/50' },
-			{ label: 'Expenses',    href: '/dashboard/expenses',     icon: Receipt,      color: 'text-orange-400', bg: 'bg-orange-950/50 border-orange-800/50' },
-			{ label: 'People',      href: '/dashboard/people',       icon: Users,        color: 'text-violet-400', bg: 'bg-violet-950/50 border-violet-800/50' },
-			{ label: 'Sponsors',    href: '/dashboard/sponsors',     icon: Star,         color: 'text-yellow-400', bg: 'bg-yellow-950/50 border-yellow-800/50' },
-			{ label: 'Franchises',  href: '/dashboard/franchises',   icon: Trophy,       color: 'text-rose-400',   bg: 'bg-rose-950/50 border-rose-800/50' },
+			{ label: 'Departments',  href: '/dashboard/departments',         icon: Building2,    color: 'text-blue-400',   bg: 'bg-blue-950/50 border-blue-800/50' },
+			{ label: 'Projects',     href: '/dashboard/projects',          icon: FolderKanban, color: 'text-emerald-400', bg: 'bg-emerald-950/50 border-emerald-800/50' },
+			{ label: 'Expenses',     href: '/dashboard/expenses',          icon: Receipt,      color: 'text-orange-400', bg: 'bg-orange-950/50 border-orange-800/50' },
+			{ label: 'People',       href: '/dashboard/people',            icon: Users,        color: 'text-violet-400', bg: 'bg-violet-950/50 border-violet-800/50' },
+			{ label: 'Sponsors',     href: '/dashboard/sponsors',          icon: Star,         color: 'text-yellow-400', bg: 'bg-yellow-950/50 border-yellow-800/50' },
+			{ label: 'Franchises',   href: '/dashboard/franchises',        icon: Trophy,       color: 'text-rose-400',   bg: 'bg-rose-950/50 border-rose-800/50' },
+			{ label: 'Collections',  href: '/dashboard/active-collections', icon: DollarSign,   color: 'text-teal-400',   bg: 'bg-teal-950/50 border-teal-800/50' },
 		] as link}
 			<a href={link.href}
 				class="group flex flex-col items-center gap-2 rounded-xl border {link.bg} px-2 py-3 text-center hover:brightness-125 transition-all duration-150">
