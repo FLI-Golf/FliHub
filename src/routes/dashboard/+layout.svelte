@@ -30,6 +30,7 @@
 		'/dashboard/vendors': 'Vendors',
 		'/dashboard/approvals': 'Approvals',
 		'/dashboard/work-orders': 'Work Orders',
+		'/dashboard/sponsor-collections': 'Collections',
 		'/dashboard/media': 'Media',
 		'/dashboard/league': 'League Overview',
 		'/dashboard/talent': 'Talent Management',
@@ -157,7 +158,7 @@
 			</div>
 		</header>
 
-		<div class="flex flex-1 flex-col gap-6 p-6">
+		<div class="flex flex-1 flex-col gap-6 p-6 min-w-0 overflow-x-clip">
 			<slot />
 		</div>
 	</Sidebar.Inset>
