@@ -69,7 +69,7 @@
 	};
 
 	const navGroups: NavGroup[] = [
-		// ── Manager portal — only visible to manager role ──
+		// ── My Portal — manager + pro + broadcaster personal section ──
 		{
 			id: 'manager-portal',
 			title: 'My Portal',
@@ -78,12 +78,12 @@
 			hoverClass: 'hover:bg-amber-50 dark:hover:bg-amber-950/40 hover:text-amber-900 dark:hover:text-amber-100',
 			borderClass: 'border-amber-500',
 			iconActiveClass: 'text-amber-600 dark:text-amber-400',
-			roles: ['manager'],
+			roles: ['manager', 'pro', 'broadcaster'],
 			items: [
-				{ title: 'My Payments', url: '/dashboard/my-payments', icon: Wallet, roles: ['manager'] },
+				{ title: 'My Payments', url: '/dashboard/my-payments', icon: Wallet, roles: ['manager', 'pro', 'broadcaster'] },
 			]
 		},
-		// ── Onboarding group — only visible to pro, manager, broadcaster ──
+		// ── My Onboarding — pro, manager, broadcaster ──
 		{
 			id: 'onboarding',
 			title: 'My Onboarding',
@@ -94,10 +94,10 @@
 			iconActiveClass: 'text-emerald-600 dark:text-emerald-400',
 			roles: ['pro', 'manager', 'broadcaster'],
 			items: [
-				{ title: 'Welcome', url: '/dashboard/welcome', icon: PartyPopper, roles: ['pro', 'manager', 'broadcaster'] },
-				{ title: 'Documents & Signing', url: '/dashboard/onboarding', icon: FileText, roles: ['pro', 'manager', 'broadcaster'] },
-				{ title: 'Player Profile', url: '/dashboard/player-profile', icon: ClipboardList, roles: ['pro', 'manager', 'broadcaster'] },
-				{ title: 'Onboarding Pipeline', url: '/dashboard/onboarding/admin', icon: FolderKanban, roles: ['admin', 'leader'] }
+				{ title: 'Welcome',             url: '/dashboard/welcome',            icon: PartyPopper,  roles: ['pro', 'manager', 'broadcaster'] },
+				{ title: 'Documents & Signing', url: '/dashboard/onboarding',         icon: FileText,     roles: ['pro', 'manager', 'broadcaster'] },
+				{ title: 'Player Profile',      url: '/dashboard/player-profile',     icon: ClipboardList, roles: ['pro', 'manager', 'broadcaster'] },
+				{ title: 'Onboarding Pipeline', url: '/dashboard/onboarding/admin',   icon: FolderKanban, roles: ['admin', 'leader'] }
 			]
 		},
 		{
@@ -302,7 +302,7 @@
 	const visibleGroups = $derived(navGroups.filter(canSeeGroup));
 </script>
 
-<Sidebar.Root {...restProps} bind:ref>
+<Sidebar.Root {...restProps} bind:ref class="bg-sidebar">
 	<!-- Brand header -->
 	<Sidebar.Header class="shrink-0">
 		<div class="flex items-center justify-between px-4 py-4 border-b border-sidebar-border">
@@ -330,7 +330,7 @@
 	</Sidebar.Header>
 
 	<!-- flex-1 + min-h-0 + overflow-y-auto ensures the nav scrolls independently -->
-	<Sidebar.Content class="px-2 py-2 gap-0 flex-1 min-h-0 overflow-y-auto overscroll-contain">
+	<Sidebar.Content class="px-2 py-2 gap-0 flex-1 min-h-0 overflow-y-auto overscroll-contain bg-sidebar">
 		{#each visibleGroups as group (group.id)}
 			{@const visibleItems = group.items.filter(canSeeItem)}
 			{#if visibleItems.length > 0}
