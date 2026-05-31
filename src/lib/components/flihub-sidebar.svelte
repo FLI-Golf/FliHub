@@ -128,6 +128,8 @@
 				{ title: 'Franchise Forecast', url: '/dashboard/franchise-sales', icon: BarChart3, roles: ['sales', 'admin'] },
 				{ title: 'Franchises', url: '/dashboard/franchises', icon: Trophy },
 				{ title: 'Sponsors', url: '/dashboard/sponsors', icon: Star, roles: ['sales', 'admin'] },
+				{ title: 'Collections', url: '/dashboard/sponsor-collections', icon: DollarSign, roles: ['sales', 'admin'] },
+				{ title: 'Active Collections', url: '/dashboard/active-collections', icon: DollarSign, roles: ['admin'] },
 				{ title: 'Territories', url: '/dashboard/territories', icon: MapPin, roles: ['sales', 'admin'] }
 			]
 		},
@@ -146,7 +148,8 @@
 				{ title: 'Tasks', url: '/dashboard/tasks', icon: ListTodo },
 				{ title: 'Expenses', url: '/dashboard/expenses', icon: Receipt },
 				{ title: 'Vendors', url: '/dashboard/vendors', icon: Store },
-				{ title: 'Bid Pipeline', url: '/dashboard/bids', icon: Send, roles: ['admin', 'leader'] },
+				{ title: 'Bid Pipeline',      url: '/dashboard/bids',            icon: Send,     roles: ['admin', 'leader'] },
+				{ title: 'Purchase Orders',   url: '/dashboard/purchase-orders', icon: FileText, roles: ['admin', 'leader'] },
 				{ title: 'Approvals', url: '/dashboard/approvals', icon: CheckSquare },
 				{ title: 'Work Orders', url: '/dashboard/work-orders', icon: ClipboardList },
 				{ title: 'Reimbursements', url: '/dashboard/reimbursements', icon: Wallet },
