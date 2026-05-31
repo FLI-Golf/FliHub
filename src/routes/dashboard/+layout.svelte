@@ -158,7 +158,7 @@
 			</div>
 		</header>
 
-		<div class="flex flex-1 flex-col gap-6 p-6 min-w-0 overflow-x-clip">
+		<div class="flex flex-1 flex-col gap-6 p-6 min-w-0">
 			<slot />
 		</div>
 	</Sidebar.Inset>

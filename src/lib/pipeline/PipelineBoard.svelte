@@ -64,7 +64,7 @@
 </script>
 
 <!-- Active pipeline board -->
-<div class="flex gap-3 overflow-x-auto pb-3 bg-background">
+<div class="flex gap-3 overflow-x-auto pb-3 bg-background w-full min-w-0">
 	{#each config.stages as stage (stage.key)}
 		<PipelineStageColumn
 			{stage}
@@ -81,7 +81,7 @@
 {#if showTerminal && config.terminalStages && config.terminalStages.length > 0}
 	<div class="mt-6">
 		<h3 class="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-3">Closed</h3>
-		<div class="flex gap-3 overflow-x-auto pb-2 bg-background">
+		<div class="flex gap-3 overflow-x-auto pb-2 bg-background w-full min-w-0">
 			{#each config.terminalStages as stage (stage.key)}
 				<PipelineStageColumn
 					{stage}
