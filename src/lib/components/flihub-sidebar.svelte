@@ -45,7 +45,8 @@
 		Zap,
 		Monitor,
 		ArrowDownLeft,
-		Send
+		Send,
+		Plus
 	} from 'lucide-svelte';
 
 	type NavItem = {
@@ -193,6 +194,7 @@
 				{ title: 'Marketing Goals',  url: '/dashboard/marketing-goals',        icon: Target,      roles: ['admin', 'leader', 'marketing', 'marketing_lead'] },
 				{ title: 'Geo Marketing',    url: '/dashboard/geo-marketing',          icon: MapPin,      roles: ['admin', 'leader', 'marketing', 'marketing_lead'] },
 				{ title: 'Campaigns',        url: '/dashboard/campaigns',              icon: Megaphone,   roles: ['admin', 'leader', 'marketing', 'marketing_lead'] },
+				{ title: 'New Campaign',     url: '/dashboard/marketing/campaigns/new', icon: Plus,        roles: ['admin', 'leader', 'marketing', 'marketing_lead'] },
 				{ title: 'Talent & Ambassadors', url: '/dashboard/marketing/talent',   icon: UserCircle,  roles: ['admin', 'leader', 'marketing', 'marketing_lead'] },
 				{ title: 'Manager Dashboard', url: '/dashboard/managers',              icon: Users,       roles: ['admin'] }
 			]
