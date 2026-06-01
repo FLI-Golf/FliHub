@@ -108,10 +108,11 @@
 			hoverClass: 'hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-slate-100',
 			borderClass: 'border-slate-500',
 			iconActiveClass: 'text-slate-700 dark:text-slate-200',
+			roles: ['admin', 'leader', 'sales', 'marketing', 'marketing_lead'],
 			items: [
-				{ title: 'Dashboard', url: '/dashboard', icon: LayoutDashboard },
-				{ title: 'Active Projects', url: '/dashboard/active-projects', icon: Zap },
-				{ title: 'Active Income', url: '/dashboard/active-income', icon: TrendingUp }
+				{ title: 'Dashboard',       url: '/dashboard',                icon: LayoutDashboard, roles: ['admin', 'leader', 'sales', 'marketing', 'marketing_lead'] },
+				{ title: 'Active Projects', url: '/dashboard/active-projects', icon: Zap,            roles: ['admin', 'leader'] },
+				{ title: 'Active Income',   url: '/dashboard/active-income',   icon: TrendingUp,     roles: ['admin', 'leader'] }
 			]
 		},
 		{
@@ -141,21 +142,22 @@
 			hoverClass: 'hover:bg-blue-50 dark:hover:bg-blue-950/40 hover:text-blue-900 dark:hover:text-blue-100',
 			borderClass: 'border-blue-500',
 			iconActiveClass: 'text-blue-600 dark:text-blue-400',
+			roles: ['admin', 'leader'],
 			items: [
-				{ title: 'Departments', url: '/dashboard/departments', icon: Building2 },
-				{ title: 'People', url: '/dashboard/people', icon: Users },
-				{ title: 'Projects', url: '/dashboard/projects', icon: FolderKanban },
-				{ title: 'Tasks', url: '/dashboard/tasks', icon: ListTodo },
-				{ title: 'Expenses', url: '/dashboard/expenses', icon: Receipt },
-				{ title: 'Vendors', url: '/dashboard/vendors', icon: Store },
-				{ title: 'Bid Pipeline',      url: '/dashboard/bids',            icon: Send,     roles: ['admin', 'leader'] },
-				{ title: 'Purchase Orders',   url: '/dashboard/purchase-orders', icon: FileText, roles: ['admin', 'leader'] },
-				{ title: 'Approvals', url: '/dashboard/approvals', icon: CheckSquare },
-				{ title: 'Work Orders', url: '/dashboard/work-orders', icon: ClipboardList },
-				{ title: 'Reimbursements', url: '/dashboard/reimbursements', icon: Wallet },
-				{ title: 'Reimbursements Admin', url: '/dashboard/reimbursements/admin', icon: ShieldCheck, roles: ['admin', 'leader'] },
-				{ title: 'Media', url: '/dashboard/media', icon: Images },
-				{ title: 'Content Pipeline', url: '/dashboard/content', icon: FolderKanban }
+				{ title: 'Departments',          url: '/dashboard/departments',          icon: Building2,    roles: ['admin', 'leader'] },
+				{ title: 'People',               url: '/dashboard/people',               icon: Users,        roles: ['admin', 'leader'] },
+				{ title: 'Projects',             url: '/dashboard/projects',             icon: FolderKanban, roles: ['admin', 'leader'] },
+				{ title: 'Tasks',                url: '/dashboard/tasks',                icon: ListTodo,     roles: ['admin', 'leader'] },
+				{ title: 'Expenses',             url: '/dashboard/expenses',             icon: Receipt,      roles: ['admin', 'leader'] },
+				{ title: 'Vendors',              url: '/dashboard/vendors',              icon: Store,        roles: ['admin', 'leader'] },
+				{ title: 'Bid Pipeline',         url: '/dashboard/bids',                 icon: Send,         roles: ['admin', 'leader'] },
+				{ title: 'Purchase Orders',      url: '/dashboard/purchase-orders',      icon: FileText,     roles: ['admin', 'leader'] },
+				{ title: 'Approvals',            url: '/dashboard/approvals',            icon: CheckSquare,  roles: ['admin', 'leader'] },
+				{ title: 'Work Orders',          url: '/dashboard/work-orders',          icon: ClipboardList, roles: ['admin', 'leader'] },
+				{ title: 'Reimbursements',       url: '/dashboard/reimbursements',       icon: Wallet,       roles: ['admin', 'leader'] },
+				{ title: 'Reimbursements Admin', url: '/dashboard/reimbursements/admin', icon: ShieldCheck,  roles: ['admin', 'leader'] },
+				{ title: 'Media',                url: '/dashboard/media',                icon: Images,       roles: ['admin', 'leader'] },
+				{ title: 'Content Pipeline',     url: '/dashboard/content',              icon: FolderKanban, roles: ['admin', 'leader'] }
 			]
 		},
 		{
@@ -166,15 +168,16 @@
 			hoverClass: 'hover:bg-violet-50 dark:hover:bg-violet-950/40 hover:text-violet-900 dark:hover:text-violet-100',
 			borderClass: 'border-violet-500',
 			iconActiveClass: 'text-violet-600 dark:text-violet-400',
+			roles: ['admin', 'leader'],
 			items: [
-				{ title: 'League Overview', url: '/dashboard/league', icon: Award },
-				{ title: 'Talent Management', url: '/dashboard/talent', icon: UserCircle },
-				{ title: 'Tournaments', url: '/dashboard/talent/tournaments', icon: Trophy },
-				{ title: 'Events', url: '/dashboard/events', icon: PartyPopper },
-				{ title: 'Special Events', url: '/dashboard/talent/special-events', icon: Medal },
-				{ title: 'Franchise Payouts', url: '/dashboard/talent/franchise-payouts', icon: DollarSign },
-				{ title: 'Pro Payments',   url: '/dashboard/talent/payments',       icon: Flag },
-				{ title: 'Payout Testing', url: '/dashboard/talent/payout-testing', icon: Zap },
+				{ title: 'League Overview',   url: '/dashboard/league',                    icon: Award,       roles: ['admin', 'leader'] },
+				{ title: 'Talent Management', url: '/dashboard/talent',                    icon: UserCircle,  roles: ['admin', 'leader'] },
+				{ title: 'Tournaments',       url: '/dashboard/talent/tournaments',        icon: Trophy,      roles: ['admin', 'leader'] },
+				{ title: 'Events',            url: '/dashboard/events',                    icon: PartyPopper, roles: ['admin', 'leader'] },
+				{ title: 'Special Events',    url: '/dashboard/talent/special-events',     icon: Medal,       roles: ['admin', 'leader'] },
+				{ title: 'Franchise Payouts', url: '/dashboard/talent/franchise-payouts',  icon: DollarSign,  roles: ['admin', 'leader'] },
+				{ title: 'Pro Payments',      url: '/dashboard/talent/payments',           icon: Flag,        roles: ['admin', 'leader'] },
+				{ title: 'Payout Testing',    url: '/dashboard/talent/payout-testing',     icon: Zap,         roles: ['admin', 'leader'] },
 			]
 		},
 		{
