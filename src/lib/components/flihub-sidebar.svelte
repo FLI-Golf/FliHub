@@ -190,10 +190,11 @@
 			borderClass: 'border-orange-500',
 			iconActiveClass: 'text-orange-600 dark:text-orange-400',
 			items: [
-				{ title: 'Marketing Goals', url: '/dashboard/marketing-goals', icon: Target,   roles: ['admin', 'leader', 'marketing', 'marketing_lead'] },
-				{ title: 'Geo Marketing',   url: '/dashboard/geo-marketing',   icon: MapPin,   roles: ['admin', 'leader', 'marketing', 'marketing_lead'] },
-				{ title: 'Campaigns',       url: '/dashboard/campaigns',       icon: Megaphone, roles: ['admin', 'leader', 'marketing', 'marketing_lead'] },
-				{ title: 'Manager Dashboard', url: '/dashboard/managers',      icon: Users,    roles: ['admin'] }
+				{ title: 'Marketing Goals',  url: '/dashboard/marketing-goals',        icon: Target,      roles: ['admin', 'leader', 'marketing', 'marketing_lead'] },
+				{ title: 'Geo Marketing',    url: '/dashboard/geo-marketing',          icon: MapPin,      roles: ['admin', 'leader', 'marketing', 'marketing_lead'] },
+				{ title: 'Campaigns',        url: '/dashboard/campaigns',              icon: Megaphone,   roles: ['admin', 'leader', 'marketing', 'marketing_lead'] },
+				{ title: 'Talent & Ambassadors', url: '/dashboard/marketing/talent',   icon: UserCircle,  roles: ['admin', 'leader', 'marketing', 'marketing_lead'] },
+				{ title: 'Manager Dashboard', url: '/dashboard/managers',              icon: Users,       roles: ['admin'] }
 			]
 		},
 		{
