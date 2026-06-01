@@ -127,8 +127,8 @@
 				{ title: 'Franchise Sales', url: '/dashboard/sales', icon: TrendingUp, roles: ['sales', 'admin'] },
 				{ title: 'Franchise Forecast', url: '/dashboard/franchise-sales', icon: BarChart3, roles: ['sales', 'admin'] },
 				{ title: 'Franchises', url: '/dashboard/franchises', icon: Trophy },
-				{ title: 'Sponsors', url: '/dashboard/sponsors', icon: Star, roles: ['sales', 'admin'] },
-				{ title: 'Collections', url: '/dashboard/sponsor-collections', icon: DollarSign, roles: ['sales', 'admin'] },
+				{ title: 'Sponsors', url: '/dashboard/sponsors', icon: Star, roles: ['sales', 'admin', 'marketing_lead'] },
+				{ title: 'Collections', url: '/dashboard/sponsor-collections', icon: DollarSign, roles: ['sales', 'admin', 'marketing_lead'] },
 				{ title: 'Active Collections', url: '/dashboard/active-collections', icon: DollarSign, roles: ['admin'] },
 				{ title: 'Territories', url: '/dashboard/territories', icon: MapPin, roles: ['sales', 'admin'] }
 			]
@@ -180,16 +180,17 @@
 		{
 			id: 'marketing',
 			title: 'Marketing',
+			roles: ['admin', 'leader', 'marketing', 'marketing_lead'],
 			labelClass: 'text-orange-600 dark:text-orange-400',
 			activeClass: 'bg-orange-50 dark:bg-orange-950/60 text-orange-900 dark:text-orange-100',
 			hoverClass: 'hover:bg-orange-50 dark:hover:bg-orange-950/40 hover:text-orange-900 dark:hover:text-orange-100',
 			borderClass: 'border-orange-500',
 			iconActiveClass: 'text-orange-600 dark:text-orange-400',
 			items: [
-				{ title: 'Marketing Goals', url: '/dashboard/marketing-goals', icon: Target },
-				{ title: 'Geo Marketing', url: '/dashboard/geo-marketing', icon: MapPin },
-				{ title: 'Campaigns', url: '/dashboard/campaigns', icon: Megaphone },
-				{ title: 'Manager Dashboard', url: '/dashboard/managers', icon: Users, roles: ['admin'] }
+				{ title: 'Marketing Goals', url: '/dashboard/marketing-goals', icon: Target,   roles: ['admin', 'leader', 'marketing', 'marketing_lead'] },
+				{ title: 'Geo Marketing',   url: '/dashboard/geo-marketing',   icon: MapPin,   roles: ['admin', 'leader', 'marketing', 'marketing_lead'] },
+				{ title: 'Campaigns',       url: '/dashboard/campaigns',       icon: Megaphone, roles: ['admin', 'leader', 'marketing', 'marketing_lead'] },
+				{ title: 'Manager Dashboard', url: '/dashboard/managers',      icon: Users,    roles: ['admin'] }
 			]
 		},
 		{

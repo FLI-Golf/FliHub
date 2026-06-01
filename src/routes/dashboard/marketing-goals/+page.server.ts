@@ -26,7 +26,9 @@ export const actions: Actions = {
 };
 
 export const load: PageServerLoad = async ({ locals, url }) => {
-	const { pb } = await RequestContext.from(locals, url);
+	const ctx = await RequestContext.from(locals, url);
+	ctx.requireRole('admin', 'leader', 'marketing', 'marketing_lead');
+	const { pb } = ctx;
 
 	const marketingGoals = await pb.collection('marketing_goals')
 		.getFullList({ sort: 'goalName' })

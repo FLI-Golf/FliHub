@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-export const UserRoleEnum = z.enum(['leader', 'admin', 'sales', 'vendor', 'pro', 'franchise_owner', 'league_owner', 'broadcaster', 'manager']);
+export const UserRoleEnum = z.enum(['leader', 'admin', 'sales', 'vendor', 'pro', 'franchise_owner', 'league_owner', 'broadcaster', 'manager', 'marketing', 'marketing_lead']);
 export const UserStatusEnum = z.enum(['active', 'inactive', 'pending']);
 
 export const UserProfileSchema = z.object({
@@ -24,25 +24,29 @@ export type UserRole = z.infer<typeof UserRoleEnum>;
 export type UserStatus = z.infer<typeof UserStatusEnum>;
 
 export const ROLE_DESCRIPTIONS: Record<UserRole, string> = {
-	leader: 'Full access to all features and settings',
-	admin: 'Manage users, projects, and business operations',
-	sales: 'Manage franchise sales leads and opportunities',
-	vendor: 'Access to vendor-specific features and contracts',
-	pro: 'Professional player access to tournaments and events',
+	leader:          'Full access to all features and settings',
+	admin:           'Manage users, projects, and business operations',
+	sales:           'Manage franchise sales leads and opportunities',
+	vendor:          'Access to vendor-specific features and contracts',
+	pro:             'Professional player access to tournaments and events',
 	franchise_owner: 'Manage franchise locations and operations',
-	league_owner: 'Manage league operations and tournaments',
-	broadcaster: 'Access to broadcast and media features',
-	manager: 'Manage pros and access their information'
+	league_owner:    'Manage league operations and tournaments',
+	broadcaster:     'Access to broadcast and media features',
+	manager:         'Manage pros and access their information',
+	marketing:       'Manage campaigns, geo marketing, and marketing goals',
+	marketing_lead:  'Full marketing access plus sponsor and budget visibility',
 };
 
 export const ROLE_LABELS: Record<UserRole, string> = {
-	leader: 'Leader',
-	admin: 'Administrator',
-	sales: 'Sales Representative',
-	vendor: 'Vendor',
-	pro: 'Professional',
+	leader:          'Leader',
+	admin:           'Administrator',
+	sales:           'Sales Representative',
+	vendor:          'Vendor',
+	pro:             'Professional',
 	franchise_owner: 'Franchise Owner',
-	league_owner: 'League Owner',
-	broadcaster: 'Broadcaster',
-	manager: 'Manager'
+	league_owner:    'League Owner',
+	broadcaster:     'Broadcaster',
+	manager:         'Manager',
+	marketing:       'Marketing Specialist',
+	marketing_lead:  'Marketing Lead',
 };
