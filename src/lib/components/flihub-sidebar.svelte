@@ -110,9 +110,9 @@
 			iconActiveClass: 'text-slate-700 dark:text-slate-200',
 			roles: ['admin', 'leader', 'sales', 'marketing', 'marketing_lead'],
 			items: [
-				{ title: 'Dashboard',       url: '/dashboard',                icon: LayoutDashboard, roles: ['admin', 'leader', 'sales', 'marketing', 'marketing_lead'] },
-				{ title: 'Active Projects', url: '/dashboard/active-projects', icon: Zap,            roles: ['admin', 'leader'] },
-				{ title: 'Active Income',   url: '/dashboard/active-income',   icon: TrendingUp,     roles: ['admin', 'leader'] }
+				{ title: 'Dashboard',       url: '/dashboard',                 icon: LayoutDashboard, roles: ['admin', 'leader', 'sales', 'marketing', 'marketing_lead'] },
+				{ title: 'Active Projects', url: '/dashboard/active-projects', icon: Zap,             roles: ['admin', 'leader', 'marketing', 'marketing_lead'] },
+				{ title: 'Active Income',   url: '/dashboard/active-income',   icon: TrendingUp,      roles: ['admin', 'leader'] }
 			]
 		},
 		{
@@ -218,28 +218,28 @@
 			hoverClass: 'hover:bg-amber-50 dark:hover:bg-amber-950/40 hover:text-amber-900 dark:hover:text-amber-100',
 			borderClass: 'border-amber-500',
 			iconActiveClass: 'text-amber-600 dark:text-amber-400',
-			roles: ['admin'],
+			roles: ['admin', 'marketing', 'marketing_lead'],
 			items: [
-				{ title: 'Payments & Income', url: '/dashboard/payments', icon: Wallet, roles: ['admin'] },
-				{ title: 'Income Pipeline', url: '/dashboard/income', icon: ArrowDownLeft, roles: ['admin'] },
-				{ title: 'Financial Projections', url: '/dashboard/financial-projections', icon: BarChart3, roles: ['admin'] },
-				{ title: 'Funding Model', url: '/dashboard/funding-model', icon: Landmark, roles: ['admin'] },
-				{ title: 'Use of Proceeds', url: '/dashboard/use-of-proceeds', icon: DollarSign, roles: ['admin'] },
-				{ title: 'Travel Budget', url: '/dashboard/travel-budget', icon: Plane, roles: ['admin'] },
-				{ title: 'Prize Purse', url: '/dashboard/prize-purse', icon: Trophy, roles: ['admin'] },
-				{ title: 'Entertainment', url: '/dashboard/entertainment', icon: Music, roles: ['admin'] },
-				{ title: 'Player Travel', url: '/dashboard/player-travel', icon: Luggage, roles: ['admin'] },
-				{ title: 'Stage Production', url: '/dashboard/stage-production', icon: Mic2, roles: ['admin'] },
-				{ title: 'On-Course Branding', url: '/dashboard/on-course-branding', icon: Flag, roles: ['admin'] },
-				{ title: 'Advertising', url: '/dashboard/advertising', icon: Megaphone, roles: ['admin'] },
-				{ title: 'Stadium Course #1', url: '/dashboard/stadium-course', icon: Hammer, roles: ['admin'] },
-				{ title: 'Scoreboards', url: '/dashboard/stadium-course/scoreboards', icon: Monitor, roles: ['admin'] },
-				{ title: 'Sponsorship Revenue', url: '/dashboard/sponsorship-revenue', icon: Star, roles: ['admin'] },
-				{ title: 'Bag Licensing', url: '/dashboard/bag-licensing', icon: ShoppingBag, roles: ['admin'] },
-				{ title: 'Disc Licensing', url: '/dashboard/disc-licensing', icon: Disc3, roles: ['admin'] },
-				{ title: 'Fantasy & Gaming', url: '/dashboard/fantasy-gaming', icon: Gamepad2, roles: ['admin'] },
-				{ title: 'Streaming & Media', url: '/dashboard/streaming-media', icon: Tv, roles: ['admin'] },
-				{ title: 'League Licensing', url: '/dashboard/league-licensing', icon: FileText, roles: ['admin'] }
+				{ title: 'Payments & Income',      url: '/dashboard/payments',                icon: Wallet,       roles: ['admin'] },
+				{ title: 'Income Pipeline',        url: '/dashboard/income',                  icon: ArrowDownLeft, roles: ['admin'] },
+				{ title: 'Financial Projections',  url: '/dashboard/financial-projections',   icon: BarChart3,    roles: ['admin', 'marketing', 'marketing_lead'] },
+				{ title: 'Funding Model',          url: '/dashboard/funding-model',           icon: Landmark,     roles: ['admin'] },
+				{ title: 'Use of Proceeds',        url: '/dashboard/use-of-proceeds',         icon: DollarSign,   roles: ['admin', 'marketing', 'marketing_lead'] },
+				{ title: 'Travel Budget',          url: '/dashboard/travel-budget',           icon: Plane,        roles: ['admin'] },
+				{ title: 'Prize Purse',            url: '/dashboard/prize-purse',             icon: Trophy,       roles: ['admin'] },
+				{ title: 'Entertainment',          url: '/dashboard/entertainment',           icon: Music,        roles: ['admin'] },
+				{ title: 'Player Travel',          url: '/dashboard/player-travel',           icon: Luggage,      roles: ['admin'] },
+				{ title: 'Stage Production',       url: '/dashboard/stage-production',        icon: Mic2,         roles: ['admin'] },
+				{ title: 'On-Course Branding',     url: '/dashboard/on-course-branding',      icon: Flag,         roles: ['admin'] },
+				{ title: 'Advertising',            url: '/dashboard/advertising',             icon: Megaphone,    roles: ['admin', 'marketing', 'marketing_lead'] },
+				{ title: 'Stadium Course #1',      url: '/dashboard/stadium-course',          icon: Hammer,       roles: ['admin'] },
+				{ title: 'Scoreboards',            url: '/dashboard/stadium-course/scoreboards', icon: Monitor,   roles: ['admin'] },
+				{ title: 'Sponsorship Revenue',    url: '/dashboard/sponsorship-revenue',     icon: Star,         roles: ['admin', 'marketing', 'marketing_lead'] },
+				{ title: 'Bag Licensing',          url: '/dashboard/bag-licensing',           icon: ShoppingBag,  roles: ['admin'] },
+				{ title: 'Disc Licensing',         url: '/dashboard/disc-licensing',          icon: Disc3,        roles: ['admin'] },
+				{ title: 'Fantasy & Gaming',       url: '/dashboard/fantasy-gaming',          icon: Gamepad2,     roles: ['admin'] },
+				{ title: 'Streaming & Media',      url: '/dashboard/streaming-media',         icon: Tv,           roles: ['admin'] },
+				{ title: 'League Licensing',       url: '/dashboard/league-licensing',        icon: FileText,     roles: ['admin'] }
 			]
 		},
 		{

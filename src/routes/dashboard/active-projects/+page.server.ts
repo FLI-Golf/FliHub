@@ -1,12 +1,17 @@
 import { RequestContext } from '$lib/infra/RequestContext';
+import { adminFetch } from '$lib/infra/pocketbase/pbClient';
 import type { PageServerLoad } from './$types';
+
+const MARKETING_ROLES = new Set(['marketing', 'marketing_lead']);
+const MARKETING_DEPT_NAMES = new Set(['Marketing', 'Marketing, Working Capital & Reserve']);
 
 export const load: PageServerLoad = async ({ locals, url }) => {
 	const ctx = await RequestContext.from(locals, url);
+	ctx.requireRole('admin', 'leader', 'marketing', 'marketing_lead');
 	const { pb, profile: userProfile } = ctx;
 
 	try {
-		const [projects, departments, tasks, expenses, sponsors, franchiseLeads, settings, pendingApprovals, reimbClaims] = await Promise.all([
+		const [projects, departments, tasks, expenses, sponsors, franchiseLeads, settings, pendingApprovals, reimbClaims, submittedBids, bidWorkOrders] = await Promise.all([
 			pb.collection('projects').getFullList({ filter: "status='in_progress'", sort: 'name' }).catch(() => []),
 			pb.collection('departments').getFullList({ fields: 'id,name,description,department_annual_budget,department_actual_expenses' }).catch(() => []),
 			pb.collection('tasks').getFullList({ sort: '-id', expand: 'projectId' }).catch(() => []),
@@ -16,7 +21,44 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 			pb.collection('settings').getFullList({ fields: 'id,key,value,label' }).catch(() => []),
 			pb.collection('approvals').getFullList({ filter: "status='pending' && entityType='expense'", fields: 'id,entityId,amount' }).catch(() => []),
 			pb.collection('reimbursement_claims').getFullList({ fields: 'id,totalAmount,status,department,claimant,title,is_historical,referenceNumber', expand: 'claimant' }).catch(() => []),
+			adminFetch('bids', { fields: 'id,projectId,status,amount,created', sort: '-created' }).catch(() => []),
+			// Bid-sourced work orders — these carry projectId directly and must be
+			// rolled into the expense pipeline since bid expenses have no projectId field.
+			adminFetch('work_orders', { filter: "source='bid'", fields: 'id,projectId,amount,status,qb_transaction_id', sort: '-created' }).catch(() => []),
 		]);
+
+		// Build per-project bid pipeline: count + amount by status
+		// Statuses: submitted → under_review → shortlisted → awarded → closed
+		const bidsByProject: Record<string, {
+			submitted: number; submittedAmt: number;
+			under_review: number; under_reviewAmt: number;
+			shortlisted: number; shortlistedAmt: number;
+			awarded: number; awardedAmt: number;
+			closed: number; closedAmt: number;
+			total: number; totalAmt: number;
+		}> = {};
+
+		for (const b of submittedBids as any[]) {
+			const pid = typeof b.projectId === 'object' ? b.projectId?.id : b.projectId;
+			if (!pid) continue;
+			bidsByProject[pid] ??= {
+				submitted: 0, submittedAmt: 0,
+				under_review: 0, under_reviewAmt: 0,
+				shortlisted: 0, shortlistedAmt: 0,
+				awarded: 0, awardedAmt: 0,
+				closed: 0, closedAmt: 0,
+				total: 0, totalAmt: 0,
+			};
+			const s   = b.status as string;
+			const amt = b.amount ?? 0;
+			const key = s as keyof typeof bidsByProject[string];
+			if (`${s}Amt` in bidsByProject[pid]) {
+				(bidsByProject[pid] as any)[s]         += 1;
+				(bidsByProject[pid] as any)[`${s}Amt`] += amt;
+			}
+			bidsByProject[pid].total    += 1;
+			bidsByProject[pid].totalAmt += amt;
+		}
 
 		const deptMap = Object.fromEntries((departments as any[]).map(d => [d.id, d]));
 
@@ -97,6 +139,19 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 				expensesByProject[pid] ??= [];
 				expensesByProject[pid].push(e);
 			}
+		}
+
+		// Merge bid work orders into the expense pipeline per project.
+		// WO status → expense status mapping:
+		//   open/approved → 'approved', paid → 'paid', anything else → 'submitted'
+		for (const wo of bidWorkOrders as any[]) {
+			const pid = wo.projectId;
+			if (!pid || !wo.amount) continue;
+			const woStatus = wo.status === 'paid' ? 'paid'
+				: (wo.status === 'open' || wo.status === 'approved') ? 'approved'
+				: 'submitted';
+			expensesByProject[pid] ??= [];
+			expensesByProject[pid].push({ id: wo.id, amount: wo.amount, status: woStatus, _fromBidWO: true });
 		}
 
 		const enriched = (projects as any[]).map(p => {
@@ -184,6 +239,8 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 				draftExpenses:     pexpenses.filter((e: any) => e.status === 'draft').length,
 				isReimbProject:    isReimbDept,
 				reimbPipeline:     isReimbDept ? reimbRollup : null,
+				bidPipeline:       bidsByProject[p.id] ?? null,
+				submittedBids:     bidsByProject[p.id]?.submitted ?? 0,
 			};
 		});
 
@@ -208,9 +265,15 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 		const raiseSetting = (settings as any[]).find(s => s.key === 'raise_target');
 		const raiseTarget  = raiseSetting ? { id: raiseSetting.id, value: Number(raiseSetting.value) } : { id: null, value: 7_500_000 };
 
+		// Marketing roles only see projects in their departments
+		const isMarketingRole = MARKETING_ROLES.has(ctx.role);
+		const visibleProjects = isMarketingRole
+			? enriched.filter((p: any) => MARKETING_DEPT_NAMES.has(p.department?.name))
+			: enriched;
+
 		return {
 			userProfile,
-			projects: enriched,
+			projects: visibleProjects,
 			sponsorSummary,
 			franchiseSummary,
 			raiseTarget,
