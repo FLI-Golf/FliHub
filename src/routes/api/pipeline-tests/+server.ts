@@ -261,7 +261,7 @@ async function suiteTournament(r: TestRunner, pb: any) {
 	});
 
 	await r.test('find tournament and write checklist record', async () => {
-		const tournaments = await pb.collection('tournaments').getFullList({ fields: 'id', perPage: 1, sort: '-created' }).catch(() => []);
+		const tournaments = await pb.collection('tournaments').getFullList({ fields: 'id' }).catch(() => []);
 		r.assert(tournaments.length > 0, 'Need at least one tournament');
 		tournamentId = tournaments[0].id;
 

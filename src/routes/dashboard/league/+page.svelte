@@ -124,7 +124,7 @@
 
 	{#each data.leagues as league}
 		<a href="/dashboard/league/{league.slug}" class="block mb-6">
-			<div class="p-6 bg-gray-800 rounded-lg border border-gray-700 hover:border-gray-600">
+			<div class="p-6 bg-slate-900 rounded-xl border border-slate-700 hover:border-slate-600 transition-colors">
 				<div class="flex items-start justify-between mb-6">
 					<div class="flex-1">
 						<h3 class="text-2xl font-semibold text-white">{league.name}</h3>
@@ -185,12 +185,12 @@
 										<button
 											type="button"
 											onclick={(e) => openLightbox(e, logo.url, league.name + ' ' + section.label)}
-											class="bg-white rounded-lg p-3 flex flex-col items-center cursor-zoom-in hover:ring-2 {section.ring} transition-all w-full"
+											class="bg-slate-800 rounded-lg p-3 flex flex-col items-center cursor-zoom-in hover:ring-2 {section.ring} transition-all w-full border border-slate-700"
 										>
 											<div class="h-24 w-full flex items-center justify-center mb-2">
 												<img src={logo.url} alt="{league.name} logo" class="max-h-full max-w-full object-contain" />
 											</div>
-											<span class="text-xs text-gray-500 font-medium">{logo.ext}</span>
+											<span class="text-xs text-slate-400 font-medium">{logo.ext}</span>
 										</button>
 									{/each}
 								</div>
@@ -204,7 +204,7 @@
 				</div>
 
 				<!-- League Info -->
-				<div class="mt-6 pt-6 border-t border-gray-700 grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+				<div class="mt-6 pt-6 border-t border-slate-700 grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
 					{#if league.foundedYear}
 						<div>
 							<span class="text-gray-400 block">Founded</span>
@@ -238,8 +238,8 @@
 	{/each}
 
 	{#if data.leagues.length === 0}
-		<div class="py-12 text-center bg-gray-800 rounded-lg border border-gray-700">
-			<p class="text-gray-400">No leagues found. Create your first league to get started.</p>
+		<div class="py-12 text-center bg-slate-900 rounded-xl border border-slate-700">
+			<p class="text-slate-400">No leagues found. Create your first league to get started.</p>
 		</div>
 	{/if}
 </div>
@@ -264,7 +264,7 @@
 			>
 				✕ Close
 			</button>
-			<div class="bg-white rounded-xl p-6 flex items-center justify-center min-h-64">
+			<div class="bg-slate-900 rounded-xl p-6 flex items-center justify-center min-h-64 border border-slate-700">
 				<img
 					src={lightboxUrl}
 					alt={lightboxAlt}
