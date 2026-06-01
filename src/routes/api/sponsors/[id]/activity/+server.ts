@@ -7,7 +7,8 @@ import { RequestContext } from '$lib/infra/RequestContext';
 import type { RequestHandler } from './$types';
 
 export const GET: RequestHandler = async ({ params, locals, url }) => {
-	const ctx = await RequestContext.from(locals, url);
+	const ctx = await RequestContext.fromApi(locals, url);
+	if (!ctx) return json({ message: 'Unauthorized' }, { status: 401 });
 
 	try {
 		const entries = await ctx.pb.collection('sponsor_activity').getFullList({
@@ -22,7 +23,8 @@ export const GET: RequestHandler = async ({ params, locals, url }) => {
 };
 
 export const POST: RequestHandler = async ({ params, request, locals, url }) => {
-	const ctx = await RequestContext.from(locals, url);
+	const ctx = await RequestContext.fromApi(locals, url);
+	if (!ctx) return json({ message: 'Unauthorized' }, { status: 401 });
 	const body = await request.json().catch(() => ({}));
 
 	const { type, note } = body;

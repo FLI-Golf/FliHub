@@ -12,9 +12,12 @@ export const load: PageServerLoad = async ({ locals, url, params }) => {
 
 	if (!sponsor) throw error(404, 'Sponsor not found');
 
-	const [payments, bridgeRecords, userProfiles, territories, activity] = await Promise.all([
+	const [payments, purchaseOrders, bridgeRecords, userProfiles, territories, activity] = await Promise.all([
 		pb.collection('sponsor_payments')
-			.getFullList({ filter: `sponsor = "${params.id}"`, sort: '-dueDate' })
+			.getFullList({ filter: `sponsor = "${params.id}"`, sort: '-dueDate', expand: 'poId' })
+			.catch(() => []),
+		pb.collection('sponsor_purchase_orders')
+			.getFullList({ filter: `sponsorId = "${params.id}"`, sort: '-created' })
 			.catch(() => []),
 		pb.collection('sponsor_franchise_bridge')
 			.getFullList({ filter: `sponsorId = "${params.id}"`, expand: 'franchiseId', sort: '-created' })
@@ -30,7 +33,7 @@ export const load: PageServerLoad = async ({ locals, url, params }) => {
 			.catch(() => [])
 	]);
 
-	return { sponsor, payments, bridgeRecords, userProfiles, territories, activity };
+	return { sponsor, payments, purchaseOrders, bridgeRecords, userProfiles, territories, activity };
 };
 
 export const actions: Actions = {

@@ -2,7 +2,7 @@
  * POST /api/projects/[id]/report
  * Generates a PDF status report for a single active project using PDFKit.
  */
-import { error } from '@sveltejs/kit';
+import { error, json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { RequestContext } from '$lib/infra/RequestContext';
 
@@ -255,7 +255,8 @@ async function buildPDF(project: any): Promise<Buffer> {
 }
 
 export const POST: RequestHandler = async ({ locals, url, request, params }) => {
-	const ctx = await RequestContext.from(locals, url);
+	const ctx = await RequestContext.fromApi(locals, url);
+	if (!ctx) return json({ message: 'Unauthorized' }, { status: 401 });
 	const { pb } = ctx;
 
 	let body: any;

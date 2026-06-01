@@ -51,7 +51,8 @@ function randDate(daysBack = 90) {
 
 // ── DELETE — wipe all expenses, approvals, work_orders and reset actuals ──────
 export const DELETE: RequestHandler = async ({ locals, url }) => {
-	const ctx = await RequestContext.from(locals, url);
+	const ctx = await RequestContext.fromApi(locals, url);
+	if (!ctx) return json({ message: 'Unauthorized' }, { status: 401 });
 	const profile = ctx.profile;
 	if (profile?.role !== 'admin' && profile?.role !== 'leader') {
 		return json({ message: 'Unauthorized' }, { status: 403 });
@@ -95,7 +96,8 @@ export const DELETE: RequestHandler = async ({ locals, url }) => {
 
 // ── POST — seed N approvals (each with a linked expense) ─────────────────────
 export const POST: RequestHandler = async ({ locals, url, request }) => {
-	const ctx = await RequestContext.from(locals, url);
+	const ctx = await RequestContext.fromApi(locals, url);
+	if (!ctx) return json({ message: 'Unauthorized' }, { status: 401 });
 	const profile = ctx.profile;
 	if (profile?.role !== 'admin' && profile?.role !== 'leader') {
 		return json({ message: 'Unauthorized' }, { status: 403 });

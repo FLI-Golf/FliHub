@@ -9,7 +9,8 @@ import { RequestContext } from '$lib/infra/RequestContext';
 import type { RequestHandler } from './$types';
 
 export const PATCH: RequestHandler = async ({ params, request, locals, url }) => {
-	const ctx = await RequestContext.from(locals, url);
+	const ctx = await RequestContext.fromApi(locals, url);
+	if (!ctx) return json({ message: 'Unauthorized' }, { status: 401 });
 	ctx.requireRole('admin', 'leader');
 
 	const body = await request.json().catch(() => ({}));

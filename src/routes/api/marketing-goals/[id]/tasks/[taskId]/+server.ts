@@ -18,7 +18,8 @@ const ALLOWED_FIELDS = [
 ];
 
 export const PATCH: RequestHandler = async ({ params, request, locals, url }) => {
-	const ctx = await RequestContext.from(locals, url);
+	const ctx = await RequestContext.fromApi(locals, url);
+	if (!ctx) return json({ message: 'Unauthorized' }, { status: 401 });
 	const body = await request.json().catch(() => ({}));
 
 	const patch: Record<string, any> = {};
@@ -167,7 +168,8 @@ async function recalculateGoalProgress(pb: any, goalId: string) {
 }
 
 export const DELETE: RequestHandler = async ({ params, locals, url }) => {
-	const ctx = await RequestContext.from(locals, url);
+	const ctx = await RequestContext.fromApi(locals, url);
+	if (!ctx) return json({ message: 'Unauthorized' }, { status: 401 });
 	try {
 		await ctx.pb.collection('goal_tasks').delete(params.taskId);
 		return json({ ok: true });

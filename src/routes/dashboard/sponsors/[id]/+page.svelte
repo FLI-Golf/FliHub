@@ -136,6 +136,73 @@
 	let payLoading    = $state(false);
 	let payForm = $state({ amount: '', paymentType: 'installment', status: 'scheduled', dueDate: '', receivedDate: '', year: '2026', invoiceNumber: '', notes: '' });
 
+	// ── Purchase Order flow (contracted → PO → payment → WO) ───────────────
+	const purchaseOrders = $derived((data as any).purchaseOrders ?? []);
+	const activePO       = $derived(purchaseOrders.find((p: any) => !['paid','cancelled'].includes(p.status)) ?? null);
+
+	let showPOModal  = $state(false);
+	let poLoading    = $state(false);
+	let poErr        = $state('');
+	let poResult     = $state<{ poNumber: string; poId: string } | null>(null);
+	let poForm       = $state({
+		amount:       String(0),
+		description:  '',
+		terms:        '',
+		deliverables: '',
+		dueDate:      '',
+		period_start: '',
+		period_end:   '',
+		year:         String(new Date().getFullYear()),
+		notes:        '',
+	});
+
+	$effect(() => {
+		if (s?.annualCommitment) poForm.amount = String(s.annualCommitment);
+		if (s?.companyName)      poForm.description = `Sponsorship agreement — ${s.companyName} (${new Date().getFullYear()})`;
+	});
+
+	async function createPO(e: SubmitEvent) {
+		e.preventDefault();
+		poLoading = true; poErr = '';
+		try {
+			const res = await fetch(`/api/sponsors/${s.id}/purchase-order`, {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ ...poForm, amount: Number(poForm.amount), year: Number(poForm.year) }),
+			});
+			const data = await res.json().catch(() => ({}));
+			if (!res.ok) throw new Error(data.message ?? `Error ${res.status}`);
+			poResult = { poNumber: data.poNumber, poId: data.po?.id };
+			showPOModal = false;
+			await invalidateAll();
+		} catch (err: any) {
+			poErr = err.message ?? 'Failed to create PO';
+		} finally {
+			poLoading = false;
+		}
+	}
+
+	let poActionLoading = $state(false);
+	let poActionErr     = $state('');
+
+	async function updatePO(poId: string, status: string, extra: Record<string, any> = {}) {
+		poActionLoading = true; poActionErr = '';
+		try {
+			const res = await fetch(`/api/sponsor-purchase-orders/${poId}`, {
+				method: 'PATCH',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ status, ...extra }),
+			});
+			const data = await res.json().catch(() => ({}));
+			if (!res.ok) throw new Error(data.message ?? `Error ${res.status}`);
+			await invalidateAll();
+		} catch (err: any) {
+			poActionErr = err.message ?? 'Action failed';
+		} finally {
+			poActionLoading = false;
+		}
+	}
+
 	async function submitPayment(e: SubmitEvent) {
 		e.preventDefault();
 		payLoading = true; payErr = '';
@@ -385,6 +452,13 @@
 					{#if s?.type}
 						<span class="text-xs text-slate-400 capitalize">{s.type.replace('_', ' ')}</span>
 					{/if}
+					{#if s?.expand?.assignedTo}
+						{@const rep = s.expand.assignedTo}
+						<span class="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded border bg-slate-700/60 border-slate-600 text-slate-300 font-medium">
+							<Users class="size-3 text-slate-400 shrink-0" />
+							{[rep.firstName, rep.lastName].filter(Boolean).join(' ') || rep.email}
+						</span>
+					{/if}
 				</div>
 			</div>
 			{#if s?.dealProbability != null && isActivePayer(s?.status) === false}
@@ -500,6 +574,93 @@
 		</Card>
 	</div>
 
+	<!-- PO / Collections action panel -->
+	{#if ['contracted','active','renewed'].includes(s?.status ?? '')}
+		<Card class="p-5 border-blue-700/50 bg-blue-950/30">
+			<div class="flex items-start justify-between gap-4 mb-3">
+				<h2 class="text-sm font-semibold text-blue-300 uppercase tracking-wide flex items-center gap-2">
+					<ScrollText class="size-4" /> Purchase Orders
+				</h2>
+				<button
+					onclick={() => { showPOModal = true; poErr = ''; }}
+					class="inline-flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-semibold transition-colors"
+				>
+					<Plus class="size-3.5" /> New PO
+				</button>
+			</div>
+
+			{#if poActionErr}<p class="text-xs text-red-400 mb-2">{poActionErr}</p>{/if}
+
+			{#if purchaseOrders.length === 0}
+				<p class="text-sm text-slate-400">No purchase orders yet. Create one to formalise the commitment before invoicing.</p>
+			{:else}
+				<div class="space-y-2">
+					{#each purchaseOrders as po (po.id)}
+						{@const statusColors: Record<string,string> = {
+							draft:        'bg-slate-700/50 text-slate-300 border-slate-600',
+							sent:         'bg-blue-500/15 text-blue-300 border-blue-500/30',
+							acknowledged: 'bg-violet-500/15 text-violet-300 border-violet-500/30',
+							invoiced:     'bg-amber-500/15 text-amber-300 border-amber-500/30',
+							partial:      'bg-orange-500/15 text-orange-300 border-orange-500/30',
+							paid:         'bg-emerald-500/15 text-emerald-300 border-emerald-500/30',
+							overdue:      'bg-red-500/15 text-red-300 border-red-500/30',
+							cancelled:    'bg-slate-800 text-slate-500 border-slate-700',
+						}}
+						<div class="flex items-center justify-between gap-3 px-3 py-2.5 rounded-lg border border-slate-700 bg-slate-800/40">
+							<div class="min-w-0">
+								<div class="flex items-center gap-2 flex-wrap">
+									<span class="text-sm font-bold text-slate-100">{po.po_number}</span>
+									<span class="text-[10px] font-semibold px-1.5 py-0.5 rounded border {statusColors[po.status] ?? statusColors.draft} capitalize">{po.status}</span>
+									{#if po.year}<span class="text-[10px] text-slate-500">FY{po.year}</span>{/if}
+								</div>
+								{#if po.description}<p class="text-xs text-slate-400 truncate mt-0.5">{po.description}</p>{/if}
+								{#if po.dueDate}<p class="text-[10px] text-slate-500 mt-0.5">Due {po.dueDate}</p>{/if}
+							</div>
+							<div class="flex items-center gap-2 shrink-0">
+								<span class="text-sm font-black tabular-nums text-slate-100">{fmt(po.amount)}</span>
+								<!-- Stage action buttons -->
+								{#if po.status === 'draft'}
+									<button disabled={poActionLoading} onclick={() => updatePO(po.id, 'sent')}
+										class="text-[10px] px-2 py-1 rounded border border-blue-500/50 bg-blue-500/10 text-blue-300 hover:bg-blue-500/20 transition-colors font-medium">
+										Mark Sent
+									</button>
+								{:else if po.status === 'sent'}
+									<button disabled={poActionLoading} onclick={() => updatePO(po.id, 'acknowledged')}
+										class="text-[10px] px-2 py-1 rounded border border-violet-500/50 bg-violet-500/10 text-violet-300 hover:bg-violet-500/20 transition-colors font-medium">
+										Acknowledged
+									</button>
+									<button disabled={poActionLoading} onclick={() => updatePO(po.id, 'overdue')}
+										class="text-[10px] px-2 py-1 rounded border border-red-500/50 bg-red-500/10 text-red-300 hover:bg-red-500/20 transition-colors font-medium">
+										Overdue
+									</button>
+								{:else if po.status === 'acknowledged' || po.status === 'invoiced'}
+									<button disabled={poActionLoading} onclick={() => updatePO(po.id, 'partial')}
+										class="text-[10px] px-2 py-1 rounded border border-orange-500/50 bg-orange-500/10 text-orange-300 hover:bg-orange-500/20 transition-colors font-medium">
+										Partial Paid
+									</button>
+									<button disabled={poActionLoading} onclick={() => updatePO(po.id, 'paid')}
+										class="text-[10px] px-2 py-1 rounded border border-emerald-500/50 bg-emerald-500/10 text-emerald-300 hover:bg-emerald-500/20 transition-colors font-medium">
+										Mark Paid → WO
+									</button>
+								{:else if po.status === 'partial'}
+									<button disabled={poActionLoading} onclick={() => updatePO(po.id, 'paid')}
+										class="text-[10px] px-2 py-1 rounded border border-emerald-500/50 bg-emerald-500/10 text-emerald-300 hover:bg-emerald-500/20 transition-colors font-medium">
+										Fully Paid → WO
+									</button>
+								{/if}
+								{#if !['paid','cancelled'].includes(po.status)}
+									<button disabled={poActionLoading} onclick={() => updatePO(po.id, 'cancelled')}
+										class="text-[10px] px-2 py-1 rounded border border-slate-600 text-slate-500 hover:text-red-400 hover:border-red-500/50 transition-colors">
+										Cancel
+									</button>
+								{/if}
+							</div>
+						</div>
+					{/each}
+				</div>
+			{/if}
+		</Card>
+	{/if}
 	<!-- Payments -->
 	<Card class="p-5 bg-slate-800/50 border-slate-700">
 		<div class="flex items-center justify-between mb-4">
@@ -818,6 +979,62 @@
 </div>
 {/if}
 
+<!-- Create Purchase Order Modal -->
+{#if showPOModal}
+<div class="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4" role="dialog" aria-modal="true">
+	<div class="bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
+		<div class="flex items-center justify-between p-5 border-b border-slate-700">
+			<div>
+				<h2 class="text-base font-semibold text-slate-100">New Purchase Order — {s?.companyName}</h2>
+				<p class="text-xs text-slate-400 mt-0.5">Formalises the commitment. Send to sponsor before invoicing.</p>
+			</div>
+			<button onclick={() => showPOModal = false} class="text-slate-400 hover:text-slate-100"><X class="size-5" /></button>
+		</div>
+		<form onsubmit={createPO} class="p-5 space-y-4">
+			{#if poErr}<p class="text-sm text-red-400 bg-red-900/30 border border-red-700 rounded-lg px-3 py-2">{poErr}</p>{/if}
+
+			<div class="grid grid-cols-2 gap-3">
+				<div><label class={LABEL}>Amount ($) *</label>
+					<input bind:value={poForm.amount} type="number" min="1" required class={INPUT} /></div>
+				<div><label class={LABEL}>Year</label>
+					<select bind:value={poForm.year} class={INPUT}>
+						{#each ['2025','2026','2027','2028'] as y}<option value={y}>{y}</option>{/each}
+					</select></div>
+			</div>
+
+			<div><label class={LABEL}>Description</label>
+				<input bind:value={poForm.description} class={INPUT} /></div>
+
+			<div class="grid grid-cols-2 gap-3">
+				<div><label class={LABEL}>Period Start</label>
+					<input bind:value={poForm.period_start} type="date" class={INPUT} /></div>
+				<div><label class={LABEL}>Period End</label>
+					<input bind:value={poForm.period_end} type="date" class={INPUT} /></div>
+			</div>
+
+			<div><label class={LABEL}>Due Date</label>
+				<input bind:value={poForm.dueDate} type="date" class={INPUT} /></div>
+
+			<div><label class={LABEL}>Deliverables</label>
+				<textarea bind:value={poForm.deliverables} rows="2" class="{INPUT} resize-none"
+					placeholder="Logo placement, event signage, digital mentions…"></textarea></div>
+
+			<div><label class={LABEL}>Payment Terms</label>
+				<input bind:value={poForm.terms} class={INPUT} placeholder="Net 30, 50% upfront…" /></div>
+
+			<div><label class={LABEL}>Notes</label>
+				<textarea bind:value={poForm.notes} rows="2" class="{INPUT} resize-none"></textarea></div>
+
+			<div class="flex justify-end gap-3 pt-1">
+				<Button type="button" variant="outline" onclick={() => showPOModal = false} class="border-slate-600 text-slate-300">Cancel</Button>
+				<Button type="submit" disabled={poLoading} class="gap-2 bg-blue-600 hover:bg-blue-700 text-white">
+					<ScrollText class="size-4" />{poLoading ? 'Creating…' : 'Create PO'}
+				</Button>
+			</div>
+		</form>
+	</div>
+</div>
+{/if}
 <!-- Assign Territory Modal -->
 {#if showTerritoryModal}
 <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4"

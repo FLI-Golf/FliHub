@@ -3,7 +3,8 @@ import { RequestContext } from '$lib/infra/RequestContext';
 import type { RequestHandler } from './$types';
 
 export const PATCH: RequestHandler = async ({ locals, url, params, request }) => {
-	const ctx = await RequestContext.from(locals, url);
+	const ctx = await RequestContext.fromApi(locals, url);
+	if (!ctx) return json({ message: 'Unauthorized' }, { status: 401 });
 	const body = await request.json();
 
 	try {
@@ -16,7 +17,8 @@ export const PATCH: RequestHandler = async ({ locals, url, params, request }) =>
 };
 
 export const DELETE: RequestHandler = async ({ locals, url, params }) => {
-	const ctx = await RequestContext.from(locals, url);
+	const ctx = await RequestContext.fromApi(locals, url);
+	if (!ctx) return json({ message: 'Unauthorized' }, { status: 401 });
 	try {
 		await ctx.pb.collection('franchise_leads').delete(params.id);
 		return json({ success: true });

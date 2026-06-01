@@ -21,7 +21,8 @@ export const PATCH: RequestHandler = async ({ locals, url, params, request }) =>
 };
 
 export const DELETE: RequestHandler = async ({ locals, url, params }) => {
-	const ctx = await RequestContext.from(locals, url);
+	const ctx = await RequestContext.fromApi(locals, url);
+	if (!ctx) return json({ message: 'Unauthorized' }, { status: 401 });
 	if (ctx.role !== 'admin') return json({ message: 'Forbidden' }, { status: 403 });
 	try {
 		await ctx.pb.collection('trademark_expenses').delete(params.id);

@@ -5,7 +5,8 @@ import type { RequestHandler } from './$types';
 // POST /api/franchises/:slug/story-links
 // Body: { links: [{ label: string; url: string }] }
 export const POST: RequestHandler = async ({ locals, url, params, request }) => {
-	const ctx = await RequestContext.from(locals, url);
+	const ctx = await RequestContext.fromApi(locals, url);
+	if (!ctx) return json({ message: 'Unauthorized' }, { status: 401 });
 
 	if (ctx.profile?.role !== 'admin' && ctx.profile?.role !== 'leader') {
 		return json({ message: 'Unauthorized' }, { status: 403 });

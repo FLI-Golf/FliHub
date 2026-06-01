@@ -7,7 +7,8 @@ import { RequestContext } from '$lib/infra/RequestContext';
 import type { RequestHandler } from './$types';
 
 export const PATCH: RequestHandler = async ({ locals, url, params, request }) => {
-	const ctx = await RequestContext.from(locals, url);
+	const ctx = await RequestContext.fromApi(locals, url);
+	if (!ctx) return json({ message: 'Unauthorized' }, { status: 401 });
 
 	if (!['admin', 'leader', 'manager'].includes(ctx.role)) {
 		return json({ message: 'Forbidden' }, { status: 403 });

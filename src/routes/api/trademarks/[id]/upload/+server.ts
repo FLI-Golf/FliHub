@@ -5,7 +5,8 @@ import type { RequestHandler } from './$types';
 // POST /api/trademarks/:id/upload
 // Accepts multipart/form-data with fields: pdf (File), pdfLabel (string)
 export const POST: RequestHandler = async ({ locals, url, params, request }) => {
-	const ctx = await RequestContext.from(locals, url);
+	const ctx = await RequestContext.fromApi(locals, url);
+	if (!ctx) return json({ message: 'Unauthorized' }, { status: 401 });
 
 	try {
 		const formData = await request.formData();

@@ -102,6 +102,9 @@ export class RequestContext {
 	 * Automatically:
 	 *   - Redirects unauthenticated requests to /auth/login
 	 *   - Redirects vendor-role users to /vendor/dashboard (they have their own portal)
+	 *
+	 * For API route handlers use RequestContext.fromApi() instead — it throws
+	 * JSON errors rather than redirects.
 	 */
 	static async from(
 		locals: App.Locals,
@@ -136,5 +139,38 @@ export class RequestContext {
 		}
 
 		return ctx;
+	}
+
+	/**
+	 * Factory for API route handlers (+server.ts).
+	 * Returns null instead of throwing a redirect so callers can return JSON errors.
+	 *
+	 * Usage:
+	 *   const ctx = await RequestContext.fromApi(locals);
+	 *   if (!ctx) return json({ message: 'Unauthorized' }, { status: 401 });
+	 */
+	static async fromApi(
+		locals: App.Locals,
+		url?: URL
+	): Promise<RequestContext | null> {
+		const isValid = locals?.pb?.authStore?.isValid ?? false;
+		const userId  = (locals?.pb?.authStore?.model?.id ?? '') as string;
+
+		if (!isValid || !userId) return null;
+
+		const pb = await getAdminPocketBase();
+
+		let profile: UserProfile | null = null;
+		try {
+			const records = await pb.collection('user_profiles').getFullList({
+				filter: `userId = "${userId}"`,
+				fields: 'id,userId,role,firstName,lastName,vendorId,proReference'
+			});
+			profile = (records[0] as unknown as UserProfile) ?? null;
+		} catch {
+			// profile stays null
+		}
+
+		return new RequestContext(pb, userId, profile, url ?? new URL('http://localhost'));
 	}
 }

@@ -7,7 +7,8 @@ import type { RequestHandler } from './$types';
 // Returns: { created, failed, errors[] } via streaming-friendly JSON
 
 export const POST: RequestHandler = async ({ locals, url, request }) => {
-	const ctx = await RequestContext.from(locals, url);
+	const ctx = await RequestContext.fromApi(locals, url);
+	if (!ctx) return json({ message: 'Unauthorized' }, { status: 401 });
 	const pb = ctx.pb;
 	const { type, rows } = await request.json() as { type: string; rows: Record<string, string>[] };
 

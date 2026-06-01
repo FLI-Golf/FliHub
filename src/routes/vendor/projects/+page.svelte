@@ -1,7 +1,17 @@
 <script lang="ts">
 	import type { PageData } from './$types';
 	import { invalidateAll } from '$app/navigation';
-	import { FolderOpen, DollarSign, Calendar, CheckCircle2, X, Send, Paperclip, ChevronDown, ChevronUp, Trash2 } from 'lucide-svelte';
+	import { FolderOpen, DollarSign, Calendar, CheckCircle2, Clock, Trophy, X, Send, Paperclip, ChevronDown, ChevronUp, Trash2 } from 'lucide-svelte';
+
+	// Per-status display config for existing bids
+	const BID_STATUS: Record<string, { label: string; color: string; bg: string; border: string; icon: any }> = {
+		submitted:    { label: 'Submitted',    color: 'text-orange-300',  bg: 'bg-orange-500/10',  border: 'border-orange-500/30',  icon: Clock },
+		under_review: { label: 'Under Review', color: 'text-amber-300',   bg: 'bg-amber-500/10',   border: 'border-amber-500/30',   icon: Clock },
+		shortlisted:  { label: 'Shortlisted',  color: 'text-violet-300',  bg: 'bg-violet-500/10',  border: 'border-violet-500/30',  icon: CheckCircle2 },
+		awarded:      { label: 'Awarded',      color: 'text-emerald-300', bg: 'bg-emerald-500/10', border: 'border-emerald-500/30', icon: Trophy },
+		closed:       { label: 'Closed',       color: 'text-slate-400',   bg: 'bg-slate-700/30',   border: 'border-slate-600/50',   icon: CheckCircle2 },
+		rejected:     { label: 'Not Selected', color: 'text-red-400',     bg: 'bg-red-900/20',     border: 'border-red-700/30',     icon: X },
+	};
 
 	let { data }: { data: PageData } = $props();
 
@@ -63,7 +73,9 @@
 
 	async function submitBid(e: SubmitEvent) {
 		e.preventDefault();
-		if (!bidProject || !vendor) return;
+		if (!bidProject) { bidErr = 'No project selected.'; return; }
+		if (!vendor)     { bidErr = 'Your account is not linked to a vendor. Contact support.'; return; }
+		if (!bidScope.trim()) { bidErr = 'Scope of work is required.'; return; }
 		bidSaving = true;
 		bidErr    = '';
 		try {
@@ -78,9 +90,9 @@
 			}
 
 			const res = await fetch('/api/bids', { method: 'POST', body: fd });
+			const body = await res.json().catch(() => ({}));
 			if (!res.ok) {
-				const data = await res.json().catch(() => ({}));
-				throw new Error(data.message ?? 'Failed to submit bid');
+				throw new Error(body.message ?? `Server error (${res.status})`);
 			}
 			bidProject = null;
 			await invalidateAll();
@@ -131,8 +143,9 @@
 									{project.type?.replace('_',' ')}
 								</span>
 								{#if myBid}
-									<span class="text-[10px] font-semibold px-2 py-0.5 rounded-full border bg-emerald-900/40 text-emerald-300 border-emerald-700/50">
-										✓ Bid submitted
+									{@const bs = BID_STATUS[myBid.status] ?? BID_STATUS.submitted}
+									<span class="text-[10px] font-semibold px-2 py-0.5 rounded-full border {bs.bg} {bs.color} {bs.border}">
+										{bs.label}
 									</span>
 								{/if}
 							</div>
@@ -160,11 +173,15 @@
 
 						<div class="shrink-0">
 							{#if myBid}
-								<div class="text-center">
-									<div class="flex items-center gap-1.5 text-emerald-400 text-sm font-semibold mb-1">
-										<CheckCircle2 class="size-4" /> Bid Submitted
+								{@const bs = BID_STATUS[myBid.status] ?? BID_STATUS.submitted}
+								<div class="flex flex-col items-end gap-1.5 min-w-[120px]">
+									<div class="flex items-center gap-1.5 px-3 py-2 rounded-xl border {bs.bg} {bs.border}">
+										<svelte:component this={bs.icon} class="size-3.5 {bs.color} shrink-0" />
+										<span class="text-xs font-semibold {bs.color}">{bs.label}</span>
 									</div>
-									<p class="text-xs text-slate-500 capitalize">{myBid.status?.replace('_',' ')}</p>
+									{#if myBid.amount}
+										<p class="text-[11px] text-slate-500">Your bid: <span class="text-slate-300 font-medium">{fmt(myBid.amount)}</span></p>
+									{/if}
 								</div>
 							{:else}
 								<button
@@ -218,7 +235,7 @@
 
 			<div>
 				<label class={LABEL}>Scope of Work <span class="text-red-400">*</span></label>
-				<textarea bind:value={bidScope} rows="5" required
+				<textarea bind:value={bidScope} rows="5"
 					placeholder="Describe what you'll deliver, your approach, relevant experience, and why you're the right fit for this project…"
 					class="{INPUT} resize-none"></textarea>
 			</div>

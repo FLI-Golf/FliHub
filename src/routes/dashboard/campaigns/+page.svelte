@@ -4,7 +4,7 @@
 	import { Button } from '$lib/components/ui/button/index.js';
 	import {
 		Megaphone, DollarSign, BarChart3, Target,
-		ArrowRight, Calendar, TrendingUp, CheckCircle2,
+		ArrowRight, Calendar, TrendingUp, CheckCircle2, Plus,
 		Clock, AlertCircle, ChevronDown, Images, Star, Link
 	} from 'lucide-svelte';
 
@@ -75,8 +75,8 @@
 			<h1 class="text-2xl font-bold tracking-tight">Campaigns</h1>
 			<p class="text-sm text-muted-foreground mt-1">Marketing campaigns, promotions, and brand activations.</p>
 		</div>
-		<Button href="/dashboard/marketing-goals" variant="outline" size="sm" class="gap-1.5 shrink-0">
-			<Target class="size-3.5" /> Marketing Goals <ArrowRight class="size-3.5" />
+		<Button href="/dashboard/marketing/campaigns/new" variant="outline" size="sm" class="gap-1.5 shrink-0">
+			<Plus class="size-3.5" /> New Campaign
 		</Button>
 	</div>
 

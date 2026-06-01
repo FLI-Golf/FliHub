@@ -187,13 +187,14 @@ export const POST: RequestHandler = async ({ locals, request }) => {
 				const seq = allWOs.length + 1;
 				workOrderNumber = `WO-${projectCode}-${String(seq).padStart(4, '0')}`;
 
-				// Approve the expense and stamp PO number
+				// Approve the expense, stamp WO number, and link to project
 				if (expense) {
 					await pb.collection('expenses').update(expense.id, {
 						status:            'approved',
 						approvedBy:        userProfile.id,
 						approvedDate:      new Date().toISOString(),
 						work_order_number: workOrderNumber,
+						projectId:         bid?.projectId ?? '',
 					}).catch((e: any) => console.warn('bid expense update failed:', e.message));
 				}
 

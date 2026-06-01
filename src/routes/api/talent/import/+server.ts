@@ -18,7 +18,8 @@ interface TalentRow {
 }
 
 export const POST: RequestHandler = async ({ locals, url, request }) => {
-	const ctx = await RequestContext.from(locals, url);
+	const ctx = await RequestContext.fromApi(locals, url);
+	if (!ctx) return json({ message: 'Unauthorized' }, { status: 401 });
 	const { rows }: { rows: TalentRow[] } = await request.json();
 
 	if (!Array.isArray(rows) || rows.length === 0) {

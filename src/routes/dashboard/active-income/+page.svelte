@@ -5,8 +5,14 @@
 	import {
 		DollarSign, Star, TrendingUp, Trophy, ArrowRight,
 		CheckCircle2, Clock, AlertCircle, ChevronDown,
-		Handshake, Building2, MapPin, Phone, Mail, Info
+		Handshake, Building2, MapPin, Phone, Mail, Info, UserCircle
 	} from 'lucide-svelte';
+
+	function repName(sp: any) {
+		const p = sp?.expand?.assignedTo;
+		if (!p) return null;
+		return [p.firstName, p.lastName].filter(Boolean).join(' ') || p.email || null;
+	}
 
 	let { data }: { data: PageData } = $props();
 
@@ -19,6 +25,34 @@
 
 	let infoExpanded = $state(false);
 	let expandedSponsor = $state<string | null>(null);
+
+	// Collapsible tier group state — all open by default
+	let openLoiTiers     = $state<Record<string, boolean>>({});
+	let openProspectTiers = $state<Record<string, boolean>>({});
+
+	function isLoiTierOpen(tier: string)     { return openLoiTiers[tier]     !== false; }
+	function isProspectTierOpen(tier: string) { return openProspectTiers[tier] !== false; }
+	function toggleLoiTier(tier: string)     { openLoiTiers     = { ...openLoiTiers,     [tier]: !isLoiTierOpen(tier) }; }
+	function toggleProspectTier(tier: string) { openProspectTiers = { ...openProspectTiers, [tier]: !isProspectTierOpen(tier) }; }
+
+	// Group sponsors by tier, preserving TIER_CONFIG sort order
+	const TIER_ORDER = ['tier_1', 'tier_2', 'tier_3', 'tier_4'];
+
+	const loiByTier = $derived(
+		TIER_ORDER.reduce((acc, t) => {
+			const group = loiSponsors.filter((s: any) => s.tier === t);
+			if (group.length) acc[t] = group;
+			return acc;
+		}, {} as Record<string, any[]>)
+	);
+
+	const prospectByTier = $derived(
+		TIER_ORDER.reduce((acc, t) => {
+			const group = prospectSponsors.filter((s: any) => s.tier === t);
+			if (group.length) acc[t] = group;
+			return acc;
+		}, {} as Record<string, any[]>)
+	);
 
 	function fmt(n: number) {
 		return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(n ?? 0);
@@ -245,116 +279,137 @@
 				</Button>
 			</div>
 
-			{#each loiSponsors as sponsor, i (sponsor.id)}
-				{@const tier = getTier(sponsor.tier)}
-				{@const status = getStatus(sponsor.status)}
-				{@const StatusIcon = status.icon}
-				{@const rowEven = i % 2 === 0}
-				<Card class="p-0 overflow-hidden border-l-4 {tier.border.replace('border-','border-l-')} {rowEven ? 'bg-slate-900' : 'bg-slate-800/60'}">
-					<div class="p-4">
-						<!-- Title row -->
-						<div class="flex items-start justify-between gap-3 mb-2">
-							<div class="flex items-center gap-2.5 min-w-0">
-								<div class="size-9 rounded-lg {rowEven ? 'bg-slate-700' : 'bg-slate-700/80'} flex items-center justify-center shrink-0">
-									<Building2 class="size-4 text-slate-300" />
-								</div>
-								<div class="min-w-0">
-									<p class="text-sm font-bold leading-tight">{sponsor.companyName}</p>
-									<div class="flex items-center gap-1.5 mt-0.5 flex-wrap">
-										<span class="text-[10px] font-bold px-1.5 py-0.5 rounded border {tier.bg} {tier.border} {tier.color}">{tier.label}</span>
-										<span class="inline-flex items-center gap-0.5 text-[10px] {status.color}">
-											<StatusIcon class="size-2.5" />{status.label}
-										</span>
-										{#if sponsor.franchiseInterest}
-											<span class="text-[10px] font-bold px-1.5 py-0.5 rounded border bg-amber-500/15 border-amber-500/30 text-amber-300">
-												🏆 Franchise Interest
-											</span>
+			<!-- LOI sponsors grouped by tier -->
+			{#each Object.entries(loiByTier) as [tier, sponsors]}
+				{@const t = getTier(tier)}
+				{@const tierTotal = sponsors.reduce((s: number, sp: any) => s + (sp.annualCommitment ?? 0), 0)}
+				{@const open = isLoiTierOpen(tier)}
+				<div class="rounded-xl border {t.border} overflow-hidden">
+					<!-- Tier header — click to collapse -->
+					<button
+						onclick={() => toggleLoiTier(tier)}
+						class="w-full flex items-center justify-between px-4 py-3 {t.bg} hover:brightness-110 transition-all"
+					>
+						<div class="flex items-center gap-2.5">
+							<span class="text-xs font-bold {t.color}">{t.label}</span>
+							<span class="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-black/20 {t.color}">{sponsors.length}</span>
+						</div>
+						<div class="flex items-center gap-3">
+							<span class="text-xs font-bold tabular-nums text-white">{fmtM(tierTotal)}</span>
+							<ChevronDown class="size-3.5 {t.color} transition-transform duration-200 {open ? 'rotate-180' : ''}" />
+						</div>
+					</button>
+
+					{#if open}
+						<div class="divide-y divide-slate-800">
+							{#each sponsors as sponsor (sponsor.id)}
+								{@const status = getStatus(sponsor.status)}
+								{@const StatusIcon = status.icon}
+								<div class="bg-slate-900/60">
+									<div class="px-4 py-3">
+										<div class="flex items-start justify-between gap-3">
+											<div class="flex items-center gap-2.5 min-w-0">
+												<div class="size-8 rounded-lg bg-slate-800 flex items-center justify-center shrink-0">
+													<Building2 class="size-3.5 text-slate-400" />
+												</div>
+												<div class="min-w-0">
+													<p class="text-sm font-bold leading-tight">{sponsor.companyName}</p>
+													<div class="flex items-center gap-1.5 mt-0.5 flex-wrap">
+														<span class="inline-flex items-center gap-0.5 text-[10px] {status.color}">
+															<StatusIcon class="size-2.5" />{status.label}
+														</span>
+														{#if sponsor.franchiseInterest}
+															<span class="text-[10px] font-bold px-1.5 py-0.5 rounded border bg-amber-500/15 border-amber-500/30 text-amber-300">🏆 Franchise Interest</span>
+														{/if}
+														{#if repName(sponsor)}
+															<span class="inline-flex items-center gap-0.5 text-[10px] text-slate-400"><UserCircle class="size-2.5 shrink-0" />{repName(sponsor)}</span>
+														{/if}
+													</div>
+												</div>
+											</div>
+											<div class="text-right shrink-0">
+												<p class="text-base font-black text-white">{fmtM(sponsor.annualCommitment ?? 0)}</p>
+												<p class="text-[10px] text-muted-foreground">annual commitment</p>
+											</div>
+										</div>
+										<!-- Location row + expand toggle -->
+										<button
+											onclick={() => expandedSponsor = expandedSponsor === sponsor.id ? null : sponsor.id}
+											class="w-full text-left group/sp mt-2"
+										>
+											<div class="flex items-center justify-between pt-2 border-t border-slate-700/50">
+												<div class="flex items-center gap-3 text-xs text-muted-foreground">
+													{#if sponsor.location}<span class="flex items-center gap-1"><MapPin class="size-3" />{sponsor.location}</span>{/if}
+													{#if sponsor.territory}<span class="text-slate-500">·</span><span>{sponsor.territory} territory</span>{/if}
+												</div>
+												<ChevronDown class="size-3 text-slate-600 group-hover/sp:text-slate-300 transition-all {expandedSponsor === sponsor.id ? 'rotate-180' : ''}" />
+											</div>
+										</button>
+										{#if expandedSponsor === sponsor.id}
+											<div class="mt-3 pt-3 border-t border-slate-700/50 space-y-2">
+												{#if repName(sponsor)}
+													<p class="text-[10px] text-slate-500 flex items-center gap-1"><UserCircle class="size-3" />Rep: <span class="text-slate-300 font-medium">{repName(sponsor)}</span></p>
+												{/if}
+												{#if sponsor.primaryContactName}<p class="text-xs font-semibold text-slate-300">{sponsor.primaryContactName}</p>{/if}
+												<div class="flex flex-wrap gap-3">
+													{#if sponsor.primaryContactEmail}<a href="mailto:{sponsor.primaryContactEmail}" class="inline-flex items-center gap-1 text-xs text-emerald-400 hover:underline"><Mail class="size-3" />{sponsor.primaryContactEmail}</a>{/if}
+													{#if sponsor.primaryContactPhone}<a href="tel:{sponsor.primaryContactPhone}" class="inline-flex items-center gap-1 text-xs text-blue-400 hover:underline"><Phone class="size-3" />{sponsor.primaryContactPhone}</a>{/if}
+												</div>
+												{#if sponsor.notes}<p class="text-xs text-muted-foreground leading-relaxed">{@html sponsor.notes}</p>{/if}
+												<div class="pt-1">
+													<Button href="/dashboard/sponsors/{sponsor.id}" variant="ghost" size="sm" class="h-6 text-xs px-2 gap-1">View full record <ArrowRight class="size-3" /></Button>
+												</div>
+											</div>
 										{/if}
 									</div>
 								</div>
-							</div>
-							<div class="text-right shrink-0">
-								<p class="text-lg font-black text-white">{fmtM(sponsor.annualCommitment ?? 0)}</p>
-								<p class="text-xs text-muted-foreground">annual commitment</p>
-							</div>
+							{/each}
 						</div>
-
-						<!-- Expandable contact details -->
-						<button
-							onclick={() => expandedSponsor = expandedSponsor === sponsor.id ? null : sponsor.id}
-							class="w-full text-left group/sp"
-						>
-							<div class="flex items-center justify-between pt-2 border-t {rowEven ? 'border-slate-700/60' : 'border-slate-700/40'}">
-								<div class="flex items-center gap-3 text-xs text-muted-foreground">
-									{#if sponsor.location}
-										<span class="flex items-center gap-1"><MapPin class="size-3" />{sponsor.location}</span>
-									{/if}
-									{#if sponsor.territory}
-										<span class="text-slate-500">·</span>
-										<span>{sponsor.territory} territory</span>
-									{/if}
-								</div>
-								<ChevronDown class="size-3.5 text-slate-500 group-hover/sp:text-slate-300 transition-all duration-200 {expandedSponsor === sponsor.id ? 'rotate-180' : ''}" />
-							</div>
-						</button>
-
-						{#if expandedSponsor === sponsor.id}
-							<div class="mt-3 pt-3 border-t {rowEven ? 'border-slate-700/60' : 'border-slate-700/40'} space-y-2">
-								{#if sponsor.primaryContactName}
-									<p class="text-xs font-semibold text-slate-300">{sponsor.primaryContactName}</p>
-								{/if}
-								<div class="flex flex-wrap gap-3">
-									{#if sponsor.primaryContactEmail}
-										<a href="mailto:{sponsor.primaryContactEmail}" class="inline-flex items-center gap-1 text-xs text-emerald-400 hover:underline">
-											<Mail class="size-3" />{sponsor.primaryContactEmail}
-										</a>
-									{/if}
-									{#if sponsor.primaryContactPhone}
-										<a href="tel:{sponsor.primaryContactPhone}" class="inline-flex items-center gap-1 text-xs text-blue-400 hover:underline">
-											<Phone class="size-3" />{sponsor.primaryContactPhone}
-										</a>
-									{/if}
-								</div>
-								{#if sponsor.notes}
-									<p class="text-xs text-muted-foreground leading-relaxed">{@html sponsor.notes}</p>
-								{/if}
-								<div class="pt-1">
-									<Button href="/dashboard/sponsors/{sponsor.id}" variant="ghost" size="sm" class="h-6 text-xs px-2 gap-1">
-										View full record <ArrowRight class="size-3" />
-									</Button>
-								</div>
-							</div>
-						{/if}
-					</div>
-				</Card>
+					{/if}
+				</div>
 			{/each}
 
-			<!-- Prospects -->
+			<!-- Prospects grouped by tier -->
 			{#if prospectSponsors.length > 0}
-				<div class="mt-2">
+				<div class="mt-4">
 					<h2 class="text-sm font-bold mb-3 text-muted-foreground">Prospects — Not Yet Committed</h2>
-					{#each prospectSponsors as sponsor (sponsor.id)}
-						{@const tier = getTier(sponsor.tier)}
-						<Card class="p-4 mb-2 border-l-4 border-l-slate-600 bg-slate-800/40">
-							<div class="flex items-center justify-between">
+					{#each Object.entries(prospectByTier) as [tier, sponsors]}
+						{@const t = getTier(tier)}
+						{@const open = isProspectTierOpen(tier)}
+						<div class="rounded-xl border border-slate-700/50 overflow-hidden mb-2">
+							<button
+								onclick={() => toggleProspectTier(tier)}
+								class="w-full flex items-center justify-between px-4 py-3 bg-slate-800/60 hover:bg-slate-800 transition-colors"
+							>
 								<div class="flex items-center gap-2.5">
-									<div class="size-8 rounded-lg bg-slate-700 flex items-center justify-center shrink-0">
-										<Building2 class="size-3.5 text-slate-400" />
-									</div>
-									<div>
-										<p class="text-sm font-medium text-slate-300">{sponsor.companyName}</p>
-										<div class="flex items-center gap-1.5 mt-0.5">
-											<span class="text-[10px] px-1.5 py-0.5 rounded border {tier.bg} {tier.border} {tier.color}">{tier.label}</span>
-											{#if sponsor.territory}<span class="text-[10px] text-muted-foreground">{sponsor.territory}</span>{/if}
+									<span class="text-xs font-bold {t.color}">{t.label}</span>
+									<span class="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-slate-700 text-slate-400">{sponsors.length}</span>
+								</div>
+								<ChevronDown class="size-3.5 text-slate-500 transition-transform duration-200 {open ? 'rotate-180' : ''}" />
+							</button>
+							{#if open}
+								<div class="divide-y divide-slate-800">
+									{#each sponsors as sponsor (sponsor.id)}
+										<div class="flex items-center justify-between px-4 py-2.5 bg-slate-900/40 hover:bg-slate-800/40 transition-colors">
+											<div class="flex items-center gap-2.5 min-w-0">
+												<Building2 class="size-3.5 text-slate-500 shrink-0" />
+												<div class="min-w-0">
+													<p class="text-sm font-medium text-slate-300 truncate">{sponsor.companyName}</p>
+													<div class="flex items-center gap-2">
+														{#if sponsor.territory}<span class="text-[10px] text-muted-foreground">{sponsor.territory}</span>{/if}
+														{#if repName(sponsor)}<span class="text-[10px] text-slate-500 flex items-center gap-0.5"><UserCircle class="size-2.5" />{repName(sponsor)}</span>{/if}
+													</div>
+												</div>
+											</div>
+											<div class="text-right shrink-0">
+												<p class="text-sm font-bold text-slate-400 tabular-nums">{fmtM(sponsor.annualCommitment ?? 0)}</p>
+												<p class="text-[10px] text-muted-foreground">target value</p>
+											</div>
 										</div>
-									</div>
+									{/each}
 								</div>
-								<div class="text-right">
-									<p class="text-sm font-bold text-slate-400">{fmtM(sponsor.annualCommitment ?? 0)}</p>
-									<p class="text-[10px] text-muted-foreground">target value</p>
-								</div>
-							</div>
-						</Card>
+							{/if}
+						</div>
 					{/each}
 				</div>
 			{/if}

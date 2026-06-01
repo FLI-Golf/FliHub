@@ -23,7 +23,8 @@ const STAGE_ORDER = ['invoiced', 'scheduled', 'received', 'reconciled'] as const
 type Stage = typeof STAGE_ORDER[number];
 
 export const PATCH: RequestHandler = async ({ locals, url, params, request }) => {
-	const ctx = await RequestContext.from(locals, url);
+	const ctx = await RequestContext.fromApi(locals, url);
+	if (!ctx) return json({ message: 'Unauthorized' }, { status: 401 });
 	const { pb } = ctx;
 	const body = await request.json().catch(() => ({})) as Record<string, any>;
 

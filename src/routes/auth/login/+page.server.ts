@@ -17,7 +17,7 @@ export const load: PageServerLoad = async ({ locals }) => {
 			}
 
 			if (userProfile?.role === 'vendor') {
-				throw redirect(303, '/dashboard/vendors');
+				throw redirect(303, '/vendor/dashboard');
 			}
 
 			if (userProfile?.role === 'leader') {
@@ -73,14 +73,9 @@ export const actions: Actions = {
 					throw redirect(303, '/dashboard/sales');
 				}
 
-				// Vendor users - redirect to vendor dashboard or setup
+				// Vendor users - redirect to vendor portal
 				if (userProfile.role === 'vendor') {
-					if (!userProfile.vendorId) {
-						// Vendor not linked yet - redirect to setup message
-						throw redirect(303, '/dashboard/vendors');
-					}
-					// Redirect to vendor-specific view
-					throw redirect(303, '/dashboard/vendors');
+					throw redirect(303, '/vendor/dashboard');
 				}
 
 				// Leader users - redirect to their department

@@ -77,7 +77,8 @@ async function getNextWO(adminPb: any, offset: number): Promise<string> {
 
 // DELETE all test claims (those with WO- reference numbers)
 export const DELETE: RequestHandler = async ({ locals, url }) => {
-	const ctx = await RequestContext.from(locals, url);
+	const ctx = await RequestContext.fromApi(locals, url);
+	if (!ctx) return json({ message: 'Unauthorized' }, { status: 401 });
 	const profile = ctx.profile;
 	if (profile?.role !== 'admin' && profile?.role !== 'leader') {
 		return json({ message: 'Unauthorized' }, { status: 403 });
@@ -121,7 +122,8 @@ export const DELETE: RequestHandler = async ({ locals, url }) => {
 
 // POST — seed N claims
 export const POST: RequestHandler = async ({ locals, url, request }) => {
-	const ctx = await RequestContext.from(locals, url);
+	const ctx = await RequestContext.fromApi(locals, url);
+	if (!ctx) return json({ message: 'Unauthorized' }, { status: 401 });
 	const profile = ctx.profile;
 	if (profile?.role !== 'admin' && profile?.role !== 'leader') {
 		return json({ message: 'Unauthorized' }, { status: 403 });

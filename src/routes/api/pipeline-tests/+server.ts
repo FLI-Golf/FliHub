@@ -114,33 +114,36 @@ async function suiteOnboarding(r: TestRunner, pb: any) {
 		r.assert(talent.length > 0, 'Need at least one talent record');
 		talentId = talent[0].id;
 
-		// Write a test onboarding_status record
-		const existing = await pb.collection('onboarding_status').getFullList({
-			filter: `userId = "${talentId}"`
-		}).catch(() => []);
-
 		const payload = { userId: talentId, pipelineStage: 'documents_sent', welcomeSeen: false, documentsInitialed: false, contractSigned: false, profileCompleted: false };
-		if (existing.length > 0) {
-			await pb.collection('onboarding_status').update(existing[0].id, payload);
+		const existing = await pb.collection('onboarding_status').getList(1, 1, {
+			filter: `userId = "${talentId}"`
+		}).catch((e: any) => { throw new Error(`onboarding_status not queryable: ${e?.message}`); });
+
+		if (existing.items.length > 0) {
+			const updated = await pb.collection('onboarding_status').update(existing.items[0].id, payload)
+				.catch((e: any) => { throw new Error(`onboarding_status update failed: ${e?.message}`); });
+			r.assert(!!updated?.id, 'Update must return a record');
 		} else {
-			await pb.collection('onboarding_status').create(payload);
+			const created = await pb.collection('onboarding_status').create(payload)
+				.catch((e: any) => { throw new Error(`onboarding_status create failed: ${e?.message}`); });
+			r.assert(!!created?.id, 'Create must return a record');
 		}
 	});
 
 	await r.test('onboarding_status record readable by admin', async () => {
 		r.assert(!!talentId, 'Need talentId from previous test');
-		const records = await pb.collection('onboarding_status').getFullList({
+		const result = await pb.collection('onboarding_status').getList(1, 1, {
 			filter: `userId = "${talentId}"`
-		});
-		r.assert(records.length > 0, 'Must find onboarding_status record');
+		}).catch((e: any) => { throw new Error(`onboarding_status not queryable: ${e?.message}`); });
+		r.assert(result.totalItems > 0, 'Must find onboarding_status record for this talent');
 	});
 
 	r.cleanup.push(async () => {
 		if (!talentId) return;
-		const records = await pb.collection('onboarding_status').getFullList({
+		const result = await pb.collection('onboarding_status').getList(1, 50, {
 			filter: `userId = "${talentId}"`
-		}).catch(() => []);
-		for (const rec of records) {
+		}).catch(() => ({ items: [] }));
+		for (const rec of result.items) {
 			await pb.collection('onboarding_status').delete(rec.id).catch(() => {});
 		}
 	});
@@ -258,7 +261,7 @@ async function suiteTournament(r: TestRunner, pb: any) {
 	});
 
 	await r.test('find tournament and write checklist record', async () => {
-		const tournaments = await pb.collection('tournaments').getFullList({ fields: 'id', perPage: 1, sort: '-created' }).catch(() => []);
+		const tournaments = await pb.collection('tournaments').getFullList({ fields: 'id' }).catch(() => []);
 		r.assert(tournaments.length > 0, 'Need at least one tournament');
 		tournamentId = tournaments[0].id;
 
@@ -427,7 +430,8 @@ async function suiteContent(r: TestRunner, pb: any) {
 // ── Request handler ───────────────────────────────────────────────────────────
 
 export const POST: RequestHandler = async ({ request, locals, url }) => {
-	const ctx = await RequestContext.from(locals, url);
+	const ctx = await RequestContext.fromApi(locals, url);
+	if (!ctx) return json({ message: 'Unauthorized' }, { status: 401 });
 	ctx.requireRole('admin');
 
 	const body = await request.json().catch(() => ({}));

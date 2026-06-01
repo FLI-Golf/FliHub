@@ -21,6 +21,14 @@
 	let confirmText = $state('');
 	let showResetConfirm = $state(false);
 
+	// Zero actual spend
+	let zeroLoading = $state(false);
+	let showZeroConfirm = $state(false);
+
+	// Seed approvals
+	let seedCount = $state('10');
+	let seedLoading = $state(false);
+
 	onMount(async () => {
 		await loadStatus();
 	});
@@ -60,6 +68,46 @@
 			message = `❌ Error: ${error.message}`;
 		} finally {
 			loading = false;
+		}
+	}
+
+	async function zeroActualSpend() {
+		zeroLoading = true;
+		message = '';
+		try {
+			const res = await fetch('/api/approvals/test-data', { method: 'DELETE' });
+			const body = await res.json().catch(() => ({}));
+			if (!res.ok) throw new Error(body.message ?? `Error ${res.status}`);
+			const d = body.deleted ?? {};
+			message = `✅ Zeroed actual spend — cleared ${d.projects_cleared ?? 0} projects, ${d.work_orders ?? 0} work orders, ${d.approvals ?? 0} approvals, ${d.expenses ?? 0} expenses`;
+			showZeroConfirm = false;
+			await loadStatus();
+			await invalidateAll();
+		} catch (err: any) {
+			message = `❌ Error: ${err.message}`;
+		} finally {
+			zeroLoading = false;
+		}
+	}
+
+	async function seedApprovals() {
+		seedLoading = true;
+		message = '';
+		try {
+			const res = await fetch('/api/approvals/test-data', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ count: parseInt(seedCount) || 10 }),
+			});
+			const body = await res.json().catch(() => ({}));
+			if (!res.ok) throw new Error(body.message ?? `Error ${res.status}`);
+			message = `✅ Created ${body.created ?? 0} test approvals`;
+			await loadStatus();
+			await invalidateAll();
+		} catch (err: any) {
+			message = `❌ Error: ${err.message}`;
+		} finally {
+			seedLoading = false;
 		}
 	}
 
@@ -163,6 +211,73 @@
 		<p class="text-sm text-muted-foreground mt-2">
 			Creates realistic test expenses and vendors for workflow testing.
 		</p>
+	</div>
+
+	<!-- Zero Actual Spend -->
+	<div class="bg-card text-card-foreground rounded-lg border border-amber-700/40 shadow-sm p-6 mb-6">
+		<h2 class="text-xl font-semibold mb-1">Zero Actual Spend</h2>
+		<p class="text-sm text-muted-foreground mb-4">
+			Resets <code class="text-xs bg-muted px-1 py-0.5 rounded">project_actual_expenses</code> to zero on all projects and clears all approvals, expenses, and work orders. Use this after testing to restore a clean baseline without touching budgets or forecasts.
+		</p>
+
+		{#if !showZeroConfirm}
+			<button
+				onclick={() => showZeroConfirm = true}
+				disabled={zeroLoading}
+				class="w-full bg-amber-600 hover:bg-amber-700 text-white px-4 py-2 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+			>
+				Zero All Actual Spend
+			</button>
+		{:else}
+			<div class="border-2 border-amber-600/40 rounded-lg p-4 bg-amber-950/20">
+				<p class="text-amber-400 font-semibold mb-2">⚠ This will delete all approvals, expenses, and work orders and zero all project actual spend.</p>
+				<div class="flex gap-2 mt-3">
+					<button
+						onclick={zeroActualSpend}
+						disabled={zeroLoading}
+						class="flex-1 bg-amber-600 hover:bg-amber-700 text-white px-4 py-2 rounded-lg disabled:opacity-50 transition-colors"
+					>
+						{zeroLoading ? 'Clearing…' : 'Confirm — Zero Spend'}
+					</button>
+					<button
+						onclick={() => showZeroConfirm = false}
+						disabled={zeroLoading}
+						class="flex-1 bg-muted text-muted-foreground px-4 py-2 rounded-lg hover:bg-muted/80 transition-colors"
+					>
+						Cancel
+					</button>
+				</div>
+			</div>
+		{/if}
+	</div>
+
+	<!-- Seed Test Approvals -->
+	<div class="bg-card text-card-foreground rounded-lg border shadow-sm p-6 mb-6">
+		<h2 class="text-xl font-semibold mb-1">Seed Test Approvals</h2>
+		<p class="text-sm text-muted-foreground mb-4">
+			Creates realistic test expenses and approval records linked to real tasks. Use this to test the approval workflow without manually creating records.
+		</p>
+		<div class="flex gap-3 items-end">
+			<div class="flex-1">
+				<label class="block text-sm font-medium mb-1">Number of approvals</label>
+				<input
+					type="number"
+					bind:value={seedCount}
+					min="1"
+					max="100"
+					class="w-full px-3 py-2 border border-input bg-zinc-900 text-foreground rounded-lg focus:outline-none focus:ring-2 focus:ring-ring"
+					disabled={seedLoading}
+				/>
+			</div>
+			<button
+				onclick={seedApprovals}
+				disabled={seedLoading}
+				class="bg-primary text-primary-foreground px-6 py-2 rounded-lg hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors whitespace-nowrap"
+			>
+				{seedLoading ? 'Seeding…' : 'Seed Approvals'}
+			</button>
+		</div>
+		<p class="text-xs text-muted-foreground mt-2">Run "Zero Actual Spend" afterwards to clean up.</p>
 	</div>
 
 	<!-- Reset Data -->

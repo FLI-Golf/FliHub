@@ -18,7 +18,8 @@ const ALLOWED = [
 ];
 
 export const PATCH: RequestHandler = async ({ params, request, locals, url }) => {
-	const ctx = await RequestContext.from(locals, url);
+	const ctx = await RequestContext.fromApi(locals, url);
+	if (!ctx) return json({ message: 'Unauthorized' }, { status: 401 });
 	const body = await request.json().catch(() => ({}));
 
 	const patch: Record<string, any> = {};
@@ -100,7 +101,8 @@ export const PATCH: RequestHandler = async ({ params, request, locals, url }) =>
 };
 
 export const DELETE: RequestHandler = async ({ params, locals, url }) => {
-	const ctx = await RequestContext.from(locals, url);
+	const ctx = await RequestContext.fromApi(locals, url);
+	if (!ctx) return json({ message: 'Unauthorized' }, { status: 401 });
 	ctx.requireRole('admin');
 	try {
 		await ctx.pb.collection('scoreboards').delete(params.id);

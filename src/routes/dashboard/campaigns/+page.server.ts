@@ -1,15 +1,17 @@
 import { RequestContext } from '$lib/infra/RequestContext';
+import { adminFetch } from '$lib/infra/pocketbase/pbClient';
 import type { PageServerLoad } from './$types';
 
 export const load: PageServerLoad = async ({ locals, url }) => {
 	const ctx = await RequestContext.from(locals, url);
+	ctx.requireRole('admin', 'leader', 'marketing', 'marketing_lead');
 	const { pb, profile: userProfile } = ctx;
 
 	try {
 		const [campaigns, mediaAssets, marketingGoals] = await Promise.all([
-			pb.collection('campaigns').getFullList({ sort: '-created', expand: 'goalId' }).catch(() => []),
-			pb.collection('media_assets').getFullList({ fields: 'id,title,asset_type,campaign,file,collectionId' }).catch(() => []),
-			pb.collection('marketing_goals').getFullList({ sort: 'priority,deadline' }).catch(() => []),
+			adminFetch('campaigns', { sort: '-created', expand: 'goalId' }).catch(() => []),
+			adminFetch('media_assets', { fields: 'id,title,asset_type,campaign,file,collectionId' }).catch(() => []),
+			adminFetch('marketing_goals', { sort: 'goalName' }).catch(() => []),
 		]);
 
 		// Group media assets by campaign
