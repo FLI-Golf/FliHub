@@ -4,7 +4,8 @@ import type { RequestHandler } from './$types';
 
 // GET /api/trademark-billing-groups
 export const GET: RequestHandler = async ({ locals, url }) => {
-	const ctx = await RequestContext.from(locals, url);
+	const ctx = await RequestContext.fromApi(locals, url);
+	if (!ctx) return json({ message: 'Unauthorized' }, { status: 401 });
 	try {
 		const groups = await ctx.pb.collection('trademark_billing_groups').getFullList({
 			sort: '-created',

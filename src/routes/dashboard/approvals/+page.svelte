@@ -6,7 +6,7 @@
 		CheckCircle2, XCircle, Clock, AlertCircle,
 		DollarSign, Receipt, FolderKanban, Wallet,
 		MessageSquare, User, Calendar, Users, Settings2, Loader2,
-		FileEdit, ArrowRight, FlaskConical, RefreshCw, Plus, ChevronDown
+		FileEdit, ArrowRight, FlaskConical, RefreshCw, Plus, ChevronDown, Send
 	} from 'lucide-svelte';
 	import { invalidateAll } from '$app/navigation';
 
@@ -101,6 +101,7 @@
 			case 'expense': return Receipt;
 			case 'project': return FolderKanban;
 			case 'budget':  return Wallet;
+			case 'bid':     return Send;
 			default:        return DollarSign;
 		}
 	}
@@ -408,6 +409,7 @@
 					<option value="expense" class="bg-slate-800">Expenses</option>
 					<option value="project" class="bg-slate-800">Projects</option>
 					<option value="budget" class="bg-slate-800">Budgets</option>
+					<option value="bid" class="bg-slate-800">Bids</option>
 				</select>
 			</div>
 			<p class="text-sm text-slate-500 pb-2">Showing {filtered.length} of {data.approvals.length}</p>
@@ -503,7 +505,11 @@
 				{@const votePct   = Math.min(100, (voteCount / quorum) * 100)}
 				{@const msg       = actionMessages[approval.id]}
 				{@const expense   = approval.expand?.expenseId}
+				{@const bid       = approval.expand?.bidId}
 				{@const isMgrCut  = expense?.description?.startsWith('Manager cut')}
+				{@const cardTitle = approval.entityType === 'bid'
+					? `Vendor Bid — ${bid?.expand?.vendorId?.name ?? expense?.description ?? 'Bid Approval'}`
+					: expense?.description ?? `${approval.entityType} Approval`}
 				<div class="p-5 hover:bg-slate-800/40 transition-colors">
 					<div class="flex items-start justify-between gap-4">
 						<!-- Left: icon + details -->
@@ -515,14 +521,21 @@
 							<div class="flex-1 min-w-0">
 								<div class="flex items-center gap-2 mb-1 flex-wrap">
 									<h3 class="font-semibold text-slate-100 truncate">
-										{expense?.description ?? `${approval.entityType} Approval`}
+										{cardTitle}
 									</h3>
 									<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium shrink-0 {statusColor(approval.status)}">
 										{approval.status.replace('_', ' ')}
 									</span>
 								</div>
 
-								{#if expense}
+								{#if approval.entityType === 'bid'}
+									<div class="flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-slate-500 mb-3">
+										<span class="text-orange-400 font-medium">Vendor Bid</span>
+										{#if expense?.work_order_number}
+											<span class="font-mono text-emerald-400">· PO: {expense.work_order_number}</span>
+										{/if}
+									</div>
+								{:else if expense}
 									<div class="flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-slate-500 mb-3">
 										{#if expense.work_order_number}
 											<span class="font-mono text-slate-400">{expense.work_order_number}</span>

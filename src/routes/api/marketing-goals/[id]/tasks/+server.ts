@@ -7,11 +7,12 @@ import { RequestContext } from '$lib/infra/RequestContext';
 import type { RequestHandler } from './$types';
 
 export const GET: RequestHandler = async ({ params, locals, url }) => {
-	const ctx = await RequestContext.from(locals, url);
+	const ctx = await RequestContext.fromApi(locals, url);
+	if (!ctx) return json({ message: 'Unauthorized' }, { status: 401 });
 	try {
 		const tasks = await ctx.pb.collection('goal_tasks').getFullList({
 			filter: `goalId = "${params.id}"`,
-			sort: 'created'
+			sort: 'priority'
 		});
 		return json(tasks);
 	} catch {
@@ -20,7 +21,8 @@ export const GET: RequestHandler = async ({ params, locals, url }) => {
 };
 
 export const POST: RequestHandler = async ({ params, request, locals, url }) => {
-	const ctx = await RequestContext.from(locals, url);
+	const ctx = await RequestContext.fromApi(locals, url);
+	if (!ctx) return json({ message: 'Unauthorized' }, { status: 401 });
 	const body = await request.json().catch(() => ({}));
 
 	if (!body.title?.trim()) return json({ message: 'title is required' }, { status: 400 });

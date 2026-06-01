@@ -12,7 +12,7 @@ export const load: PageServerLoad = async ({ locals, url, params }) => {
 	// Load tasks with their linked approvals, expenses, work orders
 	const tasks = await pb.collection('goal_tasks').getFullList({
 		filter: `goalId = "${params.id}"`,
-		sort:   'created'
+		sort:   'priority'
 	}).catch(() => []);
 
 	// Enrich tasks with linked record summaries (non-fatal)

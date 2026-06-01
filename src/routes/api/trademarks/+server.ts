@@ -4,7 +4,8 @@ import type { RequestHandler } from './$types';
 
 // GET /api/trademarks?franchiseId=xxx
 export const GET: RequestHandler = async ({ locals, url }) => {
-	const ctx = await RequestContext.from(locals, url);
+	const ctx = await RequestContext.fromApi(locals, url);
+	if (!ctx) return json({ message: 'Unauthorized' }, { status: 401 });
 	const franchiseId = url.searchParams.get('franchiseId');
 
 	try {

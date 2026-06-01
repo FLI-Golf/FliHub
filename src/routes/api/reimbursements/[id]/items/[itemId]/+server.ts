@@ -33,7 +33,8 @@ export const PATCH: RequestHandler = async ({ locals, url, params, request }) =>
 
 // DELETE /api/reimbursements/:id/items/:itemId
 export const DELETE: RequestHandler = async ({ locals, url, params }) => {
-	const ctx = await RequestContext.from(locals, url);
+	const ctx = await RequestContext.fromApi(locals, url);
+	if (!ctx) return json({ message: 'Unauthorized' }, { status: 401 });
 	try {
 		await ctx.pb.collection('reimbursement_items').delete(params.itemId);
 

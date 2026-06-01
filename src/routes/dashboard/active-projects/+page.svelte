@@ -495,6 +495,20 @@
 									{project.pendingApprovals} Awaiting Approval
 								</a>
 							{/if}
+							{#if project.submittedBids > 0}
+								<a
+									href="/dashboard/bids"
+									class="relative inline-flex items-center gap-1.5 text-[10px] font-semibold px-2 py-1 rounded border border-orange-500/60 bg-orange-500/15 text-orange-300 hover:bg-orange-500/25 transition-colors no-underline"
+									title="{project.submittedBids} new bid{project.submittedBids > 1 ? 's' : ''} submitted — awaiting review"
+								>
+									<span class="relative flex size-2">
+										<span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-orange-400 opacity-75"></span>
+										<span class="relative inline-flex rounded-full size-2 bg-orange-500"></span>
+									</span>
+									{project.submittedBids} New Bid{project.submittedBids > 1 ? 's' : ''}
+								</a>
+							{/if}
+
 							<a
 							href="/api/projects/{project.id}/report/view"
 							target="_blank"
@@ -654,7 +668,48 @@
 							</div>
 						</div>
 
-
+						<!-- Bar 2: Bid pipeline — tracks vendor bids from submission through award to payment -->
+						{#if project.bidPipeline && project.bidPipeline.total > 0}
+							{@const bp = project.bidPipeline}
+							<div class="space-y-1.5">
+								<div class="flex items-center gap-1.5 text-xs text-muted-foreground font-medium">
+									<Building2 class="size-3.5" />Bid Pipeline
+									<span class="text-slate-600 font-normal">· {bp.total} bid{bp.total > 1 ? 's' : ''}</span>
+								</div>
+								<div class="flex flex-wrap gap-1.5">
+									{#if bp.submitted > 0}
+										<a href="/dashboard/bids" class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-orange-500/15 text-orange-300 border border-orange-500/30 hover:bg-orange-500/25 transition-colors no-underline">
+											<span class="size-1.5 rounded-full bg-orange-400 shrink-0"></span>
+											Submitted · {bp.submitted}
+										</a>
+									{/if}
+									{#if bp.under_review > 0}
+										<a href="/dashboard/bids" class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-amber-500/15 text-amber-300 border border-amber-500/30 hover:bg-amber-500/25 transition-colors no-underline">
+											<span class="size-1.5 rounded-full bg-amber-400 shrink-0"></span>
+											In Review · {bp.under_review}
+										</a>
+									{/if}
+									{#if bp.shortlisted > 0}
+										<a href="/dashboard/bids" class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-violet-500/15 text-violet-300 border border-violet-500/30 hover:bg-violet-500/25 transition-colors no-underline">
+											<span class="size-1.5 rounded-full bg-violet-500 shrink-0"></span>
+											Shortlisted · {bp.shortlisted}
+										</a>
+									{/if}
+									{#if bp.awarded > 0}
+										<a href="/dashboard/bids" class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-blue-500/15 text-blue-300 border border-blue-500/30 hover:bg-blue-500/25 transition-colors no-underline">
+											<span class="size-1.5 rounded-full bg-blue-500 shrink-0"></span>
+											Awarded · {bp.awarded}
+										</a>
+									{/if}
+									{#if bp.closed > 0}
+										<a href="/dashboard/bids" class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 hover:bg-emerald-500/25 transition-colors no-underline">
+											<span class="size-1.5 rounded-full bg-emerald-500 shrink-0"></span>
+											Paid · {bp.closed}
+										</a>
+									{/if}
+								</div>
+							</div>
+						{/if}
 
 					</div>
 

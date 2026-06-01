@@ -1,12 +1,17 @@
 <script lang="ts">
 	import type { LayoutData } from './$types';
 	import { page } from '$app/stores';
-	import { LayoutDashboard, FolderOpen, FileText, LogOut, Building2, ChevronRight } from 'lucide-svelte';
+	import { LayoutDashboard, FolderOpen, FileText, LogOut, Building2, ChevronRight, ChevronDown, User } from 'lucide-svelte';
+	import * as DropdownMenu from '$lib/components/ui/dropdown-menu/index.js';
 
 	let { data, children }: { data: LayoutData; children: any } = $props();
 
 	const vendor  = $derived(data.vendor);
 	const profile = $derived(data.profile);
+	const user    = $derived((data as any).user);
+
+	const displayName = $derived(user?.email?.split('@')[0] ?? 'Vendor');
+	const initials    = $derived(displayName.slice(0, 2).toUpperCase());
 
 	const NAV = [
 		{ href: '/vendor/dashboard', label: 'Dashboard',     icon: LayoutDashboard },
@@ -81,8 +86,86 @@
 	</aside>
 
 	<!-- Main content -->
-	<main class="flex-1 overflow-auto">
-		<div class="max-w-5xl mx-auto px-8 py-8">
+	<main class="flex-1 overflow-auto flex flex-col">
+
+		<!-- Top navbar -->
+		<header class="sticky top-0 z-30 bg-slate-900/80 backdrop-blur border-b border-slate-800 flex items-center justify-between px-6 h-14 shrink-0">
+
+			<!-- Nav links -->
+			<nav class="flex items-center gap-1">
+				{#each NAV as item}
+					{@const active = $page.url.pathname === item.href}
+					<a
+						href={item.href}
+						class="flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors
+						       {active
+						         ? 'bg-orange-500/15 text-orange-300 border border-orange-500/20'
+						         : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800'}"
+					>
+						<svelte:component this={item.icon} class="size-4 shrink-0" />
+						{item.label}
+					</a>
+				{/each}
+			</nav>
+
+			<!-- Right: vendor name + user dropdown -->
+			<div class="flex items-center gap-3">
+				{#if vendor}
+					<div class="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-lg bg-slate-800/60 border border-slate-700/50">
+						<Building2 class="size-3.5 text-orange-400 shrink-0" />
+						<span class="text-xs font-medium text-slate-300 truncate max-w-[160px]">{vendor.name}</span>
+					</div>
+				{/if}
+
+				<DropdownMenu.Root>
+					<DropdownMenu.Trigger
+						class="flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-sm font-medium
+						       transition-all hover:bg-slate-800 border border-transparent hover:border-slate-700
+						       focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500"
+					>
+						<span class="flex size-7 items-center justify-center rounded-full bg-gradient-to-br from-orange-500 to-amber-500 text-white text-xs font-bold shrink-0">
+							{initials}
+						</span>
+						<span class="hidden sm:block text-sm text-slate-300 truncate max-w-[140px]">{user?.email}</span>
+						<ChevronDown class="size-3.5 text-slate-500 shrink-0" />
+					</DropdownMenu.Trigger>
+
+					<DropdownMenu.Content align="end" class="w-56">
+						<!-- Identity header -->
+						<div class="px-3 py-2.5 border-b border-border">
+							<p class="text-xs font-semibold truncate">{user?.email}</p>
+							<p class="text-[10px] text-muted-foreground mt-0.5 capitalize">
+								{profile?.role ?? 'vendor'}{vendor ? ` · ${vendor.name}` : ''}
+							</p>
+						</div>
+
+						{#if profile?.role === 'admin'}
+							<DropdownMenu.Item class="gap-2 cursor-pointer p-0">
+								<a href="/dashboard" class="flex items-center gap-2 w-full px-2 py-1.5">
+									<LayoutDashboard class="size-4 text-muted-foreground" />
+									<span>Admin Dashboard</span>
+								</a>
+							</DropdownMenu.Item>
+							<DropdownMenu.Separator />
+						{/if}
+
+						<div class="px-1 pb-1 pt-1">
+							<form method="POST" action="/auth/logout">
+								<button
+									type="submit"
+									class="flex w-full items-center gap-2 rounded-md bg-red-600 hover:bg-red-700 active:bg-red-800 px-3 py-2 text-sm font-semibold text-white transition-colors"
+								>
+									<LogOut class="size-4 shrink-0" />
+									Sign Out
+								</button>
+							</form>
+						</div>
+					</DropdownMenu.Content>
+				</DropdownMenu.Root>
+			</div>
+		</header>
+
+		<div class="flex-1 max-w-5xl mx-auto w-full px-8 py-8">
 			{@render children()}
 		</div>
 	</main>

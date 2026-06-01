@@ -4,7 +4,8 @@ import type { RequestHandler } from './$types';
 
 // POST /api/sponsor-payments — log a new payment against a sponsor
 export const POST: RequestHandler = async ({ locals, url, request }) => {
-	const ctx = await RequestContext.from(locals, url);
+	const ctx = await RequestContext.fromApi(locals, url);
+	if (!ctx) return json({ message: 'Unauthorized' }, { status: 401 });
 	const body = await request.json();
 
 	if (!body.sponsor) return json({ message: 'sponsor is required' }, { status: 400 });

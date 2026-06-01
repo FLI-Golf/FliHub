@@ -5,7 +5,8 @@ import type { RequestHandler } from './$types';
 // POST /api/franchises/:slug/upload
 // Replaces storyPdfs with up to 3 PDFs sent as pdf_0, pdf_1, pdf_2
 export const POST: RequestHandler = async ({ locals, url, params, request }) => {
-	const ctx = await RequestContext.from(locals, url);
+	const ctx = await RequestContext.fromApi(locals, url);
+	if (!ctx) return json({ message: 'Unauthorized' }, { status: 401 });
 
 	try {
 		const formData = await request.formData();

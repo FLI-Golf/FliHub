@@ -13,7 +13,8 @@ import type { RequestHandler } from './$types';
 const ALLOWED_FIELDS = ['loiDocuments', 'logo'];
 
 export const POST: RequestHandler = async ({ locals, url, params, request }) => {
-	const ctx = await RequestContext.from(locals, url);
+	const ctx = await RequestContext.fromApi(locals, url);
+	if (!ctx) return json({ message: 'Unauthorized' }, { status: 401 });
 	if (ctx.role !== 'admin') return json({ message: 'Forbidden' }, { status: 403 });
 
 	const formData = await request.formData();
