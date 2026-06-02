@@ -8,7 +8,7 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 	
 	
 		// Fetch all core data in parallel — each wrapped so one failure doesn't kill the page
-		const [projects, departments, expenses, approvals, sponsors, franchiseLeads, franchiseOpps, ticketSales] = await Promise.all([
+		const [projects, departments, expenses, approvals, sponsors, franchiseLeads, franchiseOpps, ticketSales, brandingPlacements] = await Promise.all([
 			pb.collection('projects').getFullList({ fields: 'id,name,status,department,project_budget,project_actual_expenses,project_forecasted_expenses,fiscalYear' }).catch(() => []),
 			pb.collection('departments').getFullList({ fields: 'id,name,description,status,department_annual_budget,department_actual_expenses' }).catch(() => []),
 			pb.collection('expenses').getFullList({ fields: 'id,amount,status,project' }).catch(() => []),
@@ -17,6 +17,7 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 			pb.collection('franchise_leads').getFullList({ fields: 'id,status' }).catch(() => []),
 			pb.collection('franchise_opportunities').getFullList({ fields: 'id,status' }).catch(() => []),
 			pb.collection('ticket_sales').getFullList({ fields: 'id,status,grossRevenue,netRevenue,quantity,pricePerTicket,platformFees' }).catch(() => []),
+			pb.collection('branding_placements').getFullList({ fields: 'id,status,grossRevenue,quantity,ratePerPlacement' }).catch(() => []),
 		]);
 	
 		// Budget rollup
@@ -96,6 +97,15 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 			return b.budget - a.budget;
 		});
 	
+		// Branding placement revenue rollup
+		const bp = brandingPlacements as any[];
+		const brandingMetrics = {
+			totalContracted: bp.filter(r => !['proposed','cancelled'].includes(r.status)).reduce((s, r) => s + (r.grossRevenue ?? 0), 0),
+			totalPaid:       bp.filter(r => ['paid','activated','completed'].includes(r.status)).reduce((s, r) => s + (r.grossRevenue ?? 0), 0),
+			totalProposed:   bp.filter(r => r.status === 'proposed').reduce((s, r) => s + (r.grossRevenue ?? 0), 0),
+			count:           bp.length,
+		};
+
 		// Ticket revenue rollup
 		const ts = ticketSales as any[];
 		const ticketMetrics = {
@@ -116,6 +126,7 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 				approvals: appByStatus,
 				sponsors: sponsorMetrics,
 				tickets: ticketMetrics,
+				branding: brandingMetrics,
 				franchise: {
 					pipeline: {
 						leads: franchiseLeads.length,

@@ -7,7 +7,7 @@
 	import {
 		DollarSign, CheckCircle2, Clock, AlertCircle,
 		ArrowDownLeft, BookOpen, Receipt, Building2,
-		Megaphone, FileText, RefreshCw, X, Ticket
+		Megaphone, FileText, RefreshCw, X, Ticket, Flag
 	} from 'lucide-svelte';
 
 	let { data }: { data: PageData } = $props();
@@ -31,6 +31,7 @@
 		license:         { label: 'License',    colorClass: 'bg-blue-900/50 text-blue-300 border-blue-700' },
 		broadcast:       { label: 'Broadcast',  colorClass: 'bg-orange-900/50 text-orange-300 border-orange-700' },
 		ticket_sale:     { label: 'Tickets',    colorClass: 'bg-amber-900/50 text-amber-300 border-amber-700' },
+		branding:        { label: 'Branding',   colorClass: 'bg-emerald-900/50 text-emerald-300 border-emerald-700' },
 		other:           { label: 'Other',      colorClass: 'bg-slate-700 text-slate-300 border-slate-600' },
 	};
 
@@ -283,6 +284,7 @@
 				{:else if key === 'license'}<FileText class="size-3" />
 				{:else if key === 'broadcast'}<ArrowDownLeft class="size-3" />
 				{:else if key === 'ticket_sale'}<Ticket class="size-3" />
+				{:else if key === 'branding'}<Flag class="size-3" />
 				{:else}<DollarSign class="size-3" />{/if}
 				{cfg.label}
 			</span>

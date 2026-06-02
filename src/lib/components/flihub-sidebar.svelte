@@ -236,6 +236,7 @@
 				{ title: 'Player Travel',          url: '/dashboard/player-travel',           icon: Luggage,      roles: ['admin'] },
 				{ title: 'Stage Production',       url: '/dashboard/stage-production',        icon: Mic2,         roles: ['admin'] },
 				{ title: 'On-Course Branding',     url: '/dashboard/on-course-branding',      icon: Flag,         roles: ['admin'] },
+				{ title: 'Branding Revenue',       url: '/dashboard/on-course-branding/pipeline', icon: TrendingUp,  roles: ['admin', 'leader'] },
 				{ title: 'Advertising',            url: '/dashboard/advertising',             icon: Megaphone,    roles: ['admin', 'marketing', 'marketing_lead'] },
 				{ title: 'Stadium Course #1',      url: '/dashboard/stadium-course',          icon: Hammer,       roles: ['admin'] },
 				{ title: 'Scoreboards',            url: '/dashboard/stadium-course/scoreboards', icon: Monitor,   roles: ['admin'] },

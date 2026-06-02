@@ -16,7 +16,7 @@ import type { PageServerLoad } from './$types';
 
 export interface IncomeRecord {
 	id:              string;
-	sourceType:      'sponsor_payment' | 'franchise_fee' | 'license' | 'broadcast' | 'ticket_sale' | 'other';
+	sourceType:      'sponsor_payment' | 'franchise_fee' | 'license' | 'broadcast' | 'ticket_sale' | 'branding' | 'other';
 	sourceName:      string;   // sponsor name, franchise lead name, etc.
 	description:     string;   // payment type / period label
 	amount:          number;
@@ -34,7 +34,7 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 	const { pb } = ctx;
 
 	try {
-		const [sponsorPayments, franchiseDeals, incomingPayments, sponsors, ticketSales] = await Promise.all([
+		const [sponsorPayments, franchiseDeals, incomingPayments, sponsors, ticketSales, brandingPlacements] = await Promise.all([
 			pb.collection('sponsor_payments').getFullList({
 				sort: 'dueDate',
 				expand: 'sponsor',
@@ -57,6 +57,10 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 			}).catch(() => []),
 
 			pb.collection('ticket_sales').getFullList({
+				sort: 'eventDate',
+			}).catch(() => []),
+
+			pb.collection('branding_placements').getFullList({
 				sort: 'eventDate',
 			}).catch(() => []),
 		]);
@@ -195,6 +199,33 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 				invoiceNumber:   ts.invoiceNumber ?? '',
 				workOrderNumber: '',
 				notes:           ts.notes ?? '',
+			});
+		}
+
+		// ── Branding placements ───────────────────────────────────────────────
+		for (const bp of brandingPlacements as any[]) {
+			const stageMap: Record<string, string> = {
+				proposed:   'invoiced',
+				contracted: 'invoiced',
+				invoiced:   'invoiced',
+				paid:       'scheduled',
+				activated:  'received',
+				completed:  'reconciled',
+				cancelled:  'invoiced',
+			};
+			records.push({
+				id:              bp.id,
+				sourceType:      'branding',
+				sourceName:      bp.sponsorName,
+				description:     `${(bp.placementType ?? 'placement').replace(/_/g, ' ')} — ${bp.quantity ?? 0} units @ ${bp.eventName}`,
+				amount:          bp.grossRevenue ?? ((bp.quantity ?? 0) * (bp.ratePerPlacement ?? 0)),
+				status:          stageMap[bp.status] ?? 'invoiced',
+				dueDate:         bp.eventDate ?? '',
+				receivedDate:    bp.receivedDate ?? '',
+				reconciledDate:  bp.reconciledDate ?? '',
+				invoiceNumber:   bp.invoiceNumber ?? '',
+				workOrderNumber: '',
+				notes:           bp.notes ?? '',
 			});
 		}
 
