@@ -6,7 +6,7 @@
 		DollarSign, Users, FolderKanban, Receipt,
 		Trophy, Star, Building2, TrendingUp, ArrowRight,
 		Video, Wrench, Megaphone, Cpu, Scale, Wallet, ShieldCheck, Globe, Handshake,
-		Landmark, Briefcase, Film,
+		Landmark, Briefcase, Film, Ticket,
 		CheckCircle2, Clock, AlertCircle
 	} from 'lucide-svelte';
 
@@ -15,6 +15,8 @@
 	const m = $derived(data.metrics ?? {});
 	const sponsors = $derived(data.metrics?.sponsors ?? { total: 0, totalCommitted: 0, totalPaid: 0, byTier: {} });
 	const franchise = $derived(data.metrics?.franchise ?? { pipeline: { leads: 0, opportunities: 0, deals: 0 } });
+	const tickets  = $derived(data.metrics?.tickets  ?? { totalGross: 0, totalNet: 0, totalReceived: 0, totalProjected: 0, count: 0 });
+	const branding = $derived(data.metrics?.branding ?? { totalContracted: 0, totalPaid: 0, totalProposed: 0, count: 0 });
 	const deptBudgets = $derived(data.metrics?.departmentBudgets ?? []);
 	const budget = $derived(data.metrics?.budget ?? { total: 0, actual: 0, forecasted: 0, remaining: 0 });
 	const projects = $derived(data.metrics?.projects ?? { total: 0, in_progress: 0, planned: 0, completed: 0 });
@@ -218,6 +220,56 @@
 					<div class="flex justify-between"><span class="text-slate-400">Leads</span><span class="font-medium">{franchise.pipeline.leads}</span></div>
 					<div class="flex justify-between"><span class="text-slate-400">Opportunities</span><span class="font-medium">{franchise.pipeline.opportunities}</span></div>
 					<div class="flex justify-between"><span class="text-slate-400">Deals</span><span class="font-medium">{franchise.pipeline.deals}</span></div>
+				</div>
+			</div>
+		</div>
+
+		<!-- Ticket Revenue -->
+		<div class="group/card relative">
+			<a href="/dashboard/ticket-revenue">
+				<Card class="p-5 border-l-4 border-l-amber-500 transition-all duration-150 hover:shadow-lg hover:-translate-y-0.5 cursor-pointer">
+					<div class="flex items-center justify-between mb-3">
+						<p class="text-sm font-medium text-muted-foreground">Ticket Revenue</p>
+						<div class="size-9 rounded-lg bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center transition-transform group-hover/card:scale-110">
+							<Ticket class="size-5 text-amber-600 dark:text-amber-400" />
+						</div>
+					</div>
+					<p class="text-2xl font-bold">{fmt(tickets.totalGross)}</p>
+					<p class="text-xs text-muted-foreground mt-1">{fmt(tickets.totalReceived)} received · {fmt(tickets.totalProjected)} projected</p>
+				</Card>
+			</a>
+			<div class="pointer-events-none absolute left-0 top-full mt-2 z-50 w-56 opacity-0 translate-y-1 group-hover/card:opacity-100 group-hover/card:translate-y-0 transition-all duration-200">
+				<div class="rounded-xl border border-slate-700 bg-slate-900 text-slate-100 shadow-2xl p-3 text-sm space-y-1.5">
+					<p class="font-semibold text-xs uppercase tracking-wider text-amber-400 mb-2">Ticket Sales</p>
+					<div class="flex justify-between"><span class="text-slate-400">Gross</span><span class="font-medium">{fmt(tickets.totalGross)}</span></div>
+					<div class="flex justify-between"><span class="text-slate-400">Net</span><span class="font-medium">{fmt(tickets.totalNet)}</span></div>
+					<div class="flex justify-between"><span class="text-slate-400">Received</span><span class="font-medium">{fmt(tickets.totalReceived)}</span></div>
+					<div class="flex justify-between"><span class="text-slate-400">Events</span><span class="font-medium">{tickets.count}</span></div>
+				</div>
+			</div>
+		</div>
+
+		<!-- On-Course Branding Revenue -->
+		<div class="group/card relative">
+			<a href="/dashboard/on-course-branding/pipeline">
+				<Card class="p-5 border-l-4 border-l-emerald-500 transition-all duration-150 hover:shadow-lg hover:-translate-y-0.5 cursor-pointer">
+					<div class="flex items-center justify-between mb-3">
+						<p class="text-sm font-medium text-muted-foreground">Branding Revenue</p>
+						<div class="size-9 rounded-lg bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center transition-transform group-hover/card:scale-110">
+							<Flag class="size-5 text-emerald-600 dark:text-emerald-400" />
+						</div>
+					</div>
+					<p class="text-2xl font-bold">{fmt(branding.totalContracted)}</p>
+					<p class="text-xs text-muted-foreground mt-1">{fmt(branding.totalPaid)} paid · {fmt(branding.totalProposed)} proposed</p>
+				</Card>
+			</a>
+			<div class="pointer-events-none absolute left-0 top-full mt-2 z-50 w-56 opacity-0 translate-y-1 group-hover/card:opacity-100 group-hover/card:translate-y-0 transition-all duration-200">
+				<div class="rounded-xl border border-slate-700 bg-slate-900 text-slate-100 shadow-2xl p-3 text-sm space-y-1.5">
+					<p class="font-semibold text-xs uppercase tracking-wider text-emerald-400 mb-2">On-Course Branding</p>
+					<div class="flex justify-between"><span class="text-slate-400">Contracted</span><span class="font-medium">{fmt(branding.totalContracted)}</span></div>
+					<div class="flex justify-between"><span class="text-slate-400">Paid</span><span class="font-medium">{fmt(branding.totalPaid)}</span></div>
+					<div class="flex justify-between"><span class="text-slate-400">Proposed</span><span class="font-medium">{fmt(branding.totalProposed)}</span></div>
+					<div class="flex justify-between"><span class="text-slate-400">Deals</span><span class="font-medium">{branding.count}</span></div>
 				</div>
 			</div>
 		</div>
