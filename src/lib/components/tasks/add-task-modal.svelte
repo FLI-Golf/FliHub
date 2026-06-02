@@ -5,7 +5,12 @@
 	import { Label } from '$lib/components/ui/label';
 	import { Plus, Save, X } from 'lucide-svelte';
 
-	let { open = $bindable(false), projectId = '' } = $props();
+	let {
+		open = $bindable(false),
+		projectId = '',
+		contentProductionId = '',
+		contextLabel = ''
+	} = $props();
 
 	let formData = $state({
 		title: '',
@@ -19,13 +24,17 @@
 		tags: '',
 		notes: '',
 		subTasksChecklist: '',
-		projectId: projectId
+		projectId: '',
+		contentProductionId: ''
 	});
 
-	// Update projectId in formData when prop changes
+	// Update relation IDs in formData when props change.
 	$effect(() => {
 		if (projectId) {
 			formData.projectId = projectId;
+		}
+		if (contentProductionId) {
+			formData.contentProductionId = contentProductionId;
 		}
 	});
 
@@ -93,7 +102,8 @@
 			tags: '',
 			notes: '',
 			subTasksChecklist: '',
-			projectId: projectId
+			projectId: projectId,
+			contentProductionId: contentProductionId
 		};
 		error = '';
 	}
@@ -121,7 +131,7 @@
 				Add New Task
 			</Sheet.Title>
 			<Sheet.Description class="text-slate-300">
-				Create a new task to track work and progress.
+				{contextLabel ? `Create a new task for ${contextLabel}.` : 'Create a new task to track work and progress.'}
 			</Sheet.Description>
 		</Sheet.Header>
 

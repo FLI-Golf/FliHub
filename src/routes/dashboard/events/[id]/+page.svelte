@@ -126,6 +126,14 @@
 	// Unassigned talent (not already on this event)
 	const assignedIds = $derived(new Set((data.eventTalent ?? []).map((et: any) => et.talent)));
 	const availableTalent = $derived((data.allTalent ?? []).filter((t: any) => !assignedIds.has(t.id)));
+
+	function bookingName(record: any) {
+		return record?.expand?.talentGroup?.name ?? record?.expand?.talent?.name ?? record?.talentGroup ?? record?.talent ?? '—';
+	}
+
+	function bookingInitial(record: any) {
+		return bookingName(record).charAt(0) || '?';
+	}
 </script>
 
 <svelte:head><title>{event?.name ?? 'Event'} — FliHub</title></svelte:head>
@@ -190,10 +198,10 @@
 				<div class="flex items-center justify-between px-5 py-3">
 					<div class="flex items-center gap-3">
 						<div class="w-8 h-8 rounded-full bg-gray-700 flex items-center justify-center text-sm font-bold text-gray-300">
-							{et.expand?.talent?.name?.charAt(0) ?? '?'}
+							{bookingInitial(et)}
 						</div>
 						<div>
-							<div class="font-medium text-white text-sm">{et.expand?.talent?.name ?? et.talent}</div>
+							<div class="font-medium text-white text-sm">{bookingName(et)}</div>
 							<div class="text-xs text-gray-400">{et.role} · {fmt$(et.confirmedRate ?? event?.defaultRate ?? 0)}</div>
 						</div>
 					</div>
@@ -274,7 +282,7 @@
 				{#each data.eventPayments as p (p.id)}
 				<div class="flex items-center justify-between px-5 py-3">
 					<div>
-						<div class="font-medium text-white text-sm">{p.expand?.talent?.name ?? '—'}</div>
+						<div class="font-medium text-white text-sm">{bookingName(p)}</div>
 						<div class="text-xs text-gray-400">{p.paymentType}{#if p.isBonus} · ⭐ Bonus{/if}{#if p.description} · {p.description}{/if}</div>
 						{#if p.status === 'approval_required'}
 						<div class="flex items-center gap-1 text-xs text-orange-400 mt-0.5"><AlertCircle class="w-3 h-3" />Awaiting approval</div>

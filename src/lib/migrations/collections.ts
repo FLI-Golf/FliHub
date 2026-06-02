@@ -89,6 +89,12 @@ export const collections = [
 				required: false
 			},
 			{
+				name: 'contentProductionId',
+				type: 'relation',
+				required: false,
+				options: { collectionId: 'content_production', maxSelect: 1 }
+			},
+			{
 				name: 'status',
 				type: 'select',
 				required: true,
@@ -1121,6 +1127,8 @@ export const collections = [
 				options: { maxSelect: 1, values: ['brief','shoot','edit','approval','published','paid','cancelled'] }
 			},
 			{ name: 'description',     type: 'text',   required: false },
+			{ name: 'department',      type: 'relation', required: false, options: { collectionId: 'departments', maxSelect: 1 } },
+			{ name: 'project',         type: 'relation', required: false, options: { collectionId: 'projects', maxSelect: 1 } },
 			{ name: 'talent',          type: 'relation', required: false, options: { collectionId: 'talent', maxSelect: 10 } },
 			{ name: 'assignedTo',      type: 'text',   required: false, options: { max: 255 } },
 			{ name: 'dueDate',         type: 'date',   required: false },

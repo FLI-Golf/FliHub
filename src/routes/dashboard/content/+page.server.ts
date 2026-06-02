@@ -4,10 +4,10 @@ import type { PageServerLoad } from './$types';
 export const load: PageServerLoad = async ({ locals, url }) => {
 	const ctx = await RequestContext.from(locals, url);
 
-	const [items, talent, userProfiles] = await Promise.all([
+	const [items, talent, userProfiles, departments, projects, tasks] = await Promise.all([
 		ctx.pb.collection('content_production').getFullList({
 			sort: '-created',
-			expand: 'assignedTo,talent'
+			expand: 'assignedTo,talent,department,project'
 		}).catch(() => []),
 		ctx.pb.collection('talent').getFullList({
 			sort: 'name',
@@ -17,6 +17,19 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 			filter: 'role = "admin" || role = "leader"',
 			sort: 'firstName,lastName',
 			fields: 'id,firstName,lastName,email'
+		}).catch(() => []),
+		ctx.pb.collection('departments').getFullList({
+			sort: 'name',
+			fields: 'id,name,status'
+		}).catch(() => []),
+		ctx.pb.collection('projects').getFullList({
+			sort: 'name',
+			fields: 'id,name,department,status'
+		}).catch(() => []),
+		ctx.pb.collection('tasks').getFullList({
+			filter: 'contentProductionId != ""',
+			sort: 'status,dueDate',
+			expand: 'assignedTo,contentProductionId'
 		}).catch(() => [])
 	]);
 
@@ -32,5 +45,5 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 		pendingApproval: items.filter((i: any) => i.requiresApproval && i.approvalStatus === 'pending').length
 	};
 
-	return { items, talent, userProfiles, stats };
+	return { items, talent, userProfiles, departments, projects, tasks, stats };
 };

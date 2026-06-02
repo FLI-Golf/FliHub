@@ -5,9 +5,11 @@
 	import { pipelineMove } from '$lib/pipeline';
 	import Card from '$lib/components/ui/card.svelte';
 	import { Button } from '$lib/components/ui/button';
+	import AddTaskModal from '$lib/components/tasks/add-task-modal.svelte';
 	import {
 		Plus, AlertCircle, X, FileText, Camera, Scissors,
-		CheckCircle2, Globe, DollarSign, Ban, Clock
+		CheckCircle2, Globe, DollarSign, Ban, Clock,
+		Building2, FolderOpen, ListChecks
 	} from 'lucide-svelte';
 	import type { PageData } from './$types';
 
@@ -68,6 +70,7 @@
 				tags.push({ label: 'Rejected', colorClass: 'bg-red-900/40 text-red-400 border-red-700' });
 			}
 			const metaParts: string[] = [];
+			if (item.expand?.department?.name) metaParts.push(item.expand.department.name);
 			if (item.budget) metaParts.push(fmt$(item.budget));
 			if (item.dueDate) metaParts.push(fmtDate(item.dueDate));
 
@@ -111,9 +114,17 @@
 	let selectedId = $state<string | null>(null);
 	let detailBusy = $state(false);
 	let detailErr  = $state('');
+	let showTaskModal = $state(false);
 
 	const selected = $derived(
 		selectedId ? (data.items ?? []).find((i: any) => i.id === selectedId) ?? null : null
+	);
+	const selectedTasks = $derived(
+		selectedId
+			? (data.tasks ?? []).filter((task: any) =>
+				task.contentProductionId === selectedId || task.expand?.contentProductionId?.id === selectedId
+			)
+			: []
 	);
 
 	function openDetail(item: PipelineCardItem) {
@@ -163,12 +174,24 @@
 	let newErr   = $state('');
 	let newForm  = $state({
 		title: '', contentType: 'youtube', description: '',
-		dueDate: '', budget: '', requiresApproval: false, notes: ''
+		department: '', project: '', dueDate: '', budget: '', requiresApproval: false, notes: ''
+	});
+	const availableProjects = $derived(
+		(data.projects ?? []).filter((project: any) =>
+			!newForm.department || !project.department || project.department === newForm.department
+		)
+	);
+
+	$effect(() => {
+		if (newForm.project && !availableProjects.some((project: any) => project.id === newForm.project)) {
+			newForm.project = '';
+		}
 	});
 
 	async function submitNew(e: SubmitEvent) {
 		e.preventDefault();
 		if (!newForm.title.trim()) { newErr = 'Title is required'; return; }
+		if (!newForm.department) { newErr = 'Department is required'; return; }
 		newBusy = true; newErr = '';
 		try {
 			const res = await fetch('/api/content', {
@@ -181,7 +204,7 @@
 			});
 			if (!res.ok) { const d = await res.json().catch(() => ({})); throw new Error(d.message ?? 'Failed'); }
 			showNew = false;
-			newForm = { title: '', contentType: 'youtube', description: '', dueDate: '', budget: '', requiresApproval: false, notes: '' };
+			newForm = { title: '', contentType: 'youtube', description: '', department: '', project: '', dueDate: '', budget: '', requiresApproval: false, notes: '' };
 			await invalidateAll();
 		} catch (err: any) {
 			newErr = err.message ?? 'Failed';
@@ -192,8 +215,22 @@
 
 	const INPUT = 'w-full rounded-lg border border-slate-600 bg-slate-800 text-slate-100 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 placeholder:text-slate-500';
 	const LABEL = 'block text-xs font-medium text-slate-400 mb-1';
+	const TASK_STATUS_CLASS: Record<string, string> = {
+		todo: 'bg-slate-700 text-slate-200',
+		in_progress: 'bg-blue-900/60 text-blue-300 border border-blue-700/50',
+		blocked: 'bg-red-900/60 text-red-300 border border-red-700/50',
+		completed: 'bg-emerald-900/60 text-emerald-300 border border-emerald-700/50',
+		cancelled: 'bg-slate-800 text-slate-500'
+	};
+	const TASK_STATUS_LABEL: Record<string, string> = {
+		todo: 'To Do',
+		in_progress: 'In Progress',
+		blocked: 'Blocked',
+		completed: 'Completed',
+		cancelled: 'Cancelled'
+	};
 
-	const s = data.stats;
+	const s = $derived(data.stats);
 </script>
 
 <svelte:head><title>Content Pipeline — FliHub</title></svelte:head>
@@ -289,6 +326,18 @@
 
 					<!-- Meta -->
 					<div class="space-y-1.5 text-xs text-slate-400">
+						{#if selected.expand?.department}
+							<div class="flex items-center gap-1.5">
+								<Building2 class="size-3.5 shrink-0" />
+								Department: <span class="text-slate-200">{selected.expand.department.name}</span>
+							</div>
+						{/if}
+						{#if selected.expand?.project}
+							<div class="flex items-center gap-1.5">
+								<FolderOpen class="size-3.5 shrink-0" />
+								Project: <span class="text-slate-200">{selected.expand.project.name}</span>
+							</div>
+						{/if}
 						{#if selected.budget}
 							<div class="flex items-center gap-1.5">
 								<DollarSign class="size-3.5 shrink-0" />
@@ -345,6 +394,41 @@
 						</div>
 					{/if}
 
+					<!-- Linked tasks -->
+					<div class="rounded-lg border border-slate-700 bg-slate-900/40 p-3 space-y-3">
+						<div class="flex items-center justify-between gap-2">
+							<div class="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-slate-400">
+								<ListChecks class="size-3.5" />
+								Tasks
+							</div>
+							<button
+								type="button"
+								onclick={() => showTaskModal = true}
+								class="text-[10px] px-2 py-1 rounded border border-emerald-700/60 text-emerald-300 hover:bg-emerald-950/40 transition-colors">
+								Add Task
+							</button>
+						</div>
+						{#if selectedTasks.length}
+							<div class="space-y-2">
+								{#each selectedTasks as task}
+									<div class="rounded-md border border-slate-700/70 bg-slate-950/40 p-2">
+										<div class="flex items-start justify-between gap-2">
+											<p class="text-xs font-medium text-slate-200 leading-snug">{task.title}</p>
+											<span class="text-[10px] px-1.5 py-0.5 rounded whitespace-nowrap {TASK_STATUS_CLASS[task.status] ?? TASK_STATUS_CLASS.todo}">
+												{TASK_STATUS_LABEL[task.status] ?? task.status}
+											</span>
+										</div>
+										{#if task.dueDate}
+											<p class="text-[10px] text-slate-500 mt-1">Due {fmtDate(task.dueDate)}</p>
+										{/if}
+									</div>
+								{/each}
+							</div>
+						{:else}
+							<p class="text-xs text-slate-500">No tasks linked yet.</p>
+						{/if}
+					</div>
+
 					{#if detailErr}
 						<p class="text-xs text-red-400">{detailErr}</p>
 					{/if}
@@ -394,39 +478,60 @@
 				{/if}
 
 				<div>
-					<label class={LABEL}>Title *</label>
-					<input bind:value={newForm.title} class={INPUT} placeholder="Episode 12 — Paul McBeth Interview" required />
+					<label for="content-title" class={LABEL}>Title *</label>
+					<input id="content-title" bind:value={newForm.title} class={INPUT} placeholder="Episode 12 — Paul McBeth Interview" required />
 				</div>
 
 				<div class="grid grid-cols-2 gap-3">
 					<div>
-						<label class={LABEL}>Content Type *</label>
-						<select bind:value={newForm.contentType} class={INPUT}>
+						<label for="content-type" class={LABEL}>Content Type *</label>
+						<select id="content-type" bind:value={newForm.contentType} class={INPUT}>
 							{#each Object.entries(TYPE_LABELS) as [val, label]}
 								<option value={val}>{label}</option>
 							{/each}
 						</select>
 					</div>
 					<div>
-						<label class={LABEL}>Due Date</label>
-						<input bind:value={newForm.dueDate} type="date" class={INPUT} />
+						<label for="content-due-date" class={LABEL}>Due Date</label>
+						<input id="content-due-date" bind:value={newForm.dueDate} type="date" class={INPUT} />
+					</div>
+				</div>
+
+				<div class="grid grid-cols-2 gap-3">
+					<div>
+						<label for="content-department" class={LABEL}>Department *</label>
+						<select id="content-department" bind:value={newForm.department} class={INPUT} required>
+							<option value="">Select department</option>
+							{#each data.departments ?? [] as department}
+								<option value={department.id}>{department.name}</option>
+							{/each}
+						</select>
+					</div>
+					<div>
+						<label for="content-project" class={LABEL}>Related Project</label>
+						<select id="content-project" bind:value={newForm.project} class={INPUT}>
+							<option value="">None</option>
+							{#each availableProjects as project}
+								<option value={project.id}>{project.name}</option>
+							{/each}
+						</select>
 					</div>
 				</div>
 
 				<div>
-					<label class={LABEL}>Description</label>
-					<textarea bind:value={newForm.description} rows="2"
+					<label for="content-description" class={LABEL}>Description</label>
+					<textarea id="content-description" bind:value={newForm.description} rows="2"
 						class="{INPUT} resize-none" placeholder="Brief overview of the content…"></textarea>
 				</div>
 
 				<div>
-					<label class={LABEL}>Budget ($)</label>
-					<input bind:value={newForm.budget} type="number" min="0" class={INPUT} placeholder="500" />
+					<label for="content-budget" class={LABEL}>Budget ($)</label>
+					<input id="content-budget" bind:value={newForm.budget} type="number" min="0" class={INPUT} placeholder="500" />
 				</div>
 
 				<div>
-					<label class={LABEL}>Notes</label>
-					<textarea bind:value={newForm.notes} rows="2"
+					<label for="content-notes" class={LABEL}>Notes</label>
+					<textarea id="content-notes" bind:value={newForm.notes} rows="2"
 						class="{INPUT} resize-none" placeholder="Internal notes…"></textarea>
 				</div>
 
@@ -447,4 +552,12 @@
 			</form>
 		</div>
 	</div>
+{/if}
+
+{#if selected}
+	<AddTaskModal
+		bind:open={showTaskModal}
+		contentProductionId={selected.id}
+		contextLabel={selected.title}
+	/>
 {/if}

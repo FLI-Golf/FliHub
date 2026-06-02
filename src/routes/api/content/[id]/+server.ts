@@ -8,6 +8,7 @@ import type { RequestHandler } from './$types';
 
 const ALLOWED = [
 	'title', 'contentType', 'stage', 'description', 'talent', 'assignedTo',
+	'department', 'project',
 	'dueDate', 'budget', 'actualCost', 'requiresApproval', 'approvalStatus',
 	'approvedBy', 'approvedAt', 'publishedUrl', 'paymentStatus', 'notes'
 ];

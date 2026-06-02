@@ -85,7 +85,7 @@
 			if (sortCol === 'title')     cmp = (a.title ?? '').localeCompare(b.title ?? '');
 			if (sortCol === 'status')    cmp = (STATUS_ORDER[a.status] ?? 9) - (STATUS_ORDER[b.status] ?? 9);
 			if (sortCol === 'priority')  cmp = (PRIORITY_ORDER[a.priority] ?? 9) - (PRIORITY_ORDER[b.priority] ?? 9);
-			if (sortCol === 'project')    cmp = (a.expand?.projectId?.name ?? '').localeCompare(b.expand?.projectId?.name ?? '');
+			if (sortCol === 'project')    cmp = workContext(a).label.localeCompare(workContext(b).label);
 			if (sortCol === 'assignedTo') cmp = (a.expand?.assignedTo?.[0] ? [a.expand.assignedTo[0].firstName, a.expand.assignedTo[0].lastName].filter(Boolean).join(' ') : '').localeCompare(b.expand?.assignedTo?.[0] ? [b.expand.assignedTo[0].firstName, b.expand.assignedTo[0].lastName].filter(Boolean).join(' ') : '');
 			if (sortCol === 'budget')    cmp = (a.task_budget ?? 0) - (b.task_budget ?? 0);
 			if (sortCol === 'hours')     cmp = (a.estimatedHours ?? 0) - (b.estimatedHours ?? 0);
@@ -128,6 +128,11 @@
 		const list = t.expand?.assignedTo;
 		if (!list?.length) return '—';
 		return list.map((u: any) => [u.firstName, u.lastName].filter(Boolean).join(' ') || u.email || '?').join(', ');
+	}
+	function workContext(t: any): { label: string; type: 'project' | 'content' | 'none' } {
+		if (t.expand?.projectId) return { label: t.expand.projectId.name, type: 'project' };
+		if (t.expand?.contentProductionId) return { label: t.expand.contentProductionId.title, type: 'content' };
+		return { label: '—', type: 'none' };
 	}
 
 	const STATUS_LABEL: Record<string, string> = {
@@ -292,7 +297,7 @@
 						{#if visibleCols.project}
 						<th class="px-4 py-3 text-left font-medium text-slate-400">
 							<button onclick={() => toggleSort('project')} class="flex items-center gap-1.5 hover:text-slate-200 transition-colors group">
-								Project <span class="text-slate-600 group-hover:text-slate-400">{#if sortCol === 'project'}{#if sortDir === 'asc'}<ChevronUp class="size-3.5" />{:else}<ChevronDown class="size-3.5" />{/if}{:else}<ChevronsUpDown class="size-3.5" />{/if}</span>
+								Work Context <span class="text-slate-600 group-hover:text-slate-400">{#if sortCol === 'project'}{#if sortDir === 'asc'}<ChevronUp class="size-3.5" />{:else}<ChevronDown class="size-3.5" />{/if}{:else}<ChevronsUpDown class="size-3.5" />{/if}</span>
 							</button>
 						</th>
 						{/if}
@@ -347,6 +352,7 @@
 						{#each filtered() as task (task.id)}
 							{@const overdue = isOverdue(task)}
 							{@const sub = subtaskProgress(task)}
+							{@const context = workContext(task)}
 							<tr onclick={() => openEdit(task)}
 								class="cursor-pointer transition-colors hover:bg-slate-700/40 {overdue ? 'border-l-2 border-l-red-500' : ''}">
 
@@ -379,8 +385,11 @@
 
 								{#if visibleCols.project}
 								<td class="px-4 py-3 max-w-[160px]">
-									{#if task.expand?.projectId}
-										<span class="text-slate-300 truncate block">{task.expand.projectId.name}</span>
+									{#if context.type !== 'none'}
+										<span class="text-slate-300 truncate block">{context.label}</span>
+										<span class="text-[10px] uppercase tracking-wide {context.type === 'content' ? 'text-emerald-400' : 'text-slate-500'}">
+											{context.type}
+										</span>
 									{:else}<span class="text-slate-600">—</span>{/if}
 								</td>
 								{/if}

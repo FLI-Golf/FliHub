@@ -30,6 +30,9 @@ export const PATCH: RequestHandler = async ({ request, locals, params }) => {
 		if (data.subTasksChecklist !== undefined) {
 			updateData.subTasksChecklist = data.subTasksChecklist;
 		}
+		if (data.contentProductionId !== undefined) {
+			updateData.contentProductionId = data.contentProductionId || null;
+		}
 
 		const task = await pb.collection('tasks').update(params.id, updateData);
 

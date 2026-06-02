@@ -28,6 +28,9 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 		if (data.notes) taskData.notes = data.notes;
 		if (data.subTasksChecklist) taskData.subTasksChecklist = data.subTasksChecklist;
 		if (data.projectId && data.projectId !== '') taskData.projectId = data.projectId;
+		if (data.contentProductionId && data.contentProductionId !== '') {
+			taskData.contentProductionId = data.contentProductionId;
+		}
 
 		const task = await pb.collection('tasks').create(taskData);
 
