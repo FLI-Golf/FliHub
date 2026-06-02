@@ -137,7 +137,7 @@
 		<div>
 			<div class="flex items-center gap-2 mb-1">
 				<span class="text-[10px] font-bold uppercase tracking-widest text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/40 px-2 py-0.5 rounded">
-					Funded June 15, 2026 · Seed Round
+					Funded June 30, 2026 · Seed Round
 				</span>
 				<span class="text-[10px] font-bold uppercase tracking-widest text-muted-foreground bg-muted px-2 py-0.5 rounded">
 					Young America Capital, LLC
@@ -361,7 +361,7 @@
 				</p>
 				<p class="text-xs mt-2 text-muted-foreground/70">
 					Presented by Young America Capital, LLC · SEC Registered Broker-Dealer · FINRA, SIPC ·
-					Round Type: Seed · Funded June 15, 2026
+					Round Type: Seed · Funded June 30, 2026
 				</p>
 			</div>
 		</div>

@@ -67,9 +67,9 @@ const FRANCHISES = {
 };
 
 const TOURNAMENTS = [
-  { id: '2najeglkb5rq5av', name: 'FLI Golf Season Opener',    number: 1, prizePool: 500000,  date: '2027-02-01' },
-  { id: 'olf8nz8ov6a1nma', name: 'Spring Championship',       number: 2, prizePool: 566667,  date: '2027-04-01' },
-  { id: 'zgi3dqik3hl5szc', name: 'Mid-Season Classic',        number: 3, prizePool: 633333,  date: '2027-06-01' },
+  { id: '2najeglkb5rq5av', name: 'FLI Golf Season Opener',    number: 1, prizePool: 500000,  date: '2027-04-24' },
+  { id: 'olf8nz8ov6a1nma', name: 'Spring Championship',       number: 2, prizePool: 566667,  date: '2027-05-22' },
+  { id: 'zgi3dqik3hl5szc', name: 'Mid-Season Classic',        number: 3, prizePool: 633333,  date: '2027-06-26' },
 ];
 
 // ─── Manager assignments (8 pros) ─────────────────────────────────────────────

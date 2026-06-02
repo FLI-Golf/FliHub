@@ -57,8 +57,8 @@ function getRandomAmount(min: number, max: number): number {
 function getRandomDate(range: string): string {
   const ranges: any = {
     phase1: { start: new Date('2026-04-01'), end: new Date('2026-09-30') },
-    phase2: { start: new Date('2026-10-01'), end: new Date('2027-01-31') },
-    phase3: { start: new Date('2027-02-01'), end: new Date('2028-01-01') },
+    phase2: { start: new Date('2026-10-01'), end: new Date('2027-04-24') },
+    phase3: { start: new Date('2027-04-25'), end: new Date('2028-01-01') },
     all: { start: new Date('2026-04-01'), end: new Date('2028-01-01') }
   };
 
@@ -108,7 +108,8 @@ export const POST: RequestHandler = async ({ request, locals }) => {
     // Generate status distribution
     const statuses: string[] = [];
     Object.entries(config.statusMix).forEach(([status, count]) => {
-      for (let i = 0; i < count as number; i++) {
+      const statusCount = Number(count) || 0;
+      for (let i = 0; i < statusCount; i++) {
         statuses.push(status);
       }
     });

@@ -1222,9 +1222,9 @@
 											<div class="flex-1 min-w-0">
 												<div class="font-mono text-sm font-medium">{field.name}</div>
 												<div class="text-sm text-muted-foreground">{field.description}</div>
-												{#if field.relatesTo}
+												{#if (field as any).relatesTo}
 													<div class="text-xs text-blue-600 dark:text-blue-400 mt-1">
-														→ relates to: <span class="font-mono">{field.relatesTo}</span>
+														→ relates to: <span class="font-mono">{(field as any).relatesTo}</span>
 													</div>
 												{/if}
 											</div>
@@ -1416,18 +1416,18 @@
 
 					<!-- Phase timeline -->
 					<div>
-						<h3 class="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-3">Execution Phases — Funding Date: June 15, 2026</h3>
+						<h3 class="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-3">Execution Phases — Funding Date: June 30, 2026</h3>
 						<div class="grid grid-cols-1 md:grid-cols-3 gap-3">
 							{#each [
 								{
-									phase: 'Phase 1', dates: 'Jun 15 – Sep 30, 2026', budget: '$2,800,000',
+									phase: 'Phase 1', dates: 'Jun 30 – Sep 30, 2026', budget: '$2,800,000',
 									color: 'bg-blue-950/50 border-blue-700/50 text-blue-200',
 									accent: 'text-blue-300',
 									focus: 'Foundation',
 									items: ['Executive & office staff hired', 'San Diego + Scottsdale offices open', 'App development begun', 'Player contracts signed', 'Gaming licenses secured', 'Documentary filming started', 'Marketing & PR launched']
 								},
 								{
-									phase: 'Phase 2', dates: 'Oct 1, 2026 – Jan 31, 2027', budget: '$1,473,300',
+									phase: 'Phase 2', dates: 'Oct 1, 2026 – Apr 24, 2027', budget: '$1,473,300',
 									color: 'bg-violet-950/50 border-violet-700/50 text-violet-200',
 									accent: 'text-violet-300',
 									focus: 'Launch',
@@ -1771,9 +1771,9 @@
 												<div class="flex-1 min-w-0">
 													<div class="font-mono text-sm font-medium">{field.name}</div>
 													<div class="text-sm text-muted-foreground">{field.description}</div>
-													{#if field.relatesTo}
+													{#if (field as any).relatesTo}
 														<div class="text-xs text-blue-600 dark:text-blue-400 mt-1">
-															→ relates to: <span class="font-mono">{field.relatesTo}</span>
+															→ relates to: <span class="font-mono">{(field as any).relatesTo}</span>
 														</div>
 													{/if}
 												</div>
@@ -2251,9 +2251,9 @@
 												<div class="flex-1 min-w-0">
 													<div class="font-mono text-sm font-medium">{field.name}</div>
 													<div class="text-sm text-muted-foreground">{field.description}</div>
-													{#if field.relatesTo}
+													{#if (field as any).relatesTo}
 														<div class="text-xs text-blue-600 dark:text-blue-400 mt-1">
-															→ relates to: <span class="font-mono">{field.relatesTo}</span>
+															→ relates to: <span class="font-mono">{(field as any).relatesTo}</span>
 														</div>
 													{/if}
 												</div>
@@ -2529,9 +2529,9 @@
 												<div class="flex-1 min-w-0">
 													<div class="font-mono text-sm font-medium">{field.name}</div>
 													<div class="text-sm text-muted-foreground">{field.description}</div>
-													{#if field.relatesTo}
+													{#if (field as any).relatesTo}
 														<div class="text-xs text-blue-600 dark:text-blue-400 mt-1">
-															→ relates to: <span class="font-mono">{field.relatesTo}</span>
+															→ relates to: <span class="font-mono">{(field as any).relatesTo}</span>
 														</div>
 													{/if}
 												</div>
@@ -3014,9 +3014,9 @@
 												<div class="flex-1 min-w-0">
 													<div class="font-mono text-sm font-medium">{field.name}</div>
 													<div class="text-sm text-muted-foreground">{field.description}</div>
-													{#if field.relatesTo}
+													{#if (field as any).relatesTo}
 														<div class="text-xs text-blue-600 dark:text-blue-400 mt-1">
-															→ relates to: <span class="font-mono">{field.relatesTo}</span>
+															→ relates to: <span class="font-mono">{(field as any).relatesTo}</span>
 														</div>
 													{/if}
 												</div>
@@ -3400,9 +3400,9 @@
 												<div class="flex-1 min-w-0">
 													<div class="font-mono text-sm font-medium">{field.name}</div>
 													<div class="text-sm text-muted-foreground">{field.description}</div>
-													{#if field.relatesTo}
+													{#if (field as any).relatesTo}
 														<div class="text-xs text-blue-600 dark:text-blue-400 mt-1">
-															→ relates to: <span class="font-mono">{field.relatesTo}</span>
+															→ relates to: <span class="font-mono">{(field as any).relatesTo}</span>
 														</div>
 													{/if}
 												</div>
@@ -3690,9 +3690,9 @@
 												<div class="flex-1 min-w-0">
 													<div class="font-mono text-sm font-medium">{field.name}</div>
 													<div class="text-sm text-muted-foreground">{field.description}</div>
-													{#if field.relatesTo}
+													{#if (field as any).relatesTo}
 														<div class="text-xs text-blue-600 dark:text-blue-400 mt-1">
-															→ relates to: <span class="font-mono">{field.relatesTo}</span>
+															→ relates to: <span class="font-mono">{(field as any).relatesTo}</span>
 														</div>
 													{/if}
 												</div>
@@ -3920,9 +3920,9 @@
 												<div class="flex-1 min-w-0">
 													<div class="font-mono text-sm font-medium">{field.name}</div>
 													<div class="text-sm text-muted-foreground">{field.description}</div>
-													{#if field.relatesTo}
+													{#if (field as any).relatesTo}
 														<div class="text-xs text-blue-600 dark:text-blue-400 mt-1">
-															→ relates to: <span class="font-mono">{field.relatesTo}</span>
+															→ relates to: <span class="font-mono">{(field as any).relatesTo}</span>
 														</div>
 													{/if}
 												</div>
@@ -4091,8 +4091,8 @@
 												<div class="flex-1 min-w-0">
 													<div class="font-mono text-sm font-medium">{field.name}</div>
 													<div class="text-sm text-muted-foreground">{field.description}</div>
-													{#if field.relatesTo}
-														<div class="text-xs text-blue-600 dark:text-blue-400 mt-1">→ relates to: <span class="font-mono">{field.relatesTo}</span></div>
+													{#if (field as any).relatesTo}
+														<div class="text-xs text-blue-600 dark:text-blue-400 mt-1">→ relates to: <span class="font-mono">{(field as any).relatesTo}</span></div>
 													{/if}
 												</div>
 											</div>

@@ -123,7 +123,7 @@
 	<div class="flex items-start justify-between flex-wrap gap-3">
 		<div>
 			<h1 class="text-3xl font-bold mb-1">Financial Projections</h1>
-			<p class="text-muted-foreground">FLI Golf P&amp;L · FY 2026–2031 · Funded June 15, 2025</p>
+			<p class="text-muted-foreground">FLI Golf P&amp;L · FY 2026–2031 · Funded June 30, 2026</p>
 		</div>
 		<button
 			type="button"
@@ -154,7 +154,7 @@
 					<div class="grid grid-cols-2 gap-3 text-xs">
 						<div>
 							<p class="text-slate-500 mb-1">Start Date</p>
-							<p class="font-semibold text-slate-200">June 15, 2025</p>
+							<p class="font-semibold text-slate-200">June 30, 2026</p>
 							<p class="text-slate-600 text-[10px] mt-0.5">Funding received</p>
 						</div>
 						<div>
@@ -214,7 +214,7 @@
 			<span class="size-7 rounded-full bg-amber-500 text-white text-xs font-black flex items-center justify-center shrink-0 mt-0.5">1</span>
 			<div>
 				<p class="text-xs font-bold text-amber-400 uppercase tracking-wide">Phase 1 — Pre-Tournaments</p>
-				<p class="text-xl font-black text-white mt-0.5">Funded June 15, 2025</p>
+				<p class="text-xl font-black text-white mt-0.5">Funded June 30, 2026</p>
 				<p class="text-xs text-slate-400 mt-1">$7.5M seed raise covers operations, technology, and infrastructure build-out. Spending is entirely pre-revenue — no tournament payouts, no franchise cuts. Investment year with expected net loss.</p>
 				<div class="flex items-center gap-3 mt-2">
 					<span class="text-[10px] font-semibold text-amber-300 bg-amber-950/60 border border-amber-800 rounded px-2 py-0.5">$7.5M raised</span>
@@ -228,9 +228,9 @@
 			<div>
 				<p class="text-xs font-bold text-emerald-400 uppercase tracking-wide">Phase 2 — Tournaments Live</p>
 				<p class="text-xl font-black text-white mt-0.5">Revenue Positive 2027</p>
-				<p class="text-xs text-slate-400 mt-1">First tournament Jan 31, 2027. Spending profile changes dramatically — prize pools, pro payouts, and franchise cuts all activate. League revenue covers operations by 2027. No second raise needed; growth is self-funded from here.</p>
+				<p class="text-xs text-slate-400 mt-1">First tournament Apr 24, 2027. Spending profile changes dramatically — prize pools, pro payouts, and franchise cuts all activate. League revenue covers operations by 2027. No second raise needed; growth is self-funded from here.</p>
 				<div class="flex items-center gap-3 mt-2">
-					<span class="text-[10px] font-semibold text-emerald-300 bg-emerald-950/60 border border-emerald-800 rounded px-2 py-0.5">First tournament Jan 31, 2027</span>
+					<span class="text-[10px] font-semibold text-emerald-300 bg-emerald-950/60 border border-emerald-800 rounded px-2 py-0.5">First tournament Apr 24, 2027</span>
 					<span class="text-[10px] text-slate-500">{fmt(netProfit[2027])} net '27 · {fmt(netProfit[2031])} net by '31</span>
 				</div>
 			</div>
@@ -552,12 +552,12 @@
 					{#each [
 						{
 							num: '1',
-							period: '2025–2026',
+							period: '2026',
 							phase: 'Pre-Tournaments',
 							color: 'border-amber-500 bg-amber-950/20',
 							badge: 'bg-amber-500',
 							items: [
-								{ label: 'Funded',             value: 'June 15, 2025' },
+								{ label: 'Funded',             value: 'June 30, 2026' },
 								{ label: 'Capital raised',     value: '$7.5M seed round' },
 								{ label: 'Net position',       value: fmt(netProfit[2026]), neg: true },
 								{ label: 'Spend profile',      value: 'Ops, tech, hiring — no payouts' },
@@ -587,7 +587,7 @@
 								{#each stage.items as item}
 									<div>
 										<p class="text-[10px] text-slate-500 uppercase tracking-wide">{item.label}</p>
-										<p class="text-xs font-semibold {item.pos ? 'text-emerald-400' : item.neg ? 'text-red-400' : 'text-slate-200'}">{item.value}</p>
+										<p class="text-xs font-semibold {(item as any).pos ? 'text-emerald-400' : (item as any).neg ? 'text-red-400' : 'text-slate-200'}">{item.value}</p>
 									</div>
 								{/each}
 							</div>

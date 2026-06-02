@@ -98,7 +98,7 @@
 			<span class="text-xs font-bold text-emerald-400 uppercase tracking-wide">Phase 2 — Tournaments Live</span>
 		</div>
 		<div class="flex items-center gap-4 text-xs text-slate-400 flex-wrap">
-			<span>Season 2027 · First tournament <span class="text-white font-semibold">Jan 31, 2027</span></span>
+			<span>Season 2027 · First tournament <span class="text-white font-semibold">Apr 24, 2027</span></span>
 			<span class="text-slate-600">·</span>
 			<span>6 tournaments · prize pools escalate each event</span>
 			<span class="text-slate-600">·</span>
@@ -184,10 +184,10 @@
 	</div>
 
 	<!-- Season Budget Summary -->
-	{#if data.activeSeason && data.seasonBudget > 0}
+	{#if data.activeSeasonRecord && data.seasonBudget > 0}
 		<div class="bg-slate-800 border border-slate-700 rounded-xl p-6">
 			<h2 class="text-xl font-semibold text-slate-100 mb-4">
-				Season {data.activeSeason} — Prize Budget
+				Season {data.activeSeasonRecord.year ?? data.activeSeasonRecord.name} — Prize Budget
 			</h2>
 			<div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
 				<div class="text-center p-4 bg-yellow-900/30 border border-yellow-700/40 rounded-lg">
@@ -242,7 +242,7 @@
 	<div class="rounded-lg border border-slate-700 overflow-hidden">
 		<div class="divide-y divide-slate-700">
 			{#each data.tournaments as tournament, i}
-				{@const scheduledPurse = purseByNumber[tournament.tournamentNumber]}
+				{@const scheduledPurse = purseByNumber[tournament.tournamentNumber ?? 0]}
 				{@const displayPurse = tournament.prizePool || scheduledPurse?.totalPurse || 0}
 				{@const divisionPurse = displayPurse / 2}
 				<div class="p-4 {i % 2 === 0 ? 'bg-slate-800' : 'bg-slate-700/60'} hover:bg-slate-600/50 transition-colors">

@@ -13,7 +13,7 @@
 			value: 'phase1',
 			label: 'Phase 1',
 			sublabel: 'Pre-Tournaments',
-			dateRange: 'Funded Jun 15, 2025'
+			dateRange: 'Funded Jun 30, 2026'
 		},
 		{
 			value: 'phase2',

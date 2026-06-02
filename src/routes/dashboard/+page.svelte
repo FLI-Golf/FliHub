@@ -18,9 +18,9 @@
 	const tickets  = $derived(data.metrics?.tickets  ?? { totalGross: 0, totalNet: 0, totalReceived: 0, totalProjected: 0, count: 0 });
 	const branding = $derived(data.metrics?.branding ?? { totalContracted: 0, totalPaid: 0, totalProposed: 0, count: 0 });
 	const deptBudgets = $derived(data.metrics?.departmentBudgets ?? []);
-	const budget = $derived(data.metrics?.budget ?? { total: 0, actual: 0, forecasted: 0, remaining: 0 });
+	const budget = $derived(data.metrics?.budget ?? { total: 0, actual: 0, forecasted: 0, remaining: 0, seedRaise: 0, operatingPlanTotal: 0 });
 	const projects = $derived(data.metrics?.projects ?? { total: 0, in_progress: 0, planned: 0, completed: 0 });
-	const expenses = $derived(data.metrics?.expenses ?? { total: 0, totalAmount: 0, approved: 0, submitted: 0 });
+	const expenses = $derived(data.metrics?.expenses ?? { total: 0, totalAmount: 0, approvedAmount: 0, submitted: 0, approved: 0, paid: 0, draft: 0 });
 	const approvals = $derived(data.metrics?.approvals ?? { pending: 0, approved: 0, rejected: 0 });
 
 	function fmt(n: number) {
@@ -106,7 +106,7 @@
 				<span class="size-5 rounded-full bg-amber-500 text-white text-[10px] font-black flex items-center justify-center shrink-0">1</span>
 				<p class="text-xs font-bold text-amber-400 uppercase tracking-wide">Phase 1 · Pre-Tournaments</p>
 			</div>
-			<p class="text-xl font-black text-white">Funded June 15, 2025</p>
+			<p class="text-xl font-black text-white">Funded June 30, 2026</p>
 			<div class="mt-2 h-1.5 rounded-full bg-slate-700 overflow-hidden">
 				<div class="h-full rounded-full bg-amber-500" style="width:{PHASE1_PCT}%"></div>
 			</div>
@@ -122,7 +122,7 @@
 			<div class="mt-2 h-1.5 rounded-full bg-slate-700 overflow-hidden">
 				<div class="h-full rounded-full bg-emerald-500" style="width:{PHASE2_PCT}%"></div>
 			</div>
-			<p class="text-xs text-emerald-300/70 mt-1">First tournament Jan 31, 2027 · prize pools, pro payouts &amp; franchise cuts activate · self-funded from 2027</p>
+			<p class="text-xs text-emerald-300/70 mt-1">First tournament Apr 24, 2027 · prize pools, pro payouts &amp; franchise cuts activate · self-funded from 2027</p>
 		</div>
 	</div>
 
@@ -133,7 +133,7 @@
 		<div class="group/card relative">
 			<Card class="p-5 border-l-4 border-l-blue-500 transition-all duration-150 hover:shadow-lg hover:-translate-y-0.5 cursor-default">
 				<div class="flex items-center justify-between mb-3">
-					<p class="text-sm font-medium text-muted-foreground">Total Budget</p>
+					<p class="text-sm font-medium text-muted-foreground">Seed Raise Budget</p>
 					<div class="size-9 rounded-lg bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center transition-transform group-hover/card:scale-110">
 						<DollarSign class="size-5 text-blue-600 dark:text-blue-400" />
 					</div>
@@ -142,15 +142,17 @@
 				<div class="mt-2 h-1.5 rounded-full bg-muted overflow-hidden">
 					<div class="h-full rounded-full bg-blue-500 transition-all" style="width:{pct(budget.actual, budget.total).toFixed(1)}%"></div>
 				</div>
-				<p class="text-xs text-muted-foreground mt-1">{pct(budget.actual, budget.total).toFixed(0)}% spent · {fmt(budget.remaining)} remaining</p>
+				<p class="text-xs text-muted-foreground mt-1">{pct(budget.actual, budget.total).toFixed(0)}% spent · {fmt(budget.remaining)} remaining from seed</p>
 			</Card>
 			<!-- Hover tooltip -->
 			<div class="pointer-events-none absolute left-0 top-full mt-2 z-50 w-56 opacity-0 translate-y-1 group-hover/card:opacity-100 group-hover/card:translate-y-0 transition-all duration-200">
 				<div class="rounded-xl border border-slate-700 bg-slate-900 text-slate-100 shadow-2xl p-3 text-sm space-y-1.5">
 					<p class="font-semibold text-xs uppercase tracking-wider text-blue-400 mb-2">Budget Detail</p>
+					<div class="flex justify-between"><span class="text-slate-400">Seed raise</span><span class="font-medium">{fmt(budget.seedRaise ?? budget.total)}</span></div>
+					<div class="flex justify-between"><span class="text-slate-400">Dept plan</span><span class="font-medium">{fmt(budget.operatingPlanTotal ?? budget.total)}</span></div>
 					<div class="flex justify-between"><span class="text-slate-400">Actual</span><span class="font-medium">{fmt(budget.actual)}</span></div>
 					<div class="flex justify-between"><span class="text-slate-400">Forecasted</span><span class="font-medium">{fmt(budget.forecasted)}</span></div>
-					<div class="flex justify-between"><span class="text-slate-400">Remaining</span><span class="font-medium text-emerald-600">{fmt(budget.remaining)}</span></div>
+					<div class="flex justify-between"><span class="text-slate-400">Seed remaining</span><span class="font-medium text-emerald-600">{fmt(budget.remaining)}</span></div>
 				</div>
 			</div>
 		</div>

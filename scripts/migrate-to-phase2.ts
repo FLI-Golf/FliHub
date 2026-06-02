@@ -2,7 +2,7 @@
  * Phase 2 Migration Script
  * 
  * Creates Phase 2 tasks and projects for Marketing and PR Launch
- * Period: October 1, 2026 - January 31, 2027
+ * Period: October 1, 2026 - April 24, 2027
  * Budget: $1,473,300
  * 
  * Usage: npx tsx scripts/migrate-to-phase2.ts [--dry-run]
@@ -21,7 +21,7 @@ const ADMIN_PASSWORD = process.env.POCKETBASE_ADMIN_PASSWORD;
 const DRY_RUN = process.argv.includes('--dry-run');
 
 const PHASE2_START = '2026-10-01 00:00:00.000Z';
-const PHASE2_END = '2027-01-31 23:59:59.000Z';
+const PHASE2_END = '2027-04-24 23:59:59.000Z';
 
 interface DepartmentMap {
   [key: string]: string;
@@ -130,7 +130,7 @@ async function main() {
       console.log('✅ MIGRATION COMPLETE');
       console.log('\nPhase 2 structure created successfully!');
       console.log('\nPhase 2 Stats:');
-      console.log('  - Period: October 1, 2026 - January 31, 2027');
+      console.log('  - Period: October 1, 2026 - April 24, 2027');
       console.log('  - Duration: 4 months');
       console.log('  - Investment: $1,473,300');
       console.log('  - Tasks Created: 11');
