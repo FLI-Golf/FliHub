@@ -1,7 +1,7 @@
 /**
  * reset-to-funded.ts
  *
- * Full data reset for FLI Golf League — funded June 15, 2026.
+ * Full data reset for FLI Golf League — funded June 30, 2026.
  * Wipes all test/seed data and rebuilds the four departments
  * aligned to the $7.5M Use of Proceeds allocation.
  *
@@ -15,7 +15,7 @@ import * as path from 'path';
 dotenv.config({ path: path.resolve(process.cwd(), '.env') });
 
 const DRY_RUN = process.argv.includes('--dry-run');
-const FUNDED_DATE = '2026-06-15';
+const FUNDED_DATE = '2026-06-30';
 const PHASE1_END = '2026-12-31';
 
 // Admin user profile ID — used as default headOfDepartment
@@ -46,7 +46,7 @@ async function clearCollection(name: string) {
 // ── main ─────────────────────────────────────────────────────────────────────
 
 async function main() {
-  console.log('\n🏌️  FLI Golf League — Reset to Funded (June 15, 2026)');
+  console.log('\n🏌️  FLI Golf League — Reset to Funded (June 30, 2026)');
   console.log(`Mode: ${DRY_RUN ? '🔍 DRY RUN' : '⚠️  LIVE'}\n`);
 
   await pb.admins.authWithPassword(
@@ -193,7 +193,7 @@ async function main() {
     try {
       const record = await pb.collection('fgl_funding_model').create({
         season: 2026,
-        label: 'FGL 2026 Seed Round — Funded June 15, 2026',
+        label: 'FGL 2026 Seed Round — Funded June 30, 2026',
         tournament_ops_per_event: 0,
         tournament_count: 0,
         player_purse: 0,
@@ -213,7 +213,7 @@ async function main() {
         capital_raise_1: 7_500_000,
         capital_raise_2_equity: 0,
         capital_raise_2_debt: 0,
-        notes: 'Seed round funded June 15, 2026. $7.5M total raise via Young America Capital, LLC (SEC Registered · FINRA, SIPC). Deployed across four pillars per Use of Proceeds: Event Production & Technology 35% ($2.625M), League Operations & Team Development 25% ($1.875M), Media & Content Buildout 20% ($1.5M), Marketing/Working Capital/Reserve 20% ($1.5M).',
+        notes: 'Seed round funded June 30, 2026. $7.5M total raise via Young America Capital, LLC (SEC Registered · FINRA, SIPC). Deployed across four pillars per Use of Proceeds: Event Production & Technology 35% ($2.625M), League Operations & Team Development 25% ($1.875M), Media & Content Buildout 20% ($1.5M), Marketing/Working Capital/Reserve 20% ($1.5M).',
       });
       console.log(`  ✅ Funding model seeded (${record.id})`);
     } catch (e: any) {
@@ -229,7 +229,7 @@ async function main() {
     console.log('🔍 DRY RUN complete — no changes made.');
     console.log('   Run without --dry-run to apply.\n');
   } else {
-    console.log('✅ Reset complete. FLI Golf League is ready for June 15, 2026 funding.');
+    console.log('✅ Reset complete. FLI Golf League is ready for June 30, 2026 funding.');
     console.log('\n   Departments created:');
     console.log('   • Event Production & Technology    $2,625,000 (35%)');
     console.log('   • League Operations & Team Dev     $1,875,000 (25%)');

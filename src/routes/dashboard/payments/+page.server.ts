@@ -6,7 +6,7 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 	const { pb, profile: userProfile } = ctx;
 
 	try {
-		const [payments, pendingClaims, pendingExpenses, sponsorPayments] = await Promise.all([
+		const [payments, pendingClaims, pendingExpenses, sponsorPayments, seedFundingReceipts] = await Promise.all([
 			pb.collection('payments').getFullList({
 				sort: '-created',
 				expand: 'reimbursementClaim,sponsor,vendor,franchise,processedBy,approvedBy',
@@ -32,6 +32,10 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 				expand: 'sponsor',
 				fields: 'id,sponsor,amount,status,dueDate,receivedDate,invoiceNumber,paymentType,expand',
 			}).catch(() => []),
+
+			pb.collection('seed_funding_receipts').getFullList({
+				sort: '-receivedDate,-created',
+			}).catch(() => []),
 		]);
 
 		const p = payments as any[];
@@ -41,6 +45,16 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 		const totalIncoming  = p.filter(x => x.direction === 'incoming' && x.status === 'received').reduce((s, x) => s + x.amount, 0);
 		const pendingOut     = p.filter(x => x.direction === 'outgoing' && ['pending_approval','approved','scheduled'].includes(x.status)).reduce((s, x) => s + x.amount, 0);
 		const pendingIn      = p.filter(x => x.direction === 'incoming' && ['pending_approval','approved','scheduled'].includes(x.status)).reduce((s, x) => s + x.amount, 0);
+		const seedReceipts = seedFundingReceipts as any[];
+		const seedFunding = {
+			grossCommitted: 7_500_000,
+			grossRecorded: seedReceipts.reduce((s, r) => s + (r.grossAmount ?? 0), 0),
+			netReceived: seedReceipts.reduce((s, r) => s + (r.netReceived ?? 0), 0),
+			deductions: seedReceipts.reduce((s, r) =>
+				s + (r.bankFees ?? 0) + (r.brokerCommission ?? 0) + (r.legalClosingFees ?? 0) + (r.otherDeductions ?? 0), 0
+			),
+			count: seedReceipts.length
+		};
 
 		// Action queue — approved claims + expenses not yet in payments
 		const existingClaimIds = new Set(p.map(x => x.reimbursementClaim).filter(Boolean));
@@ -71,11 +85,12 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 			pendingClaims,
 			pendingExpenses,
 			sponsorPayments,
+			seedFundingReceipts: seedReceipts,
 			actionQueue,
-			metrics: { totalOutgoing, totalIncoming, pendingOut, pendingIn, count: p.length },
+			metrics: { totalOutgoing, totalIncoming, pendingOut, pendingIn, count: p.length, seedFunding },
 		};
 	} catch (err: any) {
 		console.error('payments load error:', err?.message ?? err);
-		return { payments: [], pendingClaims: [], pendingExpenses: [], sponsorPayments: [], actionQueue: [], metrics: null };
+		return { payments: [], pendingClaims: [], pendingExpenses: [], sponsorPayments: [], seedFundingReceipts: [], actionQueue: [], metrics: null };
 	}
 };

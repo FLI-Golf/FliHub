@@ -916,7 +916,7 @@
 
 	<!-- Footer note -->
 	<p class="text-xs text-muted-foreground text-center pb-2">
-		19 projects remain <span class="font-medium text-slate-400">planned</span> — they activate when Phase 2 (Tournaments Live) begins Jan 31, 2027.
+		19 projects remain <span class="font-medium text-slate-400">planned</span> — they activate when Phase 2 (Tournaments Live) begins Apr 24, 2027.
 		<a href="/dashboard/use-of-proceeds" class="text-primary hover:underline ml-1">View Use of Proceeds →</a>
 	</p>
 

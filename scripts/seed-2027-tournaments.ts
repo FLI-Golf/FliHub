@@ -45,6 +45,15 @@ async function seed2027Tournaments() {
 			'Nashville, TN',
 			'San Diego, CA'
 		];
+		
+		const dates = [
+			'2027-04-24',
+			'2027-05-22',
+			'2027-06-26',
+			'2027-07-24',
+			'2027-08-28',
+			'2027-09-25'
+		];
 
 		console.log('2027 Season Structure:');
 		console.log('======================\n');
@@ -56,14 +65,12 @@ async function seed2027Tournaments() {
 			const name = names[i];
 			const location = locations[i];
 
-			// Calculate dates - spread throughout 2027
-			const startMonth = 2 + i * 2; // Feb, Apr, Jun, Aug, Oct, Dec
-			const startDate = new Date(2027, startMonth - 1, 1);
-			const endDate = new Date(2027, startMonth - 1, 3);
+			const startDate = dates[i];
+			const endDate = dates[i];
 
 			console.log(`Tournament ${i + 1}: ${name}`);
 			console.log(`  Location: ${location}`);
-			console.log(`  Dates: ${startDate.toLocaleDateString()} - ${endDate.toLocaleDateString()}`);
+			console.log(`  Date: ${startDate}`);
 			console.log(`  Total Purse: ${formatCurrency(purse)}`);
 			console.log(`  Franchise Cut (20%): ${formatCurrency(purse * 0.2)}`);
 			console.log(`  Pro Cut (80%): ${formatCurrency(purse * 0.8)}`);
@@ -76,7 +83,14 @@ async function seed2027Tournaments() {
 				.catch(() => null);
 
 			if (existing) {
-				console.log(`  ⏭️  Already exists, skipping...\n`);
+				await pb.collection('tournaments').update(existing.id, {
+					startDate,
+					endDate,
+					prizePool: purse,
+					franchiseCutAmount: purse * 0.2,
+					proCutAmount: purse * 0.8
+				});
+				console.log(`  ✅ Updated existing tournament date\n`);
 				totalValidation += purse;
 				continue;
 			}
@@ -86,8 +100,8 @@ async function seed2027Tournaments() {
 				name,
 				season: 2027,
 				tournamentNumber: i + 1,
-				startDate: startDate.toISOString().split('T')[0],
-				endDate: endDate.toISOString().split('T')[0],
+				startDate,
+				endDate,
 				location,
 				venue: `${location} Disc Golf Complex`,
 				prizePool: purse,

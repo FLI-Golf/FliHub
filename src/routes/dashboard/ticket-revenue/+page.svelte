@@ -316,7 +316,7 @@
 				<pre class="text-xs text-slate-300 leading-relaxed"><code>{`POST /api/ticket-sales
 {
   "eventName": "FLI Golf Open — Phoenix",
-  "eventDate": "2027-01-31",
+  "eventDate": "2027-04-24",
   "venue": "Venue or market",
   "ticketType": "general_admission",
   "quantity": 124,
@@ -328,7 +328,7 @@
   "salesChannel": "website",
   "tournamentId": "optional-tournament-id",
   "invoiceNumber": "processor-session-or-order-id",
-  "receivedDate": "2027-01-31",
+  "receivedDate": "2027-04-24",
   "notes": "Stripe checkout settlement batch"
 }`}</code></pre>
 			</div>

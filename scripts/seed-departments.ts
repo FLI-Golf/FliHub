@@ -1,10 +1,10 @@
 /**
  * Seed departments, projects, and tasks from the FLI Golf financial plan.
  *
- * Funding date : June 15, 2026
- * Phase 1      : Jun 15 – Sep 30, 2026   $2,800,000
- * Phase 2      : Oct  1 – Jan 31, 2027   $1,473,300
- * Phase 3      : Feb  1 – Jan  1, 2028   $1,315,000
+ * Funding date : June 30, 2026
+ * Phase 1      : Jun 30 – Sep 30, 2026   $2,800,000
+ * Phase 2      : Oct  1 – Apr 24, 2027   $1,473,300
+ * Phase 3      : Apr 25 – Jan  1, 2028   $1,315,000
  *
  * Idempotent — skips records that already exist by name.
  * Usage: npx tsx scripts/seed-departments.ts
@@ -28,11 +28,11 @@ const KIMBERLY = 'cr1zmsps9yive0k'; // kimberly@fligolf.com
 const GARY     = 'ipa0vii1qs3ycbj'; // gary@fligolf.com
 
 // ── Phase date ranges ─────────────────────────────────────────────────────────
-const P1_START = '2026-06-15';
+const P1_START = '2026-06-30';
 const P1_END   = '2026-09-30';
 const P2_START = '2026-10-01';
-const P2_END   = '2027-01-31';
-const P3_START = '2027-02-01';
+const P2_END   = '2027-04-24';
+const P3_START = '2027-04-25';
 const P3_END   = '2028-01-01';
 
 // DEPARTMENTS_DATA — filled below

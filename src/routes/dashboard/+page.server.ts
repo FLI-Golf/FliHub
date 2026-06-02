@@ -20,8 +20,10 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 			pb.collection('branding_placements').getFullList({ fields: 'id,status,grossRevenue,quantity,ratePerPlacement' }).catch(() => []),
 		]);
 	
-		// Budget rollup
-		const totalBudget = (departments as any[]).reduce((s, d) => s + (d.department_annual_budget ?? 0), 0);
+		// Budget rollup. The seed raise is the cash ceiling; department budgets can
+		// include later operating/revenue-funded planning assumptions.
+		const seedRaise = 7_500_000;
+		const operatingPlanTotal = (departments as any[]).reduce((s, d) => s + (d.department_annual_budget ?? 0), 0);
 		const actualSpend = (projects as any[]).reduce((s, p) => s + (p.project_actual_expenses ?? 0), 0);
 		const forecasted  = (projects as any[]).reduce((s, p) => s + (p.project_forecasted_expenses ?? 0), 0);
 	
@@ -108,11 +110,12 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 
 		// Ticket revenue rollup
 		const ts = ticketSales as any[];
+		const grossTicketRevenue = (r: any) => r.grossRevenue ?? ((r.quantity ?? 0) * (r.pricePerTicket ?? 0));
 		const ticketMetrics = {
-			totalGross:     ts.reduce((s, r) => s + (r.grossRevenue ?? (r.quantity * r.pricePerTicket) ?? 0), 0),
+			totalGross:     ts.reduce((s, r) => s + grossTicketRevenue(r), 0),
 			totalNet:       ts.reduce((s, r) => s + (r.netRevenue ?? 0), 0),
 			totalReceived:  ts.filter(r => ['completed','reconciled'].includes(r.status)).reduce((s, r) => s + (r.netRevenue ?? 0), 0),
-			totalProjected: ts.filter(r => ['projected','on_sale','sold_out'].includes(r.status)).reduce((s, r) => s + (r.grossRevenue ?? (r.quantity * r.pricePerTicket) ?? 0), 0),
+			totalProjected: ts.filter(r => ['projected','on_sale','sold_out'].includes(r.status)).reduce((s, r) => s + grossTicketRevenue(r), 0),
 			count:          ts.length,
 		};
 
@@ -120,7 +123,14 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 			user: locals.pb.authStore.model,
 			userProfile,
 			metrics: {
-				budget: { total: totalBudget, actual: actualSpend, forecasted, remaining: totalBudget - actualSpend },
+				budget: {
+					total: seedRaise,
+					actual: actualSpend,
+					forecasted,
+					remaining: seedRaise - actualSpend,
+					seedRaise,
+					operatingPlanTotal
+				},
 				projects: pByStatus,
 				expenses: expByStatus,
 				approvals: appByStatus,
