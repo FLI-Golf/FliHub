@@ -41,6 +41,10 @@ export const POST: RequestHandler = async ({ params }) => {
 
 		const approvalThreshold = event.approvalThreshold ?? 500;
 		const isBroadcast = event.eventType === 'tournament_broadcast';
+		const paymentTypeFor = (role: string) => {
+			if (role === 'broadcaster' || role === 'commentator' || role === 'analyst') return 'broadcast_fee';
+			return 'appearance_fee';
+		};
 
 		// For bonus eligibility: count events attended per talent in this season
 		let seasonEventIds: string[] = [];
@@ -88,7 +92,7 @@ export const POST: RequestHandler = async ({ params }) => {
 				event: params.id,
 				eventTalent: et.id,
 				talent: talentId,
-				paymentType: isBroadcast ? 'broadcast_fee' : 'appearance_fee',
+				paymentType: paymentTypeFor(et.role),
 				amount,
 				status,
 				approvalRoute,
@@ -105,7 +109,7 @@ export const POST: RequestHandler = async ({ params }) => {
 					event: params.id,
 					eventTalent: et.id,
 					talent: talentId,
-					paymentType: isBroadcast ? 'broadcast_fee' : 'appearance_fee',
+					paymentType: paymentTypeFor(et.role),
 					amount: managerAmount,
 					status: mgNeedsApproval ? 'approval_required' : 'pending',
 					approvalRoute: mgNeedsApproval ? 'approval_pipeline' : 'direct',

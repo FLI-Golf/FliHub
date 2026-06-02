@@ -6,10 +6,11 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 	const { pb, profile: userProfile } = ctx;
 
 	try {
-		const [sponsors, franchiseLeads, franchiseDeals] = await Promise.all([
+		const [sponsors, franchiseLeads, franchiseDeals, ticketSales] = await Promise.all([
 			pb.collection('sponsors').getFullList({ sort: '-annualCommitment', expand: 'assignedTo' }).catch(() => []),
 			pb.collection('franchise_leads').getFullList({ fields: 'id,firstName,lastName,status,territory,netWorth,liquidCapital,created', sort: '-created' }).catch(() => []),
 			pb.collection('franchise_deals').getFullList({ fields: 'id,status,franchiseFee,depositPaid,totalPaid,created', sort: '-created' }).catch(() => []),
+			pb.collection('ticket_sales').getFullList({ sort: '-eventDate' }).catch(() => []),
 		]);
 
 		const s = sponsors as any[];
@@ -42,6 +43,17 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 		const dealValue = (franchiseDeals as any[])
 			.reduce((sum, d) => sum + (d.franchiseFee ?? 0), 0);
 
+		const ticketRecords = ticketSales as any[];
+		const ticketGrossFor = (t: any) => t.grossRevenue ?? ((t.quantity ?? 0) * (t.pricePerTicket ?? 0));
+		const ticketGross = ticketRecords.reduce((sum, t) => sum + ticketGrossFor(t), 0);
+		const ticketNet = ticketRecords.reduce((sum, t) => sum + (t.netRevenue ?? 0), 0);
+		const ticketReceived = ticketRecords
+			.filter(t => ['completed', 'reconciled'].includes(t.status))
+			.reduce((sum, t) => sum + (t.netRevenue ?? ticketGrossFor(t)), 0);
+		const ticketProjected = ticketRecords
+			.filter(t => ['projected', 'on_sale', 'sold_out'].includes(t.status))
+			.reduce((sum, t) => sum + ticketGrossFor(t), 0);
+
 		return {
 			userProfile,
 			sponsors: s,
@@ -55,6 +67,11 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 				totalPaid,
 				negotiatingValue,
 				prospectCount: prospectSponsors.length,
+				ticketGross,
+				ticketNet,
+				ticketReceived,
+				ticketProjected,
+				ticketCount: ticketRecords.length,
 			},
 			byTier,
 			franchiseLeads,

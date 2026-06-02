@@ -16,6 +16,7 @@
 
 	// ── Add sale modal ────────────────────────────────────────────────────────
 	let showAdd = $state(false);
+	let showDaily = $state(false);
 	let saving  = $state(false);
 	let saveErr = $state('');
 
@@ -37,6 +38,21 @@
 		(Number(form.quantity) || 0) * (Number(form.pricePerTicket) || 0)
 	);
 	const net = $derived(gross - (Number(form.platformFees) || 0));
+
+	let dailyForm = $state({
+		eventName: '',
+		eventDate: new Date().toISOString().slice(0, 10),
+		venue: '',
+		amountReceived: '',
+		platformFees: '',
+		ticketsSold: '',
+		status: 'completed',
+		notes: ''
+	});
+
+	const dailyGross = $derived(Number(dailyForm.amountReceived) || 0);
+	const dailyFees = $derived(Number(dailyForm.platformFees) || 0);
+	const dailyNet = $derived(dailyGross - dailyFees);
 
 	async function save() {
 		if (!form.eventName.trim() || !form.eventDate || !form.quantity || !form.pricePerTicket) {
@@ -60,6 +76,41 @@
 			if (!res.ok) { const e = await res.json(); saveErr = e.message ?? 'Failed'; return; }
 			showAdd = false;
 			form = { eventName: '', eventDate: '', venue: '', ticketType: 'general_admission', quantity: '', pricePerTicket: '', platformFees: '', salesChannel: 'website', status: 'projected', tournamentId: '', notes: '' };
+			await invalidateAll();
+		} catch { saveErr = 'Network error'; }
+		finally { saving = false; }
+	}
+
+	async function saveDaily() {
+		if (!dailyForm.eventDate || !dailyForm.amountReceived) {
+			saveErr = 'Date and amount received are required.';
+			return;
+		}
+		const quantity = Math.max(1, Number(dailyForm.ticketsSold) || 1);
+		saving = true; saveErr = '';
+		try {
+			const res = await fetch('/api/ticket-sales', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({
+					eventName: dailyForm.eventName.trim() || `Website ticket sales — ${dailyForm.eventDate}`,
+					eventDate: dailyForm.eventDate,
+					venue: dailyForm.venue.trim(),
+					ticketType: 'general_admission',
+					quantity,
+					pricePerTicket: dailyGross / quantity,
+					grossRevenue: dailyGross,
+					platformFees: dailyFees,
+					netRevenue: dailyNet,
+					status: dailyForm.status,
+					salesChannel: 'website',
+					receivedDate: dailyForm.eventDate,
+					notes: ['Daily admin website intake summary.', dailyForm.notes.trim()].filter(Boolean).join(' ')
+				}),
+			});
+			if (!res.ok) { const e = await res.json(); saveErr = e.message ?? 'Failed'; return; }
+			showDaily = false;
+			dailyForm = { eventName: '', eventDate: new Date().toISOString().slice(0, 10), venue: '', amountReceived: '', platformFees: '', ticketsSold: '', status: 'completed', notes: '' };
 			await invalidateAll();
 		} catch { saveErr = 'Network error'; }
 		finally { saving = false; }
@@ -107,9 +158,14 @@
 				<p class="text-slate-400 text-sm">Track ticket sales across all FLI Golf events</p>
 			</div>
 		</div>
-		<Button onclick={() => showAdd = true} class="gap-2 bg-emerald-600 hover:bg-emerald-700 text-white">
-			<Plus class="size-4" /> Log Ticket Sale
-		</Button>
+		<div class="flex flex-wrap justify-end gap-2">
+			<Button onclick={() => showDaily = true} variant="outline" class="gap-2 border-emerald-700 text-emerald-300 hover:bg-emerald-950/40">
+				<DollarSign class="size-4" /> Daily Website Intake
+			</Button>
+			<Button onclick={() => showAdd = true} class="gap-2 bg-emerald-600 hover:bg-emerald-700 text-white">
+				<Plus class="size-4" /> Log Ticket Sale
+			</Button>
+		</div>
 	</div>
 
 	<!-- KPI Strip -->
@@ -245,7 +301,120 @@
 			</Card>
 		</div>
 	{/if}
-</div>
+
+	<!-- Future API guidance -->
+	<Card class="bg-slate-900 border-slate-700 p-5">
+		<div class="flex flex-col lg:flex-row gap-5">
+			<div class="lg:w-1/3">
+				<p class="text-xs uppercase tracking-wide text-emerald-400 font-semibold mb-1">Website booking bridge</p>
+				<h2 class="text-lg font-bold text-white">Future API payload target</h2>
+				<p class="text-sm text-slate-400 mt-2">
+					The daily intake form writes the same revenue shape the public website should send after checkout succeeds.
+				</p>
+			</div>
+			<div class="flex-1 rounded-lg border border-slate-700 bg-slate-950 p-4 overflow-x-auto">
+				<pre class="text-xs text-slate-300 leading-relaxed"><code>{`POST /api/ticket-sales
+{
+  "eventName": "FLI Golf Open — Phoenix",
+  "eventDate": "2027-01-31",
+  "venue": "Venue or market",
+  "ticketType": "general_admission",
+  "quantity": 124,
+  "pricePerTicket": 65,
+  "grossRevenue": 8060,
+  "platformFees": 322.40,
+  "netRevenue": 7737.60,
+  "status": "completed",
+  "salesChannel": "website",
+  "tournamentId": "optional-tournament-id",
+  "invoiceNumber": "processor-session-or-order-id",
+  "receivedDate": "2027-01-31",
+  "notes": "Stripe checkout settlement batch"
+}`}</code></pre>
+			</div>
+		</div>
+	</Card>
+	</div>
+
+<!-- Daily Intake Modal -->
+{#if showDaily}
+	<div class="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true">
+		<div class="bg-slate-900 border border-slate-700 rounded-xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
+			<div class="flex items-center justify-between p-5 border-b border-slate-700">
+				<h2 class="font-semibold text-white">Daily Website Ticket Intake</h2>
+				<button onclick={() => showDaily = false} class="text-slate-400 hover:text-white"><X class="size-5" /></button>
+			</div>
+			<form onsubmit={(e) => { e.preventDefault(); saveDaily(); }} class="p-5 space-y-4">
+				<div class="grid grid-cols-2 gap-3">
+					<div class="col-span-2">
+						<label for="daily-event-name" class="block text-xs text-slate-400 mb-1">Event / Batch Name</label>
+						<input id="daily-event-name" bind:value={dailyForm.eventName} class={INPUT} placeholder="Defaults to Website ticket sales — date" />
+					</div>
+					<div>
+						<label for="daily-event-date" class="block text-xs text-slate-400 mb-1">Received Date *</label>
+						<input id="daily-event-date" type="date" bind:value={dailyForm.eventDate} class={INPUT} required />
+					</div>
+					<div>
+						<label for="daily-venue" class="block text-xs text-slate-400 mb-1">Venue / Market</label>
+						<input id="daily-venue" bind:value={dailyForm.venue} class={INPUT} placeholder="Optional" />
+					</div>
+					<div>
+						<label for="daily-amount" class="block text-xs text-slate-400 mb-1">Amount Received *</label>
+						<input id="daily-amount" type="number" bind:value={dailyForm.amountReceived} class={INPUT} min="0" step="0.01" placeholder="0.00" required />
+					</div>
+					<div>
+						<label for="daily-fees" class="block text-xs text-slate-400 mb-1">Platform Fees</label>
+						<input id="daily-fees" type="number" bind:value={dailyForm.platformFees} class={INPUT} min="0" step="0.01" placeholder="0.00" />
+					</div>
+					<div>
+						<label for="daily-tickets" class="block text-xs text-slate-400 mb-1">Tickets Sold</label>
+						<input id="daily-tickets" type="number" bind:value={dailyForm.ticketsSold} class={INPUT} min="0" step="1" placeholder="Optional" />
+					</div>
+					<div>
+						<label for="daily-status" class="block text-xs text-slate-400 mb-1">Status</label>
+						<select id="daily-status" bind:value={dailyForm.status} class={SELECT}>
+							<option value="completed">Completed</option>
+							<option value="reconciled">Reconciled</option>
+						</select>
+					</div>
+				</div>
+
+				{#if dailyGross > 0}
+					<div class="bg-slate-800 rounded-lg p-3 text-sm grid grid-cols-3 gap-2 text-center">
+						<div>
+							<p class="text-slate-400 text-xs">Gross</p>
+							<p class="text-emerald-400 font-bold">{fmt(dailyGross)}</p>
+						</div>
+						<div>
+							<p class="text-slate-400 text-xs">Fees</p>
+							<p class="text-red-400 font-bold">−{fmt(dailyFees)}</p>
+						</div>
+						<div>
+							<p class="text-slate-400 text-xs">Net</p>
+							<p class="text-white font-bold">{fmt(dailyNet)}</p>
+						</div>
+					</div>
+				{/if}
+
+				<div>
+					<label for="daily-notes" class="block text-xs text-slate-400 mb-1">Notes</label>
+					<textarea id="daily-notes" bind:value={dailyForm.notes} class="{INPUT} h-16 resize-none" placeholder="Settlement batch, processor report, order range…"></textarea>
+				</div>
+
+				{#if saveErr}
+					<p class="text-red-400 text-sm">{saveErr}</p>
+				{/if}
+
+				<div class="flex gap-3 pt-1">
+					<Button type="button" variant="outline" onclick={() => showDaily = false} class="flex-1 border-slate-600 text-slate-300">Cancel</Button>
+					<Button type="submit" disabled={saving} class="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white">
+						{saving ? 'Saving…' : 'Save Daily Intake'}
+					</Button>
+				</div>
+			</form>
+		</div>
+	</div>
+{/if}
 
 <!-- Add Sale Modal -->
 {#if showAdd}
@@ -258,20 +427,20 @@
 			<form onsubmit={(e) => { e.preventDefault(); save(); }} class="p-5 space-y-4">
 				<div class="grid grid-cols-2 gap-3">
 					<div class="col-span-2">
-						<label class="block text-xs text-slate-400 mb-1">Event Name *</label>
-						<input bind:value={form.eventName} class={INPUT} placeholder="e.g. FLI Golf Open — Phoenix" required />
+						<label for="ticket-event-name" class="block text-xs text-slate-400 mb-1">Event Name *</label>
+						<input id="ticket-event-name" bind:value={form.eventName} class={INPUT} placeholder="e.g. FLI Golf Open — Phoenix" required />
 					</div>
 					<div>
-						<label class="block text-xs text-slate-400 mb-1">Event Date *</label>
-						<input type="date" bind:value={form.eventDate} class={INPUT} required />
+						<label for="ticket-event-date" class="block text-xs text-slate-400 mb-1">Event Date *</label>
+						<input id="ticket-event-date" type="date" bind:value={form.eventDate} class={INPUT} required />
 					</div>
 					<div>
-						<label class="block text-xs text-slate-400 mb-1">Venue</label>
-						<input bind:value={form.venue} class={INPUT} placeholder="e.g. Pechanga Resort" />
+						<label for="ticket-venue" class="block text-xs text-slate-400 mb-1">Venue</label>
+						<input id="ticket-venue" bind:value={form.venue} class={INPUT} placeholder="e.g. Pechanga Resort" />
 					</div>
 					<div>
-						<label class="block text-xs text-slate-400 mb-1">Ticket Type *</label>
-						<select bind:value={form.ticketType} class={SELECT}>
+						<label for="ticket-type" class="block text-xs text-slate-400 mb-1">Ticket Type *</label>
+						<select id="ticket-type" bind:value={form.ticketType} class={SELECT}>
 							<option value="general_admission">General Admission</option>
 							<option value="vip">VIP</option>
 							<option value="premium">Premium</option>
@@ -281,8 +450,8 @@
 						</select>
 					</div>
 					<div>
-						<label class="block text-xs text-slate-400 mb-1">Sales Channel</label>
-						<select bind:value={form.salesChannel} class={SELECT}>
+						<label for="ticket-sales-channel" class="block text-xs text-slate-400 mb-1">Sales Channel</label>
+						<select id="ticket-sales-channel" bind:value={form.salesChannel} class={SELECT}>
 							<option value="website">Website</option>
 							<option value="box_office">Box Office</option>
 							<option value="third_party">Third Party</option>
@@ -291,20 +460,20 @@
 						</select>
 					</div>
 					<div>
-						<label class="block text-xs text-slate-400 mb-1">Quantity *</label>
-						<input type="number" bind:value={form.quantity} class={INPUT} placeholder="0" min="0" required />
+						<label for="ticket-quantity" class="block text-xs text-slate-400 mb-1">Quantity *</label>
+						<input id="ticket-quantity" type="number" bind:value={form.quantity} class={INPUT} placeholder="0" min="0" required />
 					</div>
 					<div>
-						<label class="block text-xs text-slate-400 mb-1">Price per Ticket *</label>
-						<input type="number" bind:value={form.pricePerTicket} class={INPUT} placeholder="0.00" min="0" step="0.01" required />
+						<label for="ticket-price" class="block text-xs text-slate-400 mb-1">Price per Ticket *</label>
+						<input id="ticket-price" type="number" bind:value={form.pricePerTicket} class={INPUT} placeholder="0.00" min="0" step="0.01" required />
 					</div>
 					<div>
-						<label class="block text-xs text-slate-400 mb-1">Platform Fees</label>
-						<input type="number" bind:value={form.platformFees} class={INPUT} placeholder="0.00" min="0" step="0.01" />
+						<label for="ticket-fees" class="block text-xs text-slate-400 mb-1">Platform Fees</label>
+						<input id="ticket-fees" type="number" bind:value={form.platformFees} class={INPUT} placeholder="0.00" min="0" step="0.01" />
 					</div>
 					<div>
-						<label class="block text-xs text-slate-400 mb-1">Status</label>
-						<select bind:value={form.status} class={SELECT}>
+						<label for="ticket-status" class="block text-xs text-slate-400 mb-1">Status</label>
+						<select id="ticket-status" bind:value={form.status} class={SELECT}>
 							<option value="projected">Projected</option>
 							<option value="on_sale">On Sale</option>
 							<option value="sold_out">Sold Out</option>
@@ -334,8 +503,8 @@
 				{/if}
 
 				<div>
-					<label class="block text-xs text-slate-400 mb-1">Notes</label>
-					<textarea bind:value={form.notes} class="{INPUT} h-16 resize-none" placeholder="Optional notes…"></textarea>
+					<label for="ticket-notes" class="block text-xs text-slate-400 mb-1">Notes</label>
+					<textarea id="ticket-notes" bind:value={form.notes} class="{INPUT} h-16 resize-none" placeholder="Optional notes…"></textarea>
 				</div>
 
 				{#if saveErr}

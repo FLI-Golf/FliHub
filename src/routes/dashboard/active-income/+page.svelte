@@ -5,7 +5,7 @@
 	import {
 		DollarSign, Star, TrendingUp, Trophy, ArrowRight,
 		CheckCircle2, Clock, AlertCircle, ChevronDown,
-		Handshake, Building2, MapPin, Phone, Mail, Info, UserCircle
+		Handshake, Building2, MapPin, Phone, Mail, Info, UserCircle, Ticket
 	} from 'lucide-svelte';
 
 	function repName(sp: any) {
@@ -105,7 +105,7 @@
 			</div>
 			<h1 class="text-2xl font-bold tracking-tight">Active Income</h1>
 			<p class="text-sm text-muted-foreground mt-1">
-				Sponsorship LOIs, franchise pipeline, and revenue committed toward Phase 1 operations.
+				Sponsorship LOIs, franchise pipeline, and ticket revenue committed toward operations.
 			</p>
 		</div>
 		<Button href="/dashboard/sponsors" variant="outline" size="sm" class="gap-1.5 shrink-0">
@@ -128,7 +128,7 @@
 			{#if infoExpanded}
 				<div class="text-xs text-yellow-200/70 leading-relaxed mt-3 pl-9 space-y-2">
 					<p>
-						This page tracks the two active income streams that fund FLI Golf's path to launch: <span class="font-semibold text-yellow-300">sponsorship commitments</span> and the <span class="font-semibold text-yellow-300">franchise sales pipeline</span>. Sponsors who have signed Letters of Intent (LOIs) represent committed revenue that activates when the $7.5M seed round closes.
+						This page tracks active income streams that fund FLI Golf's path to launch: <span class="font-semibold text-yellow-300">sponsorship commitments</span>, the <span class="font-semibold text-yellow-300">franchise sales pipeline</span>, and <span class="font-semibold text-yellow-300">ticket revenue</span>. Sponsors who have signed Letters of Intent (LOIs) represent committed revenue that activates when the $7.5M seed round closes.
 					</p>
 					<p>
 						The sales team's primary focus right now is converting prospects to LOIs and advancing LOI sponsors toward signed contracts. Every dollar committed here directly reduces the net capital required from investors and demonstrates market validation to the raise.
@@ -142,7 +142,7 @@
 	</button>
 
 	<!-- KPI strip -->
-	<div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+	<div class="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-5 gap-3">
 		<div class="group/card relative">
 			<Card class="p-4 border-l-4 border-l-emerald-500 bg-emerald-950/30 hover:bg-emerald-950/50 transition-colors cursor-default">
 				<div class="flex items-center justify-between mb-2">
@@ -219,6 +219,30 @@
 					{/each}
 					<div class="h-px bg-slate-700 my-1"></div>
 					<p class="text-xs text-slate-400">Each conversion = $10M franchise fee</p>
+				</div>
+			</div>
+		</div>
+
+		<div class="group/card relative">
+			<a href="/dashboard/ticket-revenue">
+				<Card class="p-4 border-l-4 border-l-teal-500 bg-teal-950/30 hover:bg-teal-950/50 transition-colors cursor-pointer">
+					<div class="flex items-center justify-between mb-2">
+						<p class="text-xs text-teal-300/70 font-medium">Ticket Revenue</p>
+						<div class="size-7 rounded-lg bg-teal-500/20 flex items-center justify-center">
+							<Ticket class="size-3.5 text-teal-400" />
+						</div>
+					</div>
+					<p class="text-2xl font-black text-white">{fmt(metrics?.ticketReceived ?? 0)}</p>
+					<p class="text-xs text-teal-300/60 mt-0.5">{fmt(metrics?.ticketProjected ?? 0)} projected</p>
+				</Card>
+			</a>
+			<div class="pointer-events-none absolute left-0 top-full mt-2 z-50 w-60 opacity-0 translate-y-1 group-hover/card:opacity-100 group-hover/card:translate-y-0 transition-all duration-200">
+				<div class="rounded-xl border border-slate-700 bg-slate-900 shadow-2xl p-3 text-sm space-y-1.5">
+					<p class="font-semibold text-xs uppercase tracking-wider text-teal-400 mb-2">Ticket Sales</p>
+					<div class="flex justify-between"><span class="text-slate-400">Gross</span><span class="font-medium">{fmt(metrics?.ticketGross ?? 0)}</span></div>
+					<div class="flex justify-between"><span class="text-slate-400">Net</span><span class="font-medium">{fmt(metrics?.ticketNet ?? 0)}</span></div>
+					<div class="flex justify-between"><span class="text-slate-400">Received</span><span class="font-medium text-teal-400">{fmt(metrics?.ticketReceived ?? 0)}</span></div>
+					<div class="flex justify-between"><span class="text-slate-400">Records</span><span class="font-medium">{metrics?.ticketCount ?? 0}</span></div>
 				</div>
 			</div>
 		</div>
@@ -445,6 +469,7 @@
 					{#each [
 						{ label: 'Sponsor Pipeline', href: '/dashboard/sponsors', icon: Star, desc: 'Manage all sponsor stages' },
 						{ label: 'Franchise Sales', href: '/dashboard/sales', icon: TrendingUp, desc: 'Advance franchise leads' },
+						{ label: 'Ticket Revenue', href: '/dashboard/ticket-revenue', icon: Ticket, desc: 'Log daily website intake' },
 						{ label: 'Sponsorship Revenue', href: '/dashboard/sponsorship-revenue', icon: DollarSign, desc: 'Revenue projections by tier' },
 						{ label: 'Territories', href: '/dashboard/territories', icon: MapPin, desc: 'Available franchise markets' },
 					] as link}

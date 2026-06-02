@@ -30,11 +30,18 @@
 		blocked: 'bg-red-900 text-red-300', completed: 'bg-green-900 text-green-300',
 		cancelled: 'bg-gray-700 text-gray-400'
 	};
+	const TALENT_STATUS_COLORS: Record<string, string> = {
+		invited: 'bg-gray-700 text-gray-300',
+		confirmed: 'bg-green-900 text-green-300',
+		declined: 'bg-red-900 text-red-300',
+		completed: 'bg-blue-900 text-blue-300',
+		no_show: 'bg-orange-900 text-orange-300'
+	};
 
 	// Assign talent panel
 	let showAssign = $state(false);
 	let assignTalentId = $state('');
-	let assignRole = $state('player');
+	let assignRole = $state('celebrity_appearance');
 	let assignRateOverride = $state('');
 	let assignStatus = $state('confirmed');
 	let assignSaving = $state(false);
@@ -191,8 +198,8 @@
 						</div>
 					</div>
 					<div class="flex items-center gap-2">
-						{#if et.bonusEligible}<Star class="w-4 h-4 text-yellow-400" title="Bonus eligible" />{/if}
-						<Badge class={{ invited: 'bg-gray-700 text-gray-300', confirmed: 'bg-green-900 text-green-300', declined: 'bg-red-900 text-red-300', completed: 'bg-blue-900 text-blue-300', no_show: 'bg-orange-900 text-orange-300' }[et.status] ?? 'bg-gray-700 text-gray-300'}>{et.status}</Badge>
+						{#if et.bonusEligible}<Star class="w-4 h-4 text-yellow-400" aria-label="Bonus eligible" />{/if}
+						<Badge class={TALENT_STATUS_COLORS[et.status] ?? 'bg-gray-700 text-gray-300'}>{et.status}</Badge>
 					</div>
 				</div>
 				{/each}
@@ -215,6 +222,8 @@
 						<div>
 							<label class={LABEL}>Role</label>
 							<select bind:value={assignRole} class={INPUT}>
+								<option value="celebrity_appearance">Celebrity Appearance</option>
+								<option value="music_act">Music Act</option>
 								<option value="player">Player</option>
 								<option value="broadcaster">Broadcaster</option>
 								<option value="commentator">Commentator</option>
