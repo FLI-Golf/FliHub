@@ -5,20 +5,31 @@ import { error } from '@sveltejs/kit';
 export const load: PageServerLoad = async ({ locals, url, params }) => {
 	const ctx = await RequestContext.from(locals, url);
 	const { pb } = ctx;
+	const loadEventTalent = () => pb.collection('event_talent').getFullList({
+		filter: `event = '${params.id}'`,
+		expand: 'talent,talentGroup',
+		sort: 'created'
+	}).catch(() => pb.collection('event_talent').getFullList({
+		filter: `event = '${params.id}'`,
+		expand: 'talent',
+		sort: 'created'
+	}).catch(() => []));
+
+	const loadEventPayments = () => pb.collection('event_payments').getFullList({
+		filter: `event = '${params.id}'`,
+		expand: 'talent,talentGroup,eventTalent',
+		sort: '-created'
+	}).catch(() => pb.collection('event_payments').getFullList({
+		filter: `event = '${params.id}'`,
+		expand: 'talent,eventTalent',
+		sort: '-created'
+	}).catch(() => []));
 
 	try {
 		const [event, eventTalent, eventPayments, eventTasks, allTalent] = await Promise.all([
 			pb.collection('special_events').getOne(params.id, { expand: 'tournament,season' }),
-			pb.collection('event_talent').getFullList({
-				filter: `event = '${params.id}'`,
-				expand: 'talent',
-				sort: 'created'
-			}).catch(() => []),
-			pb.collection('event_payments').getFullList({
-				filter: `event = '${params.id}'`,
-				expand: 'talent,eventTalent',
-				sort: '-created'
-			}).catch(() => []),
+			loadEventTalent(),
+			loadEventPayments(),
 			pb.collection('event_tasks').getFullList({
 				filter: `event = '${params.id}'`,
 				expand: 'assignedTo',

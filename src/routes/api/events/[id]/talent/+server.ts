@@ -10,32 +10,49 @@ import type { RequestHandler } from './$types';
 export const POST: RequestHandler = async ({ request, params }) => {
 	try {
 		const pb = await getAdminPocketBase();
-		const { talentId, role, rateOverride, status } = await request.json();
+		const { talentId, talentGroupId, entityType, role, rateOverride, status } = await request.json();
+		const bookingEntityType = entityType === 'group' || talentGroupId ? 'group' : 'individual';
 
-		if (!talentId) return json({ message: 'talentId is required' }, { status: 400 });
+		if (bookingEntityType === 'individual' && !talentId) {
+			return json({ message: 'talentId is required' }, { status: 400 });
+		}
+		if (bookingEntityType === 'group' && !talentGroupId) {
+			return json({ message: 'talentGroupId is required' }, { status: 400 });
+		}
 
 		// Get event to resolve defaultRate
 		const event = await pb.collection('special_events').getOne(params.id);
-		const confirmedRate = rateOverride ?? event.defaultRate ?? 0;
+		const group = bookingEntityType === 'group'
+			? await pb.collection('talent_groups').getOne(talentGroupId).catch(() => null)
+			: null;
+		const confirmedRate = rateOverride ?? group?.defaultFee ?? event.defaultRate ?? 0;
 
 		// Check for duplicate assignment
 		const existing = await pb.collection('event_talent').getList(1, 1, {
-			filter: `event = '${params.id}' && talent = '${talentId}'`
+			filter: bookingEntityType === 'group'
+				? `event = '${params.id}' && talentGroup = '${talentGroupId}'`
+				: `event = '${params.id}' && talent = '${talentId}'`
 		});
 		if (existing.totalItems > 0) {
-			return json({ message: 'Talent already assigned to this event' }, { status: 409 });
+			return json({ message: 'Booking entity already assigned to this event' }, { status: 409 });
 		}
 
-		const record = await pb.collection('event_talent').create({
+		const payload: Record<string, any> = {
 			event: params.id,
-			talent: talentId,
+			talent: bookingEntityType === 'individual' ? talentId : null,
 			role: role ?? 'player',
 			rateOverride: rateOverride ?? null,
 			confirmedRate,
 			status: status ?? 'confirmed',
 			bonusEligible: false,
 			bonusEarned: false
-		});
+		};
+		if (bookingEntityType === 'group') {
+			payload.talentGroup = talentGroupId;
+			payload.bookingEntityType = 'group';
+		}
+
+		const record = await pb.collection('event_talent').create(payload);
 
 		return json(record, { status: 201 });
 	} catch (err: any) {

@@ -24,6 +24,8 @@
     "test:flow": "npm run test:backup && npm run test:seed:quick",
     "seed:all": "tsx scripts/seed-all.ts",
     "seed:departments": "tsx scripts/seed-departments.ts",
+    "schema:talent-groups": "tsx scripts/create-talent-groups.ts",
+    "schema:content-production-workflow": "tsx scripts/create-content-production-workflow.ts",
     "test:pipelines": "tsx scripts/test-pipelines.ts",
     "test:pipelines:keep": "tsx scripts/test-pipelines.ts --keep",
     "test:pipelines:engine": "tsx scripts/test-pipelines.ts --suite=engine",

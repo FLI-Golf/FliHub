@@ -43,7 +43,15 @@
 	let bookingBusy = $state(false);
 	let bookingForm = $state({
 		eventId: '',
+		entityType: 'individual',
 		talentId: '',
+		talentGroupId: '',
+		groupMode: 'existing',
+		groupName: '',
+		groupType: 'music_group',
+		primaryContactName: '',
+		primaryContactEmail: '',
+		memberCount: '',
 		role: 'celebrity_appearance',
 		fee: '',
 		status: 'invited'
@@ -61,6 +69,8 @@
 	const items = $derived<PipelineCardItem[]>(
 		(data.eventTalent ?? []).map((booking: any) => {
 			const event = booking.expand?.event;
+			const talentGroup = booking.expand?.talentGroup;
+			const isGroupBooking = booking.bookingEntityType === 'group' || !!booking.talentGroup;
 			const bookingPayments = paymentsByBooking[booking.id] ?? [];
 			const paymentStatus = bookingPayments.find((payment: any) => payment.status === 'approval_required')?.status
 				?? bookingPayments[0]?.status;
@@ -75,11 +85,14 @@
 						: 'bg-yellow-900/50 text-yellow-300 border-yellow-700'
 				});
 			}
+			if (isGroupBooking) {
+				tags.push({ label: 'Group', colorClass: 'bg-cyan-900/50 text-cyan-300 border-cyan-700' });
+			}
 
 			return {
 				id: booking.id,
 				status: booking.status,
-				title: booking.expand?.talent?.name ?? 'Unassigned talent',
+				title: isGroupBooking ? talentGroup?.name ?? 'Unnamed group' : booking.expand?.talent?.name ?? 'Unassigned talent',
 				subtitle: event?.name ?? 'Event not linked',
 				badge: { label: fmt$(booking.confirmedRate ?? 0), colorClass: 'bg-slate-800 text-slate-200 border-slate-600' },
 				tags,
@@ -101,17 +114,53 @@
 	async function createBooking(e: SubmitEvent) {
 		e.preventDefault();
 		bookingError = '';
-		if (!bookingForm.eventId || !bookingForm.talentId) {
-			bookingError = 'Event and talent are required';
+		if (!bookingForm.eventId) {
+			bookingError = 'Event is required';
+			return;
+		}
+		if (bookingForm.entityType === 'individual' && !bookingForm.talentId) {
+			bookingError = 'Talent is required';
+			return;
+		}
+		if (bookingForm.entityType === 'group' && bookingForm.groupMode === 'existing' && !bookingForm.talentGroupId) {
+			bookingError = 'Talent group is required';
+			return;
+		}
+		if (bookingForm.entityType === 'group' && bookingForm.groupMode === 'new' && !bookingForm.groupName.trim()) {
+			bookingError = 'Group name is required';
 			return;
 		}
 		bookingBusy = true;
 		try {
+			let talentGroupId = bookingForm.talentGroupId;
+			if (bookingForm.entityType === 'group' && bookingForm.groupMode === 'new') {
+				const groupRes = await fetch('/api/talent-groups', {
+					method: 'POST',
+					headers: { 'Content-Type': 'application/json' },
+					body: JSON.stringify({
+						name: bookingForm.groupName,
+						groupType: bookingForm.groupType,
+						primaryContactName: bookingForm.primaryContactName,
+						primaryContactEmail: bookingForm.primaryContactEmail,
+						memberCount: bookingForm.memberCount ? Number(bookingForm.memberCount) : null,
+						defaultFee: bookingForm.fee ? Number(bookingForm.fee) : null
+					})
+				});
+				if (!groupRes.ok) {
+					const body = await groupRes.json().catch(() => ({}));
+					throw new Error(body.message ?? `Error ${groupRes.status}`);
+				}
+				const group = await groupRes.json();
+				talentGroupId = group.id;
+			}
+
 			const res = await fetch(`/api/events/${bookingForm.eventId}/talent`, {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
 				body: JSON.stringify({
-					talentId: bookingForm.talentId,
+					entityType: bookingForm.entityType,
+					talentId: bookingForm.entityType === 'individual' ? bookingForm.talentId : null,
+					talentGroupId: bookingForm.entityType === 'group' ? talentGroupId : null,
 					role: bookingForm.role,
 					rateOverride: bookingForm.fee ? Number(bookingForm.fee) : null,
 					status: bookingForm.status
@@ -122,7 +171,21 @@
 				throw new Error(body.message ?? `Error ${res.status}`);
 			}
 			showNew = false;
-			bookingForm = { eventId: '', talentId: '', role: 'celebrity_appearance', fee: '', status: 'invited' };
+			bookingForm = {
+				eventId: '',
+				entityType: 'individual',
+				talentId: '',
+				talentGroupId: '',
+				groupMode: 'existing',
+				groupName: '',
+				groupType: 'music_group',
+				primaryContactName: '',
+				primaryContactEmail: '',
+				memberCount: '',
+				role: 'celebrity_appearance',
+				fee: '',
+				status: 'invited'
+			};
 			await invalidateAll();
 		} catch (err: any) {
 			bookingError = err?.message ?? 'Failed to create booking';
@@ -253,14 +316,82 @@
 				</div>
 
 				<div>
-					<label for="booking-talent" class={LABEL}>Talent / Act *</label>
-					<select id="booking-talent" bind:value={bookingForm.talentId} class={INPUT} required>
-						<option value="">Select talent</option>
-						{#each data.talent as talent}
-							<option value={talent.id}>{talent.name}</option>
-						{/each}
+					<label for="booking-entity-type" class={LABEL}>Booking Entity *</label>
+					<select id="booking-entity-type" bind:value={bookingForm.entityType} class={INPUT}>
+						<option value="individual">Individual Talent</option>
+						<option value="group">Talent Group / Band / Act</option>
 					</select>
 				</div>
+
+				{#if bookingForm.entityType === 'individual'}
+					<div>
+						<label for="booking-talent" class={LABEL}>Talent / Act *</label>
+						<select id="booking-talent" bind:value={bookingForm.talentId} class={INPUT} required>
+							<option value="">Select talent</option>
+							{#each data.talent as talent}
+								<option value={talent.id}>{talent.name}</option>
+							{/each}
+						</select>
+					</div>
+				{:else}
+					<div class="rounded-lg border border-slate-700 bg-slate-950/40 p-3 space-y-3">
+						<div class="grid grid-cols-2 gap-3">
+							<label class="flex items-center gap-2 rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-slate-200 cursor-pointer">
+								<input type="radio" bind:group={bookingForm.groupMode} value="existing" class="accent-violet-500" />
+								Existing Group
+							</label>
+							<label class="flex items-center gap-2 rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-slate-200 cursor-pointer">
+								<input type="radio" bind:group={bookingForm.groupMode} value="new" class="accent-violet-500" />
+								New Group
+							</label>
+						</div>
+
+						{#if bookingForm.groupMode === 'existing'}
+							<div>
+								<label for="booking-group" class={LABEL}>Talent Group *</label>
+								<select id="booking-group" bind:value={bookingForm.talentGroupId} class={INPUT} required>
+									<option value="">Select group</option>
+									{#each data.talentGroups as group}
+										<option value={group.id}>{group.name}</option>
+									{/each}
+								</select>
+								{#if (data.talentGroups ?? []).length === 0}
+									<p class="text-xs text-amber-400 mt-1">No groups found. Use New Group, then run the talent group schema script if this collection is not available yet.</p>
+								{/if}
+							</div>
+						{:else}
+							<div class="grid grid-cols-2 gap-3">
+								<div class="col-span-2">
+									<label for="booking-group-name" class={LABEL}>Group / Act Name *</label>
+									<input id="booking-group-name" bind:value={bookingForm.groupName} class={INPUT} placeholder="e.g. The Neon Drivers" />
+								</div>
+								<div>
+									<label for="booking-group-type" class={LABEL}>Group Type</label>
+									<select id="booking-group-type" bind:value={bookingForm.groupType} class={INPUT}>
+										<option value="music_group">Music Group</option>
+										<option value="band">Band</option>
+										<option value="celebrity_group">Celebrity Group</option>
+										<option value="performance_act">Performance Act</option>
+										<option value="agency_roster">Agency Roster</option>
+										<option value="other">Other</option>
+									</select>
+								</div>
+								<div>
+									<label for="booking-member-count" class={LABEL}>Member Count</label>
+									<input id="booking-member-count" bind:value={bookingForm.memberCount} type="number" min="0" step="1" class={INPUT} placeholder="Optional" />
+								</div>
+								<div>
+									<label for="booking-contact-name" class={LABEL}>Primary Contact</label>
+									<input id="booking-contact-name" bind:value={bookingForm.primaryContactName} class={INPUT} placeholder="Name" />
+								</div>
+								<div>
+									<label for="booking-contact-email" class={LABEL}>Contact Email</label>
+									<input id="booking-contact-email" bind:value={bookingForm.primaryContactEmail} type="email" class={INPUT} placeholder="email@example.com" />
+								</div>
+							</div>
+						{/if}
+					</div>
+				{/if}
 
 				<div class="grid grid-cols-2 gap-3">
 					<div>

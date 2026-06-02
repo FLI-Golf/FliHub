@@ -25,8 +25,11 @@ export const POST: RequestHandler = async ({ params }) => {
 		const event = await pb.collection('special_events').getOne(params.id);
 		const confirmedTalent = await pb.collection('event_talent').getFullList({
 			filter: `event = '${params.id}' && (status = 'confirmed' || status = 'completed')`,
+			expand: 'talent,talentGroup'
+		}).catch(() => pb.collection('event_talent').getFullList({
+			filter: `event = '${params.id}' && (status = 'confirmed' || status = 'completed')`,
 			expand: 'talent'
-		});
+		}));
 
 		if (confirmedTalent.length === 0) {
 			return json({ message: 'No confirmed talent to generate payments for' });
@@ -35,9 +38,9 @@ export const POST: RequestHandler = async ({ params }) => {
 		// Existing non-cancelled payments for this event (to avoid duplicates)
 		const existingPayments = await pb.collection('event_payments').getFullList({
 			filter: `event = '${params.id}' && status != 'cancelled'`,
-			fields: 'talent'
+			fields: 'eventTalent'
 		});
-		const alreadyPaid = new Set(existingPayments.map(p => p.talent));
+		const alreadyPaid = new Set(existingPayments.map(p => p.eventTalent));
 
 		const approvalThreshold = event.approvalThreshold ?? 500;
 		const isBroadcast = event.eventType === 'tournament_broadcast';
@@ -61,11 +64,14 @@ export const POST: RequestHandler = async ({ params }) => {
 
 		for (const et of confirmedTalent) {
 			const talentId = et.talent;
-			if (alreadyPaid.has(talentId)) { skipped++; continue; }
+			const talentGroupId = et.talentGroup;
+			if (alreadyPaid.has(et.id)) { skipped++; continue; }
 
 			const amount = et.confirmedRate ?? event.defaultRate ?? 0;
 			const talent = et.expand?.talent;
-			const managerCut = talent?.managerCutPercentage ?? 0;
+			const talentGroup = et.expand?.talentGroup;
+			const isGroupBooking = et.bookingEntityType === 'group' || !!talentGroupId;
+			const managerCut = isGroupBooking ? 0 : talent?.managerCutPercentage ?? 0;
 			const managerAmount = managerCut > 0 ? Math.round(amount * (managerCut / 100) * 100) / 100 : 0;
 
 			// Determine approval routing
@@ -75,7 +81,7 @@ export const POST: RequestHandler = async ({ params }) => {
 
 			// Bonus eligibility check
 			let bonusEligible = false;
-			if (isBroadcast && event.season && event.bonusThreshold && seasonEventIds.length > 0) {
+			if (!isGroupBooking && isBroadcast && event.season && event.bonusThreshold && seasonEventIds.length > 0) {
 				const attended = await pb.collection('event_talent').getList(1, 1, {
 					filter: `talent = '${talentId}' && (status = 'confirmed' || status = 'completed') && (${seasonEventIds.map(id => `event = '${id}'`).join(' || ')})`
 				});
@@ -91,7 +97,8 @@ export const POST: RequestHandler = async ({ params }) => {
 			await pb.collection('event_payments').create({
 				event: params.id,
 				eventTalent: et.id,
-				talent: talentId,
+				talent: isGroupBooking ? null : talentId,
+				...(isGroupBooking ? { talentGroup: talentGroupId } : {}),
 				paymentType: paymentTypeFor(et.role),
 				amount,
 				status,
@@ -99,6 +106,7 @@ export const POST: RequestHandler = async ({ params }) => {
 				recipient: 'talent',
 				managerCutPercentage: managerCut,
 				managerAmount,
+				description: isGroupBooking ? `Group booking fee for ${talentGroup?.name ?? talentGroupId}` : undefined,
 				isBonus: false
 			});
 

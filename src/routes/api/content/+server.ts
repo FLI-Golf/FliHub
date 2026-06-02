@@ -12,7 +12,7 @@ export const GET: RequestHandler = async ({ locals, url }) => {
 	try {
 		const items = await ctx.pb.collection('content_production').getFullList({
 			sort: '-created',
-			expand: 'assignedTo,talent'
+			expand: 'assignedTo,talent,department,project'
 		});
 		return json(items);
 	} catch {
@@ -27,6 +27,7 @@ export const POST: RequestHandler = async ({ request, locals, url }) => {
 
 	if (!body.title?.trim()) return json({ message: 'title is required' }, { status: 400 });
 	if (!body.contentType) return json({ message: 'contentType is required' }, { status: 400 });
+	if (!body.department) return json({ message: 'department is required' }, { status: 400 });
 
 	try {
 		const record = await ctx.pb.collection('content_production').create({
@@ -34,6 +35,8 @@ export const POST: RequestHandler = async ({ request, locals, url }) => {
 			contentType:  body.contentType,
 			stage:        'brief',
 			description:  body.description ?? '',
+			department:   body.department,
+			project:      body.project || null,
 			talent:       body.talent ?? [],
 			assignedTo:   body.assignedTo ?? null,
 			dueDate:      body.dueDate ?? null,
