@@ -16,7 +16,7 @@ import type { PageServerLoad } from './$types';
 
 export interface IncomeRecord {
 	id:              string;
-	sourceType:      'sponsor_payment' | 'franchise_fee' | 'license' | 'broadcast' | 'other';
+	sourceType:      'sponsor_payment' | 'franchise_fee' | 'license' | 'broadcast' | 'ticket_sale' | 'other';
 	sourceName:      string;   // sponsor name, franchise lead name, etc.
 	description:     string;   // payment type / period label
 	amount:          number;
@@ -34,7 +34,7 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 	const { pb } = ctx;
 
 	try {
-		const [sponsorPayments, franchiseDeals, incomingPayments, sponsors] = await Promise.all([
+		const [sponsorPayments, franchiseDeals, incomingPayments, sponsors, ticketSales] = await Promise.all([
 			pb.collection('sponsor_payments').getFullList({
 				sort: 'dueDate',
 				expand: 'sponsor',
@@ -54,6 +54,10 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 
 			pb.collection('sponsors').getFullList({
 				fields: 'id,companyName,tier,annualCommitment,totalPaid',
+			}).catch(() => []),
+
+			pb.collection('ticket_sales').getFullList({
+				sort: 'eventDate',
 			}).catch(() => []),
 		]);
 
@@ -165,6 +169,32 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 				invoiceNumber:   pmt.invoiceNumber ?? '',
 				workOrderNumber: pmt.workOrderNumber ?? '',
 				notes:           pmt.notes ?? '',
+			});
+		}
+
+		// ── Ticket sales ─────────────────────────────────────────────────────
+		for (const ts of ticketSales as any[]) {
+			const stageMap: Record<string, string> = {
+				projected:  'invoiced',
+				on_sale:    'invoiced',
+				sold_out:   'scheduled',
+				completed:  'received',
+				reconciled: 'reconciled',
+				cancelled:  'invoiced',
+			};
+			records.push({
+				id:              ts.id,
+				sourceType:      'ticket_sale',
+				sourceName:      ts.eventName,
+				description:     `${(ts.ticketType ?? 'ticket').replace(/_/g, ' ')} — ${ts.quantity ?? 0} tickets @ $${ts.pricePerTicket ?? 0}`,
+				amount:          ts.netRevenue ?? ts.grossRevenue ?? ((ts.quantity ?? 0) * (ts.pricePerTicket ?? 0)),
+				status:          stageMap[ts.status] ?? 'invoiced',
+				dueDate:         ts.eventDate ?? '',
+				receivedDate:    ts.receivedDate ?? '',
+				reconciledDate:  ts.reconciledDate ?? '',
+				invoiceNumber:   ts.invoiceNumber ?? '',
+				workOrderNumber: '',
+				notes:           ts.notes ?? '',
 			});
 		}
 

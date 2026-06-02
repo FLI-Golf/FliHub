@@ -46,7 +46,8 @@
 		Monitor,
 		ArrowDownLeft,
 		Send,
-		Plus
+		Plus,
+		Ticket
 	} from 'lucide-svelte';
 
 	type NavItem = {
@@ -225,6 +226,7 @@
 			items: [
 				{ title: 'Payments & Income',      url: '/dashboard/payments',                icon: Wallet,       roles: ['admin'] },
 				{ title: 'Income Pipeline',        url: '/dashboard/income',                  icon: ArrowDownLeft, roles: ['admin'] },
+				{ title: 'Ticket Revenue',         url: '/dashboard/ticket-revenue',          icon: Ticket,        roles: ['admin', 'leader'] },
 				{ title: 'Financial Projections',  url: '/dashboard/financial-projections',   icon: BarChart3,    roles: ['admin', 'marketing', 'marketing_lead'] },
 				{ title: 'Funding Model',          url: '/dashboard/funding-model',           icon: Landmark,     roles: ['admin'] },
 				{ title: 'Use of Proceeds',        url: '/dashboard/use-of-proceeds',         icon: DollarSign,   roles: ['admin', 'marketing', 'marketing_lead'] },
