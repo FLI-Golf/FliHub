@@ -2,7 +2,7 @@
 	import type { PageData } from './$types';
 	import { Button } from '$lib/components/ui/button';
 	import { Badge } from '$lib/components/ui/badge';
-	import { Calendar, DollarSign, Users, AlertCircle, Plus, ChevronRight, Star, FlaskConical, Trash2, RotateCcw } from 'lucide-svelte';
+	import { Calendar, DollarSign, Users, AlertCircle, Plus, ChevronRight, Star, FlaskConical, Trash2, RotateCcw, Music } from 'lucide-svelte';
 	import { invalidateAll } from '$app/navigation';
 
 	let { data }: { data: PageData } = $props();
@@ -13,7 +13,10 @@
 	const EVENT_TYPE_LABELS: Record<string, string> = {
 		appearance: 'Appearance', clinic: 'Clinic', media: 'Media',
 		promotional: 'Promotional', content_creation: 'Content Creation',
-		tournament_broadcast: 'Tournament Broadcast', other: 'Other'
+		tournament_broadcast: 'Tournament Broadcast',
+		celebrity_appearance: 'Celebrity Appearance',
+		music_act: 'Music Act',
+		other: 'Other'
 	};
 	const EVENT_TYPE_COLORS: Record<string, string> = {
 		appearance: 'bg-blue-900 text-blue-300',
@@ -22,6 +25,8 @@
 		promotional: 'bg-orange-900 text-orange-300',
 		content_creation: 'bg-pink-900 text-pink-300',
 		tournament_broadcast: 'bg-yellow-900 text-yellow-300',
+		celebrity_appearance: 'bg-amber-900 text-amber-300',
+		music_act: 'bg-violet-900 text-violet-300',
 		other: 'bg-gray-700 text-gray-300'
 	};
 	const STATUS_COLORS: Record<string, string> = {
@@ -110,6 +115,11 @@
 		</div>
 		<Button href="/dashboard/events/new">
 			<Plus class="w-4 h-4 mr-2" />New Event
+		</Button>
+	</div>
+	<div>
+		<Button href="/dashboard/events/bookings" variant="outline" class="gap-2">
+			<Music class="w-4 h-4" /> Event Booking Pipeline
 		</Button>
 	</div>
 

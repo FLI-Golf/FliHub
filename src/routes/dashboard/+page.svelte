@@ -4,7 +4,7 @@
 	import { Button } from '$lib/components/ui/button/index.js';
 	import {
 		DollarSign, Users, FolderKanban, Receipt,
-		Trophy, Star, Building2, TrendingUp, ArrowRight,
+		Trophy, Star, Building2, TrendingUp, ArrowRight, Flag,
 		Video, Wrench, Megaphone, Cpu, Scale, Wallet, ShieldCheck, Globe, Handshake,
 		Landmark, Briefcase, Film, Ticket,
 		CheckCircle2, Clock, AlertCircle
