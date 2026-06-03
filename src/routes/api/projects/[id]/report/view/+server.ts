@@ -19,7 +19,11 @@ function fmt(n: number) {
 }
 function fmtDate(d: string|null|undefined) {
 	if (!d) return '\u2014';
-	try { return new Date(d).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}); }
+	const dateOnly = toDateInput(d);
+	if (!dateOnly) return '\u2014';
+	const [year, month, day] = dateOnly.split('-').map(Number);
+	if (!year || !month || !day) return '\u2014';
+	try { return new Date(year, month - 1, day).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}); }
 	catch { return '\u2014'; }
 }
 function pct(a:number,b:number){return b===0?0:Math.min(100,(a/b)*100);}
@@ -46,8 +50,52 @@ function parseChecklist(cl:string|null|undefined):{done:number;total:number;item
 const STATUS_LABEL:Record<string,string>={todo:'To Do',in_progress:'In Progress',blocked:'Blocked',completed:'Completed',cancelled:'Cancelled'};
 const STATUS_COLOR:Record<string,string>={todo:C.gray,in_progress:C.blue,blocked:C.red,completed:C.green,cancelled:C.muted};
 const PRI_COLOR:Record<string,string>={low:C.gray,medium:C.amber,high:C.red,urgent:'#dc2626'};
+const PRIORITY_ORDER:Record<string,number>={urgent:0,high:1,medium:2,low:3};
+
+function toDateInput(value:string|null|undefined):string{
+	if(!value)return'';
+	return value.includes('T')?value.split('T')[0]:value.split(' ')[0];
+}
+
+function dateSortValue(value:string|null|undefined):number{
+	const dateOnly=toDateInput(value);
+	if(!dateOnly)return Number.POSITIVE_INFINITY;
+	const [year,month,day]=dateOnly.split('-').map(Number);
+	if(!year||!month||!day)return Number.POSITIVE_INFINITY;
+	return new Date(year,month-1,day).getTime();
+}
+
+function taskPhaseTag(task:any):string{
+	const d=dateSortValue(task.startDate);
+	if(!Number.isFinite(d))return'';
+	const phase1Start=new Date(2026,3,1).getTime();
+	const phase1End=new Date(2026,8,30).getTime();
+	const phase2Start=new Date(2026,9,1).getTime();
+	const phase2End=new Date(2027,3,24).getTime();
+	if(d>=phase1Start&&d<=phase1End)return'Phase 1 · Pre-Tournaments';
+	if(d>=phase2Start&&d<=phase2End)return'Phase 2 · Tournaments Live';
+	return'';
+}
+
+function reportTaskTitle(task:any):string{
+	const tag=taskPhaseTag(task);
+	return `${tag?`[${tag}] `:''}${task.title||'Untitled'}`;
+}
+
+function sortTasksForReport(tasks:any[]):any[]{
+	return[...tasks].sort((a,b)=>{
+		const priorityDiff=(PRIORITY_ORDER[a.priority]??9)-(PRIORITY_ORDER[b.priority]??9);
+		if(priorityDiff!==0)return priorityDiff;
+		const startDiff=dateSortValue(a.startDate)-dateSortValue(b.startDate);
+		if(startDiff!==0)return startDiff;
+		const dueDiff=dateSortValue(a.dueDate)-dateSortValue(b.dueDate);
+		if(dueDiff!==0)return dueDiff;
+		return String(a.title??'').localeCompare(String(b.title??''));
+	});
+}
 
 async function buildPDF(project:any,tasks:any[],expenses:any[],claims:any[]=[]):Promise<Buffer>{
+	tasks=sortTasksForReport(tasks);
 	const isReimbProject = project.expand?.department?.name === 'Tax-Exempt Reimbursements'
 	                    || project.name === 'Tax-Exempt Reimbursements';
 	const PDFDocument=(await import('pdfkit')).default;
@@ -104,14 +152,9 @@ async function buildPDF(project:any,tasks:any[],expenses:any[],claims:any[]=[]):
 		// Stat boxes
 		const budget=project.project_budget??0;
 		const taskBudgetSum=tasks.reduce((s,t)=>s+(t.task_budget??0),0);
-		const paid=expenses.filter(e=>e.status==='paid').reduce((s,e)=>s+(e.amount??0),0);
-		const approved=expenses.filter(e=>e.status==='approved').reduce((s,e)=>s+(e.amount??0),0);
-		const submitted=expenses.filter(e=>e.status==='submitted').reduce((s,e)=>s+(e.amount??0),0);
-		const totalExpensed=paid+approved+submitted;
-		const inTasks=Math.max(0,taskBudgetSum-totalExpensed);
 		const unallocated=Math.max(0,budget-taskBudgetSum);
-		const actualSpend=paid+approved;
 		const p=(v:number)=>budget>0?Math.min(100,(v/budget)*100):0;
+		const deptBudget=project.expand?.department?.department_annual_budget??project.expand?.department?.budget??0;
 
 		// Reimbursement-specific totals
 		const rPaid     = claims.filter(c=>c.status==='paid').reduce((s,c)=>s+(c.totalAmount??0),0);
@@ -129,9 +172,9 @@ async function buildPDF(project:any,tasks:any[],expenses:any[],claims:any[]=[]):
 			{label:'PAID',           value:fmt(rPaid),     sub:`${claims.filter(c=>c.status==='paid').length} claims paid`},
 			{label:'PENDING',        value:fmt(rApproved+rReview+rSubmitted), sub:`${rPending} awaiting action`},
 		] : [
-			{label:'PROJECT BUDGET',value:fmt(budget),sub:null},
-			{label:'TASK BUDGETS',value:fmt(taskBudgetSum),sub:`${p(taskBudgetSum).toFixed(0)}% allocated`},
-			{label:'ACTUAL SPEND',value:fmt(actualSpend),sub:`${p(actualSpend).toFixed(0)}% of budget`},
+			{label:'DEPT BUDGET',value:deptBudget>0?fmt(deptBudget):fmt(budget),sub:project.expand?.department?.name??null},
+			{label:'PROJECT BUDGET',value:fmt(budget),sub:deptBudget>0?`${pct(budget,deptBudget).toFixed(0)}% of dept`:null},
+			{label:'TASK ALLOCATION',value:fmt(taskBudgetSum),sub:`${p(taskBudgetSum).toFixed(0)}% allocated`},
 			{label:'UNALLOCATED',value:fmt(unallocated),sub:'remaining'},
 		]).forEach((b,i)=>{
 			const bx=ML+i*(boxW+3);
@@ -171,7 +214,7 @@ async function buildPDF(project:any,tasks:any[],expenses:any[],claims:any[]=[]):
 			y=(doc as any).y+12;
 		}
 
-		// Pipeline section — reimbursements or standard expenses
+		// Budget allocation section — reimbursements keep their claim pipeline
 		y=ensure(y,70);
 		if(isReimbProject){
 			y=sectionLabel('REIMBURSEMENT PIPELINE',y);
@@ -231,37 +274,6 @@ async function buildPDF(project:any,tasks:any[],expenses:any[],claims:any[]=[]):
 				y+=8;
 			}
 		} else {
-			y=sectionLabel('EXPENSE PIPELINE',y);
-			const segs=[
-				{pct:p(paid),color:C.green,label:'Paid',amt:paid},
-				{pct:p(approved),color:C.blue,label:'Approved',amt:approved},
-				{pct:p(submitted),color:C.amber,label:'Submitted',amt:submitted},
-				{pct:p(inTasks),color:C.violet,label:'In Tasks',amt:inTasks},
-			];
-			doc.roundedRect(ML,y,CW,14,4).fill('#e2e8f0');
-			let bx2=ML;
-			for(const s of segs){
-				if(s.pct<=0)continue;
-				const sw=Math.max(1,(s.pct/100)*CW);
-				doc.rect(bx2,y,sw,14).fill(s.color);
-				bx2+=sw;
-			}
-			doc.roundedRect(ML,y,CW,14,4).stroke(C.border);
-			y+=22;
-			const legColW=CW/2;
-			segs.forEach((s,i)=>{
-				const col=i%2,row=Math.floor(i/2);
-				const lx=ML+col*legColW,ly=y+row*16;
-				doc.circle(lx+5,ly+5,4).fill(s.color);
-				doc.fillColor(s.amt>0?C.navy:C.gray).font('Helvetica').fontSize(8)
-				   .text(`${s.label}: ${s.amt>0?fmt(s.amt):'\u2014'}`,lx+14,ly,{width:legColW-14,lineBreak:false});
-			});
-			y+=Math.ceil(segs.length/2)*16+4;
-			if(unallocated>0){
-				doc.fillColor(C.muted).font('Helvetica').fontSize(7.5)
-				   .text(`${fmt(unallocated)} unallocated`,ML,y,{lineBreak:false});
-				y+=14;
-			}
 			y+=8;
 		}
 
@@ -311,7 +323,7 @@ async function buildPDF(project:any,tasks:any[],expenses:any[],claims:any[]=[]):
 
 				// Title
 				doc.fillColor(C.navy).font('Helvetica-Bold').fontSize(9.5)
-				   .text(task.title || 'Untitled', ML+12, y+7, { width: CW-150, lineBreak: false });
+				   .text(reportTaskTitle(task), ML+12, y+7, { width: CW-150, lineBreak: false });
 
 				// Status badge
 				const bW = 72, bX = ML+CW-bW;
@@ -338,7 +350,7 @@ async function buildPDF(project:any,tasks:any[],expenses:any[],claims:any[]=[]):
 
 				// Meta row 2: budget / hours / subtasks / tags
 				const meta: string[] = [];
-				if ((task.task_budget ?? 0) > 0)      meta.push(`Budget: ${fmt(task.task_budget)}`);
+				if ((task.task_budget ?? 0) > 0)      meta.push(`Projected: ${fmt(task.task_budget)}`);
 				if ((task.task_actual_cost ?? 0) > 0)  meta.push(`Actual: ${fmt(task.task_actual_cost)}`);
 				if ((task.estimatedHours ?? 0) > 0)    meta.push(`${task.estimatedHours}h est.`);
 				if ((task.actualHours ?? 0) > 0)       meta.push(`${task.actualHours}h logged`);
@@ -443,7 +455,7 @@ export const GET: RequestHandler = async ({ locals, url, params }) => {
 		const slug = ((projectRec as any).name as string).replace(/\s+/g,'-').toLowerCase().replace(/[^a-z0-9-]/g,'');
 		const date = new Date().toISOString().slice(0,10);
 
-		return new Response(buf, {
+		return new Response(new Uint8Array(buf), {
 			status: 200,
 			headers: {
 				'Content-Type': 'application/pdf',
