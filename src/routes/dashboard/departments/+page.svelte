@@ -13,6 +13,7 @@
 	// Per-department slider state: deptId → current dragging value
 	let sliderValues = $state<Record<string, number>>({});
 	let savingBudget = $state<Record<string, boolean>>({});
+	let budgetErrors = $state<Record<string, string>>({});
 
 	function getSliderValue(dept: any): number {
 		return sliderValues[dept.id] ?? dept.department_annual_budget ?? 0;
@@ -20,13 +21,28 @@
 
 	async function saveBudget(deptId: string, value: number) {
 		savingBudget = { ...savingBudget, [deptId]: true };
-		await fetch(`/api/departments/${deptId}`, {
-			method: 'PATCH',
-			headers: { 'Content-Type': 'application/json' },
-			body: JSON.stringify({ department_annual_budget: value })
-		});
-		savingBudget = { ...savingBudget, [deptId]: false };
-		await invalidateAll();
+		budgetErrors = { ...budgetErrors, [deptId]: '' };
+		try {
+			const response = await fetch(`/api/departments/${deptId}`, {
+				method: 'PATCH',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ department_annual_budget: value })
+			});
+			if (!response.ok) {
+				const data = await response.json().catch(() => ({}));
+				throw new Error(data.message || 'Budget save failed');
+			}
+			await invalidateAll();
+		} catch (err) {
+			const { [deptId]: _discard, ...nextSliderValues } = sliderValues;
+			sliderValues = nextSliderValues;
+			budgetErrors = {
+				...budgetErrors,
+				[deptId]: err instanceof Error ? err.message : 'Budget save failed'
+			};
+		} finally {
+			savingBudget = { ...savingBudget, [deptId]: false };
+		}
 	}
 
 	// Max slider value — highest budget across all depts, min $5M, scaled to 1.5×
@@ -66,9 +82,9 @@
 	</div>
 
 	<!-- Departments Grid -->
-	{#if data.departments.length > 0}
+	{#if (data.departments ?? []).length > 0}
 		<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-			{#each data.departments as department}
+			{#each data.departments ?? [] as department}
 				{@const allocated   = data.allocatedByDept?.[department.id] ?? 0}
 				{@const total       = department.department_annual_budget ?? 0}
 				{@const allocPct    = total > 0 ? Math.min(100, (allocated / total) * 100) : 0}
@@ -122,7 +138,7 @@
 						</div>
 
 						<!-- Budget slider -->
-						<div class="space-y-1.5" onclick={(e) => e.preventDefault()}>
+						<div class="space-y-1.5">
 							<div class="flex items-baseline justify-between">
 								<span class="text-[10px] text-slate-500 uppercase tracking-wide flex items-center gap-1">
 									<DollarSign class="size-3" />Budget
@@ -174,6 +190,9 @@
 								</div>
 							{:else}
 								<p class="text-[10px] text-slate-600 italic">Drag to set budget</p>
+							{/if}
+							{#if budgetErrors[department.id]}
+								<p class="text-[10px] text-red-400">{budgetErrors[department.id]}</p>
 							{/if}
 						</div>
 

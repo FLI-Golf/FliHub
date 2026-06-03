@@ -126,7 +126,7 @@ export async function calculateDepartmentBudget(
 
 /**
  * Update department budget based on its projects.
- * department_annual_budget   = sum of project_budget
+ * department_annual_budget   = sum of project_budget, unless manually allocated/capped
  * department_actual_expenses = sum of project_actual_expenses
  */
 export async function updateDepartmentBudget(
@@ -136,13 +136,26 @@ export async function updateDepartmentBudget(
 	try {
 		const department = await pb.collection('departments').getOne(departmentId);
 		const { budget: projectsBudget, actualExpenses } = await calculateDepartmentBudget(pb, departmentId);
+		const mode = (department as any).department_budget_mode || 'auto';
+		const manualOverride = (department as any).department_manual_budget_override || 0;
+		const annualBudget = (department as any).department_annual_budget || 0;
+		const annualCap = (department as any).department_budget_cap || 0;
+		let nextBudget = projectsBudget;
+
+		if (manualOverride > 0) {
+			nextBudget = manualOverride;
+		} else if (mode === 'allocated') {
+			nextBudget = annualBudget;
+		} else if (mode === 'annual_cap') {
+			nextBudget = annualCap || annualBudget || projectsBudget;
+		}
 
 		await pb.collection('departments').update(departmentId, {
-			department_annual_budget: projectsBudget,
+			department_annual_budget: nextBudget,
 			department_actual_expenses: actualExpenses
 		});
 
-		console.log(`[Budget] Dept "${department.name}" → budget $${projectsBudget}, actual $${actualExpenses}`);
+		console.log(`[Budget] Dept "${department.name}" → budget $${nextBudget}, actual $${actualExpenses}`);
 	} catch (error) {
 		console.error('Error updating department budget:', error);
 		throw error;

@@ -15,7 +15,7 @@
 		name: '',
 		code: '',
 		description: '',
-		annualBudget: 0,
+		department_annual_budget: '0',
 		status: 'active',
 		headOfDepartment: ''
 	});
@@ -60,7 +60,7 @@
 			name: '',
 			code: '',
 			description: '',
-			annualBudget: 0,
+			department_annual_budget: '0',
 			status: 'active',
 			headOfDepartment: ''
 		};
@@ -113,7 +113,7 @@
 					id="code"
 					bind:value={formData.code}
 					placeholder="e.g., MKT"
-					maxlength="10"
+					maxlength={10}
 					class="bg-slate-800 border-slate-700 text-white placeholder:text-slate-400"
 				/>
 			</div>
@@ -124,7 +124,7 @@
 				<Input
 					id="annualBudget"
 					type="number"
-					bind:value={formData.annualBudget}
+					bind:value={formData.department_annual_budget}
 					placeholder="0"
 					min="0"
 					step="1000"

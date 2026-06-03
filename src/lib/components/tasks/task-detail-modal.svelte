@@ -463,6 +463,13 @@
 				<Button onclick={() => enterEditMode()} class="flex-1 bg-blue-600 hover:bg-blue-700 text-white">
 					<Pencil class="size-4 mr-2" /> Update Details
 				</Button>
+			{:else if activeTab === 'notes'}
+				<Button variant="outline" onclick={() => (open = false)} class="flex-1 bg-slate-800 border-slate-700 text-white hover:bg-slate-700">
+					<X class="size-4 mr-2" /> Close
+				</Button>
+				<Button onclick={() => enterEditMode('notes')} class="flex-1 bg-blue-600 hover:bg-blue-700 text-white">
+					<Pencil class="size-4 mr-2" /> Update Notes
+				</Button>
 			{:else}
 				<Button variant="outline" onclick={() => (open = false)} class="w-full bg-slate-800 border-slate-700 text-white hover:bg-slate-700">
 					<X class="size-4 mr-2" /> Close
