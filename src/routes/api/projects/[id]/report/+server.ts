@@ -18,7 +18,11 @@ function fmt(n: number) {
 }
 function fmtDate(d: string | null | undefined) {
 	if (!d) return '\u2014';
-	try { return new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }); }
+	const dateOnly = toDateInput(d);
+	if (!dateOnly) return '\u2014';
+	const [year, month, day] = dateOnly.split('-').map(Number);
+	if (!year || !month || !day) return '\u2014';
+	try { return new Date(year, month - 1, day).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }); }
 	catch { return '\u2014'; }
 }
 function pct(a: number, b: number) { return b === 0 ? 0 : Math.min(100, (a / b) * 100); }
@@ -31,6 +35,49 @@ function subtaskCounts(cl: string | null | undefined) {
 const STATUS_LABEL: Record<string, string> = { todo: 'To Do', in_progress: 'In Progress', blocked: 'Blocked', completed: 'Completed', cancelled: 'Cancelled' };
 const STATUS_COLOR: Record<string, string> = { todo: C.gray, in_progress: C.blue, blocked: C.red, completed: C.green, cancelled: C.muted };
 const PRI_COLOR:    Record<string, string> = { low: C.gray, medium: C.amber, high: C.red, urgent: '#dc2626' };
+const PRIORITY_ORDER: Record<string, number> = { urgent: 0, high: 1, medium: 2, low: 3 };
+
+function toDateInput(value: string | null | undefined): string {
+	if (!value) return '';
+	return value.includes('T') ? value.split('T')[0] : value.split(' ')[0];
+}
+
+function dateSortValue(value: string | null | undefined): number {
+	const dateOnly = toDateInput(value);
+	if (!dateOnly) return Number.POSITIVE_INFINITY;
+	const [year, month, day] = dateOnly.split('-').map(Number);
+	if (!year || !month || !day) return Number.POSITIVE_INFINITY;
+	return new Date(year, month - 1, day).getTime();
+}
+
+function taskPhaseTag(task: any): string {
+	const d = dateSortValue(task.startDate);
+	if (!Number.isFinite(d)) return '';
+	const phase1Start = new Date(2026, 3, 1).getTime();
+	const phase1End = new Date(2026, 8, 30).getTime();
+	const phase2Start = new Date(2026, 9, 1).getTime();
+	const phase2End = new Date(2027, 3, 24).getTime();
+	if (d >= phase1Start && d <= phase1End) return 'Phase 1 · Pre-Tournaments';
+	if (d >= phase2Start && d <= phase2End) return 'Phase 2 · Tournaments Live';
+	return '';
+}
+
+function reportTaskTitle(task: any): string {
+	const tag = taskPhaseTag(task);
+	return `${tag ? `[${tag}] ` : ''}${task.title || 'Untitled'}`;
+}
+
+function sortTasksForReport(tasks: any[]): any[] {
+	return [...tasks].sort((a, b) => {
+		const priorityDiff = (PRIORITY_ORDER[a.priority] ?? 9) - (PRIORITY_ORDER[b.priority] ?? 9);
+		if (priorityDiff !== 0) return priorityDiff;
+		const startDiff = dateSortValue(a.startDate) - dateSortValue(b.startDate);
+		if (startDiff !== 0) return startDiff;
+		const dueDiff = dateSortValue(a.dueDate) - dateSortValue(b.dueDate);
+		if (dueDiff !== 0) return dueDiff;
+		return String(a.title ?? '').localeCompare(String(b.title ?? ''));
+	});
+}
 
 async function buildPDF(project: any): Promise<Buffer> {
 	const PDFDocument = (await import('pdfkit')).default;
@@ -88,14 +135,18 @@ async function buildPDF(project: any): Promise<Buffer> {
 		   .text(`Generated ${genDate}  \u00b7  FY ${project.fiscalYear ?? new Date().getFullYear()}`, ML, 72, { lineBreak: false });
 
 		let y = 112;
+		const projectBudget = project.budget ?? 0;
+		const deptBudget = project.department?.budget ?? 0;
+		const taskAllocation = project.taskBudgetSum ?? 0;
+		const unallocated = project.pipeline?.unallocated ?? Math.max(0, projectBudget - taskAllocation);
 
 		// ── Stat boxes ────────────────────────────────────────────────────
 		const boxW = (CW - 9) / 4;
 		[
-			{ label: 'PROJECT BUDGET', value: fmt(project.budget),                    sub: null },
-			{ label: 'TASK BUDGETS',   value: fmt(project.taskBudgetSum ?? 0),         sub: `${(project.allocatedPct ?? 0).toFixed(0)}% allocated` },
-			{ label: 'ACTUAL SPEND',   value: fmt(Math.max(0, project.actualSpend ?? 0)), sub: `${Math.max(0, project.spendPct ?? 0).toFixed(0)}% of budget` },
-			{ label: 'UNALLOCATED',    value: fmt(project.pipeline?.unallocated ?? 0), sub: 'remaining' },
+			{ label: 'DEPT BUDGET',     value: deptBudget > 0 ? fmt(deptBudget) : fmt(projectBudget), sub: project.department?.name ?? null },
+			{ label: 'PROJECT BUDGET',  value: fmt(projectBudget),                    sub: deptBudget > 0 ? `${pct(projectBudget, deptBudget).toFixed(0)}% of dept` : null },
+			{ label: 'TASK ALLOCATION', value: fmt(taskAllocation),                   sub: `${pct(taskAllocation, projectBudget).toFixed(0)}% allocated` },
+			{ label: 'UNALLOCATED',     value: fmt(unallocated),                      sub: 'remaining' },
 		].forEach((b, i) => {
 			const bx = ML + i * (boxW + 3);
 			doc.roundedRect(bx, y, boxW, 54, 5).fillAndStroke(C.bgLight, C.border);
@@ -134,51 +185,8 @@ async function buildPDF(project: any): Promise<Buffer> {
 			y = (doc as any).y + 12;
 		}
 
-		// ── Expense pipeline ──────────────────────────────────────────────
-		y = ensure(y, 70);
-		y = sectionLabel('EXPENSE PIPELINE', y);
-
-		const pp = project.pipelinePct ?? {};
-		const segs = [
-			{ pct: pp.paid ?? 0,      color: C.green,  label: 'Paid',      amt: project.pipeline?.paid      ?? 0 },
-			{ pct: pp.approved ?? 0,  color: C.blue,   label: 'Approved',  amt: project.pipeline?.approved  ?? 0 },
-			{ pct: pp.submitted ?? 0, color: C.amber,  label: 'Submitted', amt: project.pipeline?.submitted ?? 0 },
-			{ pct: pp.inTasks ?? 0,   color: C.violet, label: 'In Tasks',  amt: project.pipeline?.inTasks   ?? 0 },
-		];
-
-		// Bar
-		doc.roundedRect(ML, y, CW, 14, 4).fill('#e2e8f0');
-		let bx2 = ML;
-		for (const s of segs) {
-			if (s.pct <= 0) continue;
-			const sw = Math.max(1, (s.pct / 100) * CW);
-			doc.rect(bx2, y, sw, 14).fill(s.color);
-			bx2 += sw;
-		}
-		doc.roundedRect(ML, y, CW, 14, 4).stroke(C.border);
-		y += 22;
-
-		// Legend — 2 columns
-		const legColW = CW / 2;
-		segs.forEach((s, i) => {
-			const col = i % 2, row = Math.floor(i / 2);
-			const lx = ML + col * legColW, ly = y + row * 16;
-			doc.circle(lx + 5, ly + 5, 4).fill(s.color);
-			doc.fillColor(s.amt > 0 ? C.navy : C.gray).font('Helvetica').fontSize(8)
-			   .text(`${s.label}: ${s.amt > 0 ? fmt(s.amt) : '\u2014'}`, lx + 14, ly, { width: legColW - 14, lineBreak: false });
-		});
-		y += Math.ceil(segs.length / 2) * 16 + 4;
-
-		const unalloc = project.pipeline?.unallocated ?? 0;
-		if (unalloc > 0) {
-			doc.fillColor(C.muted).font('Helvetica').fontSize(7.5)
-			   .text(`${fmt(unalloc)} unallocated`, ML, y, { lineBreak: false });
-			y += 14;
-		}
-		y += 8;
-
 		// ── Tasks ─────────────────────────────────────────────────────────
-		const tasks: any[] = project.tasks?.items ?? [];
+		const tasks: any[] = sortTasksForReport(project.tasks?.items ?? []);
 		if (tasks.length > 0) {
 			y = ensure(y, 50);
 			y = sectionLabel('TASKS', y);
@@ -204,7 +212,7 @@ async function buildPDF(project: any): Promise<Buffer> {
 
 				// Title
 				doc.fillColor(C.navy).font('Helvetica-Bold').fontSize(9.5)
-				   .text(task.title || 'Untitled', ML + 12, y + 8, { width: CW - 130, lineBreak: false });
+				   .text(reportTaskTitle(task), ML + 12, y + 8, { width: CW - 130, lineBreak: false });
 
 				// Status badge
 				const bW = 76, bX = ML + CW - bW;
@@ -216,7 +224,7 @@ async function buildPDF(project: any): Promise<Buffer> {
 				const meta: string[] = [];
 				if (task.priority) meta.push(task.priority.toUpperCase());
 				if (task.dueDate)  meta.push(`Due ${fmtDate(task.dueDate)}`);
-				if ((task.task_budget ?? 0) > 0) meta.push(fmt(task.task_budget));
+				if ((task.task_budget ?? 0) > 0) meta.push(`Projected ${fmt(task.task_budget)}`);
 				if (sub.total > 0) meta.push(`${sub.done}/${sub.total} subtasks`);
 				if ((task.estimatedHours ?? 0) > 0) meta.push(`${task.estimatedHours}h est.`);
 				if ((task.actualHours ?? 0) > 0) meta.push(`${task.actualHours}h actual`);
@@ -235,7 +243,7 @@ async function buildPDF(project: any): Promise<Buffer> {
 			for (const task of withNotes) {
 				y = ensure(y, 30);
 				doc.fillColor(C.slateL).font('Helvetica-Bold').fontSize(8)
-				   .text(task.title || 'Untitled', ML, y, { lineBreak: false });
+				   .text(reportTaskTitle(task), ML, y, { lineBreak: false });
 				y += 13;
 				doc.fillColor(C.muted).font('Helvetica').fontSize(7.5)
 				   .text(task.notes, ML, y, { width: CW });
@@ -323,7 +331,7 @@ export const POST: RequestHandler = async ({ locals, url, request, params }) => 
 		const buf = await buildPDF(project);
 		const slug = (project.name as string).replace(/\s+/g, '-').toLowerCase().replace(/[^a-z0-9-]/g, '');
 		const date = new Date().toISOString().slice(0, 10);
-		return new Response(buf, {
+		return new Response(new Uint8Array(buf), {
 			status: 200,
 			headers: {
 				'Content-Type': 'application/pdf',

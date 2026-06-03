@@ -3,7 +3,7 @@
 	import { Button } from '$lib/components/ui/button';
 	import { Input } from '$lib/components/ui/input';
 	import { Label } from '$lib/components/ui/label';
-	import { CheckSquare, Square, X, Calendar, Clock, Info, ListChecks, FileText, Pencil, Save } from 'lucide-svelte';
+	import { CheckSquare, Square, X, Calendar, Clock, Info, ListChecks, FileText, Pencil, Save, Plus } from 'lucide-svelte';
 	import StatusBadge from '$lib/components/metrics/status-badge.svelte';
 	import VisualTabs from '$lib/components/ui/visual-tabs.svelte';
 	import { tick } from 'svelte';
@@ -16,6 +16,7 @@
 	let checklistSaveStatus = $state<'idle' | 'saving' | 'saved' | 'error'>('idle');
 	let checklistSaveMessage = $state('');
 	let checklistLastSavedAt = $state<Date | null>(null);
+	let newSubtaskText = $state('');
 	let isSaving = $state(false);
 	let activeTab = $state<string>('details');
 	let editMode = $state(false);
@@ -74,8 +75,44 @@
 				.filter((l: string) => l.includes('[ ]') || l.includes('[x]') || l.includes('[X]'))
 				.map((l: string, i: number) => ({ id: i, text: l.replace(/^[*-]\s*\[([ xX])\]\s*/, '').trim(), completed: l.includes('[x]') || l.includes('[X]') }));
 		}
-		if (Array.isArray(data)) return data;
+		if (Array.isArray(data)) {
+			return data.map((item: any, i: number) => ({
+				id: item.id ?? i,
+				text: item.text || item.label || item.name || '',
+				completed: Boolean(item.completed || item.checked || item.done)
+			}));
+		}
 		return [];
+	}
+
+	function checklistMarkdown(items: any[]): string {
+		return items
+			.map(s => ({ ...s, text: String(s.text || '').trim() }))
+			.filter(s => s.text)
+			.map(s => `- [${s.completed ? 'x' : ' '}] ${s.text}`)
+			.join('\n');
+	}
+
+	function resetSubtasks() {
+		if (task?.subTasksChecklist) subtasks = parseSubtasks(task.subTasksChecklist);
+		else subtasks = [];
+		newSubtaskText = '';
+	}
+
+	function addSubtask() {
+		const text = newSubtaskText.trim();
+		if (!text) return;
+		const nextId = subtasks.reduce((max, s) => Math.max(max, Number(s.id) || 0), -1) + 1;
+		subtasks = [...subtasks, { id: nextId, text, completed: false }];
+		newSubtaskText = '';
+	}
+
+	function removeSubtask(index: number) {
+		subtasks = subtasks.filter((_, i) => i !== index);
+	}
+
+	function toggleSubtaskLocal(index: number) {
+		subtasks = subtasks.map((s, i) => i === index ? { ...s, completed: !s.completed } : s);
 	}
 
 	async function toggleSubtask(index: number) {
@@ -84,7 +121,7 @@
 		checklistSaveMessage = 'Saving...';
 		subtasks[index].completed = !subtasks[index].completed;
 		try {
-			const markdown = subtasks.map(s => `- [${s.completed ? 'x' : ' '}] ${s.text}`).join('\n');
+			const markdown = checklistMarkdown(subtasks);
 			const res = await fetch(`/api/tasks/${task.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ subTasksChecklist: markdown }) });
 			if (!res.ok) throw new Error('Failed');
 			checklistLastSavedAt = new Date();
@@ -119,13 +156,15 @@
 					task_actual_cost: Number(form.task_actual_cost) || 0,
 					tags: form.tags,
 					description: form.description,
-					notes: form.notes
+					notes: form.notes,
+					subTasksChecklist: checklistMarkdown(subtasks)
 				})
 			});
 			if (!res.ok) throw new Error('Failed to save');
 			const updated = await res.json();
 			task = { ...task, ...updated };
 			editMode = false;
+			open = false;
 			onUpdated(updated);
 		} catch (err) {
 			saveError = err instanceof Error ? err.message : 'Save failed';
@@ -157,6 +196,7 @@
 
 	function cancelEdit() {
 		resetForm();
+		resetSubtasks();
 		editMode = false;
 		saveError = '';
 	}
@@ -188,7 +228,11 @@
 
 	function formatDate(d: string): string {
 		if (!d) return '-';
-		return new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+		const dateOnly = toDateInput(d);
+		if (!dateOnly) return '-';
+		const [year, month, day] = dateOnly.split('-').map(Number);
+		if (!year || !month || !day) return '-';
+		return new Date(year, month - 1, day).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 	}
 
 	function formatLastSaved(d: Date | null): string {
@@ -291,6 +335,54 @@
 							<div class="space-y-1 pt-4 border-t border-slate-700">
 								<Label class="text-slate-400 text-sm">Tags</Label>
 								<Input bind:ref={tagsField} bind:value={form.tags} placeholder="community, outreach, school" class="bg-slate-800 border-slate-600 text-white placeholder:text-slate-500" />
+							</div>
+							<div class="space-y-3 pt-4 border-t border-slate-700">
+								<div class="flex items-center justify-between gap-3">
+									<Label class="text-slate-400 text-sm">Checklist</Label>
+									{#if subtasks.length > 0}
+										<span class="text-xs text-slate-500">
+											{subtasks.filter(s => s.completed).length} of {subtasks.length} complete
+										</span>
+									{/if}
+								</div>
+								{#if subtasks.length > 0}
+									<div class="space-y-2 max-h-64 overflow-y-auto pr-1">
+										{#each subtasks as subtask, index}
+											<div class="flex items-start gap-2 rounded-lg border border-slate-700 bg-slate-800/40 px-3 py-2">
+												<button type="button" onclick={() => toggleSubtaskLocal(index)}
+													class="mt-0.5 shrink-0 text-slate-400 hover:text-emerald-400 transition-colors">
+													{#if subtask.completed}
+														<CheckSquare class="size-4 text-emerald-400" />
+													{:else}
+														<Square class="size-4" />
+													{/if}
+												</button>
+												<input
+													bind:value={subtask.text}
+													class="min-w-0 flex-1 bg-transparent text-sm text-slate-200 placeholder:text-slate-500 focus:outline-none"
+													placeholder="Subtask"
+												/>
+												<button type="button" onclick={() => removeSubtask(index)}
+													class="mt-0.5 shrink-0 text-slate-600 hover:text-red-400 transition-colors">
+													<X class="size-4" />
+												</button>
+											</div>
+										{/each}
+									</div>
+								{:else}
+									<p class="text-xs text-slate-500 italic">No subtasks yet.</p>
+								{/if}
+								<div class="flex gap-2">
+									<input
+										bind:value={newSubtaskText}
+										onkeydown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addSubtask(); } }}
+										placeholder="Add a subtask..."
+										class="flex min-h-10 w-full rounded-md border border-slate-600 bg-slate-800 px-3 py-2 text-sm text-white placeholder:text-slate-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-500"
+									/>
+									<Button type="button" onclick={addSubtask} variant="outline" class="shrink-0 bg-slate-800 border-slate-700 text-white hover:bg-slate-700">
+										<Plus class="size-4 mr-2" /> Add
+									</Button>
+								</div>
 							</div>
 							<div class="space-y-1 pt-4 border-t border-slate-700">
 								<Label class="text-slate-400 text-sm">Description</Label>

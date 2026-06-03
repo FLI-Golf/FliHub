@@ -635,33 +635,20 @@
 							</div>
 						{/if}
 
-						<!-- Bar 1: Expense pipeline — task budgets flow into expenses into payments -->
+						<!-- Bar 1: Task allocation -->
 						<div class="space-y-1">
 							<div class="flex items-center justify-between text-xs">
 								<span class="text-muted-foreground font-medium flex items-center gap-1.5">
-									<DollarSign class="size-3.5" />Expense Pipeline
+									<DollarSign class="size-3.5" />Task Allocation
 								</span>
-								<span class="tabular-nums text-slate-300">{fmt(project.budget)}</span>
+								<span class="tabular-nums text-slate-300">{fmt(project.taskBudgetSum)}</span>
 							</div>
-							<div class="h-3 rounded-full overflow-hidden flex bg-slate-900 border border-slate-700">
-								{#if project.pipelinePct.paid > 0}
-									<div class="h-full bg-emerald-500 shrink-0 transition-all duration-500" style="width:{project.pipelinePct.paid.toFixed(2)}%"></div>
-								{/if}
-								{#if project.pipelinePct.approved > 0}
-									<div class="h-full bg-blue-500 shrink-0 transition-all duration-500" style="width:{project.pipelinePct.approved.toFixed(2)}%"></div>
-								{/if}
-								{#if project.pipelinePct.submitted > 0}
-									<div class="h-full bg-amber-400 shrink-0 transition-all duration-500" style="width:{project.pipelinePct.submitted.toFixed(2)}%"></div>
-								{/if}
-								{#if project.pipelinePct.inTasks > 0}
-									<div class="h-full bg-violet-500/80 shrink-0 transition-all duration-500" style="width:{project.pipelinePct.inTasks.toFixed(2)}%"></div>
-								{/if}
+							<div class="h-3 rounded-full overflow-hidden bg-slate-900 border border-slate-700">
+								<div class="h-full bg-violet-500/80 shrink-0 transition-all duration-500" style="width:{project.allocatedPct.toFixed(2)}%"></div>
 							</div>
-							<div class="flex flex-wrap gap-x-3 text-[10px]">
-								<span class="flex items-center gap-1 {project.pipeline.paid > 0 ? 'text-emerald-400' : 'text-slate-600'}"><span class="size-1.5 rounded-full bg-emerald-500 shrink-0"></span>Paid {project.pipeline.paid > 0 ? fmt(project.pipeline.paid) : '—'}</span>
-								<span class="flex items-center gap-1 {project.pipeline.approved > 0 ? 'text-blue-400' : 'text-slate-600'}"><span class="size-1.5 rounded-full bg-blue-500 shrink-0"></span>Approved {project.pipeline.approved > 0 ? fmt(project.pipeline.approved) : '—'}</span>
-								<span class="flex items-center gap-1 {project.pipeline.submitted > 0 ? 'text-amber-400' : 'text-slate-600'}"><span class="size-1.5 rounded-full bg-amber-400 shrink-0"></span>Submitted {project.pipeline.submitted > 0 ? fmt(project.pipeline.submitted) : '—'}</span>
-								<span class="flex items-center gap-1 {project.pipeline.inTasks > 0 ? 'text-violet-400' : 'text-slate-600'}"><span class="size-1.5 rounded-full bg-violet-500 shrink-0"></span>In Tasks {project.pipeline.inTasks > 0 ? fmt(project.pipeline.inTasks) : '—'}</span>
+							<div class="flex flex-wrap gap-x-3 text-[10px] text-slate-500">
+								<span>{fmt(project.taskBudgetSum)} allocated to tasks</span>
+								<span>Projected {fmt(project.forecasted || project.taskBudgetSum)}</span>
 								{#if project.pipeline.unallocated > 0}
 									<span class="text-slate-500 ml-auto">{fmt(project.pipeline.unallocated)} unallocated</span>
 								{/if}
@@ -923,14 +910,13 @@
 </div>
 
 {#if showRaiseModal}
-	<div class="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4"
-		onclick={() => showRaiseModal = false}
-		onkeydown={(e) => e.key === 'Escape' && (showRaiseModal = false)}
-		role="dialog" aria-modal="true">
-		<div class="w-full max-w-sm rounded-2xl border border-slate-700 bg-slate-900 shadow-2xl"
-			onclick={(e) => e.stopPropagation()}
-			onkeydown={(e) => e.stopPropagation()}
-			role="document">
+		<div class="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4"
+			onclick={() => showRaiseModal = false}
+			onkeydown={(e) => e.key === 'Escape' && (showRaiseModal = false)}
+			role="dialog" aria-modal="true" tabindex="-1">
+			<div class="w-full max-w-sm rounded-2xl border border-slate-700 bg-slate-900 shadow-2xl"
+				onclick={(e) => e.stopPropagation()}
+				role="presentation">
 
 			<div class="flex items-center justify-between p-5 border-b border-slate-700/60">
 				<div>
