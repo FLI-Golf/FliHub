@@ -6,17 +6,49 @@
 	import { CheckSquare, Square, X, Calendar, Clock, Info, ListChecks, FileText, Pencil, Save } from 'lucide-svelte';
 	import StatusBadge from '$lib/components/metrics/status-badge.svelte';
 	import VisualTabs from '$lib/components/ui/visual-tabs.svelte';
+	import { tick } from 'svelte';
 
-	let { open = $bindable(false), task = $bindable(), onUpdated = (_t: any) => {} } = $props();
+	let { open = $bindable(false), task = $bindable(), startInEdit = false, onUpdated = (_t: any) => {} } = $props();
 
 	let subtasks = $state<any[]>([]);
+	let sheetContent = $state<HTMLElement | null>(null);
 	let isUpdating = $state(false);
+	let checklistSaveStatus = $state<'idle' | 'saving' | 'saved' | 'error'>('idle');
+	let checklistSaveMessage = $state('');
+	let checklistLastSavedAt = $state<Date | null>(null);
 	let isSaving = $state(false);
 	let activeTab = $state<string>('details');
 	let editMode = $state(false);
 	let saveError = $state('');
+	type EditFocus = 'status' | 'startDate' | 'dueDate' | 'completedDate' | 'priority' | 'estimatedHours' | 'actualHours' | 'taskBudget' | 'actualCost' | 'tags' | 'description' | 'notes';
+	let statusField = $state<HTMLSelectElement | null>(null);
+	let startDateField = $state<HTMLInputElement | null>(null);
+	let dueDateField = $state<HTMLInputElement | null>(null);
+	let completedDateField = $state<HTMLInputElement | null>(null);
+	let priorityField = $state<HTMLSelectElement | null>(null);
+	let estimatedHoursField = $state<HTMLInputElement | null>(null);
+	let actualHoursField = $state<HTMLInputElement | null>(null);
+	let taskBudgetField = $state<HTMLInputElement | null>(null);
+	let actualCostField = $state<HTMLInputElement | null>(null);
+	let tagsField = $state<HTMLInputElement | null>(null);
+	let descriptionField = $state<HTMLTextAreaElement | null>(null);
+	let notesField = $state<HTMLTextAreaElement | null>(null);
 
-	let form = $state({ title: '', status: '', priority: '', dueDate: '', startDate: '', estimatedHours: 0, actualHours: 0, description: '' });
+	let form = $state({
+		title: '',
+		status: '',
+		priority: '',
+		dueDate: '',
+		startDate: '',
+		completedDate: '',
+		estimatedHours: '',
+		actualHours: '',
+		task_budget: '',
+		task_actual_cost: '',
+		tags: '',
+		description: '',
+		notes: ''
+	});
 
 	$effect(() => {
 		if (task?.subTasksChecklist) subtasks = parseSubtasks(task.subTasksChecklist);
@@ -25,16 +57,13 @@
 
 	$effect(() => {
 		if (task) {
-			form = {
-				title:          task.title          || '',
-				status:         task.status         || 'todo',
-				priority:       task.priority       || 'medium',
-				dueDate:        task.dueDate        ? task.dueDate.split(' ')[0] : '',
-				startDate:      task.startDate      ? task.startDate.split(' ')[0] : '',
-				estimatedHours: task.estimatedHours || 0,
-				actualHours:    task.actualHours    || 0,
-				description:    task.description    || ''
-			};
+			resetForm();
+		}
+	});
+
+	$effect(() => {
+		if (open && task && startInEdit) {
+			enterEditMode();
 		}
 	});
 
@@ -51,12 +80,21 @@
 
 	async function toggleSubtask(index: number) {
 		isUpdating = true;
+		checklistSaveStatus = 'saving';
+		checklistSaveMessage = 'Saving...';
 		subtasks[index].completed = !subtasks[index].completed;
 		try {
 			const markdown = subtasks.map(s => `- [${s.completed ? 'x' : ' '}] ${s.text}`).join('\n');
 			const res = await fetch(`/api/tasks/${task.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ subTasksChecklist: markdown }) });
 			if (!res.ok) throw new Error('Failed');
-		} catch { subtasks[index].completed = !subtasks[index].completed; }
+			checklistLastSavedAt = new Date();
+			checklistSaveStatus = 'saved';
+			checklistSaveMessage = 'Saved';
+		} catch {
+			subtasks[index].completed = !subtasks[index].completed;
+			checklistSaveStatus = 'error';
+			checklistSaveMessage = 'Could not save checklist. Try again.';
+		}
 		finally { isUpdating = false; }
 	}
 
@@ -64,10 +102,25 @@
 		isSaving = true;
 		saveError = '';
 		try {
+			const completedDate = form.completedDate || (form.status === 'completed' ? new Date().toISOString() : null);
 			const res = await fetch(`/api/tasks/${task.id}`, {
 				method: 'PATCH',
 				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ title: form.title, status: form.status, priority: form.priority, dueDate: form.dueDate || null, startDate: form.startDate || null, estimatedHours: Number(form.estimatedHours) || 0, actualHours: Number(form.actualHours) || 0, description: form.description })
+				body: JSON.stringify({
+					title: form.title,
+					status: form.status,
+					priority: form.priority,
+					dueDate: form.dueDate || null,
+					startDate: form.startDate || null,
+					completedDate,
+					estimatedHours: Number(form.estimatedHours) || 0,
+					actualHours: Number(form.actualHours) || 0,
+					task_budget: Number(form.task_budget) || 0,
+					task_actual_cost: Number(form.task_actual_cost) || 0,
+					tags: form.tags,
+					description: form.description,
+					notes: form.notes
+				})
 			});
 			if (!res.ok) throw new Error('Failed to save');
 			const updated = await res.json();
@@ -79,15 +132,71 @@
 		} finally { isSaving = false; }
 	}
 
+	function toDateInput(value: string | null | undefined): string {
+		if (!value) return '';
+		return value.includes('T') ? value.split('T')[0] : value.split(' ')[0];
+	}
+
+	function resetForm() {
+		form = {
+			title:            task.title || '',
+			status:           task.status || 'todo',
+			priority:         task.priority || 'medium',
+			dueDate:          toDateInput(task.dueDate),
+			startDate:        toDateInput(task.startDate),
+			completedDate:    toDateInput(task.completedDate),
+			estimatedHours:   task.estimatedHours?.toString() || '',
+			actualHours:      task.actualHours?.toString() || '',
+			task_budget:      task.task_budget?.toString() || '',
+			task_actual_cost: task.task_actual_cost?.toString() || '',
+			tags:             task.tags || '',
+			description:      task.description || '',
+			notes:            task.notes || ''
+		};
+	}
+
 	function cancelEdit() {
-		form = { title: task.title || '', status: task.status || 'todo', priority: task.priority || 'medium', dueDate: task.dueDate ? task.dueDate.split(' ')[0] : '', startDate: task.startDate ? task.startDate.split(' ')[0] : '', estimatedHours: task.estimatedHours || 0, actualHours: task.actualHours || 0, description: task.description || '' };
+		resetForm();
 		editMode = false;
 		saveError = '';
+	}
+
+	async function enterEditMode(focus?: EditFocus) {
+		activeTab = 'details';
+		editMode = true;
+		await tick();
+		sheetContent?.scrollTo({ top: 0, behavior: 'smooth' });
+		const fieldMap: Record<EditFocus, HTMLElement | null> = {
+			status: statusField,
+			startDate: startDateField,
+			dueDate: dueDateField,
+			completedDate: completedDateField,
+			priority: priorityField,
+			estimatedHours: estimatedHoursField,
+			actualHours: actualHoursField,
+			taskBudget: taskBudgetField,
+			actualCost: actualCostField,
+			tags: tagsField,
+			description: descriptionField,
+			notes: notesField
+		};
+		if (focus) {
+			fieldMap[focus]?.focus();
+			fieldMap[focus]?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+		}
 	}
 
 	function formatDate(d: string): string {
 		if (!d) return '-';
 		return new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+	}
+
+	function formatLastSaved(d: Date | null): string {
+		if (!d) return '';
+		const seconds = Math.max(0, Math.round((Date.now() - d.getTime()) / 1000));
+		if (seconds < 10) return 'Last saved just now';
+		if (seconds < 60) return `Last saved ${seconds}s ago`;
+		return `Last saved ${d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}`;
 	}
 
 	function handleOpenChange(newOpen: boolean) {
@@ -101,12 +210,12 @@
 		{ value: 'notes',     label: 'Notes',     icon: FileText }
 	]);
 
-	const statusOptions = ['todo', 'in_progress', 'review', 'completed', 'cancelled'];
+	const statusOptions = ['todo', 'in_progress', 'blocked', 'completed', 'cancelled'];
 	const priorityOptions = ['low', 'medium', 'high', 'urgent'];
 </script>
 
 <Sheet.Root {open} onOpenChange={handleOpenChange}>
-	<Sheet.Content side="left" class="w-full sm:max-w-3xl overflow-y-auto bg-slate-900 text-white border-slate-800">
+	<Sheet.Content bind:ref={sheetContent} side="left" class="w-full sm:max-w-3xl overflow-y-auto bg-slate-900 text-white border-slate-800">
 		<Sheet.Header class="border-b border-slate-800 pb-4">
 			{#if editMode}
 				<Input bind:value={form.title} class="text-xl font-bold bg-slate-800 border-slate-600 text-white" />
@@ -135,49 +244,71 @@
 								<div class="space-y-4">
 									<div class="space-y-1">
 										<Label class="text-slate-400 text-sm">Status</Label>
-										<select bind:value={form.status} class="flex h-10 w-full rounded-md border border-slate-600 bg-slate-800 px-3 py-2 text-sm text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-500">
+										<select bind:this={statusField} bind:value={form.status} class="flex h-10 w-full rounded-md border border-slate-600 bg-slate-800 px-3 py-2 text-sm text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-500">
 											{#each statusOptions as s}<option value={s}>{s.replace('_', ' ')}</option>{/each}
 										</select>
 									</div>
 									<div class="space-y-1">
-										<Label class="text-slate-400 text-sm">Due Date</Label>
-										<Input type="date" bind:value={form.dueDate} class="bg-slate-800 border-slate-600 text-white" />
+										<Label class="text-slate-400 text-sm">Start Date</Label>
+										<Input bind:ref={startDateField} type="date" bind:value={form.startDate} class="bg-slate-800 border-slate-600 text-white [color-scheme:dark]" />
 									</div>
 									<div class="space-y-1">
-										<Label class="text-slate-400 text-sm">Start Date</Label>
-										<Input type="date" bind:value={form.startDate} class="bg-slate-800 border-slate-600 text-white" />
+										<Label class="text-slate-400 text-sm">Due Date</Label>
+										<Input bind:ref={dueDateField} type="date" bind:value={form.dueDate} class="bg-slate-800 border-slate-600 text-white [color-scheme:dark]" />
+									</div>
+									<div class="space-y-1">
+										<Label class="text-slate-400 text-sm">Completed Date</Label>
+										<Input bind:ref={completedDateField} type="date" bind:value={form.completedDate} class="bg-slate-800 border-slate-600 text-white [color-scheme:dark]" />
 									</div>
 								</div>
 								<div class="space-y-4">
 									<div class="space-y-1">
 										<Label class="text-slate-400 text-sm">Priority</Label>
-										<select bind:value={form.priority} class="flex h-10 w-full rounded-md border border-slate-600 bg-slate-800 px-3 py-2 text-sm text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-500">
+										<select bind:this={priorityField} bind:value={form.priority} class="flex h-10 w-full rounded-md border border-slate-600 bg-slate-800 px-3 py-2 text-sm text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-500">
 											{#each priorityOptions as p}<option value={p}>{p}</option>{/each}
 										</select>
 									</div>
 									<div class="space-y-1">
 										<Label class="text-slate-400 text-sm">Estimated Hours</Label>
-										<Input type="number" min="0" step="0.5" bind:value={form.estimatedHours} class="bg-slate-800 border-slate-600 text-white" />
+										<Input bind:ref={estimatedHoursField} type="number" min="0" step="0.5" bind:value={form.estimatedHours} class="bg-slate-800 border-slate-600 text-white" />
 									</div>
 									<div class="space-y-1">
 										<Label class="text-slate-400 text-sm">Actual Hours</Label>
-										<Input type="number" min="0" step="0.5" bind:value={form.actualHours} class="bg-slate-800 border-slate-600 text-white" />
+										<Input bind:ref={actualHoursField} type="number" min="0" step="0.5" bind:value={form.actualHours} class="bg-slate-800 border-slate-600 text-white" />
 									</div>
 								</div>
 							</div>
+							<div class="grid grid-cols-2 gap-6 pt-4 border-t border-slate-700">
+								<div class="space-y-1">
+									<Label class="text-slate-400 text-sm">Task Budget ($)</Label>
+									<Input bind:ref={taskBudgetField} type="number" min="0" step="0.01" bind:value={form.task_budget} placeholder="0.00" class="bg-slate-800 border-slate-600 text-white placeholder:text-slate-500" />
+								</div>
+								<div class="space-y-1">
+									<Label class="text-slate-400 text-sm">Actual Cost ($)</Label>
+									<Input bind:ref={actualCostField} type="number" min="0" step="0.01" bind:value={form.task_actual_cost} placeholder="0.00" class="bg-slate-800 border-slate-600 text-white placeholder:text-slate-500" />
+								</div>
+							</div>
+							<div class="space-y-1 pt-4 border-t border-slate-700">
+								<Label class="text-slate-400 text-sm">Tags</Label>
+								<Input bind:ref={tagsField} bind:value={form.tags} placeholder="community, outreach, school" class="bg-slate-800 border-slate-600 text-white placeholder:text-slate-500" />
+							</div>
 							<div class="space-y-1 pt-4 border-t border-slate-700">
 								<Label class="text-slate-400 text-sm">Description</Label>
-								<textarea bind:value={form.description} rows="5" placeholder="Task description..." class="flex w-full rounded-md border border-slate-600 bg-slate-800 px-3 py-2 text-sm text-white placeholder:text-slate-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-500"></textarea>
+								<textarea bind:this={descriptionField} bind:value={form.description} rows="5" placeholder="Task description..." class="flex w-full rounded-md border border-slate-600 bg-slate-800 px-3 py-2 text-sm text-white placeholder:text-slate-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-500"></textarea>
+							</div>
+							<div class="space-y-1 pt-4 border-t border-slate-700">
+								<Label class="text-slate-400 text-sm">Notes</Label>
+								<textarea bind:this={notesField} bind:value={form.notes} rows="4" placeholder="Internal notes..." class="flex w-full rounded-md border border-slate-600 bg-slate-800 px-3 py-2 text-sm text-white placeholder:text-slate-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-500"></textarea>
 							</div>
 						{:else}
 							<div class="space-y-3">
 								<!-- Status + Priority -->
 								<div class="flex flex-wrap gap-3">
-									<div class="flex-1 min-w-[140px] bg-slate-800/50 rounded-lg p-3 border border-slate-700/50">
+									<button type="button" onclick={() => enterEditMode('status')} class="flex-1 min-w-[140px] bg-slate-800/50 rounded-lg p-3 border border-slate-700/50 text-left hover:border-blue-500/60 hover:bg-slate-800 transition-colors">
 										<div class="text-xs text-slate-500 mb-1.5">Status</div>
 										<StatusBadge status={task.status} />
-									</div>
-									<div class="flex-1 min-w-[140px] bg-slate-800/50 rounded-lg p-3 border border-slate-700/50">
+									</button>
+									<button type="button" onclick={() => enterEditMode('priority')} class="flex-1 min-w-[140px] bg-slate-800/50 rounded-lg p-3 border border-slate-700/50 text-left hover:border-blue-500/60 hover:bg-slate-800 transition-colors">
 										<div class="text-xs text-slate-500 mb-1.5">Priority</div>
 										<span class="px-2.5 py-1 rounded-full text-xs font-semibold capitalize
 											{task.priority === 'urgent' ? 'bg-red-900/40 text-red-300 border border-red-700/50' : ''}
@@ -185,26 +316,26 @@
 											{task.priority === 'medium' ? 'bg-yellow-900/40 text-yellow-300 border border-yellow-700/50' : ''}
 											{task.priority === 'low'    ? 'bg-green-900/40 text-green-300 border border-green-700/50' : ''}
 										">{task.priority || 'medium'}</span>
-									</div>
+									</button>
 								</div>
 								<!-- Dates -->
 								<div class="grid grid-cols-3 gap-3">
-									<div class="bg-slate-800/50 rounded-lg p-3 border border-slate-700/50">
+									<button type="button" onclick={() => enterEditMode('startDate')} class="bg-slate-800/50 rounded-lg p-3 border border-slate-700/50 text-left hover:border-blue-500/60 hover:bg-slate-800 transition-colors">
 										<div class="text-xs text-slate-500 mb-1 flex items-center gap-1"><Calendar class="size-3" />Start</div>
 										<div class="text-sm font-medium text-white">{formatDate(task.startDate)}</div>
-									</div>
-									<div class="bg-slate-800/50 rounded-lg p-3 border border-slate-700/50">
+									</button>
+									<button type="button" onclick={() => enterEditMode('dueDate')} class="bg-slate-800/50 rounded-lg p-3 border border-slate-700/50 text-left hover:border-blue-500/60 hover:bg-slate-800 transition-colors">
 										<div class="text-xs text-slate-500 mb-1 flex items-center gap-1"><Calendar class="size-3" />Due</div>
 										<div class="text-sm font-medium text-white">{formatDate(task.dueDate)}</div>
-									</div>
-									<div class="bg-slate-800/50 rounded-lg p-3 border border-slate-700/50">
+									</button>
+									<button type="button" onclick={() => enterEditMode('completedDate')} class="bg-slate-800/50 rounded-lg p-3 border border-slate-700/50 text-left hover:border-blue-500/60 hover:bg-slate-800 transition-colors">
 										<div class="text-xs text-slate-500 mb-1 flex items-center gap-1"><Calendar class="size-3" />Completed</div>
 										<div class="text-sm font-medium {task.completedDate ? 'text-emerald-400' : 'text-slate-600'}">{formatDate(task.completedDate)}</div>
-									</div>
+									</button>
 								</div>
 								<!-- Hours + Budget -->
 								<div class="grid grid-cols-2 gap-3">
-									<div class="bg-slate-800/50 rounded-lg p-3 border border-slate-700/50">
+									<button type="button" onclick={() => enterEditMode('actualHours')} class="bg-slate-800/50 rounded-lg p-3 border border-slate-700/50 text-left hover:border-blue-500/60 hover:bg-slate-800 transition-colors">
 										<div class="text-xs text-slate-500 mb-1 flex items-center gap-1"><Clock class="size-3" />Hours</div>
 										<div class="text-sm font-medium text-white tabular-nums">
 											{task.actualHours || 0}h actual
@@ -217,8 +348,8 @@
 												</div>
 											</div>
 										{/if}
-									</div>
-									<div class="bg-slate-800/50 rounded-lg p-3 border border-slate-700/50">
+									</button>
+									<button type="button" onclick={() => enterEditMode('taskBudget')} class="bg-slate-800/50 rounded-lg p-3 border border-slate-700/50 text-left hover:border-blue-500/60 hover:bg-slate-800 transition-colors">
 										<div class="text-xs text-slate-500 mb-1">Budget</div>
 										{#if (task.task_budget || 0) > 0}
 											<div class="text-sm font-medium text-white tabular-nums">
@@ -233,25 +364,25 @@
 										{#if !(task.task_budget || 0) && !(task.task_actual_cost || 0)}
 											<span class="text-slate-600 text-sm">—</span>
 										{/if}
-									</div>
+									</button>
 								</div>
 								<!-- Tags -->
 								{#if task.tags}
-									<div class="bg-slate-800/50 rounded-lg p-3 border border-slate-700/50">
+									<button type="button" onclick={() => enterEditMode('tags')} class="w-full bg-slate-800/50 rounded-lg p-3 border border-slate-700/50 text-left hover:border-blue-500/60 hover:bg-slate-800 transition-colors">
 										<div class="text-xs text-slate-500 mb-2">Tags</div>
 										<div class="flex flex-wrap gap-1.5">
 											{#each task.tags.split(',').map((t: string) => t.trim()).filter(Boolean) as tag}
 												<span class="px-2 py-0.5 rounded-full text-xs bg-slate-700 text-slate-300 border border-slate-600">{tag}</span>
 											{/each}
 										</div>
-									</div>
+									</button>
 								{/if}
 								<!-- Description -->
 								{#if task.description}
-									<div class="bg-slate-800/50 rounded-lg p-3 border border-slate-700/50">
+									<button type="button" onclick={() => enterEditMode('description')} class="w-full bg-slate-800/50 rounded-lg p-3 border border-slate-700/50 text-left hover:border-blue-500/60 hover:bg-slate-800 transition-colors">
 										<div class="text-xs text-slate-500 mb-2">Description</div>
 										<div class="prose prose-sm dark:prose-invert max-w-none text-slate-300 leading-relaxed">{@html task.description}</div>
-									</div>
+									</button>
 								{/if}
 							</div>
 						{/if}
@@ -259,10 +390,27 @@
 					{:else if activeTab === 'checklist'}
 						{#if subtasks.length > 0}
 							<div>
-								<div class="flex items-center justify-between mb-6 p-4 bg-slate-800/50 rounded-lg">
-									<span class="text-sm font-medium">Progress: {subtasks.filter(s => s.completed).length} of {subtasks.length} completed</span>
-									<div class="flex-1 bg-slate-700 rounded-full h-3 max-w-[300px] ml-6">
-										<div class="bg-green-600 h-3 rounded-full transition-all" style="width: {subtasks.length > 0 ? (subtasks.filter(s => s.completed).length / subtasks.length * 100) : 0}%"></div>
+								<div class="mb-6 p-4 bg-slate-800/50 rounded-lg">
+									<div class="flex items-center justify-between gap-4">
+										<span class="text-sm font-medium">Progress: {subtasks.filter(s => s.completed).length} of {subtasks.length} completed</span>
+										<div class="flex-1 bg-slate-700 rounded-full h-3 max-w-[300px]">
+											<div class="bg-green-600 h-3 rounded-full transition-all" style="width: {subtasks.length > 0 ? (subtasks.filter(s => s.completed).length / subtasks.length * 100) : 0}%"></div>
+										</div>
+									</div>
+									<div class="mt-3 flex min-h-5 items-center justify-between gap-3 text-xs">
+										<span
+											class="{checklistSaveStatus === 'saving' ? 'text-blue-300' : checklistSaveStatus === 'saved' ? 'text-emerald-300' : checklistSaveStatus === 'error' ? 'text-red-300' : 'text-slate-500'}"
+											aria-live="polite"
+										>
+											{#if checklistSaveMessage}
+												{checklistSaveMessage}
+											{:else}
+												Checklist autosaves as you mark items complete.
+											{/if}
+										</span>
+										{#if checklistLastSavedAt && checklistSaveStatus !== 'saving'}
+											<span class="text-slate-500">{formatLastSaved(checklistLastSavedAt)}</span>
+										{/if}
 									</div>
 								</div>
 								<div class="space-y-3">
@@ -306,14 +454,14 @@
 					<X class="size-4 mr-2" /> Cancel
 				</Button>
 				<Button onclick={saveDetails} disabled={isSaving} class="flex-1 bg-blue-600 hover:bg-blue-700 text-white">
-					<Save class="size-4 mr-2" /> {isSaving ? 'Saving...' : 'Save'}
+					<Save class="size-4 mr-2" /> {isSaving ? 'Saving...' : 'Save Details'}
 				</Button>
 			{:else if activeTab === 'details'}
 				<Button variant="outline" onclick={() => (open = false)} class="flex-1 bg-slate-800 border-slate-700 text-white hover:bg-slate-700">
 					<X class="size-4 mr-2" /> Close
 				</Button>
-				<Button onclick={() => (editMode = true)} class="flex-1 bg-blue-600 hover:bg-blue-700 text-white">
-					<Pencil class="size-4 mr-2" /> Edit Details
+				<Button onclick={() => enterEditMode()} class="flex-1 bg-blue-600 hover:bg-blue-700 text-white">
+					<Pencil class="size-4 mr-2" /> Update Details
 				</Button>
 			{:else}
 				<Button variant="outline" onclick={() => (open = false)} class="w-full bg-slate-800 border-slate-700 text-white hover:bg-slate-700">

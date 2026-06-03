@@ -12,19 +12,25 @@ export const PATCH: RequestHandler = async ({ request, locals, params }) => {
 	try {
 		const data = await request.json();
 
-		const updateData: any = {
-			title: data.title,
-			description: data.description || '',
-			status: data.status,
-			priority: data.priority || 'medium',
-			startDate: data.startDate || null,
-			dueDate: data.dueDate || null,
-			estimatedHours: data.estimatedHours !== undefined ? data.estimatedHours : null,
-			actualHours: data.actualHours !== undefined ? data.actualHours : null,
-			task_budget: data.task_budget !== undefined ? parseFloat(data.task_budget) || 0 : null,
-			notes: data.notes || '',
-			completedDate: data.status === 'completed' ? new Date().toISOString() : null
-		};
+		const updateData: any = {};
+
+		if (data.title !== undefined) updateData.title = data.title;
+		if (data.description !== undefined) updateData.description = data.description || '';
+		if (data.status !== undefined) updateData.status = data.status;
+		if (data.priority !== undefined) updateData.priority = data.priority || 'medium';
+		if (data.startDate !== undefined) updateData.startDate = data.startDate || null;
+		if (data.dueDate !== undefined) updateData.dueDate = data.dueDate || null;
+		if (data.estimatedHours !== undefined) updateData.estimatedHours = data.estimatedHours ?? null;
+		if (data.actualHours !== undefined) updateData.actualHours = data.actualHours ?? null;
+		if (data.task_budget !== undefined) updateData.task_budget = parseFloat(data.task_budget) || 0;
+		if (data.task_actual_cost !== undefined) updateData.task_actual_cost = parseFloat(data.task_actual_cost) || 0;
+		if (data.tags !== undefined) updateData.tags = data.tags || '';
+		if (data.notes !== undefined) updateData.notes = data.notes || '';
+		if (data.completedDate !== undefined) {
+			updateData.completedDate = data.completedDate || null;
+		} else if (data.status !== undefined) {
+			updateData.completedDate = data.status === 'completed' ? new Date().toISOString() : null;
+		}
 
 		// Only update subTasksChecklist if it's provided in the request
 		if (data.subTasksChecklist !== undefined) {

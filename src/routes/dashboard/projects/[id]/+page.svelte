@@ -11,11 +11,10 @@
 	import SelectOrAddVendorModal from '$lib/components/vendors/select-or-add-vendor-modal.svelte';
 	import AddExpenseModal from '$lib/components/expenses/add-expense-modal.svelte';
 	import TaskExpenseModal from '$lib/components/expenses/task-expense-modal.svelte';
+	import { invalidateAll } from '$app/navigation';
 	import { 
 		ArrowLeft,
 		DollarSign,
-		Calendar,
-		Users,
 		Building2,
 		FileText,
 		TrendingUp,
@@ -24,7 +23,11 @@
 		Plus,
 		X,
 		Receipt,
-		Link
+		Link,
+		PlayCircle,
+		ChevronUp,
+		ChevronDown,
+		ChevronsUpDown
 	} from 'lucide-svelte';
 	
 	let { data }: { data: PageData } = $props();
@@ -36,16 +39,53 @@
 	let showAddVendorModal = $state(false);
 	let showAddExpenseModal = $state(false);
 	let selectedTask = $state<any>(null);
+	let taskDetailStartsInEdit = $state(false);
 	let removingVendorId = $state<string | null>(null);
+	let activatingProject = $state(false);
+	let activationError = $state('');
+	type TaskSortCol = 'title' | 'subtasks' | 'priority' | 'hours' | 'status' | 'dueDate' | 'expense';
+	let taskSortCol = $state<TaskSortCol>('expense');
+	let taskSortDir = $state<'asc' | 'desc'>('desc');
 	
-	let project = $derived(data.project);
+	let project = $derived(data.project as any);
+	let canMakeActive = $derived(project.status === 'draft' || project.status === 'planned');
 	let expenses = $derived(data.expenses || []);
 	let expenseStats = $derived(data.expenseStats || {
 		total: 0,
 		byStatus: { draft: 0, submitted: 0, approved: 0, rejected: 0, paid: 0 },
 		byCategory: {}
 	});
-	let tasks = $derived(data.tasks || []);
+	let tasks = $derived((data.tasks || []) as any[]);
+	const PRIORITY_ORDER: Record<string, number> = { urgent: 0, high: 1, medium: 2, low: 3 };
+	const STATUS_ORDER: Record<string, number> = { in_progress: 0, blocked: 1, todo: 2, completed: 3, cancelled: 4 };
+	let sortedTasks = $derived(() => {
+		return [...tasks].sort((a: any, b: any) => {
+			let cmp = 0;
+			if (taskSortCol === 'title') cmp = (a.title ?? '').localeCompare(b.title ?? '');
+			if (taskSortCol === 'subtasks') {
+				const aSub = parseSubtasks(a.subTasksChecklist);
+				const bSub = parseSubtasks(b.subTasksChecklist);
+				const aPct = aSub.total > 0 ? aSub.completed / aSub.total : -1;
+				const bPct = bSub.total > 0 ? bSub.completed / bSub.total : -1;
+				cmp = aPct === bPct ? aSub.total - bSub.total : aPct - bPct;
+			}
+			if (taskSortCol === 'priority') cmp = (PRIORITY_ORDER[a.priority] ?? 9) - (PRIORITY_ORDER[b.priority] ?? 9);
+			if (taskSortCol === 'hours') cmp = (a.estimatedHours ?? 0) - (b.estimatedHours ?? 0);
+			if (taskSortCol === 'status') cmp = (STATUS_ORDER[a.status] ?? 9) - (STATUS_ORDER[b.status] ?? 9);
+			if (taskSortCol === 'dueDate') {
+				const aDue = a.dueDate ? new Date(a.dueDate).getTime() : Infinity;
+				const bDue = b.dueDate ? new Date(b.dueDate).getTime() : Infinity;
+				cmp = aDue - bDue;
+			}
+			if (taskSortCol === 'expense') {
+				const aExpense = (a.task_actual_cost ?? 0) || (a.task_budget ?? 0);
+				const bExpense = (b.task_actual_cost ?? 0) || (b.task_budget ?? 0);
+				cmp = aExpense - bExpense;
+			}
+			if (cmp === 0) cmp = (a.title ?? '').localeCompare(b.title ?? '');
+			return taskSortDir === 'asc' ? cmp : -cmp;
+		});
+	});
 	
 	function parseSubtasks(subtasksData: any) {
 		if (!subtasksData) return { total: 0, completed: 0, items: [] };
@@ -80,8 +120,20 @@
 	}
 	
 	function handleTaskClick(task: any) {
+		taskDetailStartsInEdit = false;
 		selectedTask = task;
 		showTaskDetailModal = true;
+	}
+
+	function openTaskEditor(task: any) {
+		taskDetailStartsInEdit = true;
+		selectedTask = task;
+		showTaskDetailModal = true;
+	}
+
+	async function handleTaskUpdated(updatedTask: any) {
+		selectedTask = { ...selectedTask, ...updatedTask };
+		await invalidateAll();
 	}
 	
 	function formatCurrency(amount: number): string {
@@ -111,6 +163,19 @@
 		if (percentage >= 100) return 'danger';
 		if (percentage >= 80) return 'warning';
 		return 'success';
+	}
+
+	function taskHasExpense(task: any): boolean {
+		return (task.task_budget || 0) > 0 || (task.task_actual_cost || 0) > 0;
+	}
+
+	function toggleTaskSort(col: TaskSortCol) {
+		if (taskSortCol === col) {
+			taskSortDir = taskSortDir === 'asc' ? 'desc' : 'asc';
+			return;
+		}
+		taskSortCol = col;
+		taskSortDir = 'asc';
 	}
 
 	async function handleRemoveVendor(vendorId: string, event: Event) {
@@ -150,6 +215,34 @@
 			removingVendorId = null;
 		}
 	}
+
+	async function handleMakeActive() {
+		if (!canMakeActive || activatingProject) return;
+
+		activatingProject = true;
+		activationError = '';
+
+		try {
+			const response = await fetch(`/api/projects/${project.id}`, {
+				method: 'PATCH',
+				headers: {
+					'Content-Type': 'application/json'
+				},
+				body: JSON.stringify({ status: 'in_progress' })
+			});
+
+			if (!response.ok) {
+				const data = await response.json().catch(() => ({}));
+				throw new Error(data.message || 'Failed to activate project');
+			}
+
+			await invalidateAll();
+		} catch (err) {
+			activationError = err instanceof Error ? err.message : 'Failed to activate project';
+		} finally {
+			activatingProject = false;
+		}
+	}
 </script>
 
 <svelte:head>
@@ -176,10 +269,23 @@
 				</div>
 			{/if}
 		</div>
-		<Button onclick={() => showEditModal = true} class="gap-2">
-			<Edit class="size-4" />
-			Edit Project
-		</Button>
+		<div class="flex flex-col items-end gap-2">
+			<div class="flex flex-wrap justify-end gap-2">
+				{#if canMakeActive}
+					<Button onclick={handleMakeActive} disabled={activatingProject} class="gap-2">
+						<PlayCircle class="size-4" />
+						{activatingProject ? 'Activating...' : 'Make Active'}
+					</Button>
+				{/if}
+				<Button onclick={() => showEditModal = true} variant={canMakeActive ? 'outline' : 'default'} class="gap-2">
+					<Edit class="size-4" />
+					Edit Project
+				</Button>
+			</div>
+			{#if activationError}
+				<p class="max-w-xs text-right text-sm text-red-500">{activationError}</p>
+			{/if}
+		</div>
 	</div>
 
 	<!-- Edit Project Modal -->
@@ -190,7 +296,7 @@
 	
 	<!-- Task Detail Modal -->
 	{#if selectedTask}
-		<TaskDetailModal bind:open={showTaskDetailModal} task={selectedTask} />
+		<TaskDetailModal bind:open={showTaskDetailModal} task={selectedTask} startInEdit={taskDetailStartsInEdit} onUpdated={handleTaskUpdated} />
 	{/if}
 
 	<!-- Select or Add Vendor Modal -->
@@ -477,22 +583,60 @@
 				<thead class="bg-slate-50 dark:bg-slate-900 border-b">
 					<tr>
 						<th class="px-6 py-3 text-left text-xs font-semibold text-slate-900 dark:text-slate-100 uppercase tracking-wider">
-							Task
+							<button onclick={() => toggleTaskSort('title')} class="inline-flex items-center gap-1.5 hover:text-blue-500 transition-colors group">
+								Task
+								<span class="text-slate-500 group-hover:text-blue-500">
+									{#if taskSortCol === 'title'}{#if taskSortDir === 'asc'}<ChevronUp class="size-3.5" />{:else}<ChevronDown class="size-3.5" />{/if}{:else}<ChevronsUpDown class="size-3.5" />{/if}
+								</span>
+							</button>
 						</th>
 						<th class="px-6 py-3 text-left text-xs font-semibold text-slate-900 dark:text-slate-100 uppercase tracking-wider">
-							Subtasks
+							<button onclick={() => toggleTaskSort('subtasks')} class="inline-flex items-center gap-1.5 hover:text-blue-500 transition-colors group">
+								Subtasks
+								<span class="text-slate-500 group-hover:text-blue-500">
+									{#if taskSortCol === 'subtasks'}{#if taskSortDir === 'asc'}<ChevronUp class="size-3.5" />{:else}<ChevronDown class="size-3.5" />{/if}{:else}<ChevronsUpDown class="size-3.5" />{/if}
+								</span>
+							</button>
 						</th>
 						<th class="px-6 py-3 text-left text-xs font-semibold text-slate-900 dark:text-slate-100 uppercase tracking-wider">
-							Priority
+							<button onclick={() => toggleTaskSort('priority')} class="inline-flex items-center gap-1.5 hover:text-blue-500 transition-colors group">
+								Priority
+								<span class="text-slate-500 group-hover:text-blue-500">
+									{#if taskSortCol === 'priority'}{#if taskSortDir === 'asc'}<ChevronUp class="size-3.5" />{:else}<ChevronDown class="size-3.5" />{/if}{:else}<ChevronsUpDown class="size-3.5" />{/if}
+								</span>
+							</button>
 						</th>
 						<th class="px-6 py-3 text-left text-xs font-semibold text-slate-900 dark:text-slate-100 uppercase tracking-wider">
-							Hours
+							<button onclick={() => toggleTaskSort('hours')} class="inline-flex items-center gap-1.5 hover:text-blue-500 transition-colors group">
+								Hours
+								<span class="text-slate-500 group-hover:text-blue-500">
+									{#if taskSortCol === 'hours'}{#if taskSortDir === 'asc'}<ChevronUp class="size-3.5" />{:else}<ChevronDown class="size-3.5" />{/if}{:else}<ChevronsUpDown class="size-3.5" />{/if}
+								</span>
+							</button>
 						</th>
 						<th class="px-6 py-3 text-left text-xs font-semibold text-slate-900 dark:text-slate-100 uppercase tracking-wider">
-							Status
+							<button onclick={() => toggleTaskSort('status')} class="inline-flex items-center gap-1.5 hover:text-blue-500 transition-colors group">
+								Status
+								<span class="text-slate-500 group-hover:text-blue-500">
+									{#if taskSortCol === 'status'}{#if taskSortDir === 'asc'}<ChevronUp class="size-3.5" />{:else}<ChevronDown class="size-3.5" />{/if}{:else}<ChevronsUpDown class="size-3.5" />{/if}
+								</span>
+							</button>
 						</th>
 						<th class="px-6 py-3 text-left text-xs font-semibold text-slate-900 dark:text-slate-100 uppercase tracking-wider">
-							Due Date
+							<button onclick={() => toggleTaskSort('dueDate')} class="inline-flex items-center gap-1.5 hover:text-blue-500 transition-colors group">
+								Due Date
+								<span class="text-slate-500 group-hover:text-blue-500">
+									{#if taskSortCol === 'dueDate'}{#if taskSortDir === 'asc'}<ChevronUp class="size-3.5" />{:else}<ChevronDown class="size-3.5" />{/if}{:else}<ChevronsUpDown class="size-3.5" />{/if}
+								</span>
+							</button>
+						</th>
+						<th class="px-6 py-3 text-left text-xs font-semibold text-slate-900 dark:text-slate-100 uppercase tracking-wider">
+							<button onclick={() => toggleTaskSort('expense')} class="inline-flex items-center gap-1.5 hover:text-blue-500 transition-colors group">
+								Expense
+								<span class="text-slate-500 group-hover:text-blue-500">
+									{#if taskSortCol === 'expense'}{#if taskSortDir === 'asc'}<ChevronUp class="size-3.5" />{:else}<ChevronDown class="size-3.5" />{/if}{:else}<ChevronsUpDown class="size-3.5" />{/if}
+								</span>
+							</button>
 						</th>
 						<th class="px-6 py-3"></th>
 					</tr>
@@ -500,13 +644,16 @@
 				<tbody class="divide-y divide-slate-200 dark:divide-slate-800">
 					{#if tasks.length === 0}
 						<tr>
-							<td colspan="6" class="px-6 py-8 text-center text-muted-foreground">
+							<td colspan="8" class="px-6 py-8 text-center text-muted-foreground">
 								No tasks recorded for this project
 							</td>
 						</tr>
 					{:else}
-						{#each tasks as task, i}
+						{#each sortedTasks() as task, i}
 							{@const subtasks = parseSubtasks(task.subTasksChecklist)}
+							{@const hasExpense = taskHasExpense(task)}
+							{@const taskBudget = task.task_budget || 0}
+							{@const taskActual = task.task_actual_cost || 0}
 							<tr 
 								class="hover:bg-green-800 dark:hover:bg-green-800/50 transition-colors cursor-pointer {i % 2 === 1 ? 'bg-blue-800 dark:bg-blue-800/30' : ''}"
 								onclick={() => handleTaskClick(task)}
@@ -565,13 +712,48 @@
 								<td class="px-6 py-4 text-sm text-muted-foreground">
 									{formatDate(task.dueDate)}
 								</td>
+								<td class="px-6 py-4 text-sm">
+									{#if hasExpense}
+										<div class="space-y-1 min-w-[120px]">
+											<div class="text-xs font-medium text-slate-200 tabular-nums">
+												{formatCurrency(taskActual)}
+												{#if taskBudget > 0}
+													<span class="text-slate-500"> / {formatCurrency(taskBudget)}</span>
+												{:else}
+													<span class="text-slate-500"> actual</span>
+												{/if}
+											</div>
+											{#if taskBudget > 0}
+												<div class="h-1.5 rounded-full bg-slate-700 overflow-hidden">
+													<div
+														class="h-full rounded-full {taskActual > taskBudget ? 'bg-red-500' : 'bg-emerald-500'}"
+														style="width: {Math.min(100, (taskActual / taskBudget) * 100)}%"
+													></div>
+												</div>
+											{/if}
+										</div>
+									{:else}
+										<span class="inline-flex items-center rounded-full border border-slate-700 bg-slate-800/60 px-2 py-1 text-xs font-medium text-slate-400">
+											No expense
+										</span>
+									{/if}
+								</td>
 								<td class="px-6 py-4" onclick={(e) => e.stopPropagation()}>
-									<button
-										onclick={(e) => { e.stopPropagation(); selectedTask = task; showExpenseModal = true; }}
-										class="flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-lg border border-emerald-700/60 bg-emerald-950/40 text-emerald-400 hover:bg-emerald-900/60 hover:text-emerald-300 hover:border-emerald-600 transition-all whitespace-nowrap"
-									>
-										<Receipt class="size-3.5" /> Log Expense
-									</button>
+									{#if hasExpense}
+										<button
+											onclick={(e) => { e.stopPropagation(); selectedTask = task; showExpenseModal = true; }}
+											class="flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-lg border border-emerald-700/60 bg-emerald-950/40 text-emerald-400 hover:bg-emerald-900/60 hover:text-emerald-300 hover:border-emerald-600 transition-all whitespace-nowrap"
+										>
+											<Receipt class="size-3.5" /> Log Expense
+										</button>
+									{:else}
+										<button
+											onclick={(e) => { e.stopPropagation(); openTaskEditor(task); }}
+											class="flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-lg border border-slate-700 bg-slate-800/60 text-slate-400 hover:bg-slate-700 hover:text-slate-200 transition-all whitespace-nowrap"
+										>
+											Set Budget
+										</button>
+									{/if}
 								</td>
 							</tr>
 						{/each}
