@@ -48,11 +48,14 @@ export class DepartmentProvider {
 	}
 
 	get filteredMetrics(): {
-		projects: { total: number };
+		projects: { total: number; in_progress: number; planned: number; completed: number; draft: number; cancelled: number };
 		budget: { total: number; actual: number; forecasted: number; remaining: number };
 	} {
 		if (!this.department) {
-			return { projects: { total: 0 }, budget: { total: 0, actual: 0, forecasted: 0, remaining: 0 } };
+			return {
+				projects: { total: 0, in_progress: 0, planned: 0, completed: 0, draft: 0, cancelled: 0 },
+				budget: { total: 0, actual: 0, forecasted: 0, remaining: 0 }
+			};
 		}
 		if (this.selectedPhase === 'all') {
 			return {
@@ -61,8 +64,17 @@ export class DepartmentProvider {
 			};
 		}
 		const phase = this.department.metrics.phases[this.selectedPhase];
+		const phaseProjects = this.filteredProjects;
+		const projects = {
+			total: phaseProjects.length,
+			in_progress: phaseProjects.filter(p => p.status === 'in_progress').length,
+			planned: phaseProjects.filter(p => p.status === 'planned').length,
+			completed: phaseProjects.filter(p => p.status === 'completed').length,
+			draft: phaseProjects.filter(p => p.status === 'draft').length,
+			cancelled: phaseProjects.filter(p => p.status === 'cancelled').length
+		};
 		return {
-			projects: { total: phase.projectCount },
+			projects,
 			budget: {
 				total: phase.budget,
 				actual: phase.actual,

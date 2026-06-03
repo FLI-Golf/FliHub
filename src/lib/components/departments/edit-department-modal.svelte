@@ -17,7 +17,7 @@
 		name: '',
 		code: '',
 		description: '',
-		department_annual_budget: 0,
+		department_annual_budget: '0',
 		status: 'active',
 		headOfDepartment: ''
 	});
@@ -34,9 +34,10 @@
 				code: department.code || '',
 				description: department.description || '',
 				// DTO exposes metrics.budget.total; fall back to direct field if raw record passed
-				department_annual_budget:
+				department_annual_budget: String(
 					(department as any).department_annual_budget ??
-					department.metrics?.budget?.total ?? 0,
+					department.metrics?.budget?.total ?? 0
+				),
 				status: department.status || 'active',
 				// DTO uses headOfDepartmentId; raw record uses headOfDepartment
 				headOfDepartment:
@@ -121,7 +122,7 @@
 					id="edit-code"
 					bind:value={formData.code}
 					placeholder="e.g., MKT"
-					maxlength="10"
+					maxlength={10}
 					class="bg-slate-800 border-slate-700 text-white placeholder:text-slate-400"
 				/>
 			</div>

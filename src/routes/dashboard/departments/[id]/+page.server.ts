@@ -80,17 +80,18 @@ export const load: PageServerLoad = async ({ locals, url, params }) => {
 		}
 	} catch { /* non-fatal */ }
 
-	const allocatedBudget = department.metrics?.budget?.allocated ?? 0;
+	const departmentBudget = department.metrics?.budget?.total ?? 0;
 	const totalExpensed2 = Math.max(0, paid + approved + submitted + draft + reimbPaid + reimbApproved + reimbSubmitted);
-	const unallocated = Math.max(0, allocatedBudget - totalExpensed2 - inTasks);
-	const pct = (v: number) => allocatedBudget > 0 ? Math.min(100, (v / allocatedBudget) * 100) : 0;
+	const unallocated = Math.max(0, departmentBudget - totalExpensed2 - inTasks);
+	const remaining = departmentBudget - totalExpensed2 - inTasks;
+	const pct = (v: number) => departmentBudget > 0 ? Math.min(100, (v / departmentBudget) * 100) : 0;
 
 	// Fetch tasks for all projects in this department
 	let tasksByProject: Record<string, any[]> = {};
 	if (projectIds.length > 0) {
 		const allTasks = await pb.collection('tasks').getFullList({
 			filter: projectIds.map(id => `projectId = "${id}"`).join(' || '),
-			fields: 'id,title,status,priority,task_budget,task_actual_cost,projectId,needs_review,dueDate',
+			fields: 'id,title,description,notes,status,priority,startDate,dueDate,completedDate,estimatedHours,actualHours,task_budget,task_actual_cost,tags,subTasksChecklist,projectId,needs_review',
 			sort: 'title'
 		}).catch(() => []) as any[];
 
@@ -113,7 +114,8 @@ export const load: PageServerLoad = async ({ locals, url, params }) => {
 		userProfiles,
 		tasksByProject,
 		budgetRollup: {
-			allocated:      allocatedBudget,
+			allocated:      departmentBudget,
+			projectAllocated: department.metrics?.budget?.allocated ?? 0,
 			paid,
 			approved,
 			submitted,
@@ -125,7 +127,7 @@ export const load: PageServerLoad = async ({ locals, url, params }) => {
 			reimbApproved,
 			reimbSubmitted,
 			actual:         totalExpensed2,
-			remaining:      Math.max(0, allocatedBudget - totalExpensed2),
+			remaining,
 			usedPct:        pct(totalExpensed2),
 			pipelinePct: {
 				paid:          pct(paid + reimbPaid),

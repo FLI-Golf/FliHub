@@ -12,6 +12,7 @@
 	import { invalidateAll } from '$app/navigation';
 	import EditDepartmentModal from '$lib/components/departments/edit-department-modal.svelte';
 	import TaskExpenseModal from '$lib/components/expenses/task-expense-modal.svelte';
+	import TaskDetailModal from '$lib/components/tasks/task-detail-modal.svelte';
 	import {
 		Building2,
 		Users,
@@ -72,11 +73,9 @@
 	// Task expense modal
 	let expenseTask       = $state<any>(null);
 	let showExpenseModal  = $state(false);
+	let selectedTask      = $state<any>(null);
+	let showTaskDetailModal = $state(false);
 	const tasksByProject  = $derived(data.tasksByProject ?? {});
-	$effect(() => {
-		console.log('[dept] tasksByProject keys:', Object.keys(tasksByProject));
-		console.log('[dept] phaseFilteredProjects ids:', phaseFilteredProjects.map((p: any) => p.id));
-	});
 
 	// Project expand/collapse
 	let expandedProjects  = $state<Record<string, boolean>>({});
@@ -107,6 +106,16 @@
 		} finally {
 			biddingLoading = { ...biddingLoading, [projectId]: false };
 		}
+	}
+
+	function openTaskDetail(task: any) {
+		selectedTask = task;
+		showTaskDetailModal = true;
+	}
+
+	async function handleTaskUpdated(updatedTask: any) {
+		selectedTask = { ...selectedTask, ...updatedTask };
+		await invalidateAll();
 	}
 
 	const fmt = (n: number) =>
@@ -470,7 +479,7 @@
 
 	<!-- Expense Pipeline -->
 	{#if rollup}
-		{@const fmt = (n) => new Intl.NumberFormat('en-US',{style:'currency',currency:'USD',minimumFractionDigits:0,maximumFractionDigits:0}).format(n ?? 0)}
+		{@const fmt = (n: number) => new Intl.NumberFormat('en-US',{style:'currency',currency:'USD',minimumFractionDigits:0,maximumFractionDigits:0}).format(n ?? 0)}
 		<div class="space-y-4">
 			<h2 class="text-2xl font-bold">Expense Pipeline</h2>
 
@@ -719,7 +728,13 @@
 												{/if}
 											</div>
 											<!-- Title -->
-											<p class="flex-1 text-sm text-slate-300 truncate">{task.title}</p>
+											<button
+												type="button"
+												onclick={() => openTaskDetail(task)}
+												class="flex-1 text-left text-sm text-slate-300 truncate hover:text-blue-400 transition-colors"
+											>
+												{task.title}
+											</button>
 											<!-- needs_review dot -->
 											{#if task.needs_review}
 												<span class="relative flex size-2 shrink-0">
@@ -759,6 +774,14 @@
 	<TaskExpenseModal
 		task={expenseTask}
 		bind:open={showExpenseModal}
+	/>
+{/if}
+
+{#if selectedTask}
+	<TaskDetailModal
+		bind:open={showTaskDetailModal}
+		task={selectedTask}
+		onUpdated={handleTaskUpdated}
 	/>
 {/if}
 

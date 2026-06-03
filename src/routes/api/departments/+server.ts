@@ -4,8 +4,29 @@ import type { RequestHandler } from './$types';
 export const POST: RequestHandler = async ({ request, locals }) => {
 	try {
 		const data = await request.json();
-		
-		const department = await locals.pb.collection('departments').create(data);
+
+		const createData = { ...data };
+		if (data.department_annual_budget !== undefined) {
+			const budget = Number(data.department_annual_budget) || 0;
+			createData.department_annual_budget = budget;
+			createData.department_budget_mode = 'allocated';
+			createData.department_budget_cap = budget;
+		}
+
+		let department;
+		try {
+			department = await locals.pb.collection('departments').create(createData);
+		} catch (error: any) {
+			if (
+				data.department_annual_budget === undefined ||
+				!String(error?.response?.message || error?.message || '').toLowerCase().includes('unknown')
+			) {
+				throw error;
+			}
+
+			const { department_budget_mode, department_budget_cap, ...fallbackData } = createData;
+			department = await locals.pb.collection('departments').create(fallbackData);
+		}
 		
 		return json(department, { status: 201 });
 	} catch (error: any) {
