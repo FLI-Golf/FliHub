@@ -170,6 +170,7 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 		const recapById = new Map((sponsorRecapPackages as any[]).map((item) => [item.id, item]));
 		const highlightPackagesById = new Map((highlightPackages as any[]).map((item) => [item.id, item]));
 		const mediaCollectionsById = new Map((mediaCollections as any[]).map((item) => [item.id, item]));
+		const assetsById = new Map((assets as any[]).map((item) => [item.id, item]));
 
 		const talentsById = new Map((talents as any[]).map((item) => [item.id, item]));
 		const sponsorsById = new Map((sponsors as any[]).map((item) => [item.id, item]));
@@ -243,6 +244,13 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 				}
 			};
 		});
+
+		const enrichedHighlightItems = (highlightPackageItems as any[]).map((row: any) => ({
+			...row,
+			assetRecord: row.asset ? assetsById.get(row.asset) || null : null,
+			packageRecord: row.highlight_package ? highlightPackagesById.get(row.highlight_package) || null : null,
+			collectionRecord: row.media_collection ? mediaCollectionsById.get(row.media_collection) || null : null
+		}));
 	
 		// Pass PocketBase URL and auth token to the client so uploads go directly
 		// to PocketBase, bypassing Netlify's 1MB function body limit.
@@ -251,6 +259,9 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 	
 		return {
 			assets: enrichedAssets,
+			highlightPackages,
+			mediaCollections,
+			highlightPackageItems: enrichedHighlightItems,
 			franchises,
 			projects,
 			campaigns,

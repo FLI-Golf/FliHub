@@ -6,8 +6,11 @@
 	import UploadMediaModal from '$lib/components/media/upload-media-modal.svelte';
 	import EditMediaModal from '$lib/components/media/edit-media-modal.svelte';
 	import MediaAssetDetailSheet from '$lib/components/media/media-asset-detail-sheet.svelte';
-	import { Upload, Search, Trash2, ExternalLink, Image, Pencil, Film, FileText, Mic, Archive, Eye } from 'lucide-svelte';
+	import { Upload, Search, Trash2, ExternalLink, Image, Pencil, Film, FileText, Mic, Archive, Eye, Plus, Download, ChevronUp, ChevronDown } from 'lucide-svelte';
 	import {
+		highlightExportTargets,
+		highlightPackageStatuses,
+		highlightPackageTypes,
 		labelFor,
 		mediaAssetTypes,
 		mediaCategories,
@@ -57,6 +60,18 @@
 	let selectedAsset = $state<any>(null);
 	let editingAsset = $state<any>(null);
 	let assets = $state((data.assets || []).map((asset: any) => decorateAsset(asset)));
+	let highlightPackages = $state(data.highlightPackages || []);
+	let mediaCollections = $state(data.mediaCollections || []);
+	let highlightPackageItems = $state(data.highlightPackageItems || []);
+	let selectedPackageId = $state((data.highlightPackages || [])[0]?.id || '');
+	let phase5Busy = $state(false);
+	let phase5Error = $state('');
+	let createPackageForm = $state({
+		name: '',
+		package_type: 'event_recap',
+		export_target: 'social',
+		create_collection: true
+	});
 	let searchQuery = $state('');
 	let typeFilter = $state('all');
 	let categoryFilter = $state('all');
@@ -202,6 +217,23 @@
 		}, { packageItems: 0, packages: 0, approved: 0, published: 0 })
 	);
 
+	let selectedPackage = $derived(highlightPackages.find((pkg: any) => pkg.id === selectedPackageId) || null);
+
+	let selectedPackageItems = $derived(
+		highlightPackageItems
+			.filter((row: any) => row.highlight_package === selectedPackageId)
+			.sort((a: any, b: any) => (Number(a.sort_order) || 0) - (Number(b.sort_order) || 0))
+	);
+
+	let selectedPackageDurationSeconds = $derived(
+		selectedPackageItems.reduce((sum: number, row: any) => {
+			const start = Number(row.clip_in_seconds) || 0;
+			const end = Number(row.clip_out_seconds) || 0;
+			if (!end || end < start) return sum;
+			return sum + (end - start);
+		}, 0)
+	);
+
 	function seasonLabel(asset: any) {
 		return asset.expand?.season?.name || asset.expand?.season?.year || '';
 	}
@@ -247,6 +279,202 @@
 		assets = assets.map((a: any) => a.id === updated.id ? { ...a, ...decorated } : a);
 		if (selectedAsset?.id === updated.id) {
 			selectedAsset = { ...selectedAsset, ...decorated };
+		}
+	}
+
+	function highlightItemAssetLabel(row: any) {
+		const cached = row.assetRecord;
+		if (cached?.title) return cached.title;
+		const asset = assets.find((item: any) => item.id === row.asset);
+		return asset?.title || row.asset;
+	}
+
+	async function createHighlightPackage() {
+		if (!createPackageForm.name.trim()) {
+			phase5Error = 'Package name is required.';
+			return;
+		}
+
+		phase5Busy = true;
+		phase5Error = '';
+
+		try {
+			const res = await fetch('/api/media/highlight-packages', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({
+					name: createPackageForm.name.trim(),
+					package_type: createPackageForm.package_type,
+					export_target: createPackageForm.export_target,
+					create_collection: createPackageForm.create_collection,
+					collection_name: `${createPackageForm.name.trim()} Collection`,
+					collection_type: createPackageForm.package_type
+				})
+			});
+
+			if (!res.ok) {
+				const data = await res.json().catch(() => ({}));
+				throw new Error(data.message || 'Failed to create package');
+			}
+
+			const payload = await res.json();
+			highlightPackages = [payload.package, ...highlightPackages];
+			if (payload.collection) {
+				mediaCollections = [payload.collection, ...mediaCollections];
+			}
+			selectedPackageId = payload.package.id;
+			createPackageForm = { ...createPackageForm, name: '' };
+		} catch (error) {
+			phase5Error = error instanceof Error ? error.message : 'Failed to create package';
+		} finally {
+			phase5Busy = false;
+		}
+	}
+
+	async function addAssetToSelectedPackage(asset: any) {
+		if (!selectedPackageId) {
+			phase5Error = 'Select or create a package first.';
+			return;
+		}
+
+		phase5Busy = true;
+		phase5Error = '';
+
+		try {
+			const res = await fetch('/api/media/highlight-packages/items', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({
+					highlight_package: selectedPackageId,
+					asset: asset.id,
+					usage_role: 'feature'
+				})
+			});
+
+			if (!res.ok) {
+				const data = await res.json().catch(() => ({}));
+				throw new Error(data.message || 'Failed to add asset to package');
+			}
+
+			const item = await res.json();
+			const exists = highlightPackageItems.some((row: any) => row.id === item.id);
+			if (!exists) {
+				highlightPackageItems = [...highlightPackageItems, { ...item, assetRecord: asset }];
+			}
+		} catch (error) {
+			phase5Error = error instanceof Error ? error.message : 'Failed to add asset';
+		} finally {
+			phase5Busy = false;
+		}
+	}
+
+	async function removePackageItem(itemId: string) {
+		phase5Busy = true;
+		phase5Error = '';
+		try {
+			const res = await fetch(`/api/media/highlight-packages/items/${itemId}`, { method: 'DELETE' });
+			if (!res.ok) {
+				const data = await res.json().catch(() => ({}));
+				throw new Error(data.message || 'Failed to remove item');
+			}
+			highlightPackageItems = highlightPackageItems.filter((row: any) => row.id !== itemId);
+		} catch (error) {
+			phase5Error = error instanceof Error ? error.message : 'Failed to remove item';
+		} finally {
+			phase5Busy = false;
+		}
+	}
+
+	async function movePackageItem(itemId: string, direction: -1 | 1) {
+		const sorted = [...selectedPackageItems];
+		const currentIndex = sorted.findIndex((row: any) => row.id === itemId);
+		const targetIndex = currentIndex + direction;
+		if (currentIndex < 0 || targetIndex < 0 || targetIndex >= sorted.length) return;
+
+		const current = sorted[currentIndex];
+		const target = sorted[targetIndex];
+
+		phase5Busy = true;
+		phase5Error = '';
+
+		try {
+			await Promise.all([
+				fetch(`/api/media/highlight-packages/items/${current.id}`, {
+					method: 'PATCH',
+					headers: { 'Content-Type': 'application/json' },
+					body: JSON.stringify({ sort_order: Number(target.sort_order) || 0 })
+				}),
+				fetch(`/api/media/highlight-packages/items/${target.id}`, {
+					method: 'PATCH',
+					headers: { 'Content-Type': 'application/json' },
+					body: JSON.stringify({ sort_order: Number(current.sort_order) || 0 })
+				})
+			]);
+
+			highlightPackageItems = highlightPackageItems.map((row: any) => {
+				if (row.id === current.id) return { ...row, sort_order: Number(target.sort_order) || 0 };
+				if (row.id === target.id) return { ...row, sort_order: Number(current.sort_order) || 0 };
+				return row;
+			});
+		} catch (error) {
+			phase5Error = error instanceof Error ? error.message : 'Failed to reorder item';
+		} finally {
+			phase5Busy = false;
+		}
+	}
+
+	async function updatePackageStatus(status: string) {
+		if (!selectedPackageId) return;
+		phase5Busy = true;
+		phase5Error = '';
+		try {
+			const res = await fetch(`/api/media/highlight-packages/${selectedPackageId}`, {
+				method: 'PATCH',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ status })
+			});
+			if (!res.ok) {
+				const data = await res.json().catch(() => ({}));
+				throw new Error(data.message || 'Failed to update package status');
+			}
+			const updated = await res.json();
+			highlightPackages = highlightPackages.map((pkg: any) => (pkg.id === updated.id ? updated : pkg));
+		} catch (error) {
+			phase5Error = error instanceof Error ? error.message : 'Failed to update package';
+		} finally {
+			phase5Busy = false;
+		}
+	}
+
+	async function exportSelectedPackageManifest() {
+		if (!selectedPackageId) {
+			phase5Error = 'Select a package to export.';
+			return;
+		}
+
+		phase5Busy = true;
+		phase5Error = '';
+		try {
+			const res = await fetch(`/api/media/highlight-packages/${selectedPackageId}/export`);
+			if (!res.ok) {
+				const data = await res.json().catch(() => ({}));
+				throw new Error(data.message || 'Failed to export manifest');
+			}
+
+			const manifest = await res.json();
+			const blob = new Blob([JSON.stringify(manifest, null, 2)], { type: 'application/json' });
+			const url = URL.createObjectURL(blob);
+			const anchor = document.createElement('a');
+			anchor.href = url;
+			anchor.download = `${(selectedPackage?.name || 'highlight-package').replace(/\s+/g, '-').toLowerCase()}-manifest.json`;
+			document.body.appendChild(anchor);
+			anchor.click();
+			anchor.remove();
+			URL.revokeObjectURL(url);
+		} catch (error) {
+			phase5Error = error instanceof Error ? error.message : 'Failed to export manifest';
+		} finally {
+			phase5Busy = false;
 		}
 	}
 
@@ -418,6 +646,102 @@
 		{/each}
 	</div>
 
+	<div class="mb-6 rounded-xl border border-violet-700/40 bg-violet-950/20 p-4 space-y-4">
+		<div class="flex flex-col md:flex-row md:items-end gap-3">
+			<div class="flex-1 space-y-1">
+				<p class="text-sm font-semibold text-violet-200">Phase 5 Package Manager</p>
+				<p class="text-xs text-violet-300/80">Build highlight packages, add assets, reorder clip queue, and export manifest JSON.</p>
+			</div>
+			{#if phase5Error}
+				<p class="text-xs text-red-300">{phase5Error}</p>
+			{/if}
+		</div>
+
+		<div class="grid grid-cols-1 xl:grid-cols-3 gap-3">
+			<div class="space-y-2">
+				<label class="text-xs text-violet-200">Selected Package</label>
+				<select bind:value={selectedPackageId} class="flex h-10 w-full rounded-md border border-violet-700/40 bg-slate-900 px-3 py-2 text-sm text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500">
+					<option value="">None</option>
+					{#each highlightPackages as pkg}
+						<option value={pkg.id}>{pkg.name}</option>
+					{/each}
+				</select>
+			</div>
+			<div class="space-y-2">
+				<label class="text-xs text-violet-200">Package Status</label>
+				<select
+					value={selectedPackage?.status || 'draft'}
+					disabled={!selectedPackageId || phase5Busy}
+					onchange={(event) => updatePackageStatus((event.currentTarget as HTMLSelectElement).value)}
+					class="flex h-10 w-full rounded-md border border-violet-700/40 bg-slate-900 px-3 py-2 text-sm text-white disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500"
+				>
+					{#each highlightPackageStatuses as option}
+						<option value={option.value}>{option.label}</option>
+					{/each}
+				</select>
+			</div>
+			<div class="space-y-2">
+				<label class="text-xs text-violet-200">Manifest Export</label>
+				<Button type="button" onclick={exportSelectedPackageManifest} disabled={!selectedPackageId || phase5Busy} class="w-full bg-violet-700 hover:bg-violet-600 text-white disabled:opacity-60">
+					<Download class="size-4 mr-2" />
+					Export Manifest
+				</Button>
+			</div>
+		</div>
+
+		<div class="grid grid-cols-1 xl:grid-cols-5 gap-3">
+			<Input bind:value={createPackageForm.name} placeholder="New package name" class="xl:col-span-2 bg-slate-900 border-violet-700/40 text-white placeholder:text-slate-400" />
+			<select bind:value={createPackageForm.package_type} class="flex h-10 w-full rounded-md border border-violet-700/40 bg-slate-900 px-3 py-2 text-sm text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500">
+				{#each highlightPackageTypes as option}
+					<option value={option.value}>{option.label}</option>
+				{/each}
+			</select>
+			<select bind:value={createPackageForm.export_target} class="flex h-10 w-full rounded-md border border-violet-700/40 bg-slate-900 px-3 py-2 text-sm text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500">
+				{#each highlightExportTargets as option}
+					<option value={option.value}>{option.label}</option>
+				{/each}
+			</select>
+			<Button type="button" onclick={createHighlightPackage} disabled={phase5Busy} class="bg-violet-700 hover:bg-violet-600 text-white disabled:opacity-60">
+				<Plus class="size-4 mr-2" />
+				Create
+			</Button>
+		</div>
+
+		{#if selectedPackageId}
+			<div class="rounded-lg border border-violet-700/30 bg-slate-900/70 p-3">
+				<div class="flex items-center justify-between mb-2">
+					<p class="text-xs text-violet-200">{selectedPackage?.name || 'Package'} queue</p>
+					<p class="text-xs text-violet-300">{selectedPackageItems.length} items · {selectedPackageDurationSeconds}s clip span</p>
+				</div>
+				{#if selectedPackageItems.length === 0}
+					<p class="text-xs text-slate-400">Use Add to Package on any asset card to build this queue.</p>
+				{:else}
+					<div class="space-y-2 max-h-56 overflow-y-auto pr-1">
+						{#each selectedPackageItems as row, index (row.id)}
+							<div class="flex items-center justify-between rounded border border-slate-700 bg-slate-950/70 px-2 py-1.5 gap-2">
+								<div class="min-w-0">
+									<p class="text-xs text-slate-100 truncate">{index + 1}. {highlightItemAssetLabel(row)}</p>
+									<p class="text-[10px] text-slate-400">{row.usage_role || 'feature'} · {row.clip_in_seconds || 0}s-{row.clip_out_seconds || 0}s</p>
+								</div>
+								<div class="flex items-center gap-1 shrink-0">
+									<button type="button" class="p-1 rounded bg-slate-800 border border-slate-700 text-slate-200 hover:bg-slate-700" onclick={() => movePackageItem(row.id, -1)} disabled={phase5Busy || index === 0}>
+										<ChevronUp class="size-3.5" />
+									</button>
+									<button type="button" class="p-1 rounded bg-slate-800 border border-slate-700 text-slate-200 hover:bg-slate-700" onclick={() => movePackageItem(row.id, 1)} disabled={phase5Busy || index === selectedPackageItems.length - 1}>
+										<ChevronDown class="size-3.5" />
+									</button>
+									<button type="button" class="p-1 rounded bg-red-900/40 border border-red-700/50 text-red-200 hover:bg-red-800/50" onclick={() => removePackageItem(row.id)} disabled={phase5Busy}>
+										<Trash2 class="size-3.5" />
+									</button>
+								</div>
+							</div>
+						{/each}
+					</div>
+				{/if}
+			</div>
+		{/if}
+	</div>
+
 	<!-- Grid -->
 	{#if filtered.length === 0}
 		<div class="flex flex-col items-center justify-center py-24 text-slate-500">
@@ -467,6 +791,13 @@
 
 					<!-- Overlay actions -->
 					<div class="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+						<button
+							onclick={() => addAssetToSelectedPackage(asset)}
+							class="p-2 rounded-full bg-violet-500/70 hover:bg-violet-500 text-white transition-colors"
+							title="Add to selected package"
+						>
+							<Plus class="size-4" />
+						</button>
 						<button
 							onclick={() => openDetail(asset)}
 							class="p-2 rounded-full bg-slate-500/70 hover:bg-slate-500 text-white transition-colors"
