@@ -3,6 +3,18 @@ import { adminFetch } from '$lib/infra/pocketbase/pbClient';
 import type { PageServerLoad } from './$types';
 import { env } from '$env/dynamic/private';
 
+function deriveDeliverableSlaStatus(row: any) {
+	if (!row) return 'pending';
+	if (row.status === 'approved' || row.status === 'delivered' || row.status === 'cancelled') {
+		return row.status;
+	}
+	const due = row.due_date ? new Date(row.due_date).getTime() : NaN;
+	if (!Number.isNaN(due) && due < Date.now()) {
+		return 'overdue';
+	}
+	return row.status || 'pending';
+}
+
 export const load: PageServerLoad = async ({ locals, url }) => {
 	const ctx = await RequestContext.from(locals, url);
 	const { pb, userId, profile: userProfile, role } = ctx;
@@ -30,7 +42,10 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 			usageLogs,
 			sponsorDeliverables,
 			sponsorAppearances,
-			sponsorRecapPackages
+			sponsorRecapPackages,
+			highlightPackageItems,
+			highlightPackages,
+			mediaCollections
 		] = await Promise.all([
 			adminFetch('media_assets', {
 				sort: '-created'
@@ -58,7 +73,10 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 			adminFetch('media_usage_logs').catch(() => []),
 			adminFetch('sponsor_media_deliverables').catch(() => []),
 			adminFetch('sponsor_media_appearances').catch(() => []),
-			adminFetch('sponsor_recap_packages').catch(() => [])
+			adminFetch('sponsor_recap_packages').catch(() => []),
+			adminFetch('highlight_package_items').catch(() => []),
+			adminFetch('highlight_packages').catch(() => []),
+			adminFetch('media_collections').catch(() => [])
 		]);
 
 		const assetTagMap = new Map<string, any[]>();
@@ -72,6 +90,7 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 		const assetUsageMap = new Map<string, any[]>();
 		const assetDeliverablesMap = new Map<string, any[]>();
 		const assetAppearancesMap = new Map<string, any[]>();
+		const assetHighlightItemsMap = new Map<string, any[]>();
 
 		for (const row of assetTags as any[]) {
 			const list = assetTagMap.get(row.asset) || [];
@@ -140,8 +159,17 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 			assetAppearancesMap.set(row.asset, list);
 		}
 
+		for (const row of highlightPackageItems as any[]) {
+			if (!row.asset) continue;
+			const list = assetHighlightItemsMap.get(row.asset) || [];
+			list.push(row);
+			assetHighlightItemsMap.set(row.asset, list);
+		}
+
 		const dealsById = new Map((licenseDeals as any[]).map((item) => [item.id, item]));
 		const recapById = new Map((sponsorRecapPackages as any[]).map((item) => [item.id, item]));
+		const highlightPackagesById = new Map((highlightPackages as any[]).map((item) => [item.id, item]));
+		const mediaCollectionsById = new Map((mediaCollections as any[]).map((item) => [item.id, item]));
 
 		const talentsById = new Map((talents as any[]).map((item) => [item.id, item]));
 		const sponsorsById = new Map((sponsors as any[]).map((item) => [item.id, item]));
@@ -169,6 +197,7 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 
 			const deliverableRows = (assetDeliverablesMap.get(asset.id) || []).map((row) => ({
 				...row,
+				sla_status: deriveDeliverableSlaStatus(row),
 				sponsorRecord: row.sponsor ? sponsorsById.get(row.sponsor) || null : null,
 				recapPackageRecord: row.recap_package ? recapById.get(row.recap_package) || null : null
 			}));
@@ -176,6 +205,12 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 			const appearanceRows = (assetAppearancesMap.get(asset.id) || []).map((row) => ({
 				...row,
 				sponsorRecord: row.sponsor ? sponsorsById.get(row.sponsor) || null : null
+			}));
+
+			const highlightRows = (assetHighlightItemsMap.get(asset.id) || []).map((row) => ({
+				...row,
+				packageRecord: row.highlight_package ? highlightPackagesById.get(row.highlight_package) || null : null,
+				collectionRecord: row.media_collection ? mediaCollectionsById.get(row.media_collection) || null : null
 			}));
 
 			return {
@@ -198,6 +233,12 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 					appearances: appearanceRows,
 					recapPackages: deliverableRows
 						.map((row: any) => row.recapPackageRecord)
+						.filter(Boolean)
+				},
+				highlightPackaging: {
+					items: highlightRows,
+					packages: highlightRows
+						.map((row: any) => row.packageRecord)
 						.filter(Boolean)
 				}
 			};

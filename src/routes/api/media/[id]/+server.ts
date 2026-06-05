@@ -71,6 +71,55 @@ async function loadAssetLicensing(pb: any, assetId: string) {
 	};
 }
 
+function deriveDeliverableSlaStatus(row: any) {
+	if (!row) return 'pending';
+	if (row.status === 'approved' || row.status === 'delivered' || row.status === 'cancelled') {
+		return row.status;
+	}
+	const due = row.due_date ? new Date(row.due_date).getTime() : NaN;
+	if (!Number.isNaN(due) && due < Date.now()) {
+		return 'overdue';
+	}
+	return row.status || 'pending';
+}
+
+async function loadAssetSponsorFulfillment(pb: any, assetId: string) {
+	const [deliverables, appearances] = await Promise.all([
+		pb.collection('sponsor_media_deliverables').getFullList({ filter: `asset = "${assetId}"` }).catch(() => []),
+		pb.collection('sponsor_media_appearances').getFullList({ filter: `asset = "${assetId}"` }).catch(() => [])
+	]);
+
+	const recapIds = Array.from(new Set(deliverables.map((row: any) => row.recap_package).filter(Boolean)));
+	const sponsorIds = Array.from(new Set([
+		...deliverables.map((row: any) => row.sponsor).filter(Boolean),
+		...appearances.map((row: any) => row.sponsor).filter(Boolean)
+	]));
+
+	const [recapRows, sponsorRows] = await Promise.all([
+		Promise.all(recapIds.map((id: string) => pb.collection('sponsor_recap_packages').getOne(id).catch(() => null))),
+		Promise.all(sponsorIds.map((id: string) => pb.collection('sponsors').getOne(id).catch(() => null)))
+	]);
+
+	const recapsById = new Map(recapRows.filter(Boolean).map((row: any) => [row.id, row]));
+	const sponsorsById = new Map(sponsorRows.filter(Boolean).map((row: any) => [row.id, row]));
+
+	const deliverableRows = deliverables.map((row: any) => ({
+		...row,
+		sla_status: deriveDeliverableSlaStatus(row),
+		sponsorRecord: row.sponsor ? sponsorsById.get(row.sponsor) || null : null,
+		recapPackageRecord: row.recap_package ? recapsById.get(row.recap_package) || null : null
+	}));
+
+	return {
+		deliverables: deliverableRows,
+		appearances: appearances.map((row: any) => ({
+			...row,
+			sponsorRecord: row.sponsor ? sponsorsById.get(row.sponsor) || null : null
+		})),
+		recapPackages: deliverableRows.map((row: any) => row.recapPackageRecord).filter(Boolean)
+	};
+}
+
 export const PATCH: RequestHandler = async ({ request, locals, params }) => {
 	const pb = locals.pb;
 
@@ -227,10 +276,115 @@ export const PATCH: RequestHandler = async ({ request, locals, params }) => {
 			}
 		}
 
+		if (data.phase4Meta) {
+			const phase4 = data.phase4Meta || {};
+
+			const existingDeliverables = await pb.collection('sponsor_media_deliverables').getFullList({
+				filter: `asset = "${params.id}"`,
+				fields: 'id,recap_package'
+			}).catch(() => []);
+
+			for (const row of existingDeliverables) {
+				await pb.collection('sponsor_media_deliverables').delete(row.id).catch(() => undefined);
+			}
+
+			const existingAppearances = await pb.collection('sponsor_media_appearances').getFullList({
+				filter: `asset = "${params.id}"`,
+				fields: 'id'
+			}).catch(() => []);
+
+			for (const row of existingAppearances) {
+				await pb.collection('sponsor_media_appearances').delete(row.id).catch(() => undefined);
+			}
+
+			const previousRecapIds = Array.from(new Set(existingDeliverables.map((row: any) => row.recap_package).filter(Boolean)));
+			for (const recapId of previousRecapIds) {
+				const rowsUsingRecap = await pb.collection('sponsor_media_deliverables').getFullList({
+					filter: `recap_package = "${recapId}"`,
+					fields: 'id'
+				}).catch(() => []);
+				if (!rowsUsingRecap.length) {
+					await pb.collection('sponsor_recap_packages').delete(recapId).catch(() => undefined);
+				}
+			}
+
+			const shouldCreateDeliverable = Boolean(
+				phase4.sponsor ||
+				phase4.deliverable_type ||
+				phase4.obligation_reference ||
+				phase4.recap_package_name ||
+				phase4.appearance_logo_visibility ||
+				phase4.appearance_placement
+			);
+
+			if (shouldCreateDeliverable && phase4.sponsor) {
+				let recapId: string | null = null;
+				const shouldCreateRecap = Boolean(
+					phase4.recap_package_name ||
+					phase4.recap_status ||
+					phase4.recap_delivered_at ||
+					phase4.recap_proof_url ||
+					phase4.recap_notes
+				);
+
+				if (shouldCreateRecap) {
+					const recap = await pb.collection('sponsor_recap_packages').create({
+						sponsor: phase4.sponsor,
+						package_name: phase4.recap_package_name || `Recap Package - ${asset.title}`,
+						season: phase4.recap_season || asset.season || null,
+						tournament: phase4.recap_tournament || asset.tournament || null,
+						special_event: phase4.recap_special_event || asset.special_event || null,
+						status: phase4.recap_status || 'draft',
+						delivered_at: phase4.recap_delivered_at || null,
+						proof_url: phase4.recap_proof_url || '',
+						notes: phase4.recap_notes || ''
+					});
+					recapId = recap.id;
+				}
+
+				const deliverable = await pb.collection('sponsor_media_deliverables').create({
+					sponsor: phase4.sponsor,
+					asset: params.id,
+					recap_package: recapId,
+					deliverable_type: phase4.deliverable_type || 'other',
+					obligation_reference: phase4.obligation_reference || '',
+					status: phase4.deliverable_status || 'pending',
+					due_date: phase4.deliverable_due_date || null,
+					delivered_at: phase4.deliverable_delivered_at || null,
+					visibility_score: phase4.deliverable_visibility_score ? Number(phase4.deliverable_visibility_score) : null,
+					proof_note: phase4.deliverable_proof_note || ''
+				});
+
+				const shouldCreateAppearance = Boolean(
+					phase4.appearance_logo_visibility ||
+					phase4.appearance_placement ||
+					phase4.appearance_timestamp_seconds ||
+					phase4.appearance_screenshot_url ||
+					phase4.appearance_notes ||
+					phase4.appearance_verified
+				);
+
+				if (shouldCreateAppearance) {
+					await pb.collection('sponsor_media_appearances').create({
+						asset: params.id,
+						sponsor: phase4.sponsor,
+						deliverable: deliverable.id,
+						logo_visibility: phase4.appearance_logo_visibility || 'clear',
+						placement: phase4.appearance_placement || '',
+						timestamp_seconds: phase4.appearance_timestamp_seconds ? Number(phase4.appearance_timestamp_seconds) : null,
+						screenshot_url: phase4.appearance_screenshot_url || '',
+						verified: Boolean(phase4.appearance_verified),
+						notes: phase4.appearance_notes || ''
+					});
+				}
+			}
+		}
+
 		const taxonomy = await loadAssetTaxonomy(pb, params.id);
 		const licensing = await loadAssetLicensing(pb, params.id);
+		const sponsorFulfillment = await loadAssetSponsorFulfillment(pb, params.id);
 
-		return json({ ...asset, taxonomy, licensing });
+		return json({ ...asset, taxonomy, licensing, sponsorFulfillment });
 	} catch (error) {
 		console.error('Error updating media asset:', error);
 		return json({ message: 'Failed to update media asset', error: String(error) }, { status: 500 });

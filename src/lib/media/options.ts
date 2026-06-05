@@ -114,6 +114,69 @@ export const mediaMomentTypes: MediaOption[] = [
 	{ value: 'other', label: 'Other' }
 ];
 
+export const sponsorDeliverableTypes: MediaOption[] = [
+	{ value: 'logo_exposure', label: 'Logo Exposure' },
+	{ value: 'highlight_clip', label: 'Highlight Clip' },
+	{ value: 'recap_image', label: 'Recap Image' },
+	{ value: 'interview_cut', label: 'Interview Cut' },
+	{ value: 'social_post', label: 'Social Post' },
+	{ value: 'broadcast_feature', label: 'Broadcast Feature' },
+	{ value: 'hospitality_recap', label: 'Hospitality Recap' },
+	{ value: 'other', label: 'Other' }
+];
+
+export const sponsorDeliverableStatuses: MediaOption[] = [
+	{ value: 'pending', label: 'Pending' },
+	{ value: 'in_progress', label: 'In Progress' },
+	{ value: 'delivered', label: 'Delivered' },
+	{ value: 'approved', label: 'Approved' },
+	{ value: 'overdue', label: 'Overdue' },
+	{ value: 'cancelled', label: 'Cancelled' }
+];
+
+export const sponsorRecapStatuses: MediaOption[] = [
+	{ value: 'draft', label: 'Draft' },
+	{ value: 'in_progress', label: 'In Progress' },
+	{ value: 'ready', label: 'Ready' },
+	{ value: 'sent', label: 'Sent' },
+	{ value: 'approved', label: 'Approved' },
+	{ value: 'archived', label: 'Archived' }
+];
+
+export const sponsorLogoVisibilityLevels: MediaOption[] = [
+	{ value: 'background', label: 'Background' },
+	{ value: 'partial', label: 'Partial' },
+	{ value: 'clear', label: 'Clear' },
+	{ value: 'hero', label: 'Hero' },
+	{ value: 'verbal_mention', label: 'Verbal Mention' }
+];
+
+export const highlightPackageTypes: MediaOption[] = [
+	{ value: 'reel', label: 'Reel' },
+	{ value: 'event_recap', label: 'Event Recap' },
+	{ value: 'player_package', label: 'Player Package' },
+	{ value: 'sponsor_package', label: 'Sponsor Package' },
+	{ value: 'social_export', label: 'Social Export' },
+	{ value: 'other', label: 'Other' }
+];
+
+export const highlightPackageStatuses: MediaOption[] = [
+	{ value: 'draft', label: 'Draft' },
+	{ value: 'review', label: 'In Review' },
+	{ value: 'approved', label: 'Approved' },
+	{ value: 'published', label: 'Published' },
+	{ value: 'archived', label: 'Archived' }
+];
+
+export const highlightExportTargets: MediaOption[] = [
+	{ value: 'broadcast', label: 'Broadcast' },
+	{ value: 'social', label: 'Social' },
+	{ value: 'internal', label: 'Internal' },
+	{ value: 'sponsor', label: 'Sponsor' },
+	{ value: 'editorial', label: 'Editorial' },
+	{ value: 'other', label: 'Other' }
+];
+
 export function labelFor(options: MediaOption[], value: string | null | undefined): string {
 	return options.find((option) => option.value === value)?.label ?? value ?? '';
 }

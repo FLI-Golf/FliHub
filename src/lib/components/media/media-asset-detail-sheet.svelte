@@ -279,7 +279,7 @@
 								<div class="space-y-1 text-sm">
 									{#each asset.sponsorFulfillment.deliverables as row}
 										<div class="text-slate-200">
-											{row.sponsorRecord?.name || 'Sponsor'} · {row.deliverable_type} · {row.status || 'pending'}
+											{row.sponsorRecord?.name || 'Sponsor'} · {row.deliverable_type} · {row.sla_status || row.status || 'pending'}
 											{#if row.visibility_score} · score {row.visibility_score}{/if}
 											{#if row.obligation_reference} · {row.obligation_reference}{/if}
 										</div>
@@ -307,6 +307,27 @@
 								<div class="space-y-1 text-sm">
 									{#each asset.sponsorFulfillment.recapPackages as row}
 										<div class="text-slate-200">{row.package_name} · {row.status || 'draft'}{#if row.delivered_at} · delivered {formatDate(row.delivered_at)}{/if}</div>
+									{/each}
+								</div>
+							</div>
+						{/if}
+					</div>
+				{/if}
+
+				{#if asset.highlightPackaging?.items?.length || asset.highlightPackaging?.packages?.length}
+					<div class="rounded-xl border border-slate-800 bg-slate-900 p-4 space-y-3">
+						<h3 class="text-sm font-semibold text-slate-100">Highlight Packaging (Phase 5)</h3>
+						{#if asset.highlightPackaging?.items?.length}
+							<div>
+								<div class="text-slate-400 text-sm mb-1">Package Items</div>
+								<div class="space-y-1 text-sm">
+									{#each asset.highlightPackaging.items as row}
+										<div class="text-slate-200">
+											{row.packageRecord?.name || 'Package'}
+											{#if row.collectionRecord?.name} · {row.collectionRecord.name}{/if}
+											{#if row.clip_in_seconds || row.clip_out_seconds} · {row.clip_in_seconds || 0}s-{row.clip_out_seconds || 0}s{/if}
+											{#if row.usage_role} · {row.usage_role}{/if}
+										</div>
 									{/each}
 								</div>
 							</div>

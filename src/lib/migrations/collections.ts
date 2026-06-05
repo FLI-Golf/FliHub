@@ -1550,6 +1550,103 @@ export const collections = [
 		deleteRule: '@request.auth.id != ""'
 	},
 
+	// ─── Highlight builder + internal packaging (Phase 5) ───────────────────
+	{
+		name: 'media_collections',
+		type: 'base',
+		schema: [
+			{ name: 'name', type: 'text', required: true, options: { max: 255 } },
+			{
+				name: 'collection_type',
+				type: 'select',
+				required: true,
+				options: { maxSelect: 1, values: ['reel', 'event_recap', 'player_package', 'sponsor_package', 'social_export', 'other'] }
+			},
+			{ name: 'season', type: 'relation', required: false, options: { collectionId: 'seasons', maxSelect: 1 } },
+			{ name: 'tournament', type: 'relation', required: false, options: { collectionId: 'tournaments', maxSelect: 1 } },
+			{ name: 'special_event', type: 'relation', required: false, options: { collectionId: 'special_events', maxSelect: 1 } },
+			{ name: 'sponsor', type: 'relation', required: false, options: { collectionId: 'sponsors', maxSelect: 1 } },
+			{ name: 'owner', type: 'text', required: false, options: { max: 120 } },
+			{
+				name: 'status',
+				type: 'select',
+				required: false,
+				options: { maxSelect: 1, values: ['draft', 'curating', 'ready_for_edit', 'complete', 'archived'] }
+			},
+			{ name: 'notes', type: 'text', required: false }
+		],
+		listRule: '@request.auth.id != ""',
+		viewRule: '@request.auth.id != ""',
+		createRule: '@request.auth.id != ""',
+		updateRule: '@request.auth.id != ""',
+		deleteRule: '@request.auth.id != ""'
+	},
+	{
+		name: 'highlight_packages',
+		type: 'base',
+		schema: [
+			{ name: 'name', type: 'text', required: true, options: { max: 255 } },
+			{
+				name: 'package_type',
+				type: 'select',
+				required: true,
+				options: { maxSelect: 1, values: ['reel', 'event_recap', 'player_package', 'sponsor_package', 'social_export', 'other'] }
+			},
+			{
+				name: 'status',
+				type: 'select',
+				required: false,
+				options: { maxSelect: 1, values: ['draft', 'review', 'approved', 'published', 'archived'] }
+			},
+			{
+				name: 'export_target',
+				type: 'select',
+				required: false,
+				options: { maxSelect: 1, values: ['broadcast', 'social', 'internal', 'sponsor', 'editorial', 'other'] }
+			},
+			{
+				name: 'approval_status',
+				type: 'select',
+				required: false,
+				options: { maxSelect: 1, values: ['pending', 'approved', 'rejected'] }
+			},
+			{ name: 'approved_by', type: 'text', required: false, options: { max: 120 } },
+			{ name: 'approved_at', type: 'date', required: false },
+			{ name: 'published_url', type: 'url', required: false },
+			{ name: 'manifest_json', type: 'json', required: false },
+			{ name: 'notes', type: 'text', required: false }
+		],
+		listRule: '@request.auth.id != ""',
+		viewRule: '@request.auth.id != ""',
+		createRule: '@request.auth.id != ""',
+		updateRule: '@request.auth.id != ""',
+		deleteRule: '@request.auth.id != ""'
+	},
+	{
+		name: 'highlight_package_items',
+		type: 'base',
+		schema: [
+			{ name: 'highlight_package', type: 'relation', required: true, options: { collectionId: 'highlight_packages', maxSelect: 1 } },
+			{ name: 'media_collection', type: 'relation', required: false, options: { collectionId: 'media_collections', maxSelect: 1 } },
+			{ name: 'asset', type: 'relation', required: true, options: { collectionId: 'media_assets', maxSelect: 1 } },
+			{ name: 'clip_in_seconds', type: 'number', required: false, options: { min: 0 } },
+			{ name: 'clip_out_seconds', type: 'number', required: false, options: { min: 0 } },
+			{ name: 'sort_order', type: 'number', required: false, options: { noDecimal: true, min: 0 } },
+			{
+				name: 'usage_role',
+				type: 'select',
+				required: false,
+				options: { maxSelect: 1, values: ['opening', 'feature', 'sponsor_callout', 'transition', 'closing', 'other'] }
+			},
+			{ name: 'notes', type: 'text', required: false }
+		],
+		listRule: '@request.auth.id != ""',
+		viewRule: '@request.auth.id != ""',
+		createRule: '@request.auth.id != ""',
+		updateRule: '@request.auth.id != ""',
+		deleteRule: '@request.auth.id != ""'
+	},
+
 	{
 		name: 'content_production',
 		type: 'base',

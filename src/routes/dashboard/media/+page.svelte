@@ -173,18 +173,33 @@
 	);
 
 	let sponsorMetrics = $derived(
-		assets.reduce((acc: { deliverables: number; delivered: number; approved: number; appearances: number; recapPackages: number }, asset: any) => {
+		assets.reduce((acc: { deliverables: number; delivered: number; approved: number; inProgress: number; overdue: number; appearances: number; recapPackages: number }, asset: any) => {
 			const deliverables = asset.sponsorFulfillment?.deliverables || [];
 			const appearances = asset.sponsorFulfillment?.appearances || [];
 			const recapPackages = asset.sponsorFulfillment?.recapPackages || [];
 
 			acc.deliverables += deliverables.length;
-			acc.delivered += deliverables.filter((row: any) => row.status === 'delivered').length;
+			acc.delivered += deliverables.filter((row: any) => row.sla_status === 'delivered').length;
 			acc.approved += deliverables.filter((row: any) => row.status === 'approved').length;
+			acc.inProgress += deliverables.filter((row: any) => row.sla_status === 'in_progress').length;
+			acc.overdue += deliverables.filter((row: any) => row.sla_status === 'overdue').length;
 			acc.appearances += appearances.length;
 			acc.recapPackages += recapPackages.length;
 			return acc;
-		}, { deliverables: 0, delivered: 0, approved: 0, appearances: 0, recapPackages: 0 })
+		}, { deliverables: 0, delivered: 0, approved: 0, inProgress: 0, overdue: 0, appearances: 0, recapPackages: 0 })
+	);
+
+	let highlightMetrics = $derived(
+		assets.reduce((acc: { packageItems: number; packages: number; approved: number; published: number }, asset: any) => {
+			const items = asset.highlightPackaging?.items || [];
+			const packages = asset.highlightPackaging?.packages || [];
+
+			acc.packageItems += items.length;
+			acc.packages += packages.length;
+			acc.approved += packages.filter((row: any) => row.status === 'approved').length;
+			acc.published += packages.filter((row: any) => row.status === 'published').length;
+			return acc;
+		}, { packageItems: 0, packages: 0, approved: 0, published: 0 })
 	);
 
 	function seasonLabel(asset: any) {
@@ -278,7 +293,10 @@
 				<span class="px-2 py-1 rounded-md border border-cyan-700/60 bg-cyan-900/20 text-cyan-300">Attributed revenue: ${licensingMetrics.totalAttributedRevenue.toLocaleString()}</span>
 				<span class="px-2 py-1 rounded-md border border-amber-700/60 bg-amber-900/20 text-amber-300">Sponsor deliverables: {sponsorMetrics.deliverables}</span>
 				<span class="px-2 py-1 rounded-md border border-lime-700/60 bg-lime-900/20 text-lime-300">Delivered/Approved: {sponsorMetrics.delivered}/{sponsorMetrics.approved}</span>
+				<span class="px-2 py-1 rounded-md border border-blue-700/60 bg-blue-900/20 text-blue-300">In Progress: {sponsorMetrics.inProgress}</span>
+				<span class="px-2 py-1 rounded-md border border-red-700/60 bg-red-900/20 text-red-300">Overdue: {sponsorMetrics.overdue}</span>
 				<span class="px-2 py-1 rounded-md border border-orange-700/60 bg-orange-900/20 text-orange-300">Appearances/Recaps: {sponsorMetrics.appearances}/{sponsorMetrics.recapPackages}</span>
+				<span class="px-2 py-1 rounded-md border border-violet-700/60 bg-violet-900/20 text-violet-300">Phase 5 Packages: {highlightMetrics.packages}</span>
 			</div>
 		</div>
 		<Button onclick={() => (showUploadModal = true)} class="bg-blue-600 hover:bg-blue-700 text-white">
@@ -536,8 +554,27 @@
 								{[
 									asset.sponsorFulfillment?.deliverables?.length ? `${asset.sponsorFulfillment.deliverables.length} deliverables` : '',
 									asset.sponsorFulfillment?.appearances?.length ? `${asset.sponsorFulfillment.appearances.length} appearances` : '',
+									asset.sponsorFulfillment?.deliverables?.some((row: any) => row.sla_status === 'overdue') ? 'needs attention' : '',
 									asset.sponsorFulfillment?.deliverables?.some((row: any) => row.status === 'delivered' || row.status === 'approved') ? 'proof ready' : ''
 								].filter(Boolean).join(' · ')}
+							</p>
+						{/if}
+						{#if asset.sponsorFulfillment?.deliverables?.length}
+							<div class="flex flex-wrap gap-1 mt-1">
+								{#if asset.sponsorFulfillment.deliverables.some((row: any) => row.sla_status === 'overdue')}
+									<span class="px-1.5 py-0.5 rounded border border-red-700/60 bg-red-900/30 text-[10px] text-red-300">Overdue</span>
+								{/if}
+								{#if asset.sponsorFulfillment.deliverables.some((row: any) => row.sla_status === 'in_progress')}
+									<span class="px-1.5 py-0.5 rounded border border-blue-700/60 bg-blue-900/30 text-[10px] text-blue-300">In Progress</span>
+								{/if}
+								{#if asset.sponsorFulfillment.deliverables.some((row: any) => row.status === 'approved')}
+									<span class="px-1.5 py-0.5 rounded border border-lime-700/60 bg-lime-900/30 text-[10px] text-lime-300">Approved</span>
+								{/if}
+							</div>
+						{/if}
+						{#if asset.highlightPackaging?.items?.length}
+							<p class="text-[10px] text-violet-300 mt-1 truncate">
+								{asset.highlightPackaging.items.length} highlight item{asset.highlightPackaging.items.length !== 1 ? 's' : ''} in package queue
 							</p>
 						{/if}
 					</div>

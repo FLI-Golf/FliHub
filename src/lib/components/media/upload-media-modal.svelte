@@ -14,6 +14,10 @@
 		mediaShotTypes,
 		mediaSourceTypes,
 		mediaStatuses,
+		sponsorDeliverableStatuses,
+		sponsorDeliverableTypes,
+		sponsorLogoVisibilityLevels,
+		sponsorRecapStatuses,
 		mediaStorageTiers,
 		mediaUsageScopes
 	} from '$lib/media/options';
@@ -61,6 +65,16 @@
 		shot_type: '',
 		moment_type: '',
 		hole_number: '',
+		phase4_sponsor: '',
+		deliverable_type: 'other',
+		deliverable_status: 'pending',
+		deliverable_due_date: '',
+		deliverable_obligation_reference: '',
+		recap_package_name: '',
+		recap_status: 'draft',
+		appearance_logo_visibility: 'clear',
+		appearance_placement: '',
+		appearance_verified: false,
 		tags: '',
 		notes: ''
 	});
@@ -147,6 +161,18 @@
 						season: formData.season,
 						tournament: formData.tournament,
 						special_event: formData.special_event
+					},
+					phase4Meta: {
+						sponsor: formData.phase4_sponsor,
+						deliverable_type: formData.deliverable_type,
+						deliverable_status: formData.deliverable_status,
+						deliverable_due_date: formData.deliverable_due_date,
+						obligation_reference: formData.deliverable_obligation_reference,
+						recap_package_name: formData.recap_package_name,
+						recap_status: formData.recap_status,
+						appearance_logo_visibility: formData.appearance_logo_visibility,
+						appearance_placement: formData.appearance_placement,
+						appearance_verified: formData.appearance_verified
 					}
 				})
 			});
@@ -194,6 +220,16 @@
 			shot_type: '',
 			moment_type: '',
 			hole_number: '',
+			phase4_sponsor: '',
+			deliverable_type: 'other',
+			deliverable_status: 'pending',
+			deliverable_due_date: '',
+			deliverable_obligation_reference: '',
+			recap_package_name: '',
+			recap_status: 'draft',
+			appearance_logo_visibility: 'clear',
+			appearance_placement: '',
+			appearance_verified: false,
 			tags: '',
 			notes: ''
 		};
@@ -506,6 +542,77 @@
 								<option value={sponsor.id}>{sponsor.name}</option>
 							{/each}
 						</select>
+					</div>
+				</div>
+			</div>
+
+			<div class="rounded-lg border border-slate-700 p-4 space-y-4 bg-slate-900/40">
+				<div>
+					<p class="text-sm font-semibold text-slate-100">Phase 4 Sponsor Fulfillment (Optional)</p>
+					<p class="text-xs text-slate-400">Create an initial deliverable and appearance proof while uploading.</p>
+				</div>
+
+				<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+					<div class="space-y-2 md:col-span-2">
+						<Label for="media-phase4-sponsor" class="text-slate-200">Sponsor</Label>
+						<select id="media-phase4-sponsor" bind:value={formData.phase4_sponsor} class="flex h-10 w-full rounded-md border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-500">
+							<option value="">None</option>
+							{#each sponsors as sponsor}
+								<option value={sponsor.id}>{sponsor.name}</option>
+							{/each}
+						</select>
+					</div>
+					<div class="space-y-2">
+						<Label for="media-deliverable-type" class="text-slate-200">Deliverable Type</Label>
+						<select id="media-deliverable-type" bind:value={formData.deliverable_type} class="flex h-10 w-full rounded-md border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-500">
+							{#each sponsorDeliverableTypes as option}
+								<option value={option.value}>{option.label}</option>
+							{/each}
+						</select>
+					</div>
+					<div class="space-y-2">
+						<Label for="media-deliverable-status" class="text-slate-200">Deliverable Status</Label>
+						<select id="media-deliverable-status" bind:value={formData.deliverable_status} class="flex h-10 w-full rounded-md border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-500">
+							{#each sponsorDeliverableStatuses as option}
+								<option value={option.value}>{option.label}</option>
+							{/each}
+						</select>
+					</div>
+					<div class="space-y-2">
+						<Label for="media-deliverable-due-date" class="text-slate-200">Due Date</Label>
+						<Input id="media-deliverable-due-date" type="date" bind:value={formData.deliverable_due_date} class="bg-slate-800 border-slate-700 text-white" />
+					</div>
+					<div class="space-y-2">
+						<Label for="media-deliverable-obligation" class="text-slate-200">Obligation Reference</Label>
+						<Input id="media-deliverable-obligation" bind:value={formData.deliverable_obligation_reference} class="bg-slate-800 border-slate-700 text-white" />
+					</div>
+					<div class="space-y-2">
+						<Label for="media-recap-name" class="text-slate-200">Recap Package Name</Label>
+						<Input id="media-recap-name" bind:value={formData.recap_package_name} class="bg-slate-800 border-slate-700 text-white" />
+					</div>
+					<div class="space-y-2">
+						<Label for="media-recap-status" class="text-slate-200">Recap Status</Label>
+						<select id="media-recap-status" bind:value={formData.recap_status} class="flex h-10 w-full rounded-md border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-500">
+							{#each sponsorRecapStatuses as option}
+								<option value={option.value}>{option.label}</option>
+							{/each}
+						</select>
+					</div>
+					<div class="space-y-2">
+						<Label for="media-appearance-visibility" class="text-slate-200">Appearance Visibility</Label>
+						<select id="media-appearance-visibility" bind:value={formData.appearance_logo_visibility} class="flex h-10 w-full rounded-md border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-500">
+							{#each sponsorLogoVisibilityLevels as option}
+								<option value={option.value}>{option.label}</option>
+							{/each}
+						</select>
+					</div>
+					<div class="space-y-2">
+						<Label for="media-appearance-placement" class="text-slate-200">Appearance Placement</Label>
+						<Input id="media-appearance-placement" bind:value={formData.appearance_placement} class="bg-slate-800 border-slate-700 text-white" />
+					</div>
+					<div class="md:col-span-2 flex items-center gap-2">
+						<input id="media-appearance-verified" type="checkbox" bind:checked={formData.appearance_verified} class="h-4 w-4 rounded border-slate-600 bg-slate-800 text-blue-500" />
+						<Label for="media-appearance-verified" class="text-slate-200">Mark appearance as verified</Label>
 					</div>
 				</div>
 			</div>

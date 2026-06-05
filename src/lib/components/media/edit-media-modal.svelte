@@ -13,6 +13,10 @@
 		mediaShotTypes,
 		mediaSourceTypes,
 		mediaStatuses,
+		sponsorDeliverableStatuses,
+		sponsorDeliverableTypes,
+		sponsorLogoVisibilityLevels,
+		sponsorRecapStatuses,
 		mediaStorageTiers,
 		mediaUsageScopes
 	} from '$lib/media/options';
@@ -86,6 +90,25 @@
 		line_item_fee_amount: '',
 		line_item_revenue_share_pct: '',
 		line_item_restrictions: '',
+		phase4_sponsor: '',
+		deliverable_type: 'other',
+		deliverable_status: 'pending',
+		deliverable_due_date: '',
+		deliverable_delivered_at: '',
+		deliverable_visibility_score: '',
+		deliverable_obligation_reference: '',
+		deliverable_proof_note: '',
+		recap_package_name: '',
+		recap_status: 'draft',
+		recap_delivered_at: '',
+		recap_proof_url: '',
+		recap_notes: '',
+		appearance_logo_visibility: 'clear',
+		appearance_placement: '',
+		appearance_timestamp_seconds: '',
+		appearance_screenshot_url: '',
+		appearance_verified: false,
+		appearance_notes: '',
 		tags: '',
 		notes: ''
 	});
@@ -99,6 +122,9 @@
 			const rightsProfile = asset.licensing?.rightsProfiles?.[0] || null;
 			const lineItem = asset.licensing?.lineItems?.[0] || null;
 			const deal = lineItem?.dealRecord || null;
+			const deliverable = asset.sponsorFulfillment?.deliverables?.[0] || null;
+			const recap = deliverable?.recapPackageRecord || asset.sponsorFulfillment?.recapPackages?.[0] || null;
+			const appearance = asset.sponsorFulfillment?.appearances?.[0] || null;
 			formData = {
 				title:      asset.title      || '',
 				asset_type: asset.asset_type || 'flyer',
@@ -153,6 +179,25 @@
 				line_item_fee_amount: lineItem?.fee_amount ? String(lineItem.fee_amount) : '',
 				line_item_revenue_share_pct: lineItem?.revenue_share_pct ? String(lineItem.revenue_share_pct) : '',
 				line_item_restrictions: lineItem?.restrictions || '',
+				phase4_sponsor: deliverable?.sponsor || appearance?.sponsor || '',
+				deliverable_type: deliverable?.deliverable_type || 'other',
+				deliverable_status: deliverable?.status || 'pending',
+				deliverable_due_date: deliverable?.due_date ? String(deliverable.due_date).slice(0, 10) : '',
+				deliverable_delivered_at: deliverable?.delivered_at ? String(deliverable.delivered_at).slice(0, 10) : '',
+				deliverable_visibility_score: deliverable?.visibility_score ? String(deliverable.visibility_score) : '',
+				deliverable_obligation_reference: deliverable?.obligation_reference || '',
+				deliverable_proof_note: deliverable?.proof_note || '',
+				recap_package_name: recap?.package_name || '',
+				recap_status: recap?.status || 'draft',
+				recap_delivered_at: recap?.delivered_at ? String(recap.delivered_at).slice(0, 10) : '',
+				recap_proof_url: recap?.proof_url || '',
+				recap_notes: recap?.notes || '',
+				appearance_logo_visibility: appearance?.logo_visibility || 'clear',
+				appearance_placement: appearance?.placement || '',
+				appearance_timestamp_seconds: appearance?.timestamp_seconds ? String(appearance.timestamp_seconds) : '',
+				appearance_screenshot_url: appearance?.screenshot_url || '',
+				appearance_verified: Boolean(appearance?.verified),
+				appearance_notes: appearance?.notes || '',
 				tags:       asset.tags       || '',
 				notes:      asset.notes      || ''
 			};
@@ -216,6 +261,27 @@
 						line_item_fee_amount: formData.line_item_fee_amount,
 						line_item_revenue_share_pct: formData.line_item_revenue_share_pct,
 						line_item_restrictions: formData.line_item_restrictions
+					},
+					phase4Meta: {
+						sponsor: formData.phase4_sponsor,
+						deliverable_type: formData.deliverable_type,
+						deliverable_status: formData.deliverable_status,
+						deliverable_due_date: formData.deliverable_due_date,
+						deliverable_delivered_at: formData.deliverable_delivered_at,
+						deliverable_visibility_score: formData.deliverable_visibility_score,
+						obligation_reference: formData.deliverable_obligation_reference,
+						deliverable_proof_note: formData.deliverable_proof_note,
+						recap_package_name: formData.recap_package_name,
+						recap_status: formData.recap_status,
+						recap_delivered_at: formData.recap_delivered_at,
+						recap_proof_url: formData.recap_proof_url,
+						recap_notes: formData.recap_notes,
+						appearance_logo_visibility: formData.appearance_logo_visibility,
+						appearance_placement: formData.appearance_placement,
+						appearance_timestamp_seconds: formData.appearance_timestamp_seconds,
+						appearance_screenshot_url: formData.appearance_screenshot_url,
+						appearance_verified: formData.appearance_verified,
+						appearance_notes: formData.appearance_notes
 					}
 				})
 			});
@@ -660,6 +726,119 @@
 					<div class="space-y-2 md:col-span-2">
 						<Label for="edit-line-item-restrictions" class="text-slate-200">Line Item Restrictions</Label>
 						<textarea id="edit-line-item-restrictions" bind:value={formData.line_item_restrictions} rows="2" class="flex w-full rounded-md border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-500"></textarea>
+					</div>
+				</div>
+			</div>
+
+			<div class="rounded-lg border border-slate-700 p-4 space-y-4 bg-slate-900/40">
+				<div>
+					<p class="text-sm font-semibold text-slate-100">Phase 4 Sponsor Fulfillment</p>
+					<p class="text-xs text-slate-400">Track sponsor deliverables, proof appearances, and recap package status.</p>
+				</div>
+
+				<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+					<div class="space-y-2 md:col-span-2">
+						<Label for="edit-phase4-sponsor" class="text-slate-200">Sponsor</Label>
+						<select id="edit-phase4-sponsor" bind:value={formData.phase4_sponsor} class="flex h-10 w-full rounded-md border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-500">
+							<option value="">None</option>
+							{#each sponsors as sponsor}
+								<option value={sponsor.id}>{sponsor.name}</option>
+							{/each}
+						</select>
+					</div>
+					<div class="space-y-2">
+						<Label for="edit-deliverable-type" class="text-slate-200">Deliverable Type</Label>
+						<select id="edit-deliverable-type" bind:value={formData.deliverable_type} class="flex h-10 w-full rounded-md border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-500">
+							{#each sponsorDeliverableTypes as option}
+								<option value={option.value}>{option.label}</option>
+							{/each}
+						</select>
+					</div>
+					<div class="space-y-2">
+						<Label for="edit-deliverable-status" class="text-slate-200">Deliverable Status</Label>
+						<select id="edit-deliverable-status" bind:value={formData.deliverable_status} class="flex h-10 w-full rounded-md border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-500">
+							{#each sponsorDeliverableStatuses as option}
+								<option value={option.value}>{option.label}</option>
+							{/each}
+						</select>
+					</div>
+					<div class="space-y-2">
+						<Label for="edit-deliverable-due-date" class="text-slate-200">Due Date</Label>
+						<Input id="edit-deliverable-due-date" type="date" bind:value={formData.deliverable_due_date} class="bg-slate-800 border-slate-700 text-white" />
+					</div>
+					<div class="space-y-2">
+						<Label for="edit-deliverable-delivered-at" class="text-slate-200">Delivered At</Label>
+						<Input id="edit-deliverable-delivered-at" type="date" bind:value={formData.deliverable_delivered_at} class="bg-slate-800 border-slate-700 text-white" />
+					</div>
+					<div class="space-y-2">
+						<Label for="edit-deliverable-score" class="text-slate-200">Visibility Score (0-100)</Label>
+						<Input id="edit-deliverable-score" type="number" min="0" max="100" bind:value={formData.deliverable_visibility_score} class="bg-slate-800 border-slate-700 text-white" />
+					</div>
+					<div class="space-y-2">
+						<Label for="edit-deliverable-obligation" class="text-slate-200">Obligation Reference</Label>
+						<Input id="edit-deliverable-obligation" bind:value={formData.deliverable_obligation_reference} class="bg-slate-800 border-slate-700 text-white" />
+					</div>
+					<div class="space-y-2 md:col-span-2">
+						<Label for="edit-deliverable-proof-note" class="text-slate-200">Deliverable Proof Note</Label>
+						<textarea id="edit-deliverable-proof-note" bind:value={formData.deliverable_proof_note} rows="2" class="flex w-full rounded-md border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-500"></textarea>
+					</div>
+					<div class="md:col-span-2 border-t border-slate-700 pt-4">
+						<p class="text-sm font-semibold text-slate-100">Recap Package</p>
+					</div>
+					<div class="space-y-2 md:col-span-2">
+						<Label for="edit-recap-package-name" class="text-slate-200">Package Name</Label>
+						<Input id="edit-recap-package-name" bind:value={formData.recap_package_name} class="bg-slate-800 border-slate-700 text-white" />
+					</div>
+					<div class="space-y-2">
+						<Label for="edit-recap-status" class="text-slate-200">Recap Status</Label>
+						<select id="edit-recap-status" bind:value={formData.recap_status} class="flex h-10 w-full rounded-md border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-500">
+							{#each sponsorRecapStatuses as option}
+								<option value={option.value}>{option.label}</option>
+							{/each}
+						</select>
+					</div>
+					<div class="space-y-2">
+						<Label for="edit-recap-delivered-at" class="text-slate-200">Recap Delivered At</Label>
+						<Input id="edit-recap-delivered-at" type="date" bind:value={formData.recap_delivered_at} class="bg-slate-800 border-slate-700 text-white" />
+					</div>
+					<div class="space-y-2 md:col-span-2">
+						<Label for="edit-recap-proof-url" class="text-slate-200">Recap Proof URL</Label>
+						<Input id="edit-recap-proof-url" type="url" bind:value={formData.recap_proof_url} class="bg-slate-800 border-slate-700 text-white" />
+					</div>
+					<div class="space-y-2 md:col-span-2">
+						<Label for="edit-recap-notes" class="text-slate-200">Recap Notes</Label>
+						<textarea id="edit-recap-notes" bind:value={formData.recap_notes} rows="2" class="flex w-full rounded-md border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-500"></textarea>
+					</div>
+					<div class="md:col-span-2 border-t border-slate-700 pt-4">
+						<p class="text-sm font-semibold text-slate-100">Appearance Proof</p>
+					</div>
+					<div class="space-y-2">
+						<Label for="edit-appearance-visibility" class="text-slate-200">Logo Visibility</Label>
+						<select id="edit-appearance-visibility" bind:value={formData.appearance_logo_visibility} class="flex h-10 w-full rounded-md border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-500">
+							{#each sponsorLogoVisibilityLevels as option}
+								<option value={option.value}>{option.label}</option>
+							{/each}
+						</select>
+					</div>
+					<div class="space-y-2">
+						<Label for="edit-appearance-placement" class="text-slate-200">Placement</Label>
+						<Input id="edit-appearance-placement" bind:value={formData.appearance_placement} class="bg-slate-800 border-slate-700 text-white" />
+					</div>
+					<div class="space-y-2">
+						<Label for="edit-appearance-seconds" class="text-slate-200">Timestamp (seconds)</Label>
+						<Input id="edit-appearance-seconds" type="number" min="0" bind:value={formData.appearance_timestamp_seconds} class="bg-slate-800 border-slate-700 text-white" />
+					</div>
+					<div class="space-y-2">
+						<Label for="edit-appearance-screenshot" class="text-slate-200">Screenshot URL</Label>
+						<Input id="edit-appearance-screenshot" type="url" bind:value={formData.appearance_screenshot_url} class="bg-slate-800 border-slate-700 text-white" />
+					</div>
+					<div class="md:col-span-2 flex items-center gap-2">
+						<input id="edit-appearance-verified" type="checkbox" bind:checked={formData.appearance_verified} class="h-4 w-4 rounded border-slate-600 bg-slate-800 text-blue-500" />
+						<Label for="edit-appearance-verified" class="text-slate-200">Appearance Verified</Label>
+					</div>
+					<div class="space-y-2 md:col-span-2">
+						<Label for="edit-appearance-notes" class="text-slate-200">Appearance Notes</Label>
+						<textarea id="edit-appearance-notes" bind:value={formData.appearance_notes} rows="2" class="flex w-full rounded-md border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-500"></textarea>
 					</div>
 				</div>
 			</div>
