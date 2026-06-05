@@ -25,6 +25,8 @@
     "test:seed:media:phase3": "tsx scripts/seed-media-assets-phase3.ts",
     "test:seed:media:phase4": "tsx scripts/seed-media-assets-phase4.ts",
     "test:seed:media:phase5": "tsx scripts/seed-media-assets-phase5.ts",
+    "test:seed:media:phase6": "tsx scripts/seed-media-assets-phase6.ts",
+    "test:seed:media:phase7": "tsx scripts/seed-media-assets-phase7.ts",
     "test:restore": "tsx scripts/restore-from-seed-backup.ts latest",
     "test:flow": "npm run test:backup && npm run test:seed:quick",
     "seed:all": "tsx scripts/seed-all.ts",
@@ -36,6 +38,8 @@
     "schema:media-assets-phase3": "tsx scripts/update-media-assets-phase3.ts",
     "schema:media-assets-phase4": "tsx scripts/update-media-assets-phase4.ts",
     "schema:media-assets-phase5": "tsx scripts/update-media-assets-phase5.ts",
+    "schema:media-assets-phase6": "tsx scripts/update-media-assets-phase6.ts",
+    "schema:media-assets-phase7": "tsx scripts/update-media-assets-phase7.ts",
     "schema:seed-funding-receipts": "tsx scripts/create-seed-funding-receipts.ts",
     "data:update-funded-date": "tsx scripts/update-funded-date.ts",
     "data:update-2027-tournament-dates": "tsx scripts/update-2027-tournament-dates.ts",
@@ -45,7 +49,10 @@
     "test:pipelines:onboarding": "tsx scripts/test-pipelines.ts --suite=onboarding",
     "test:pipelines:sponsor": "tsx scripts/test-pipelines.ts --suite=sponsor",
     "test:pipelines:tournament": "tsx scripts/test-pipelines.ts --suite=tournament",
-    "test:pipelines:content": "tsx scripts/test-pipelines.ts --suite=content"
+    "test:pipelines:content": "tsx scripts/test-pipelines.ts --suite=content",
+    "jobs:media-ai:process": "tsx scripts/process-media-ai-jobs.ts",
+    "jobs:media-ai:one-shot": "tsx scripts/media-ai-one-shot.ts",
+    "migrate:media:module8-10": "tsx scripts/migrate-media-module8-10.ts"
   },
   "repository": {
     "type": "git",

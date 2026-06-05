@@ -1,15 +1,17 @@
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
+import { RequestContext } from '$lib/infra/RequestContext';
 
 function hasOwn(data: Record<string, any>, key: string) {
 	return Object.prototype.hasOwnProperty.call(data, key);
 }
 
 export const PATCH: RequestHandler = async ({ locals, request, params }) => {
-	const pb = locals.pb;
-	if (!pb.authStore.isValid) {
+	const ctx = await RequestContext.fromApi(locals);
+	if (!ctx) {
 		return json({ message: 'Unauthorized' }, { status: 401 });
 	}
+	const pb = ctx.pb;
 
 	try {
 		const data = await request.json();
@@ -34,10 +36,11 @@ export const PATCH: RequestHandler = async ({ locals, request, params }) => {
 };
 
 export const DELETE: RequestHandler = async ({ locals, params }) => {
-	const pb = locals.pb;
-	if (!pb.authStore.isValid) {
+	const ctx = await RequestContext.fromApi(locals);
+	if (!ctx) {
 		return json({ message: 'Unauthorized' }, { status: 401 });
 	}
+	const pb = ctx.pb;
 
 	try {
 		await pb.collection('highlight_package_items').delete(params.itemId);

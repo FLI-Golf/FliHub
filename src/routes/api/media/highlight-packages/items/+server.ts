@@ -1,11 +1,13 @@
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
+import { RequestContext } from '$lib/infra/RequestContext';
 
 export const POST: RequestHandler = async ({ locals, request }) => {
-	const pb = locals.pb;
-	if (!pb.authStore.isValid) {
+	const ctx = await RequestContext.fromApi(locals);
+	if (!ctx) {
 		return json({ message: 'Unauthorized' }, { status: 401 });
 	}
+	const pb = ctx.pb;
 
 	try {
 		const data = await request.json();

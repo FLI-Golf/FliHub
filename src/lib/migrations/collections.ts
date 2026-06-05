@@ -1647,6 +1647,269 @@ export const collections = [
 		deleteRule: '@request.auth.id != ""'
 	},
 
+	// ─── Marketplace + archive + executive reporting (Phase 6 / Modules 8-10) ──
+	{
+		name: 'media_marketplace_listings',
+		type: 'base',
+		schema: [
+			{ name: 'title', type: 'text', required: true, options: { max: 255 } },
+			{ name: 'highlight_package', type: 'relation', required: false, options: { collectionId: 'highlight_packages', maxSelect: 1 } },
+			{ name: 'media_collection', type: 'relation', required: false, options: { collectionId: 'media_collections', maxSelect: 1 } },
+			{ name: 'primary_asset', type: 'relation', required: false, options: { collectionId: 'media_assets', maxSelect: 1 } },
+			{
+				name: 'listing_status',
+				type: 'select',
+				required: true,
+				options: { maxSelect: 1, values: ['draft', 'pending_review', 'active', 'inactive', 'sold', 'archived'] }
+			},
+			{
+				name: 'pricing_model',
+				type: 'select',
+				required: false,
+				options: { maxSelect: 1, values: ['flat_fee', 'license_tier', 'custom_quote'] }
+			},
+			{ name: 'asking_price', type: 'number', required: false, options: { min: 0 } },
+			{ name: 'currency', type: 'text', required: false, options: { max: 3 } },
+			{
+				name: 'license_scope',
+				type: 'select',
+				required: false,
+				options: { maxSelect: 1, values: ['single_use', 'season_use', 'perpetual_internal', 'broadcast_window', 'custom'] }
+			},
+			{
+				name: 'approved_buyer_types',
+				type: 'select',
+				required: false,
+				options: { maxSelect: 6, values: ['internal', 'sponsor', 'brand_partner', 'broadcaster', 'media_outlet', 'other'] }
+			},
+			{ name: 'available_from', type: 'date', required: false },
+			{ name: 'expires_at', type: 'date', required: false },
+			{ name: 'rights_summary', type: 'text', required: false },
+			{ name: 'notes', type: 'text', required: false }
+		],
+		indexes: [
+			'CREATE INDEX idx_media_marketplace_listings_status ON media_marketplace_listings (listing_status)',
+			'CREATE INDEX idx_media_marketplace_listings_price ON media_marketplace_listings (asking_price)'
+		],
+		listRule: '@request.auth.id != ""',
+		viewRule: '@request.auth.id != ""',
+		createRule: '@request.auth.id != ""',
+		updateRule: '@request.auth.id != ""',
+		deleteRule: '@request.auth.id != ""'
+	},
+	{
+		name: 'media_purchase_requests',
+		type: 'base',
+		schema: [
+			{ name: 'listing', type: 'relation', required: true, options: { collectionId: 'media_marketplace_listings', maxSelect: 1 } },
+			{ name: 'buyer_name', type: 'text', required: true, options: { max: 120 } },
+			{ name: 'buyer_email', type: 'text', required: false, options: { max: 200 } },
+			{ name: 'buyer_organization', type: 'text', required: false, options: { max: 200 } },
+			{
+				name: 'request_status',
+				type: 'select',
+				required: true,
+				options: { maxSelect: 1, values: ['submitted', 'reviewing', 'quoted', 'approved', 'rejected', 'cancelled', 'fulfilled'] }
+			},
+			{
+				name: 'intended_use',
+				type: 'select',
+				required: false,
+				options: { maxSelect: 1, values: ['social', 'broadcast', 'sponsor_campaign', 'internal', 'press', 'other'] }
+			},
+			{ name: 'offered_price', type: 'number', required: false, options: { min: 0 } },
+			{ name: 'requested_terms', type: 'text', required: false },
+			{ name: 'approved_by', type: 'text', required: false, options: { max: 120 } },
+			{ name: 'approved_at', type: 'date', required: false },
+			{ name: 'fulfilled_at', type: 'date', required: false },
+			{ name: 'notes', type: 'text', required: false }
+		],
+		indexes: [
+			'CREATE INDEX idx_media_purchase_requests_status ON media_purchase_requests (request_status)'
+		],
+		listRule: '@request.auth.id != ""',
+		viewRule: '@request.auth.id != ""',
+		createRule: '@request.auth.id != ""',
+		updateRule: '@request.auth.id != ""',
+		deleteRule: '@request.auth.id != ""'
+	},
+	{
+		name: 'media_download_audits',
+		type: 'base',
+		schema: [
+			{ name: 'listing', type: 'relation', required: false, options: { collectionId: 'media_marketplace_listings', maxSelect: 1 } },
+			{ name: 'purchase_request', type: 'relation', required: false, options: { collectionId: 'media_purchase_requests', maxSelect: 1 } },
+			{ name: 'highlight_package', type: 'relation', required: false, options: { collectionId: 'highlight_packages', maxSelect: 1 } },
+			{ name: 'asset', type: 'relation', required: false, options: { collectionId: 'media_assets', maxSelect: 1 } },
+			{ name: 'downloaded_by', type: 'text', required: true, options: { max: 120 } },
+			{ name: 'downloader_organization', type: 'text', required: false, options: { max: 200 } },
+			{
+				name: 'download_source',
+				type: 'select',
+				required: false,
+				options: { maxSelect: 1, values: ['marketplace', 'internal_export', 'sponsor_portal', 'api', 'other'] }
+			},
+			{
+				name: 'usage_context',
+				type: 'select',
+				required: false,
+				options: { maxSelect: 1, values: ['evaluation', 'licensed_use', 'internal_review', 'press', 'other'] }
+			},
+			{ name: 'file_variant', type: 'text', required: false, options: { max: 120 } },
+			{ name: 'bytes_served', type: 'number', required: false, options: { noDecimal: true, min: 0 } },
+			{ name: 'ip_hash', type: 'text', required: false, options: { max: 128 } },
+			{ name: 'downloaded_at', type: 'date', required: true },
+			{
+				name: 'status',
+				type: 'select',
+				required: false,
+				options: { maxSelect: 1, values: ['started', 'completed', 'failed', 'cancelled'] }
+			}
+		],
+		indexes: [
+			'CREATE INDEX idx_media_download_audits_downloaded_at ON media_download_audits (downloaded_at)',
+			'CREATE INDEX idx_media_download_audits_status ON media_download_audits (status)'
+		],
+		listRule: '@request.auth.id != ""',
+		viewRule: '@request.auth.id != ""',
+		createRule: '@request.auth.id != ""',
+		updateRule: '@request.auth.id != ""',
+		deleteRule: '@request.auth.id != ""'
+	},
+	{
+		name: 'media_dashboard_snapshots',
+		type: 'base',
+		schema: [
+			{ name: 'snapshot_date', type: 'date', required: true },
+			{ name: 'total_assets_stored', type: 'number', required: false, options: { noDecimal: true, min: 0 } },
+			{ name: 'hours_of_footage', type: 'number', required: false, options: { min: 0 } },
+			{ name: 'photo_count', type: 'number', required: false, options: { noDecimal: true, min: 0 } },
+			{ name: 'most_used_assets_json', type: 'json', required: false },
+			{ name: 'assets_by_season_json', type: 'json', required: false },
+			{ name: 'sponsor_deliverables_completed', type: 'number', required: false, options: { noDecimal: true, min: 0 } },
+			{ name: 'licensing_revenue', type: 'number', required: false, options: { min: 0 } },
+			{ name: 'downloads', type: 'number', required: false, options: { noDecimal: true, min: 0 } },
+			{ name: 'top_players_by_media_value_json', type: 'json', required: false },
+			{ name: 'top_teams_by_media_value_json', type: 'json', required: false },
+			{ name: 'notes', type: 'text', required: false }
+		],
+		indexes: [
+			'CREATE UNIQUE INDEX idx_media_dashboard_snapshots_date ON media_dashboard_snapshots (snapshot_date)'
+		],
+		listRule: '@request.auth.id != ""',
+		viewRule: '@request.auth.id != ""',
+		createRule: '@request.auth.id != ""',
+		updateRule: '@request.auth.id != ""',
+		deleteRule: '@request.auth.id != ""'
+	},
+
+	// ─── AI enrichment + natural language search (Phase 7) ───────────────────
+	{
+		name: 'media_ai_jobs',
+		type: 'base',
+		schema: [
+			{ name: 'asset', type: 'relation', required: true, options: { collectionId: 'media_assets', maxSelect: 1 } },
+			{
+				name: 'job_type',
+				type: 'select',
+				required: true,
+				options: { maxSelect: 1, values: ['player_recognition', 'logo_recognition', 'scene_detection', 'transcript_extraction', 'clip_summarization', 'metadata_suggestion'] }
+			},
+			{
+				name: 'status',
+				type: 'select',
+				required: true,
+				options: { maxSelect: 1, values: ['queued', 'running', 'completed', 'failed', 'cancelled'] }
+			},
+			{ name: 'provider', type: 'text', required: false, options: { max: 120 } },
+			{ name: 'model_name', type: 'text', required: false, options: { max: 120 } },
+			{ name: 'started_at', type: 'date', required: false },
+			{ name: 'completed_at', type: 'date', required: false },
+			{ name: 'error_message', type: 'text', required: false },
+			{ name: 'result_json', type: 'json', required: false }
+		],
+		indexes: [
+			'CREATE INDEX idx_media_ai_jobs_asset ON media_ai_jobs (asset)',
+			'CREATE INDEX idx_media_ai_jobs_type_status ON media_ai_jobs (job_type, status)'
+		],
+		listRule: '@request.auth.id != ""',
+		viewRule: '@request.auth.id != ""',
+		createRule: '@request.auth.id != ""',
+		updateRule: '@request.auth.id != ""',
+		deleteRule: '@request.auth.id != ""'
+	},
+	{
+		name: 'media_ai_detections',
+		type: 'base',
+		schema: [
+			{ name: 'asset', type: 'relation', required: true, options: { collectionId: 'media_assets', maxSelect: 1 } },
+			{ name: 'job', type: 'relation', required: false, options: { collectionId: 'media_ai_jobs', maxSelect: 1 } },
+			{
+				name: 'detection_type',
+				type: 'select',
+				required: true,
+				options: { maxSelect: 1, values: ['player', 'sponsor_logo', 'scene', 'keyword', 'moment'] }
+			},
+			{ name: 'label', type: 'text', required: true, options: { max: 255 } },
+			{ name: 'confidence', type: 'number', required: false, options: { min: 0, max: 1 } },
+			{ name: 'time_in_seconds', type: 'number', required: false, options: { min: 0 } },
+			{ name: 'time_out_seconds', type: 'number', required: false, options: { min: 0 } },
+			{ name: 'bbox_json', type: 'json', required: false },
+			{ name: 'metadata_json', type: 'json', required: false }
+		],
+		indexes: [
+			'CREATE INDEX idx_media_ai_detections_asset_type ON media_ai_detections (asset, detection_type)',
+			'CREATE INDEX idx_media_ai_detections_label ON media_ai_detections (label)'
+		],
+		listRule: '@request.auth.id != ""',
+		viewRule: '@request.auth.id != ""',
+		createRule: '@request.auth.id != ""',
+		updateRule: '@request.auth.id != ""',
+		deleteRule: '@request.auth.id != ""'
+	},
+	{
+		name: 'media_ai_transcripts',
+		type: 'base',
+		schema: [
+			{ name: 'asset', type: 'relation', required: true, options: { collectionId: 'media_assets', maxSelect: 1 } },
+			{ name: 'job', type: 'relation', required: false, options: { collectionId: 'media_ai_jobs', maxSelect: 1 } },
+			{ name: 'language', type: 'text', required: false, options: { max: 16 } },
+			{ name: 'transcript_text', type: 'text', required: true },
+			{ name: 'segments_json', type: 'json', required: false },
+			{ name: 'word_count', type: 'number', required: false, options: { noDecimal: true, min: 0 } },
+			{ name: 'confidence_avg', type: 'number', required: false, options: { min: 0, max: 1 } }
+		],
+		indexes: [
+			'CREATE INDEX idx_media_ai_transcripts_asset ON media_ai_transcripts (asset)'
+		],
+		listRule: '@request.auth.id != ""',
+		viewRule: '@request.auth.id != ""',
+		createRule: '@request.auth.id != ""',
+		updateRule: '@request.auth.id != ""',
+		deleteRule: '@request.auth.id != ""'
+	},
+	{
+		name: 'media_ai_summaries',
+		type: 'base',
+		schema: [
+			{ name: 'asset', type: 'relation', required: true, options: { collectionId: 'media_assets', maxSelect: 1 } },
+			{ name: 'job', type: 'relation', required: false, options: { collectionId: 'media_ai_jobs', maxSelect: 1 } },
+			{ name: 'summary_text', type: 'text', required: true },
+			{ name: 'suggested_tags_json', type: 'json', required: false },
+			{ name: 'suggested_title', type: 'text', required: false, options: { max: 255 } },
+			{ name: 'priority_score', type: 'number', required: false, options: { min: 0, max: 100 } },
+			{ name: 'approved', type: 'bool', required: false }
+		],
+		indexes: [
+			'CREATE INDEX idx_media_ai_summaries_asset ON media_ai_summaries (asset)'
+		],
+		listRule: '@request.auth.id != ""',
+		viewRule: '@request.auth.id != ""',
+		createRule: '@request.auth.id != ""',
+		updateRule: '@request.auth.id != ""',
+		deleteRule: '@request.auth.id != ""'
+	},
+
 	{
 		name: 'content_production',
 		type: 'base',

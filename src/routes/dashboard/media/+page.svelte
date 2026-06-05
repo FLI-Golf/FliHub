@@ -6,7 +6,7 @@
 	import UploadMediaModal from '$lib/components/media/upload-media-modal.svelte';
 	import EditMediaModal from '$lib/components/media/edit-media-modal.svelte';
 	import MediaAssetDetailSheet from '$lib/components/media/media-asset-detail-sheet.svelte';
-	import { Upload, Search, Trash2, ExternalLink, Image, Pencil, Film, FileText, Mic, Archive, Eye, Plus, Download, ChevronUp, ChevronDown, Save, RotateCcw } from 'lucide-svelte';
+	import { Upload, Search, Trash2, ExternalLink, Image, Pencil, Film, FileText, Mic, Archive, Eye, Plus, Download, ChevronUp, ChevronDown, Save, RotateCcw, Bot } from 'lucide-svelte';
 	import {
 		highlightExportTargets,
 		highlightPackageStatuses,
@@ -34,6 +34,14 @@
 	const specialEventMap = new Map((data.specialEvents || []).map((item: any) => [item.id, item]));
 	const talentMap = new Map((data.talents || []).map((item: any) => [item.id, item]));
 	const sponsorMap = new Map((data.sponsors || []).map((item: any) => [item.id, item]));
+	const phase7Permissions = data.phase7Permissions || {
+		canQueue: false,
+		canProcess: false,
+		canViewJobs: false
+	};
+	const canQueuePhase7 = Boolean(phase7Permissions.canQueue);
+	const canProcessPhase7 = Boolean(phase7Permissions.canProcess);
+	const canViewPhase7Jobs = Boolean(phase7Permissions.canViewJobs);
 
 	function decorateAsset(asset: any) {
 		if (!asset) return asset;
@@ -219,6 +227,27 @@
 	);
 
 	let selectedPackage = $derived(highlightPackages.find((pkg: any) => pkg.id === selectedPackageId) || null);
+	let phase6Loading = $state(false);
+	let phase6Error = $state('');
+	let phase6Summary = $state<any>(null);
+	let phase6ActionBusy = $state(false);
+	let phase6ActionMessage = $state('');
+	let phase7Query = $state('');
+	let phase7Loading = $state(false);
+	let phase7Error = $state('');
+	let phase7Results = $state<any[]>([]);
+	let phase7ApproveBusy = $state<Record<string, boolean>>({});
+	let phase7ApproveMessage = $state<Record<string, string>>({});
+	let phase7QueueType = $state('metadata_suggestion');
+	let phase7QueueBusy = $state<Record<string, boolean>>({});
+	let phase7QueueMessage = $state<Record<string, string>>({});
+	let phase7ProcessBusy = $state(false);
+	let phase7ProcessMessage = $state('');
+	let phase7Jobs = $state<any[]>([]);
+	let phase7JobsLoading = $state(false);
+	let phase7JobsError = $state('');
+	let phase7ClearBusy = $state(false);
+	let phase5ClearBusy = $state(false);
 
 	let selectedPackageItems = $derived(
 		highlightPackageItems
@@ -254,6 +283,18 @@
 		if (asset.media_category === 'audio') return 'audio';
 		if (asset.media_category === 'archive_package') return 'archive';
 		return 'document';
+	}
+
+	function formatCurrency(value: number | null | undefined) {
+		const numeric = Number(value || 0);
+		return `$${numeric.toLocaleString(undefined, { maximumFractionDigits: 0 })}`;
+	}
+
+	function formatDate(value: string | null | undefined) {
+		if (!value) return 'N/A';
+		const parsed = new Date(value);
+		if (Number.isNaN(parsed.getTime())) return 'N/A';
+		return parsed.toLocaleDateString();
 	}
 
 	async function deleteAsset(id: string) {
@@ -299,17 +340,35 @@
 		return asset?.title || row.asset;
 	}
 
-	function ensureDraftForItem(row: any) {
-		if (packageItemDrafts[row.id]) return;
-		packageItemDrafts = {
-			...packageItemDrafts,
-			[row.id]: {
-				clip_in_seconds: row.clip_in_seconds != null ? String(row.clip_in_seconds) : '',
-				clip_out_seconds: row.clip_out_seconds != null ? String(row.clip_out_seconds) : '',
-				usage_role: row.usage_role || 'feature'
+	$effect(() => {
+		const rows = selectedPackageItems as any[];
+		const nextDrafts = { ...packageItemDrafts };
+		const rowIds = new Set<string>();
+		let changed = false;
+
+		for (const row of rows) {
+			rowIds.add(row.id);
+			if (!nextDrafts[row.id]) {
+				nextDrafts[row.id] = {
+					clip_in_seconds: row.clip_in_seconds != null ? String(row.clip_in_seconds) : '',
+					clip_out_seconds: row.clip_out_seconds != null ? String(row.clip_out_seconds) : '',
+					usage_role: row.usage_role || 'feature'
+				};
+				changed = true;
 			}
-		};
-	}
+		}
+
+		for (const draftId of Object.keys(nextDrafts)) {
+			if (!rowIds.has(draftId)) {
+				delete nextDrafts[draftId];
+				changed = true;
+			}
+		}
+
+		if (changed) {
+			packageItemDrafts = nextDrafts;
+		}
+	});
 
 	function updateDraftField(itemId: string, field: 'clip_in_seconds' | 'clip_out_seconds' | 'usage_role', value: string) {
 		const existing = packageItemDrafts[itemId] || {
@@ -410,7 +469,7 @@
 
 			if (!res.ok) {
 				const data = await res.json().catch(() => ({}));
-				throw new Error(data.message || 'Failed to add asset to package');
+				throw new Error(data.error || data.message || 'Failed to add asset to package');
 			}
 
 			const item = await res.json();
@@ -586,7 +645,267 @@
 		}
 	}
 
+	async function loadPhase6Summary() {
+		phase6Loading = true;
+		phase6Error = '';
+
+		try {
+			const res = await fetch('/api/media/phase6');
+			if (!res.ok) {
+				const payload = await res.json().catch(() => ({}));
+				throw new Error(payload.error || payload.message || 'Failed to load Module 8-10 summary');
+			}
+
+			phase6Summary = await res.json();
+		} catch (error) {
+			phase6Error = error instanceof Error ? error.message : 'Failed to load Module 8-10 summary';
+		} finally {
+			phase6Loading = false;
+		}
+	}
+
+	async function clearPhase6TestData() {
+		phase6ActionBusy = true;
+		phase6ActionMessage = '';
+
+		try {
+			const res = await fetch('/api/media/phase6/clear', { method: 'POST' });
+			const payload = await res.json().catch(() => ({}));
+			if (!res.ok) throw new Error(payload.message || 'Failed to clear Phase 6 test data');
+
+			phase6ActionMessage = 'Phase 6 test data cleared.';
+			await loadPhase6Summary();
+		} catch (error) {
+			phase6ActionMessage = error instanceof Error ? error.message : 'Failed to clear Phase 6 test data';
+		} finally {
+			phase6ActionBusy = false;
+		}
+	}
+
+	function phase7ResultAssetTag(result: any) {
+		const parts = [result.media_category, result.asset_type].filter(Boolean);
+		return parts.join(' / ') || 'media';
+	}
+
+	function summaryPreview(value: string) {
+		const text = String(value || '').trim();
+		if (text.length <= 180) return text;
+		return `${text.slice(0, 180)}...`;
+	}
+
+	async function runPhase7Search() {
+		if (!phase7Query.trim()) {
+			phase7Error = 'Enter a search query.';
+			phase7Results = [];
+			return;
+		}
+
+		phase7Loading = true;
+		phase7Error = '';
+
+		try {
+			const res = await fetch(`/api/media/phase7/search?q=${encodeURIComponent(phase7Query.trim())}&limit=12`);
+			if (!res.ok) {
+				const payload = await res.json().catch(() => ({}));
+				throw new Error(payload.message || 'Failed to search Phase 7 index');
+			}
+
+			const payload = await res.json();
+			phase7Results = payload.items || [];
+		} catch (error) {
+			phase7Error = error instanceof Error ? error.message : 'Failed to search Phase 7 index';
+		} finally {
+			phase7Loading = false;
+		}
+	}
+
+	async function approvePhase7Result(result: any) {
+		if (!result?.id) return;
+
+		phase7ApproveBusy = { ...phase7ApproveBusy, [result.id]: true };
+		phase7ApproveMessage = { ...phase7ApproveMessage, [result.id]: '' };
+
+		try {
+			const res = await fetch('/api/media/phase7/approve', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({
+					assetId: result.id,
+					summaryId: result.summaryId,
+					applySuggestedTags: true,
+					applyDetections: true
+				})
+			});
+
+			if (!res.ok) {
+				const payload = await res.json().catch(() => ({}));
+				throw new Error(payload.message || 'Failed to approve AI suggestions');
+			}
+
+			const payload = await res.json();
+			phase7Results = phase7Results.map((item: any) => (
+				item.id === result.id
+					? { ...item, summaryApproved: true }
+					: item
+			));
+
+			phase7ApproveMessage = {
+				...phase7ApproveMessage,
+				[result.id]: `Applied ${payload?.counts?.tagsAdded || 0} tags, ${payload?.counts?.peopleAdded || 0} people, ${payload?.counts?.sponsorsAdded || 0} sponsors.`
+			};
+		} catch (error) {
+			phase7ApproveMessage = {
+				...phase7ApproveMessage,
+				[result.id]: error instanceof Error ? error.message : 'Failed to approve AI suggestions'
+			};
+		} finally {
+			phase7ApproveBusy = { ...phase7ApproveBusy, [result.id]: false };
+		}
+	}
+
+	async function queuePhase7Job(assetId: string) {
+		if (!assetId) return;
+		if (!canQueuePhase7) {
+			phase7QueueMessage = {
+				...phase7QueueMessage,
+				[assetId]: 'Queue is restricted to admin/leader/marketing roles.'
+			};
+			return;
+		}
+
+		phase7QueueBusy = { ...phase7QueueBusy, [assetId]: true };
+		phase7QueueMessage = { ...phase7QueueMessage, [assetId]: '' };
+
+		try {
+			const res = await fetch('/api/media/phase7/queue', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({
+					assetId,
+					jobType: phase7QueueType
+				})
+			});
+
+			if (!res.ok) {
+				const payload = await res.json().catch(() => ({}));
+				throw new Error(payload.message || 'Failed to queue AI job');
+			}
+
+			const payload = await res.json();
+			phase7QueueMessage = {
+				...phase7QueueMessage,
+				[assetId]: `Queued ${payload.jobType} (${payload.jobId}).`
+			};
+			await loadPhase7Jobs();
+		} catch (error) {
+			phase7QueueMessage = {
+				...phase7QueueMessage,
+				[assetId]: error instanceof Error ? error.message : 'Failed to queue AI job'
+			};
+		} finally {
+			phase7QueueBusy = { ...phase7QueueBusy, [assetId]: false };
+		}
+	}
+
+	async function loadPhase7Jobs() {
+		if (!canViewPhase7Jobs) {
+			phase7Jobs = [];
+			phase7JobsError = 'Queued jobs are restricted to admin/leader/marketing roles.';
+			return;
+		}
+
+		phase7JobsLoading = true;
+		phase7JobsError = '';
+
+		try {
+			const res = await fetch('/api/media/phase7/jobs');
+			if (!res.ok) {
+				const payload = await res.json().catch(() => ({}));
+				throw new Error(payload.error || payload.message || 'Failed to load queued jobs');
+			}
+
+			const payload = await res.json();
+			phase7Jobs = payload.items || [];
+		} catch (error) {
+			phase7JobsError = error instanceof Error ? error.message : 'Failed to load queued jobs';
+		} finally {
+			phase7JobsLoading = false;
+		}
+	}
+
+	async function processPhase7Queue() {
+		if (!canProcessPhase7) {
+			phase7ProcessMessage = 'Process Queue is restricted to admin/leader roles.';
+			return;
+		}
+
+		phase7ProcessBusy = true;
+		phase7ProcessMessage = '';
+
+		try {
+			const res = await fetch('/api/media/phase7/process', { method: 'POST' });
+			const payload = await res.json().catch(() => ({}));
+
+			if (!res.ok) {
+				throw new Error(payload.message || 'Failed to process Phase 7 queue');
+			}
+
+			const summary = String(payload.stdout || '').trim();
+			phase7ProcessMessage = summary || 'Queue processed.';
+			await loadPhase7Jobs();
+			if (phase7Query.trim()) {
+				await runPhase7Search();
+			}
+		} catch (error) {
+			phase7ProcessMessage = error instanceof Error ? error.message : 'Failed to process Phase 7 queue';
+		} finally {
+			phase7ProcessBusy = false;
+		}
+	}
+
+	async function clearPhase7TestData() {
+		phase7ClearBusy = true;
+		phase7ProcessMessage = '';
+
+		try {
+			const res = await fetch('/api/media/phase7/clear', { method: 'POST' });
+			const payload = await res.json().catch(() => ({}));
+			if (!res.ok) throw new Error(payload.message || 'Failed to clear Phase 7 test data');
+
+			phase7ProcessMessage = 'Phase 7 test data cleared.';
+			phase7Results = [];
+			await loadPhase7Jobs();
+		} catch (error) {
+			phase7ProcessMessage = error instanceof Error ? error.message : 'Failed to clear Phase 7 test data';
+		} finally {
+			phase7ClearBusy = false;
+		}
+	}
+
+	async function clearPhase5TestData() {
+		phase5ClearBusy = true;
+		phase5Error = '';
+
+		try {
+			const res = await fetch('/api/media/phase5/clear', { method: 'POST' });
+			const payload = await res.json().catch(() => ({}));
+			if (!res.ok) throw new Error(payload.message || 'Failed to clear Phase 5 test data');
+
+			highlightPackages = [];
+			highlightPackageItems = [];
+			mediaCollections = [];
+			selectedPackageId = '';
+			phase5Error = 'Phase 5 test data cleared.';
+		} catch (error) {
+			phase5Error = error instanceof Error ? error.message : 'Failed to clear Phase 5 test data';
+		} finally {
+			phase5ClearBusy = false;
+		}
+	}
+
 	onMount(() => {
+		loadPhase6Summary();
+		loadPhase7Jobs();
 		console.log('[media dashboard] mounted', {
 			assetCount: assets.length,
 			filters: {
@@ -754,12 +1073,266 @@
 		{/each}
 	</div>
 
+	<div class="mb-6 rounded-xl border border-cyan-700/40 bg-cyan-950/20 p-4 space-y-3">
+		<div class="flex items-center justify-between gap-2">
+			<div>
+				<p class="text-sm font-semibold text-cyan-200">Module 8-10: Marketplace and Executive Snapshot</p>
+				<p class="text-xs text-cyan-300/80">Live summary from /api/media/phase6 for listings, requests, downloads, and monetization metrics.</p>
+			</div>
+			<div class="flex items-center gap-2">
+				<Button type="button" class="bg-cyan-700 hover:bg-cyan-600 text-white" onclick={loadPhase6Summary} disabled={phase6Loading || phase6ActionBusy}>
+					{phase6Loading ? 'Refreshing...' : 'Refresh'}
+				</Button>
+				<Button type="button" class="bg-rose-700 hover:bg-rose-600 text-white disabled:opacity-60" onclick={clearPhase6TestData} disabled={phase6ActionBusy}>
+					{phase6ActionBusy ? 'Clearing...' : 'Clear Test Data'}
+				</Button>
+			</div>
+		</div>
+		{#if phase6ActionMessage}
+			<p class="text-xs text-slate-300">{phase6ActionMessage}</p>
+		{/if}
+
+		{#if phase6Error}
+			<p class="text-xs text-red-300">{phase6Error}</p>
+		{:else if phase6Summary}
+			<div class="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-7 gap-2">
+				<div class="rounded-lg border border-cyan-700/40 bg-slate-900/70 px-3 py-2">
+					<p class="text-[11px] text-slate-400">Assets Stored</p>
+					<p class="text-sm font-semibold text-white">{phase6Summary.metrics?.total_assets_stored ?? 0}</p>
+				</div>
+				<div class="rounded-lg border border-cyan-700/40 bg-slate-900/70 px-3 py-2">
+					<p class="text-[11px] text-slate-400">Hours of Footage</p>
+					<p class="text-sm font-semibold text-white">{phase6Summary.metrics?.hours_of_footage ?? 0}</p>
+				</div>
+				<div class="rounded-lg border border-cyan-700/40 bg-slate-900/70 px-3 py-2">
+					<p class="text-[11px] text-slate-400">Photo Count</p>
+					<p class="text-sm font-semibold text-white">{phase6Summary.metrics?.photo_count ?? 0}</p>
+				</div>
+				<div class="rounded-lg border border-cyan-700/40 bg-slate-900/70 px-3 py-2">
+					<p class="text-[11px] text-slate-400">Deliverables Completed</p>
+					<p class="text-sm font-semibold text-white">{phase6Summary.metrics?.sponsor_deliverables_completed ?? 0}</p>
+				</div>
+				<div class="rounded-lg border border-cyan-700/40 bg-slate-900/70 px-3 py-2">
+					<p class="text-[11px] text-slate-400">Licensing Revenue</p>
+					<p class="text-sm font-semibold text-emerald-300">{formatCurrency(phase6Summary.metrics?.licensing_revenue)}</p>
+				</div>
+				<div class="rounded-lg border border-cyan-700/40 bg-slate-900/70 px-3 py-2">
+					<p class="text-[11px] text-slate-400">Downloads</p>
+					<p class="text-sm font-semibold text-white">{phase6Summary.metrics?.downloads ?? 0}</p>
+				</div>
+				<div class="rounded-lg border border-cyan-700/40 bg-slate-900/70 px-3 py-2">
+					<p class="text-[11px] text-slate-400">Snapshot Date</p>
+					<p class="text-sm font-semibold text-white">{formatDate(phase6Summary.metrics?.snapshot_date)}</p>
+				</div>
+			</div>
+
+			<div class="rounded-lg border border-cyan-700/30 bg-slate-900/70 p-3">
+				<div class="flex items-center justify-between mb-2">
+					<p class="text-xs text-cyan-200">Latest Marketplace Listings</p>
+					<p class="text-xs text-cyan-300">{phase6Summary.latestListings?.length || 0} shown</p>
+				</div>
+				{#if !phase6Summary.latestListings?.length}
+					<p class="text-xs text-slate-400">No marketplace listings found yet.</p>
+				{:else}
+					<div class="space-y-1.5">
+						{#each phase6Summary.latestListings as listing}
+							<div class="flex flex-col md:flex-row md:items-center md:justify-between rounded border border-slate-700 bg-slate-950/70 px-2 py-1.5 gap-1.5">
+								<div class="min-w-0">
+									<p class="text-xs text-slate-100 truncate">{listing.title}</p>
+									<p class="text-[11px] text-slate-400">
+										{listing.listing_status} · {listing.pricing_model || 'n/a'} · {formatDate(listing.created)}
+									</p>
+								</div>
+								<div class="flex items-center gap-2 text-[11px]">
+									<span class="px-2 py-0.5 rounded border border-emerald-700/60 bg-emerald-900/20 text-emerald-300">{formatCurrency(listing.asking_price)}</span>
+									<span class="px-2 py-0.5 rounded border border-cyan-700/60 bg-cyan-900/20 text-cyan-300">requests: {listing.request_count || 0}</span>
+								</div>
+							</div>
+						{/each}
+					</div>
+				{/if}
+			</div>
+		{:else}
+			<p class="text-xs text-slate-400">Loading Module 8-10 summary...</p>
+		{/if}
+	</div>
+
+	<div class="mb-6 rounded-xl border border-emerald-700/40 bg-emerald-950/20 p-4 space-y-3">
+		<div class="flex flex-col md:flex-row md:items-end gap-3">
+			<div class="flex-1 space-y-1">
+				<p class="text-sm font-semibold text-emerald-200">Phase 7 AI Search and Approval</p>
+				<p class="text-xs text-emerald-300/80">Search across AI transcripts, detections, and summaries, then approve suggestions into structured taxonomy.</p>
+			</div>
+		</div>
+
+		<div class="grid grid-cols-1 md:grid-cols-[1fr_auto] gap-2">
+			<Input
+				bind:value={phase7Query}
+				onkeydown={(event) => {
+					if (event.key === 'Enter') {
+						event.preventDefault();
+						runPhase7Search();
+					}
+				}}
+				placeholder="Try: sponsor logo near green, player interview, championship highlight"
+				class="bg-slate-900 border-emerald-700/40 text-white placeholder:text-slate-400"
+			/>
+			<Button type="button" onclick={runPhase7Search} disabled={phase7Loading} class="bg-emerald-700 hover:bg-emerald-600 text-white disabled:opacity-60">
+				{phase7Loading ? 'Searching...' : 'Search Phase 7'}
+			</Button>
+		</div>
+
+		<div class="grid grid-cols-1 md:grid-cols-[220px_1fr] gap-2 items-center">
+			<select bind:value={phase7QueueType} class="flex h-9 rounded-md border border-emerald-700/40 bg-slate-900 px-2 py-1 text-xs text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500">
+				<option value="metadata_suggestion">metadata_suggestion</option>
+				<option value="clip_summarization">clip_summarization</option>
+				<option value="transcript_extraction">transcript_extraction</option>
+				<option value="scene_detection">scene_detection</option>
+				<option value="logo_recognition">logo_recognition</option>
+				<option value="player_recognition">player_recognition</option>
+			</select>
+			<p class="text-[11px] text-emerald-300/80">Queue Type for new jobs from search results and asset cards.</p>
+		</div>
+
+		{#if !canQueuePhase7 || !canProcessPhase7}
+			<div class="flex flex-wrap items-center gap-2 text-[11px]">
+				{#if !canQueuePhase7}
+					<span class="px-2 py-0.5 rounded border border-amber-700/60 bg-amber-900/20 text-amber-300">Restricted: queue requires admin/leader/marketing</span>
+				{/if}
+				{#if !canProcessPhase7}
+					<span class="px-2 py-0.5 rounded border border-red-700/60 bg-red-900/20 text-red-300">Admin-only badge: process requires admin/leader</span>
+				{/if}
+			</div>
+		{/if}
+
+		<div class="flex items-center gap-2">
+			<Button type="button" onclick={processPhase7Queue} disabled={phase7ProcessBusy || !canProcessPhase7} class="bg-teal-700 hover:bg-teal-600 text-white disabled:opacity-60">
+				{phase7ProcessBusy ? 'Processing...' : 'Process Queue'}
+			</Button>
+			<Button type="button" onclick={loadPhase7Jobs} disabled={phase7JobsLoading || !canViewPhase7Jobs} class="bg-slate-700 hover:bg-slate-600 text-white disabled:opacity-60">
+				{phase7JobsLoading ? 'Refreshing Jobs...' : 'Refresh Jobs'}
+			</Button>
+			<Button type="button" onclick={clearPhase7TestData} disabled={phase7ClearBusy || !canProcessPhase7} class="bg-rose-700 hover:bg-rose-600 text-white disabled:opacity-60">
+				{phase7ClearBusy ? 'Clearing...' : 'Clear Test Data'}
+			</Button>
+			{#if phase7ProcessMessage}
+				<p class="text-[11px] text-slate-300 truncate">{phase7ProcessMessage}</p>
+			{/if}
+		</div>
+
+		<div class="rounded-lg border border-emerald-700/30 bg-slate-900/70 p-3">
+			<div class="flex items-center justify-between mb-2">
+				<p class="text-xs text-emerald-200">Queued Jobs</p>
+				<p class="text-xs text-emerald-300">{phase7Jobs.length} shown</p>
+			</div>
+			{#if phase7JobsError}
+				<p class="text-xs text-red-300">{phase7JobsError}</p>
+			{:else if phase7JobsLoading && !phase7Jobs.length}
+				<p class="text-xs text-slate-400">Loading jobs...</p>
+			{:else if !phase7Jobs.length}
+				<p class="text-xs text-slate-400">No jobs yet. Queue an asset and click Process Queue.</p>
+			{:else}
+				<div class="space-y-1.5 max-h-44 overflow-y-auto pr-1">
+					{#each phase7Jobs as job}
+						<div class="flex items-center justify-between gap-2 rounded border border-slate-700 bg-slate-950/70 px-2 py-1.5">
+							<div class="min-w-0">
+								<p class="text-[11px] text-slate-200 truncate">{job.asset_title}</p>
+								<p class="text-[10px] text-slate-400 truncate">{job.job_type} · {job.provider || 'manual'} · {formatDate(job.created)}</p>
+							</div>
+							<div class="shrink-0 text-[10px] px-2 py-0.5 rounded border {job.status === 'completed' ? 'border-emerald-700/60 bg-emerald-900/20 text-emerald-300' : job.status === 'failed' ? 'border-red-700/60 bg-red-900/20 text-red-300' : job.status === 'running' ? 'border-amber-700/60 bg-amber-900/20 text-amber-300' : 'border-cyan-700/60 bg-cyan-900/20 text-cyan-300'}">
+								{job.status}
+							</div>
+						</div>
+					{/each}
+				</div>
+			{/if}
+		</div>
+
+		{#if phase7Error}
+			<p class="text-xs text-red-300">{phase7Error}</p>
+		{/if}
+
+		{#if phase7Results.length > 0}
+			<div class="space-y-2 max-h-80 overflow-y-auto pr-1">
+				{#each phase7Results as result}
+					<div class="rounded-lg border border-slate-700 bg-slate-950/70 p-3 space-y-2">
+						<div class="flex items-start justify-between gap-3">
+							<div class="min-w-0">
+								<p class="text-sm text-slate-100 truncate">{result.title || 'Untitled Asset'}</p>
+								<p class="text-[11px] text-slate-400">score {result.score} · {phase7ResultAssetTag(result)} · {formatDate(result.created)}</p>
+							</div>
+							<div class="flex items-center gap-1.5 text-[11px] shrink-0">
+								<span class="px-2 py-0.5 rounded border border-slate-700 text-slate-300">S {result.summaryCount || 0}</span>
+								<span class="px-2 py-0.5 rounded border border-slate-700 text-slate-300">T {result.transcriptCount || 0}</span>
+								<span class="px-2 py-0.5 rounded border border-slate-700 text-slate-300">D {result.detectionCount || 0}</span>
+							</div>
+						</div>
+
+						{#if result.summaryText}
+							<p class="text-xs text-slate-300">{summaryPreview(result.summaryText)}</p>
+						{/if}
+
+						{#if Array.isArray(result.suggestedTags) && result.suggestedTags.length}
+							<div class="flex flex-wrap gap-1.5">
+								{#each result.suggestedTags.slice(0, 8) as tag}
+									<span class="px-2 py-0.5 rounded border border-emerald-700/60 bg-emerald-900/20 text-emerald-300 text-[11px]">{tag}</span>
+								{/each}
+							</div>
+						{/if}
+
+						{#if Array.isArray(result.detections) && result.detections.length}
+							<div class="text-[11px] text-slate-400">
+								Detections: {result.detections.map((row: any) => row.label).filter(Boolean).join(', ')}
+							</div>
+						{/if}
+
+						<div class="flex items-center justify-between gap-2">
+							<div class="text-[11px] {result.summaryApproved ? 'text-emerald-300' : 'text-amber-300'}">
+								{result.summaryApproved ? 'Approved and applied' : 'Pending approval'}
+							</div>
+							<div class="flex items-center gap-1.5">
+								<Button
+									type="button"
+									onclick={() => queuePhase7Job(result.id)}
+									disabled={phase7QueueBusy[result.id] || !canQueuePhase7}
+									class="bg-slate-700 hover:bg-slate-600 text-white disabled:opacity-60"
+								>
+									{phase7QueueBusy[result.id] ? 'Queueing...' : 'Queue Job'}
+								</Button>
+								<Button
+									type="button"
+									onclick={() => approvePhase7Result(result)}
+									disabled={phase7ApproveBusy[result.id] || !result.summaryId}
+									class="bg-emerald-700 hover:bg-emerald-600 text-white disabled:opacity-60"
+								>
+									{phase7ApproveBusy[result.id] ? 'Applying...' : 'Approve to Taxonomy'}
+								</Button>
+							</div>
+						</div>
+
+						{#if phase7ApproveMessage[result.id]}
+							<p class="text-[11px] text-slate-300">{phase7ApproveMessage[result.id]}</p>
+						{/if}
+						{#if phase7QueueMessage[result.id]}
+							<p class="text-[11px] text-slate-300">{phase7QueueMessage[result.id]}</p>
+						{/if}
+					</div>
+				{/each}
+			</div>
+		{:else if !phase7Loading && phase7Query.trim()}
+			<p class="text-xs text-slate-400">No matches found for that query.</p>
+		{/if}
+	</div>
+
 	<div class="mb-6 rounded-xl border border-violet-700/40 bg-violet-950/20 p-4 space-y-4">
 		<div class="flex flex-col md:flex-row md:items-end gap-3">
 			<div class="flex-1 space-y-1">
 				<p class="text-sm font-semibold text-violet-200">Phase 5 Package Manager</p>
 				<p class="text-xs text-violet-300/80">Build highlight packages, add assets, reorder clip queue, and export manifest JSON.</p>
 			</div>
+			<Button type="button" onclick={clearPhase5TestData} disabled={phase5ClearBusy} class="bg-rose-700 hover:bg-rose-600 text-white disabled:opacity-60">
+				{phase5ClearBusy ? 'Clearing...' : 'Clear Test Data'}
+			</Button>
 			{#if phase5Error}
 				<p class="text-xs text-red-300">{phase5Error}</p>
 			{/if}
@@ -826,7 +1399,6 @@
 				{:else}
 					<div class="space-y-2 max-h-56 overflow-y-auto pr-1">
 						{#each selectedPackageItems as row, index (row.id)}
-							{@const _ = ensureDraftForItem(row)}
 							<div class="flex items-center justify-between rounded border border-slate-700 bg-slate-950/70 px-2 py-1.5 gap-2">
 								<div class="min-w-0 flex-1">
 									<p class="text-xs text-slate-100 truncate">{index + 1}. {highlightItemAssetLabel(row)}</p>
@@ -931,7 +1503,7 @@
 					</div>
 
 					<!-- Overlay actions -->
-					<div class="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+					<div class="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex flex-wrap items-center justify-center gap-2 p-2">
 						<button
 							onclick={() => addAssetToSelectedPackage(asset)}
 							class="p-2 rounded-full bg-violet-500/70 hover:bg-violet-500 text-white transition-colors"
@@ -1008,6 +1580,20 @@
 						{/if}
 						{#if asset.tags}
 							<p class="text-xs text-slate-500 mt-1 truncate">{asset.tags}</p>
+						{/if}
+						<div class="mt-1 flex items-center gap-1.5">
+							<button
+								type="button"
+								onclick={() => queuePhase7Job(asset.id)}
+								class="inline-flex items-center gap-1 rounded border border-emerald-700/60 bg-emerald-900/20 px-1.5 py-0.5 text-[10px] text-emerald-200 hover:bg-emerald-800/30 disabled:opacity-50"
+								disabled={phase7QueueBusy[asset.id] || !canQueuePhase7}
+							>
+								<Bot class="size-3" />
+								{phase7QueueBusy[asset.id] ? 'Queueing...' : 'Queue AI'}
+							</button>
+						</div>
+						{#if phase7QueueMessage[asset.id]}
+							<p class="text-[10px] text-emerald-300 mt-1 truncate">{phase7QueueMessage[asset.id]}</p>
 						{/if}
 						{#if asset.licensing?.lineItems?.length || asset.licensing?.usageLogs?.length}
 							<p class="text-[10px] text-emerald-300 mt-1 truncate">

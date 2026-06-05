@@ -17,7 +17,7 @@ function deriveDeliverableSlaStatus(row: any) {
 
 export const load: PageServerLoad = async ({ locals, url }) => {
 	const ctx = await RequestContext.from(locals, url);
-	const { pb, userId, profile: userProfile, role } = ctx;
+	const { pb, role } = ctx;
 	try {
 		
 		const [
@@ -256,6 +256,11 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 		// to PocketBase, bypassing Netlify's 1MB function body limit.
 		const pbUrl = env.POCKETBASE_URL || 'http://127.0.0.1:8090';
 		const authToken = locals.pb.authStore.token || '';
+		const phase7Permissions = {
+			canQueue: ['admin', 'leader', 'marketing', 'marketing_lead'].includes(role),
+			canProcess: ['admin', 'leader'].includes(role),
+			canViewJobs: ['admin', 'leader', 'marketing', 'marketing_lead'].includes(role)
+		};
 	
 		return {
 			assets: enrichedAssets,
@@ -270,6 +275,8 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 			specialEvents,
 			talents,
 			sponsors,
+			viewerRole: role,
+			phase7Permissions,
 			pbUrl,
 			authToken
 		};

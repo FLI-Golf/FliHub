@@ -32,6 +32,7 @@ class SidebarState {
 		this.setOpen = props.setOpen;
 		this.#isMobile = new IsMobile();
 		this.props = props;
+		this.openMobile = props.open();
 	}
 
 	// Convenience getter for checking if the sidebar is mobile
