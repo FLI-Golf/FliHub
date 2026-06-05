@@ -27,7 +27,10 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 			rightsProfiles,
 			licenseLineItems,
 			licenseDeals,
-			usageLogs
+			usageLogs,
+			sponsorDeliverables,
+			sponsorAppearances,
+			sponsorRecapPackages
 		] = await Promise.all([
 			adminFetch('media_assets', {
 				sort: '-created'
@@ -52,7 +55,10 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 			adminFetch('media_rights_profiles').catch(() => []),
 			adminFetch('media_license_line_items').catch(() => []),
 			adminFetch('media_license_deals').catch(() => []),
-			adminFetch('media_usage_logs').catch(() => [])
+			adminFetch('media_usage_logs').catch(() => []),
+			adminFetch('sponsor_media_deliverables').catch(() => []),
+			adminFetch('sponsor_media_appearances').catch(() => []),
+			adminFetch('sponsor_recap_packages').catch(() => [])
 		]);
 
 		const assetTagMap = new Map<string, any[]>();
@@ -64,6 +70,8 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 		const assetRightsMap = new Map<string, any[]>();
 		const assetLineItemsMap = new Map<string, any[]>();
 		const assetUsageMap = new Map<string, any[]>();
+		const assetDeliverablesMap = new Map<string, any[]>();
+		const assetAppearancesMap = new Map<string, any[]>();
 
 		for (const row of assetTags as any[]) {
 			const list = assetTagMap.get(row.asset) || [];
@@ -119,7 +127,21 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 			assetUsageMap.set(row.asset, list);
 		}
 
+		for (const row of sponsorDeliverables as any[]) {
+			if (!row.asset) continue;
+			const list = assetDeliverablesMap.get(row.asset) || [];
+			list.push(row);
+			assetDeliverablesMap.set(row.asset, list);
+		}
+
+		for (const row of sponsorAppearances as any[]) {
+			const list = assetAppearancesMap.get(row.asset) || [];
+			list.push(row);
+			assetAppearancesMap.set(row.asset, list);
+		}
+
 		const dealsById = new Map((licenseDeals as any[]).map((item) => [item.id, item]));
+		const recapById = new Map((sponsorRecapPackages as any[]).map((item) => [item.id, item]));
 
 		const talentsById = new Map((talents as any[]).map((item) => [item.id, item]));
 		const sponsorsById = new Map((sponsors as any[]).map((item) => [item.id, item]));
@@ -145,6 +167,17 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 				dealRecord: row.deal ? dealsById.get(row.deal) || null : null
 			}));
 
+			const deliverableRows = (assetDeliverablesMap.get(asset.id) || []).map((row) => ({
+				...row,
+				sponsorRecord: row.sponsor ? sponsorsById.get(row.sponsor) || null : null,
+				recapPackageRecord: row.recap_package ? recapById.get(row.recap_package) || null : null
+			}));
+
+			const appearanceRows = (assetAppearancesMap.get(asset.id) || []).map((row) => ({
+				...row,
+				sponsorRecord: row.sponsor ? sponsorsById.get(row.sponsor) || null : null
+			}));
+
 			return {
 				...asset,
 				taxonomy: {
@@ -159,6 +192,13 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 					rightsProfiles: assetRightsMap.get(asset.id) || [],
 					lineItems: lineItemRows,
 					usageLogs: usageRows
+				},
+				sponsorFulfillment: {
+					deliverables: deliverableRows,
+					appearances: appearanceRows,
+					recapPackages: deliverableRows
+						.map((row: any) => row.recapPackageRecord)
+						.filter(Boolean)
 				}
 			};
 		});

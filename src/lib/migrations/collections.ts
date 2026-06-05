@@ -1464,6 +1464,92 @@ export const collections = [
 		deleteRule: '@request.auth.id != ""'
 	},
 
+	// ─── Sponsor deliverables + visibility tracking (Phase 4) ───────────────
+	{
+		name: 'sponsor_recap_packages',
+		type: 'base',
+		schema: [
+			{ name: 'sponsor', type: 'relation', required: true, options: { collectionId: 'sponsors', maxSelect: 1 } },
+			{ name: 'package_name', type: 'text', required: true, options: { max: 255 } },
+			{ name: 'season', type: 'relation', required: false, options: { collectionId: 'seasons', maxSelect: 1 } },
+			{ name: 'tournament', type: 'relation', required: false, options: { collectionId: 'tournaments', maxSelect: 1 } },
+			{ name: 'special_event', type: 'relation', required: false, options: { collectionId: 'special_events', maxSelect: 1 } },
+			{
+				name: 'status',
+				type: 'select',
+				required: false,
+				options: { maxSelect: 1, values: ['draft', 'in_progress', 'ready', 'sent', 'approved', 'archived'] }
+			},
+			{ name: 'delivered_at', type: 'date', required: false },
+			{ name: 'proof_url', type: 'url', required: false },
+			{ name: 'notes', type: 'text', required: false }
+		],
+		listRule: '@request.auth.id != ""',
+		viewRule: '@request.auth.id != ""',
+		createRule: '@request.auth.id != ""',
+		updateRule: '@request.auth.id != ""',
+		deleteRule: '@request.auth.id != ""'
+	},
+	{
+		name: 'sponsor_media_deliverables',
+		type: 'base',
+		schema: [
+			{ name: 'sponsor', type: 'relation', required: true, options: { collectionId: 'sponsors', maxSelect: 1 } },
+			{ name: 'asset', type: 'relation', required: false, options: { collectionId: 'media_assets', maxSelect: 1 } },
+			{ name: 'recap_package', type: 'relation', required: false, options: { collectionId: 'sponsor_recap_packages', maxSelect: 1 } },
+			{
+				name: 'deliverable_type',
+				type: 'select',
+				required: true,
+				options: {
+					maxSelect: 1,
+					values: ['logo_exposure', 'highlight_clip', 'recap_image', 'interview_cut', 'social_post', 'broadcast_feature', 'hospitality_recap', 'other']
+				}
+			},
+			{ name: 'obligation_reference', type: 'text', required: false, options: { max: 255 } },
+			{
+				name: 'status',
+				type: 'select',
+				required: false,
+				options: { maxSelect: 1, values: ['pending', 'in_progress', 'delivered', 'approved', 'overdue', 'cancelled'] }
+			},
+			{ name: 'due_date', type: 'date', required: false },
+			{ name: 'delivered_at', type: 'date', required: false },
+			{ name: 'visibility_score', type: 'number', required: false, options: { noDecimal: true, min: 0, max: 100 } },
+			{ name: 'proof_note', type: 'text', required: false }
+		],
+		listRule: '@request.auth.id != ""',
+		viewRule: '@request.auth.id != ""',
+		createRule: '@request.auth.id != ""',
+		updateRule: '@request.auth.id != ""',
+		deleteRule: '@request.auth.id != ""'
+	},
+	{
+		name: 'sponsor_media_appearances',
+		type: 'base',
+		schema: [
+			{ name: 'asset', type: 'relation', required: true, options: { collectionId: 'media_assets', maxSelect: 1 } },
+			{ name: 'sponsor', type: 'relation', required: true, options: { collectionId: 'sponsors', maxSelect: 1 } },
+			{ name: 'deliverable', type: 'relation', required: false, options: { collectionId: 'sponsor_media_deliverables', maxSelect: 1 } },
+			{
+				name: 'logo_visibility',
+				type: 'select',
+				required: false,
+				options: { maxSelect: 1, values: ['background', 'partial', 'clear', 'hero', 'verbal_mention'] }
+			},
+			{ name: 'placement', type: 'text', required: false, options: { max: 120 } },
+			{ name: 'timestamp_seconds', type: 'number', required: false, options: { min: 0 } },
+			{ name: 'screenshot_url', type: 'url', required: false },
+			{ name: 'verified', type: 'bool', required: false },
+			{ name: 'notes', type: 'text', required: false }
+		],
+		listRule: '@request.auth.id != ""',
+		viewRule: '@request.auth.id != ""',
+		createRule: '@request.auth.id != ""',
+		updateRule: '@request.auth.id != ""',
+		deleteRule: '@request.auth.id != ""'
+	},
+
 	{
 		name: 'content_production',
 		type: 'base',

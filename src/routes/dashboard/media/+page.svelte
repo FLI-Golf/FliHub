@@ -172,6 +172,21 @@
 		}, { totalDealFees: 0, totalAttributedRevenue: 0, licensedAssets: 0 })
 	);
 
+	let sponsorMetrics = $derived(
+		assets.reduce((acc: { deliverables: number; delivered: number; approved: number; appearances: number; recapPackages: number }, asset: any) => {
+			const deliverables = asset.sponsorFulfillment?.deliverables || [];
+			const appearances = asset.sponsorFulfillment?.appearances || [];
+			const recapPackages = asset.sponsorFulfillment?.recapPackages || [];
+
+			acc.deliverables += deliverables.length;
+			acc.delivered += deliverables.filter((row: any) => row.status === 'delivered').length;
+			acc.approved += deliverables.filter((row: any) => row.status === 'approved').length;
+			acc.appearances += appearances.length;
+			acc.recapPackages += recapPackages.length;
+			return acc;
+		}, { deliverables: 0, delivered: 0, approved: 0, appearances: 0, recapPackages: 0 })
+	);
+
 	function seasonLabel(asset: any) {
 		return asset.expand?.season?.name || asset.expand?.season?.year || '';
 	}
@@ -261,6 +276,9 @@
 				<span class="px-2 py-1 rounded-md border border-slate-700 bg-slate-900 text-slate-300">Licensed assets: {licensingMetrics.licensedAssets}</span>
 				<span class="px-2 py-1 rounded-md border border-emerald-700/60 bg-emerald-900/20 text-emerald-300">Deal fees: ${licensingMetrics.totalDealFees.toLocaleString()}</span>
 				<span class="px-2 py-1 rounded-md border border-cyan-700/60 bg-cyan-900/20 text-cyan-300">Attributed revenue: ${licensingMetrics.totalAttributedRevenue.toLocaleString()}</span>
+				<span class="px-2 py-1 rounded-md border border-amber-700/60 bg-amber-900/20 text-amber-300">Sponsor deliverables: {sponsorMetrics.deliverables}</span>
+				<span class="px-2 py-1 rounded-md border border-lime-700/60 bg-lime-900/20 text-lime-300">Delivered/Approved: {sponsorMetrics.delivered}/{sponsorMetrics.approved}</span>
+				<span class="px-2 py-1 rounded-md border border-orange-700/60 bg-orange-900/20 text-orange-300">Appearances/Recaps: {sponsorMetrics.appearances}/{sponsorMetrics.recapPackages}</span>
 			</div>
 		</div>
 		<Button onclick={() => (showUploadModal = true)} class="bg-blue-600 hover:bg-blue-700 text-white">
@@ -510,6 +528,15 @@
 									asset.licensing?.usageLogs?.length
 										? `$${(asset.licensing.usageLogs.reduce((sum: number, row: any) => sum + (Number(row.revenue_attributed) || 0), 0)).toLocaleString()} revenue`
 										: ''
+								].filter(Boolean).join(' · ')}
+							</p>
+						{/if}
+						{#if asset.sponsorFulfillment?.deliverables?.length || asset.sponsorFulfillment?.appearances?.length}
+							<p class="text-[10px] text-amber-300 mt-1 truncate">
+								{[
+									asset.sponsorFulfillment?.deliverables?.length ? `${asset.sponsorFulfillment.deliverables.length} deliverables` : '',
+									asset.sponsorFulfillment?.appearances?.length ? `${asset.sponsorFulfillment.appearances.length} appearances` : '',
+									asset.sponsorFulfillment?.deliverables?.some((row: any) => row.status === 'delivered' || row.status === 'approved') ? 'proof ready' : ''
 								].filter(Boolean).join(' · ')}
 							</p>
 						{/if}

@@ -270,6 +270,50 @@
 					</div>
 				{/if}
 
+				{#if asset.sponsorFulfillment?.deliverables?.length || asset.sponsorFulfillment?.appearances?.length || asset.sponsorFulfillment?.recapPackages?.length}
+					<div class="rounded-xl border border-slate-800 bg-slate-900 p-4 space-y-3">
+						<h3 class="text-sm font-semibold text-slate-100">Sponsor Fulfillment</h3>
+						{#if asset.sponsorFulfillment?.deliverables?.length}
+							<div>
+								<div class="text-slate-400 text-sm mb-1">Deliverables</div>
+								<div class="space-y-1 text-sm">
+									{#each asset.sponsorFulfillment.deliverables as row}
+										<div class="text-slate-200">
+											{row.sponsorRecord?.name || 'Sponsor'} · {row.deliverable_type} · {row.status || 'pending'}
+											{#if row.visibility_score} · score {row.visibility_score}{/if}
+											{#if row.obligation_reference} · {row.obligation_reference}{/if}
+										</div>
+									{/each}
+								</div>
+							</div>
+						{/if}
+						{#if asset.sponsorFulfillment?.appearances?.length}
+							<div>
+								<div class="text-slate-400 text-sm mb-1">Appearances</div>
+								<div class="space-y-1 text-sm">
+									{#each asset.sponsorFulfillment.appearances as row}
+										<div class="text-slate-200">
+											{row.sponsorRecord?.name || 'Sponsor'} · {row.logo_visibility || 'visibility n/a'}
+											{#if row.placement} · {row.placement}{/if}
+											{#if row.timestamp_seconds} · {row.timestamp_seconds}s{/if}
+										</div>
+									{/each}
+								</div>
+							</div>
+						{/if}
+						{#if asset.sponsorFulfillment?.recapPackages?.length}
+							<div>
+								<div class="text-slate-400 text-sm mb-1">Recap Packages</div>
+								<div class="space-y-1 text-sm">
+									{#each asset.sponsorFulfillment.recapPackages as row}
+										<div class="text-slate-200">{row.package_name} · {row.status || 'draft'}{#if row.delivered_at} · delivered {formatDate(row.delivered_at)}{/if}</div>
+									{/each}
+								</div>
+							</div>
+						{/if}
+					</div>
+				{/if}
+
 				<div class="flex justify-between items-center pt-2">
 					<div class="text-xs text-slate-500">Filename: {asset.file}</div>
 					<a href={fileUrl()} target="_blank" rel="noopener noreferrer">
