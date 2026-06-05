@@ -1,4 +1,5 @@
 import { RequestContext } from '$lib/infra/RequestContext';
+import { adminFetch } from '$lib/infra/pocketbase/pbClient';
 import type { PageServerLoad } from './$types';
 import { env } from '$env/dynamic/private';
 
@@ -7,14 +8,19 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 	const { pb, userId, profile: userProfile, role } = ctx;
 	try {
 		
-		const [assets, franchises, projects, campaigns] = await Promise.all([
-			pb.collection('media_assets').getFullList().catch((err: any) => {
+		const [assets, franchises, projects, campaigns, seasons, tournaments, specialEvents] = await Promise.all([
+			adminFetch('media_assets', {
+				sort: '-created'
+			}).catch((err: any) => {
 				console.error('Failed to fetch media_assets:', err?.message, err?.status);
 				return [];
 			}),
 			pb.collection('franchises').getFullList({ sort: 'name', fields: 'id,name' }).catch(() => []),
 			pb.collection('projects').getFullList({ sort: 'name', fields: 'id,name' }).catch(() => []),
-			pb.collection('campaigns').getFullList({ sort: 'name', fields: 'id,name' }).catch(() => [])
+			pb.collection('campaigns').getFullList({ sort: 'name', fields: 'id,name' }).catch(() => []),
+			pb.collection('seasons').getFullList({ sort: '-created', fields: 'id,name,year' }).catch(() => []),
+			pb.collection('tournaments').getFullList({ sort: 'name', fields: 'id,name' }).catch(() => []),
+			pb.collection('special_events').getFullList({ sort: 'name', fields: 'id,name' }).catch(() => [])
 		]);
 	
 		// Pass PocketBase URL and auth token to the client so uploads go directly
@@ -22,7 +28,7 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 		const pbUrl = env.POCKETBASE_URL || 'http://127.0.0.1:8090';
 		const authToken = locals.pb.authStore.token || '';
 	
-		return { assets, franchises, projects, campaigns, pbUrl, authToken };
+		return { assets, franchises, projects, campaigns, seasons, tournaments, specialEvents, pbUrl, authToken };
 	} catch (err: any) {
 		console.error('media load error:', err?.message ?? err);
 		return {};

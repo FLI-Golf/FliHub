@@ -685,20 +685,37 @@
 		},
 		{
 			collection: 'media_assets',
-			description: 'Stores uploaded media files — logos, photos, videos, documents — associated with franchises, projects, or campaigns. Each asset has a type (logo, photo, video, document, other) and can be tagged for filtering. Assets linked to a franchise appear on the franchise detail page; assets linked to a project appear in the project media gallery.',
+			description: 'Stores uploaded media files for the Phase 1 Media Asset Management system. Each asset keeps its original asset type for brand-library workflows, plus structured media metadata for season, tournament, event context, workflow status, storage tier, usage scope, and rights status.',
 			fields: [
 				{ name: 'title', type: 'text', description: 'Display name for the asset.' },
-				{ name: 'asset_type', type: 'select', description: 'logo, photo, video, document, or other. Drives which gallery section the asset appears in.' },
-				{ name: 'file', type: 'file', description: 'The uploaded file. Supports images, PDFs, and video files.' },
+				{ name: 'asset_type', type: 'select', description: 'Legacy library bucket used by the current UI: flyer, jersey, shoe, logo, banner, social, or other.' },
+				{ name: 'media_category', type: 'select', description: 'Structured media class for MAM workflows: graphic, photo, video, audio, document, broadcast segment, social clip, interview, highlight, sponsor asset, archive package, or other.' },
+				{ name: 'file', type: 'file', description: 'The uploaded source file. Phase 1 supports images, video, audio, PDFs, and archive packages.' },
 				{ name: 'franchise', type: 'relation', relatesTo: 'franchises', description: 'The franchise this asset belongs to, if applicable.' },
 				{ name: 'project', type: 'relation', relatesTo: 'projects', description: 'The project this asset is associated with, if applicable.' },
 				{ name: 'campaign', type: 'relation', relatesTo: 'campaigns', description: 'The marketing campaign this asset belongs to, if applicable.' },
+				{ name: 'season', type: 'relation', relatesTo: 'seasons', description: 'Season context for archive browsing and reporting.' },
+				{ name: 'tournament', type: 'relation', relatesTo: 'tournaments', description: 'Tournament context for searchable league footage and photos.' },
+				{ name: 'special_event', type: 'relation', relatesTo: 'special_events', description: 'Optional special event context when the asset is not tied to a standard tournament.' },
+				{ name: 'source_type', type: 'select', description: 'Where the asset came from: broadcast camera, drone, mobile, photographer, livestream, social export, production company, podcast, sponsor submission, or other.' },
+				{ name: 'capture_date', type: 'date', description: 'When the media was captured or exported.' },
+				{ name: 'duration_seconds', type: 'number', description: 'Runtime in seconds for time-based assets.' },
+				{ name: 'file_size_bytes', type: 'number', description: 'Original file size in bytes.' },
+				{ name: 'resolution', type: 'text', description: 'Resolution or dimensions, such as 1920x1080.' },
+				{ name: 'status', type: 'select', description: 'Phase 1 workflow state: uploaded, processing, tagged, approved, archived, or restricted.' },
+				{ name: 'storage_tier', type: 'select', description: 'Storage lifecycle bucket: hot, warm, or archive.' },
+				{ name: 'usage_scope', type: 'select', description: 'Allowed usage scope: internal, sponsor, broadcast, commercial, or restricted.' },
+				{ name: 'rights_status', type: 'select', description: 'High-level rights summary: owned, shared, licensed_out, licensed_in, talent_restricted, or expired.' },
 				{ name: 'tags', type: 'text', description: 'Comma-separated tags for filtering and search.' },
 				{ name: 'notes', type: 'editor', description: 'Notes about the asset — usage rights, context, or version history.' }
 			],
 			relationships: [
 				{ to: 'franchises', type: 'many-to-one', description: 'Franchise this asset is associated with' },
-				{ to: 'projects', type: 'many-to-one', description: 'Project this asset is associated with' }
+				{ to: 'projects', type: 'many-to-one', description: 'Project this asset is associated with' },
+				{ to: 'campaigns', type: 'many-to-one', description: 'Campaign this asset supports' },
+				{ to: 'seasons', type: 'many-to-one', description: 'Season context for archive and reporting' },
+				{ to: 'tournaments', type: 'many-to-one', description: 'Tournament context for media search' },
+				{ to: 'special_events', type: 'many-to-one', description: 'Special event context for one-off media capture' }
 			]
 		}
 	];

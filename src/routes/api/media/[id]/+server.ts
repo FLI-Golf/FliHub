@@ -12,13 +12,26 @@ export const PATCH: RequestHandler = async ({ request, locals, params }) => {
 		const data = await request.json();
 
 		const asset = await pb.collection('media_assets').update(params.id, {
-			title:      data.title,
+			title: data.title,
 			asset_type: data.asset_type,
-			franchise:  data.franchise  || null,
-			project:    data.project    || null,
-			campaign:   data.campaign   || null,
-			tags:       data.tags       || '',
-			notes:      data.notes      || ''
+			media_category: data.media_category || null,
+			franchise: data.franchise || null,
+			project: data.project || null,
+			campaign: data.campaign || null,
+			season: data.season || null,
+			tournament: data.tournament || null,
+			special_event: data.special_event || null,
+			source_type: data.source_type || null,
+			capture_date: data.capture_date || null,
+			duration_seconds: data.duration_seconds ? Number(data.duration_seconds) : null,
+			file_size_bytes: data.file_size_bytes ? Number(data.file_size_bytes) : null,
+			resolution: data.resolution || '',
+			status: data.status || null,
+			storage_tier: data.storage_tier || null,
+			usage_scope: data.usage_scope || null,
+			rights_status: data.rights_status || null,
+			tags: data.tags || '',
+			notes: data.notes || ''
 		});
 
 		return json(asset);

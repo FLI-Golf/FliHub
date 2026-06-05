@@ -1110,6 +1110,104 @@ export const collections = [
 
 	// ─── Content production pipeline ─────────────────────────────────────────
 	{
+		name: 'media_assets',
+		type: 'base',
+		schema: [
+			{ name: 'title', type: 'text', required: true, options: { max: 500 } },
+			{
+				name: 'asset_type',
+				type: 'select',
+				required: true,
+				options: { maxSelect: 1, values: ['flyer', 'jersey', 'shoe', 'logo', 'banner', 'social', 'other'] }
+			},
+			{
+				name: 'media_category',
+				type: 'select',
+				required: false,
+				options: {
+					maxSelect: 1,
+					values: [
+						'graphic',
+						'photo',
+						'video',
+						'audio',
+						'document',
+						'broadcast_segment',
+						'social_clip',
+						'interview',
+						'highlight',
+						'sponsor_asset',
+						'archive_package',
+						'other'
+					]
+				}
+			},
+			{ name: 'file', type: 'file', required: true, options: { maxSelect: 1, maxSize: 104857600 } },
+			{ name: 'franchise', type: 'relation', required: false, options: { collectionId: 'franchises', maxSelect: 1 } },
+			{ name: 'project', type: 'relation', required: false, options: { collectionId: 'projects', maxSelect: 1 } },
+			{ name: 'campaign', type: 'relation', required: false, options: { collectionId: 'campaigns', maxSelect: 1 } },
+			{ name: 'season', type: 'relation', required: false, options: { collectionId: 'seasons', maxSelect: 1 } },
+			{ name: 'tournament', type: 'relation', required: false, options: { collectionId: 'tournaments', maxSelect: 1 } },
+			{ name: 'special_event', type: 'relation', required: false, options: { collectionId: 'special_events', maxSelect: 1 } },
+			{
+				name: 'source_type',
+				type: 'select',
+				required: false,
+				options: {
+					maxSelect: 1,
+					values: [
+						'broadcast_camera',
+						'drone',
+						'mobile',
+						'photographer',
+						'livestream',
+						'social_export',
+						'production_company',
+						'podcast',
+						'sponsor_submission',
+						'other'
+					]
+				}
+			},
+			{ name: 'capture_date', type: 'date', required: false },
+			{ name: 'duration_seconds', type: 'number', required: false },
+			{ name: 'file_size_bytes', type: 'number', required: false },
+			{ name: 'resolution', type: 'text', required: false, options: { max: 100 } },
+			{
+				name: 'status',
+				type: 'select',
+				required: false,
+				options: { maxSelect: 1, values: ['uploaded', 'processing', 'tagged', 'approved', 'archived', 'restricted'] }
+			},
+			{
+				name: 'storage_tier',
+				type: 'select',
+				required: false,
+				options: { maxSelect: 1, values: ['hot', 'warm', 'archive'] }
+			},
+			{
+				name: 'usage_scope',
+				type: 'select',
+				required: false,
+				options: { maxSelect: 1, values: ['internal', 'sponsor', 'broadcast', 'commercial', 'restricted'] }
+			},
+			{
+				name: 'rights_status',
+				type: 'select',
+				required: false,
+				options: { maxSelect: 1, values: ['owned', 'shared', 'licensed_out', 'licensed_in', 'talent_restricted', 'expired'] }
+			},
+			{ name: 'tags', type: 'text', required: false },
+			{ name: 'notes', type: 'editor', required: false }
+		],
+		listRule: '@request.auth.id != ""',
+		viewRule: '@request.auth.id != ""',
+		createRule: '@request.auth.id != ""',
+		updateRule: '@request.auth.id != ""',
+		deleteRule: '@request.auth.id != ""'
+	},
+
+	{
 		name: 'content_production',
 		type: 'base',
 		schema: [

@@ -4,6 +4,15 @@
 	import { Input } from '$lib/components/ui/input';
 	import { Label } from '$lib/components/ui/label';
 	import { Edit, Save, X } from 'lucide-svelte';
+	import {
+		mediaAssetTypes,
+		mediaCategories,
+		mediaRightsStatuses,
+		mediaSourceTypes,
+		mediaStatuses,
+		mediaStorageTiers,
+		mediaUsageScopes
+	} from '$lib/media/options';
 
 	let {
 		open = $bindable(false),
@@ -11,27 +20,32 @@
 		franchises = [],
 		projects = [],
 		campaigns = [],
+		seasons = [],
+		tournaments = [],
+		specialEvents = [],
+		pbUrl = 'https://pocketbase-production-6ab5.up.railway.app',
 		onUpdated = (_asset: any) => {}
 	} = $props();
-
-	const PB_URL = 'https://pocketbase-production-6ab5.up.railway.app';
-
-	const assetTypes = [
-		{ value: 'flyer',   label: 'Flyer' },
-		{ value: 'jersey',  label: 'Jersey' },
-		{ value: 'shoe',    label: 'Shoe' },
-		{ value: 'logo',    label: 'Logo' },
-		{ value: 'banner',  label: 'Banner' },
-		{ value: 'social',  label: 'Social Media' },
-		{ value: 'other',   label: 'Other' }
-	];
 
 	let formData = $state({
 		title: '',
 		asset_type: 'flyer',
+		media_category: 'graphic',
 		franchise: '',
 		project: '',
 		campaign: '',
+		season: '',
+		tournament: '',
+		special_event: '',
+		source_type: 'other',
+		capture_date: '',
+		duration_seconds: '',
+		file_size_bytes: '',
+		resolution: '',
+		status: 'uploaded',
+		storage_tier: 'hot',
+		usage_scope: 'internal',
+		rights_status: 'owned',
 		tags: '',
 		notes: ''
 	});
@@ -45,9 +59,22 @@
 			formData = {
 				title:      asset.title      || '',
 				asset_type: asset.asset_type || 'flyer',
+				media_category: asset.media_category || 'graphic',
 				franchise:  asset.franchise  || '',
 				project:    asset.project    || '',
 				campaign:   asset.campaign   || '',
+				season: asset.season || '',
+				tournament: asset.tournament || '',
+				special_event: asset.special_event || '',
+				source_type: asset.source_type || 'other',
+				capture_date: asset.capture_date ? String(asset.capture_date).slice(0, 10) : '',
+				duration_seconds: asset.duration_seconds ? String(asset.duration_seconds) : '',
+				file_size_bytes: asset.file_size_bytes ? String(asset.file_size_bytes) : '',
+				resolution: asset.resolution || '',
+				status: asset.status || 'uploaded',
+				storage_tier: asset.storage_tier || 'hot',
+				usage_scope: asset.usage_scope || 'internal',
+				rights_status: asset.rights_status || 'owned',
 				tags:       asset.tags       || '',
 				notes:      asset.notes      || ''
 			};
@@ -56,7 +83,7 @@
 
 	function previewUrl() {
 		if (!asset?.file) return '';
-		return `${PB_URL}/api/files/${asset.collectionId}/${asset.id}/${asset.file}?thumb=400x400`;
+		return `${pbUrl}/api/files/${asset.collectionId}/${asset.id}/${asset.file}?thumb=400x400`;
 	}
 
 	async function handleSubmit(e: Event) {
@@ -135,22 +162,48 @@
 			</div>
 
 			<!-- Asset Type -->
-			<div class="space-y-2">
-				<Label for="edit-media-type" class="text-slate-200">Asset Type *</Label>
-				<select
-					id="edit-media-type"
-					bind:value={formData.asset_type}
-					required
-					class="flex h-10 w-full rounded-md border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-500"
-				>
-					{#each assetTypes as type}
-						<option value={type.value}>{type.label}</option>
-					{/each}
-				</select>
+			<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+				<div class="space-y-2">
+					<Label for="edit-media-type" class="text-slate-200">Asset Type *</Label>
+					<select id="edit-media-type" bind:value={formData.asset_type} required class="flex h-10 w-full rounded-md border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-500">
+						{#each mediaAssetTypes as type}
+							<option value={type.value}>{type.label}</option>
+						{/each}
+					</select>
+				</div>
+
+				<div class="space-y-2">
+					<Label for="edit-media-category" class="text-slate-200">Media Category</Label>
+					<select id="edit-media-category" bind:value={formData.media_category} class="flex h-10 w-full rounded-md border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-500">
+						{#each mediaCategories as option}
+							<option value={option.value}>{option.label}</option>
+						{/each}
+					</select>
+				</div>
+			</div>
+
+			<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+				<div class="space-y-2">
+					<Label for="edit-media-source" class="text-slate-200">Source Type</Label>
+					<select id="edit-media-source" bind:value={formData.source_type} class="flex h-10 w-full rounded-md border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-500">
+						{#each mediaSourceTypes as option}
+							<option value={option.value}>{option.label}</option>
+						{/each}
+					</select>
+				</div>
+
+				<div class="space-y-2">
+					<Label for="edit-media-status" class="text-slate-200">Workflow Status</Label>
+					<select id="edit-media-status" bind:value={formData.status} class="flex h-10 w-full rounded-md border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-500">
+						{#each mediaStatuses as option}
+							<option value={option.value}>{option.label}</option>
+						{/each}
+					</select>
+				</div>
 			</div>
 
 			<!-- Relations -->
-			<div class="grid grid-cols-1 gap-4">
+			<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
 				<div class="space-y-2">
 					<Label for="edit-media-franchise" class="text-slate-200">Franchise</Label>
 					<select
@@ -189,6 +242,87 @@
 						<option value="">None</option>
 						{#each campaigns as c}
 							<option value={c.id}>{c.name}</option>
+						{/each}
+					</select>
+				</div>
+
+				<div class="space-y-2">
+					<Label for="edit-media-season" class="text-slate-200">Season</Label>
+					<select id="edit-media-season" bind:value={formData.season} class="flex h-10 w-full rounded-md border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-500">
+						<option value="">None</option>
+						{#each seasons as season}
+							<option value={season.id}>{season.name || season.year}</option>
+						{/each}
+					</select>
+				</div>
+
+				<div class="space-y-2">
+					<Label for="edit-media-tournament" class="text-slate-200">Tournament</Label>
+					<select id="edit-media-tournament" bind:value={formData.tournament} class="flex h-10 w-full rounded-md border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-500">
+						<option value="">None</option>
+						{#each tournaments as tournament}
+							<option value={tournament.id}>{tournament.name}</option>
+						{/each}
+					</select>
+				</div>
+
+				<div class="space-y-2 md:col-span-2">
+					<Label for="edit-media-special-event" class="text-slate-200">Special Event</Label>
+					<select id="edit-media-special-event" bind:value={formData.special_event} class="flex h-10 w-full rounded-md border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-500">
+						<option value="">None</option>
+						{#each specialEvents as event}
+							<option value={event.id}>{event.name}</option>
+						{/each}
+					</select>
+				</div>
+			</div>
+
+			<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+				<div class="space-y-2">
+					<Label for="edit-media-capture-date" class="text-slate-200">Capture Date</Label>
+					<Input id="edit-media-capture-date" type="date" bind:value={formData.capture_date} class="bg-slate-800 border-slate-700 text-white" />
+				</div>
+
+				<div class="space-y-2">
+					<Label for="edit-media-duration" class="text-slate-200">Duration (seconds)</Label>
+					<Input id="edit-media-duration" type="number" min="0" bind:value={formData.duration_seconds} class="bg-slate-800 border-slate-700 text-white" />
+				</div>
+
+				<div class="space-y-2">
+					<Label for="edit-media-resolution" class="text-slate-200">Resolution</Label>
+					<Input id="edit-media-resolution" bind:value={formData.resolution} placeholder="e.g. 1920x1080" class="bg-slate-800 border-slate-700 text-white placeholder:text-slate-400" />
+				</div>
+
+				<div class="space-y-2">
+					<Label for="edit-media-filesize" class="text-slate-200">File Size (bytes)</Label>
+					<Input id="edit-media-filesize" type="number" min="0" bind:value={formData.file_size_bytes} class="bg-slate-800 border-slate-700 text-white" />
+				</div>
+			</div>
+
+			<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+				<div class="space-y-2">
+					<Label for="edit-media-storage-tier" class="text-slate-200">Storage Tier</Label>
+					<select id="edit-media-storage-tier" bind:value={formData.storage_tier} class="flex h-10 w-full rounded-md border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-500">
+						{#each mediaStorageTiers as option}
+							<option value={option.value}>{option.label}</option>
+						{/each}
+					</select>
+				</div>
+
+				<div class="space-y-2">
+					<Label for="edit-media-usage-scope" class="text-slate-200">Usage Scope</Label>
+					<select id="edit-media-usage-scope" bind:value={formData.usage_scope} class="flex h-10 w-full rounded-md border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-500">
+						{#each mediaUsageScopes as option}
+							<option value={option.value}>{option.label}</option>
+						{/each}
+					</select>
+				</div>
+
+				<div class="space-y-2 md:col-span-2">
+					<Label for="edit-media-rights-status" class="text-slate-200">Rights Status</Label>
+					<select id="edit-media-rights-status" bind:value={formData.rights_status} class="flex h-10 w-full rounded-md border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-500">
+						{#each mediaRightsStatuses as option}
+							<option value={option.value}>{option.label}</option>
 						{/each}
 					</select>
 				</div>
