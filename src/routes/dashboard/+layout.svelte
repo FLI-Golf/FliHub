@@ -76,7 +76,7 @@
 </script>
 
 <Sidebar.Provider>
-	<FliHubSidebar />
+	<FliHubSidebar collapsible="none" />
 	<Sidebar.Inset>
 		<header class="flex h-14 shrink-0 items-center gap-2 border-b bg-card/80 backdrop-blur-sm sticky top-0 z-10">
 			<div class="flex items-center gap-3 px-4 flex-1 min-w-0">
