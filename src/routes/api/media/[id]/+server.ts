@@ -45,6 +45,32 @@ async function loadAssetTaxonomy(pb: any, assetId: string) {
 	};
 }
 
+async function loadAssetLicensing(pb: any, assetId: string) {
+	const [rightsProfiles, lineItems, usageLogs] = await Promise.all([
+		pb.collection('media_rights_profiles').getFullList({ filter: `asset = "${assetId}"` }).catch(() => []),
+		pb.collection('media_license_line_items').getFullList({ filter: `asset = "${assetId}"` }).catch(() => []),
+		pb.collection('media_usage_logs').getFullList({ filter: `asset = "${assetId}"` }).catch(() => [])
+	]);
+
+	const dealIds = Array.from(new Set(lineItems.map((row: any) => row.deal).filter(Boolean)));
+	const dealRows = await Promise.all(
+		dealIds.map((id) => pb.collection('media_license_deals').getOne(id).catch(() => null))
+	);
+	const dealsById = new Map(dealRows.filter(Boolean).map((row: any) => [row.id, row]));
+
+	return {
+		rightsProfiles,
+		lineItems: lineItems.map((row: any) => ({
+			...row,
+			dealRecord: row.deal ? dealsById.get(row.deal) || null : null
+		})),
+		usageLogs: usageLogs.map((row: any) => ({
+			...row,
+			dealRecord: row.deal ? dealsById.get(row.deal) || null : null
+		}))
+	};
+}
+
 export const PATCH: RequestHandler = async ({ request, locals, params }) => {
 	const pb = locals.pb;
 
@@ -125,9 +151,86 @@ export const PATCH: RequestHandler = async ({ request, locals, params }) => {
 			await replaceRelationRows(pb, 'media_asset_events', params.id, eventRows);
 		}
 
-		const taxonomy = await loadAssetTaxonomy(pb, params.id);
+		if (data.phase3Meta) {
+			const phase3 = data.phase3Meta || {};
 
-		return json({ ...asset, taxonomy });
+			const rightsRows = (phase3.rights_owner || phase3.rights_contract_reference || phase3.rights_territory || phase3.rights_channel)
+				? [{
+					rights_owner: phase3.rights_owner || 'FLI Golf League',
+					usage_type: phase3.rights_usage_type || null,
+					territory: phase3.rights_territory || '',
+					channel: phase3.rights_channel || '',
+					exclusive: Boolean(phase3.rights_exclusive),
+					start_date: phase3.rights_start_date || null,
+					expiration_date: phase3.rights_expiration_date || null,
+					restrictions: phase3.rights_restrictions || '',
+					contract_reference: phase3.rights_contract_reference || '',
+					status: phase3.rights_profile_status || 'active'
+				}]
+				: [];
+
+			await replaceRelationRows(pb, 'media_rights_profiles', params.id, rightsRows);
+
+			const existingLineItems = await pb.collection('media_license_line_items').getFullList({
+				filter: `asset = "${params.id}"`,
+				fields: 'id,deal'
+			}).catch(() => []);
+
+			const previousDealIds = Array.from(new Set(existingLineItems.map((row: any) => row.deal).filter(Boolean)));
+
+			for (const row of existingLineItems) {
+				await pb.collection('media_license_line_items').delete(row.id).catch(() => undefined);
+			}
+
+			for (const dealId of previousDealIds) {
+				const stillUsed = await pb.collection('media_license_line_items').getFullList({
+					filter: `deal = "${dealId}"`,
+					fields: 'id'
+				}).catch(() => []);
+				if (!stillUsed.length) {
+					await pb.collection('media_license_deals').delete(dealId).catch(() => undefined);
+				}
+			}
+
+			const shouldCreateDeal = Boolean(
+				phase3.deal_name ||
+				phase3.deal_licensee ||
+				phase3.deal_fee_amount ||
+				phase3.line_item_fee_amount
+			);
+
+			if (shouldCreateDeal) {
+				const deal = await pb.collection('media_license_deals').create({
+					name: phase3.deal_name || `License Deal - ${asset.title}`,
+					licensee: phase3.deal_licensee || 'TBD Licensee',
+					usage_type: phase3.deal_usage_type || 'broadcast',
+					territory: phase3.deal_territory || '',
+					channel: phase3.deal_channel || '',
+					exclusive: Boolean(phase3.deal_exclusive),
+					start_date: phase3.deal_start_date || null,
+					expiration_date: phase3.deal_expiration_date || null,
+					fee_amount: phase3.deal_fee_amount ? Number(phase3.deal_fee_amount) : null,
+					currency: phase3.deal_currency || 'USD',
+					payment_status: phase3.deal_payment_status || 'draft',
+					contract_reference: phase3.deal_contract_reference || '',
+					notes: phase3.deal_notes || ''
+				});
+
+				await pb.collection('media_license_line_items').create({
+					deal: deal.id,
+					asset: params.id,
+					usage_type: phase3.deal_usage_type || 'broadcast',
+					fee_amount: phase3.line_item_fee_amount ? Number(phase3.line_item_fee_amount) : (phase3.deal_fee_amount ? Number(phase3.deal_fee_amount) : null),
+					revenue_share_pct: phase3.line_item_revenue_share_pct ? Number(phase3.line_item_revenue_share_pct) : null,
+					restrictions: phase3.line_item_restrictions || ''
+				});
+			}
+		}
+
+		const taxonomy = await loadAssetTaxonomy(pb, params.id);
+		const licensing = await loadAssetLicensing(pb, params.id);
+
+		return json({ ...asset, taxonomy, licensing });
 	} catch (error) {
 		console.error('Error updating media asset:', error);
 		return json({ message: 'Failed to update media asset', error: String(error) }, { status: 500 });

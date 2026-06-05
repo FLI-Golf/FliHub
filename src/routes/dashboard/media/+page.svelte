@@ -152,6 +152,26 @@
 		}, {} as Record<string, number>)
 	);
 
+	let licensingMetrics = $derived(
+		assets.reduce((acc: { totalDealFees: number; totalAttributedRevenue: number; licensedAssets: number }, asset: any) => {
+			const lineItemFees = (asset.licensing?.lineItems || []).reduce(
+				(sum: number, row: any) => sum + (Number(row.fee_amount) || 0),
+				0
+			);
+			const attributedRevenue = (asset.licensing?.usageLogs || []).reduce(
+				(sum: number, row: any) => sum + (Number(row.revenue_attributed) || 0),
+				0
+			);
+
+			acc.totalDealFees += lineItemFees;
+			acc.totalAttributedRevenue += attributedRevenue;
+			if ((asset.licensing?.lineItems || []).length > 0 || (asset.licensing?.rightsProfiles || []).length > 0) {
+				acc.licensedAssets += 1;
+			}
+			return acc;
+		}, { totalDealFees: 0, totalAttributedRevenue: 0, licensedAssets: 0 })
+	);
+
 	function seasonLabel(asset: any) {
 		return asset.expand?.season?.name || asset.expand?.season?.year || '';
 	}
@@ -237,6 +257,11 @@
 		<div>
 			<h1 class="text-2xl font-bold text-white">Media Assets</h1>
 			<p class="text-slate-400 text-sm mt-1">{assets.length} asset{assets.length !== 1 ? 's' : ''} total</p>
+			<div class="flex flex-wrap gap-2 mt-2 text-[11px]">
+				<span class="px-2 py-1 rounded-md border border-slate-700 bg-slate-900 text-slate-300">Licensed assets: {licensingMetrics.licensedAssets}</span>
+				<span class="px-2 py-1 rounded-md border border-emerald-700/60 bg-emerald-900/20 text-emerald-300">Deal fees: ${licensingMetrics.totalDealFees.toLocaleString()}</span>
+				<span class="px-2 py-1 rounded-md border border-cyan-700/60 bg-cyan-900/20 text-cyan-300">Attributed revenue: ${licensingMetrics.totalAttributedRevenue.toLocaleString()}</span>
+			</div>
 		</div>
 		<Button onclick={() => (showUploadModal = true)} class="bg-blue-600 hover:bg-blue-700 text-white">
 			<Upload class="size-4 mr-2" />
@@ -475,6 +500,18 @@
 						{/if}
 						{#if asset.tags}
 							<p class="text-xs text-slate-500 mt-1 truncate">{asset.tags}</p>
+						{/if}
+						{#if asset.licensing?.lineItems?.length || asset.licensing?.usageLogs?.length}
+							<p class="text-[10px] text-emerald-300 mt-1 truncate">
+								{[
+									asset.licensing?.lineItems?.length
+										? `$${(asset.licensing.lineItems.reduce((sum: number, row: any) => sum + (Number(row.fee_amount) || 0), 0)).toLocaleString()} fees`
+										: '',
+									asset.licensing?.usageLogs?.length
+										? `$${(asset.licensing.usageLogs.reduce((sum: number, row: any) => sum + (Number(row.revenue_attributed) || 0), 0)).toLocaleString()} revenue`
+										: ''
+								].filter(Boolean).join(' · ')}
+							</p>
 						{/if}
 					</div>
 				</div>

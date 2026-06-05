@@ -60,6 +60,32 @@
 		shot_type: '',
 		moment_type: '',
 		hole_number: '',
+		rights_owner: '',
+		rights_usage_type: 'broadcast',
+		rights_territory: '',
+		rights_channel: '',
+		rights_exclusive: false,
+		rights_start_date: '',
+		rights_expiration_date: '',
+		rights_restrictions: '',
+		rights_contract_reference: '',
+		rights_profile_status: 'active',
+		deal_name: '',
+		deal_licensee: '',
+		deal_usage_type: 'broadcast',
+		deal_territory: '',
+		deal_channel: '',
+		deal_exclusive: false,
+		deal_start_date: '',
+		deal_expiration_date: '',
+		deal_fee_amount: '',
+		deal_currency: 'USD',
+		deal_payment_status: 'draft',
+		deal_contract_reference: '',
+		deal_notes: '',
+		line_item_fee_amount: '',
+		line_item_revenue_share_pct: '',
+		line_item_restrictions: '',
 		tags: '',
 		notes: ''
 	});
@@ -70,6 +96,9 @@
 	// Populate form when modal opens
 	$effect(() => {
 		if (open && asset) {
+			const rightsProfile = asset.licensing?.rightsProfiles?.[0] || null;
+			const lineItem = asset.licensing?.lineItems?.[0] || null;
+			const deal = lineItem?.dealRecord || null;
 			formData = {
 				title:      asset.title      || '',
 				asset_type: asset.asset_type || 'flyer',
@@ -98,6 +127,32 @@
 				shot_type: asset.taxonomy?.event?.shot_type || '',
 				moment_type: asset.taxonomy?.event?.moment_type || '',
 				hole_number: asset.taxonomy?.event?.hole_number ? String(asset.taxonomy.event.hole_number) : '',
+				rights_owner: rightsProfile?.rights_owner || '',
+				rights_usage_type: rightsProfile?.usage_type || 'broadcast',
+				rights_territory: rightsProfile?.territory || '',
+				rights_channel: rightsProfile?.channel || '',
+				rights_exclusive: Boolean(rightsProfile?.exclusive),
+				rights_start_date: rightsProfile?.start_date ? String(rightsProfile.start_date).slice(0, 10) : '',
+				rights_expiration_date: rightsProfile?.expiration_date ? String(rightsProfile.expiration_date).slice(0, 10) : '',
+				rights_restrictions: rightsProfile?.restrictions || '',
+				rights_contract_reference: rightsProfile?.contract_reference || '',
+				rights_profile_status: rightsProfile?.status || 'active',
+				deal_name: deal?.name || '',
+				deal_licensee: deal?.licensee || '',
+				deal_usage_type: deal?.usage_type || 'broadcast',
+				deal_territory: deal?.territory || '',
+				deal_channel: deal?.channel || '',
+				deal_exclusive: Boolean(deal?.exclusive),
+				deal_start_date: deal?.start_date ? String(deal.start_date).slice(0, 10) : '',
+				deal_expiration_date: deal?.expiration_date ? String(deal.expiration_date).slice(0, 10) : '',
+				deal_fee_amount: deal?.fee_amount ? String(deal.fee_amount) : '',
+				deal_currency: deal?.currency || 'USD',
+				deal_payment_status: deal?.payment_status || 'draft',
+				deal_contract_reference: deal?.contract_reference || '',
+				deal_notes: deal?.notes || '',
+				line_item_fee_amount: lineItem?.fee_amount ? String(lineItem.fee_amount) : '',
+				line_item_revenue_share_pct: lineItem?.revenue_share_pct ? String(lineItem.revenue_share_pct) : '',
+				line_item_restrictions: lineItem?.restrictions || '',
 				tags:       asset.tags       || '',
 				notes:      asset.notes      || ''
 			};
@@ -133,6 +188,34 @@
 						season: formData.season,
 						tournament: formData.tournament,
 						special_event: formData.special_event
+					},
+					phase3Meta: {
+						rights_owner: formData.rights_owner,
+						rights_usage_type: formData.rights_usage_type,
+						rights_territory: formData.rights_territory,
+						rights_channel: formData.rights_channel,
+						rights_exclusive: formData.rights_exclusive,
+						rights_start_date: formData.rights_start_date,
+						rights_expiration_date: formData.rights_expiration_date,
+						rights_restrictions: formData.rights_restrictions,
+						rights_contract_reference: formData.rights_contract_reference,
+						rights_profile_status: formData.rights_profile_status,
+						deal_name: formData.deal_name,
+						deal_licensee: formData.deal_licensee,
+						deal_usage_type: formData.deal_usage_type,
+						deal_territory: formData.deal_territory,
+						deal_channel: formData.deal_channel,
+						deal_exclusive: formData.deal_exclusive,
+						deal_start_date: formData.deal_start_date,
+						deal_expiration_date: formData.deal_expiration_date,
+						deal_fee_amount: formData.deal_fee_amount,
+						deal_currency: formData.deal_currency,
+						deal_payment_status: formData.deal_payment_status,
+						deal_contract_reference: formData.deal_contract_reference,
+						deal_notes: formData.deal_notes,
+						line_item_fee_amount: formData.line_item_fee_amount,
+						line_item_revenue_share_pct: formData.line_item_revenue_share_pct,
+						line_item_restrictions: formData.line_item_restrictions
 					}
 				})
 			});
@@ -437,6 +520,146 @@
 								<option value={sponsor.id}>{sponsor.name}</option>
 							{/each}
 						</select>
+					</div>
+				</div>
+			</div>
+
+			<div class="rounded-lg border border-slate-700 p-4 space-y-4 bg-slate-900/40">
+				<div>
+					<p class="text-sm font-semibold text-slate-100">Phase 3 Rights & Licensing</p>
+					<p class="text-xs text-slate-400">Create or update one primary rights profile and one license deal line item for this asset.</p>
+				</div>
+
+				<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+					<div class="space-y-2 md:col-span-2">
+						<Label for="edit-rights-owner" class="text-slate-200">Rights Owner</Label>
+						<Input id="edit-rights-owner" bind:value={formData.rights_owner} placeholder="e.g. FLI Golf League" class="bg-slate-800 border-slate-700 text-white placeholder:text-slate-400" />
+					</div>
+					<div class="space-y-2">
+						<Label for="edit-rights-usage-type" class="text-slate-200">Rights Usage Type</Label>
+						<select id="edit-rights-usage-type" bind:value={formData.rights_usage_type} class="flex h-10 w-full rounded-md border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-500">
+							<option value="broadcast">Broadcast</option>
+							<option value="commercial">Commercial</option>
+							<option value="sponsor">Sponsor</option>
+							<option value="social">Social</option>
+							<option value="internal">Internal</option>
+							<option value="other">Other</option>
+						</select>
+					</div>
+					<div class="space-y-2">
+						<Label for="edit-rights-status" class="text-slate-200">Rights Profile Status</Label>
+						<select id="edit-rights-status" bind:value={formData.rights_profile_status} class="flex h-10 w-full rounded-md border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-500">
+							<option value="active">Active</option>
+							<option value="pending">Pending</option>
+							<option value="expired">Expired</option>
+							<option value="restricted">Restricted</option>
+							<option value="disputed">Disputed</option>
+						</select>
+					</div>
+					<div class="space-y-2">
+						<Label for="edit-rights-territory" class="text-slate-200">Territory</Label>
+						<Input id="edit-rights-territory" bind:value={formData.rights_territory} class="bg-slate-800 border-slate-700 text-white" />
+					</div>
+					<div class="space-y-2">
+						<Label for="edit-rights-channel" class="text-slate-200">Channel</Label>
+						<Input id="edit-rights-channel" bind:value={formData.rights_channel} class="bg-slate-800 border-slate-700 text-white" />
+					</div>
+					<div class="space-y-2">
+						<Label for="edit-rights-start" class="text-slate-200">Rights Start Date</Label>
+						<Input id="edit-rights-start" type="date" bind:value={formData.rights_start_date} class="bg-slate-800 border-slate-700 text-white" />
+					</div>
+					<div class="space-y-2">
+						<Label for="edit-rights-end" class="text-slate-200">Rights Expiration Date</Label>
+						<Input id="edit-rights-end" type="date" bind:value={formData.rights_expiration_date} class="bg-slate-800 border-slate-700 text-white" />
+					</div>
+					<div class="space-y-2 md:col-span-2">
+						<Label for="edit-rights-contract" class="text-slate-200">Rights Contract Reference</Label>
+						<Input id="edit-rights-contract" bind:value={formData.rights_contract_reference} class="bg-slate-800 border-slate-700 text-white" />
+					</div>
+					<div class="md:col-span-2 flex items-center gap-2">
+						<input id="edit-rights-exclusive" type="checkbox" bind:checked={formData.rights_exclusive} class="h-4 w-4 rounded border-slate-600 bg-slate-800 text-blue-500" />
+						<Label for="edit-rights-exclusive" class="text-slate-200">Exclusive Rights</Label>
+					</div>
+					<div class="space-y-2 md:col-span-2">
+						<Label for="edit-rights-restrictions" class="text-slate-200">Rights Restrictions</Label>
+						<textarea id="edit-rights-restrictions" bind:value={formData.rights_restrictions} rows="2" class="flex w-full rounded-md border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-500"></textarea>
+					</div>
+
+					<div class="md:col-span-2 border-t border-slate-700 pt-4">
+						<p class="text-sm font-semibold text-slate-100">License Deal & Line Item</p>
+					</div>
+					<div class="space-y-2 md:col-span-2">
+						<Label for="edit-deal-name" class="text-slate-200">Deal Name</Label>
+						<Input id="edit-deal-name" bind:value={formData.deal_name} class="bg-slate-800 border-slate-700 text-white" />
+					</div>
+					<div class="space-y-2 md:col-span-2">
+						<Label for="edit-deal-licensee" class="text-slate-200">Licensee</Label>
+						<Input id="edit-deal-licensee" bind:value={formData.deal_licensee} class="bg-slate-800 border-slate-700 text-white" />
+					</div>
+					<div class="space-y-2">
+						<Label for="edit-deal-usage-type" class="text-slate-200">Deal Usage Type</Label>
+						<select id="edit-deal-usage-type" bind:value={formData.deal_usage_type} class="flex h-10 w-full rounded-md border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-500">
+							<option value="broadcast">Broadcast</option>
+							<option value="streaming">Streaming</option>
+							<option value="social">Social</option>
+							<option value="sponsor">Sponsor</option>
+							<option value="commercial">Commercial</option>
+							<option value="other">Other</option>
+						</select>
+					</div>
+					<div class="space-y-2">
+						<Label for="edit-deal-payment-status" class="text-slate-200">Payment Status</Label>
+						<select id="edit-deal-payment-status" bind:value={formData.deal_payment_status} class="flex h-10 w-full rounded-md border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-500">
+							<option value="draft">Draft</option>
+							<option value="invoiced">Invoiced</option>
+							<option value="paid">Paid</option>
+							<option value="past_due">Past Due</option>
+							<option value="void">Void</option>
+						</select>
+					</div>
+					<div class="space-y-2">
+						<Label for="edit-deal-fee" class="text-slate-200">Deal Fee Amount</Label>
+						<Input id="edit-deal-fee" type="number" min="0" bind:value={formData.deal_fee_amount} class="bg-slate-800 border-slate-700 text-white" />
+					</div>
+					<div class="space-y-2">
+						<Label for="edit-line-item-fee" class="text-slate-200">Line Item Fee Amount</Label>
+						<Input id="edit-line-item-fee" type="number" min="0" bind:value={formData.line_item_fee_amount} class="bg-slate-800 border-slate-700 text-white" />
+					</div>
+					<div class="space-y-2">
+						<Label for="edit-line-item-share" class="text-slate-200">Revenue Share %</Label>
+						<Input id="edit-line-item-share" type="number" min="0" max="100" bind:value={formData.line_item_revenue_share_pct} class="bg-slate-800 border-slate-700 text-white" />
+					</div>
+					<div class="space-y-2">
+						<Label for="edit-deal-currency" class="text-slate-200">Currency</Label>
+						<Input id="edit-deal-currency" bind:value={formData.deal_currency} class="bg-slate-800 border-slate-700 text-white" />
+					</div>
+					<div class="space-y-2">
+						<Label for="edit-deal-territory" class="text-slate-200">Deal Territory</Label>
+						<Input id="edit-deal-territory" bind:value={formData.deal_territory} class="bg-slate-800 border-slate-700 text-white" />
+					</div>
+					<div class="space-y-2">
+						<Label for="edit-deal-channel" class="text-slate-200">Deal Channel</Label>
+						<Input id="edit-deal-channel" bind:value={formData.deal_channel} class="bg-slate-800 border-slate-700 text-white" />
+					</div>
+					<div class="space-y-2">
+						<Label for="edit-deal-start" class="text-slate-200">Deal Start Date</Label>
+						<Input id="edit-deal-start" type="date" bind:value={formData.deal_start_date} class="bg-slate-800 border-slate-700 text-white" />
+					</div>
+					<div class="space-y-2">
+						<Label for="edit-deal-end" class="text-slate-200">Deal Expiration Date</Label>
+						<Input id="edit-deal-end" type="date" bind:value={formData.deal_expiration_date} class="bg-slate-800 border-slate-700 text-white" />
+					</div>
+					<div class="md:col-span-2 flex items-center gap-2">
+						<input id="edit-deal-exclusive" type="checkbox" bind:checked={formData.deal_exclusive} class="h-4 w-4 rounded border-slate-600 bg-slate-800 text-blue-500" />
+						<Label for="edit-deal-exclusive" class="text-slate-200">Deal Exclusive</Label>
+					</div>
+					<div class="space-y-2 md:col-span-2">
+						<Label for="edit-deal-contract-ref" class="text-slate-200">Deal Contract Reference</Label>
+						<Input id="edit-deal-contract-ref" bind:value={formData.deal_contract_reference} class="bg-slate-800 border-slate-700 text-white" />
+					</div>
+					<div class="space-y-2 md:col-span-2">
+						<Label for="edit-line-item-restrictions" class="text-slate-200">Line Item Restrictions</Label>
+						<textarea id="edit-line-item-restrictions" bind:value={formData.line_item_restrictions} rows="2" class="flex w-full rounded-md border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-500"></textarea>
 					</div>
 				</div>
 			</div>
