@@ -1207,6 +1207,152 @@ export const collections = [
 		deleteRule: '@request.auth.id != ""'
 	},
 
+	// ─── Media taxonomy + structured metadata (Phase 2) ──────────────────────
+	{
+		name: 'media_asset_tags',
+		type: 'base',
+		schema: [
+			{ name: 'asset', type: 'relation', required: true, options: { collectionId: 'media_assets', maxSelect: 1 } },
+			{ name: 'tag', type: 'text', required: true, options: { max: 100 } },
+			{
+				name: 'domain',
+				type: 'select',
+				required: false,
+				options: {
+					maxSelect: 1,
+					values: ['general', 'mood', 'scene', 'brand', 'competition', 'broadcast', 'location', 'other']
+				}
+			},
+			{ name: 'notes', type: 'text', required: false }
+		],
+		listRule: '@request.auth.id != ""',
+		viewRule: '@request.auth.id != ""',
+		createRule: '@request.auth.id != ""',
+		updateRule: '@request.auth.id != ""',
+		deleteRule: '@request.auth.id != ""'
+	},
+	{
+		name: 'media_asset_people',
+		type: 'base',
+		schema: [
+			{ name: 'asset', type: 'relation', required: true, options: { collectionId: 'media_assets', maxSelect: 1 } },
+			{ name: 'person', type: 'relation', required: true, options: { collectionId: 'talent', maxSelect: 1 } },
+			{
+				name: 'role',
+				type: 'select',
+				required: false,
+				options: {
+					maxSelect: 1,
+					values: ['player', 'host', 'interviewer', 'analyst', 'coach', 'staff', 'fan', 'vip', 'other']
+				}
+			},
+			{ name: 'is_primary', type: 'bool', required: false }
+		],
+		listRule: '@request.auth.id != ""',
+		viewRule: '@request.auth.id != ""',
+		createRule: '@request.auth.id != ""',
+		updateRule: '@request.auth.id != ""',
+		deleteRule: '@request.auth.id != ""'
+	},
+	{
+		name: 'media_asset_teams',
+		type: 'base',
+		schema: [
+			{ name: 'asset', type: 'relation', required: true, options: { collectionId: 'media_assets', maxSelect: 1 } },
+			{ name: 'team', type: 'relation', required: true, options: { collectionId: 'franchises', maxSelect: 1 } },
+			{
+				name: 'context',
+				type: 'select',
+				required: false,
+				options: { maxSelect: 1, values: ['featured', 'opponent', 'crowd', 'support', 'other'] }
+			}
+		],
+		listRule: '@request.auth.id != ""',
+		viewRule: '@request.auth.id != ""',
+		createRule: '@request.auth.id != ""',
+		updateRule: '@request.auth.id != ""',
+		deleteRule: '@request.auth.id != ""'
+	},
+	{
+		name: 'media_asset_sponsors',
+		type: 'base',
+		schema: [
+			{ name: 'asset', type: 'relation', required: true, options: { collectionId: 'media_assets', maxSelect: 1 } },
+			{ name: 'sponsor', type: 'relation', required: true, options: { collectionId: 'sponsors', maxSelect: 1 } },
+			{
+				name: 'visibility',
+				type: 'select',
+				required: false,
+				options: { maxSelect: 1, values: ['background', 'partial', 'clear', 'hero', 'verbal_mention'] }
+			},
+			{ name: 'placement', type: 'text', required: false, options: { max: 120 } }
+		],
+		listRule: '@request.auth.id != ""',
+		viewRule: '@request.auth.id != ""',
+		createRule: '@request.auth.id != ""',
+		updateRule: '@request.auth.id != ""',
+		deleteRule: '@request.auth.id != ""'
+	},
+	{
+		name: 'media_asset_events',
+		type: 'base',
+		schema: [
+			{ name: 'asset', type: 'relation', required: true, options: { collectionId: 'media_assets', maxSelect: 1 } },
+			{ name: 'season', type: 'relation', required: false, options: { collectionId: 'seasons', maxSelect: 1 } },
+			{ name: 'tournament', type: 'relation', required: false, options: { collectionId: 'tournaments', maxSelect: 1 } },
+			{ name: 'special_event', type: 'relation', required: false, options: { collectionId: 'special_events', maxSelect: 1 } },
+			{ name: 'hole_number', type: 'number', required: false, options: { min: 1, max: 36, noDecimal: true } },
+			{
+				name: 'round_type',
+				type: 'select',
+				required: false,
+				options: { maxSelect: 1, values: ['practice', 'qualifier', 'round_1', 'round_2', 'round_3', 'final_round', 'playoff', 'other'] }
+			},
+			{
+				name: 'shot_type',
+				type: 'select',
+				required: false,
+				options: { maxSelect: 1, values: ['drive', 'approach', 'chip', 'putt', 'bunker', 'penalty', 'other'] }
+			},
+			{
+				name: 'moment_type',
+				type: 'select',
+				required: false,
+				options: {
+					maxSelect: 1,
+					values: ['crowd_reaction', 'interview_segment', 'award_ceremony', 'vip_hospitality', 'sponsor_activation', 'other']
+				}
+			}
+		],
+		listRule: '@request.auth.id != ""',
+		viewRule: '@request.auth.id != ""',
+		createRule: '@request.auth.id != ""',
+		updateRule: '@request.auth.id != ""',
+		deleteRule: '@request.auth.id != ""'
+	},
+	{
+		name: 'media_asset_markers',
+		type: 'base',
+		schema: [
+			{ name: 'asset', type: 'relation', required: true, options: { collectionId: 'media_assets', maxSelect: 1 } },
+			{
+				name: 'marker_type',
+				type: 'select',
+				required: true,
+				options: { maxSelect: 1, values: ['timestamp', 'segment'] }
+			},
+			{ name: 'start_seconds', type: 'number', required: true, options: { min: 0 } },
+			{ name: 'end_seconds', type: 'number', required: false, options: { min: 0 } },
+			{ name: 'label', type: 'text', required: false, options: { max: 200 } },
+			{ name: 'description', type: 'text', required: false }
+		],
+		listRule: '@request.auth.id != ""',
+		viewRule: '@request.auth.id != ""',
+		createRule: '@request.auth.id != ""',
+		updateRule: '@request.auth.id != ""',
+		deleteRule: '@request.auth.id != ""'
+	},
+
 	{
 		name: 'content_production',
 		type: 'base',
