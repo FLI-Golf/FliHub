@@ -234,6 +234,42 @@
 					</div>
 				{/if}
 
+				{#if asset.licensing?.rightsProfiles?.length || asset.licensing?.lineItems?.length || asset.licensing?.usageLogs?.length}
+					<div class="rounded-xl border border-slate-800 bg-slate-900 p-4 space-y-3">
+						<h3 class="text-sm font-semibold text-slate-100">Rights & Licensing History</h3>
+						{#if asset.licensing?.rightsProfiles?.length}
+							<div>
+								<div class="text-slate-400 text-sm mb-1">Rights Profiles</div>
+								<div class="space-y-1 text-sm">
+									{#each asset.licensing.rightsProfiles as row}
+										<div class="text-slate-200">{row.rights_owner} · {row.status || 'active'}{#if row.territory} · {row.territory}{/if}</div>
+									{/each}
+								</div>
+							</div>
+						{/if}
+						{#if asset.licensing?.lineItems?.length}
+							<div>
+								<div class="text-slate-400 text-sm mb-1">License Deals</div>
+								<div class="space-y-1 text-sm">
+									{#each asset.licensing.lineItems as row}
+										<div class="text-slate-200">{row.dealRecord?.name || 'Deal'}{#if row.fee_amount} · ${row.fee_amount}{/if}{#if row.usage_type} · {row.usage_type}{/if}</div>
+									{/each}
+								</div>
+							</div>
+						{/if}
+						{#if asset.licensing?.usageLogs?.length}
+							<div>
+								<div class="text-slate-400 text-sm mb-1">Usage Logs</div>
+								<div class="space-y-1 text-sm">
+									{#each asset.licensing.usageLogs as row}
+										<div class="text-slate-200">{row.channel || 'unknown channel'}{#if row.usage_date} · {formatDate(row.usage_date)}{/if}{#if row.revenue_attributed} · ${row.revenue_attributed}{/if}</div>
+									{/each}
+								</div>
+							</div>
+						{/if}
+					</div>
+				{/if}
+
 				<div class="flex justify-between items-center pt-2">
 					<div class="text-xs text-slate-500">Filename: {asset.file}</div>
 					<a href={fileUrl()} target="_blank" rel="noopener noreferrer">

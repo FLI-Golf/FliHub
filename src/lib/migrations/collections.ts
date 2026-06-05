@@ -1353,6 +1353,117 @@ export const collections = [
 		deleteRule: '@request.auth.id != ""'
 	},
 
+	// ─── Media rights + licensing (Phase 3) ─────────────────────────────────
+	{
+		name: 'media_rights_profiles',
+		type: 'base',
+		schema: [
+			{ name: 'asset', type: 'relation', required: true, options: { collectionId: 'media_assets', maxSelect: 1 } },
+			{ name: 'rights_owner', type: 'text', required: true, options: { max: 255 } },
+			{
+				name: 'usage_type',
+				type: 'select',
+				required: false,
+				options: { maxSelect: 1, values: ['internal', 'sponsor', 'broadcast', 'commercial', 'social', 'other'] }
+			},
+			{ name: 'territory', type: 'text', required: false, options: { max: 120 } },
+			{ name: 'channel', type: 'text', required: false, options: { max: 120 } },
+			{ name: 'exclusive', type: 'bool', required: false },
+			{ name: 'start_date', type: 'date', required: false },
+			{ name: 'expiration_date', type: 'date', required: false },
+			{ name: 'restrictions', type: 'text', required: false },
+			{ name: 'contract_reference', type: 'text', required: false, options: { max: 255 } },
+			{
+				name: 'status',
+				type: 'select',
+				required: false,
+				options: { maxSelect: 1, values: ['active', 'pending', 'expired', 'restricted', 'disputed'] }
+			}
+		],
+		listRule: '@request.auth.id != ""',
+		viewRule: '@request.auth.id != ""',
+		createRule: '@request.auth.id != ""',
+		updateRule: '@request.auth.id != ""',
+		deleteRule: '@request.auth.id != ""'
+	},
+	{
+		name: 'media_license_deals',
+		type: 'base',
+		schema: [
+			{ name: 'name', type: 'text', required: true, options: { max: 255 } },
+			{ name: 'licensee', type: 'text', required: true, options: { max: 255 } },
+			{
+				name: 'usage_type',
+				type: 'select',
+				required: true,
+				options: { maxSelect: 1, values: ['broadcast', 'streaming', 'social', 'sponsor', 'commercial', 'other'] }
+			},
+			{ name: 'territory', type: 'text', required: false, options: { max: 120 } },
+			{ name: 'channel', type: 'text', required: false, options: { max: 120 } },
+			{ name: 'exclusive', type: 'bool', required: false },
+			{ name: 'start_date', type: 'date', required: false },
+			{ name: 'expiration_date', type: 'date', required: false },
+			{ name: 'fee_amount', type: 'number', required: false },
+			{ name: 'currency', type: 'text', required: false, options: { max: 12 } },
+			{
+				name: 'payment_status',
+				type: 'select',
+				required: false,
+				options: { maxSelect: 1, values: ['draft', 'invoiced', 'paid', 'past_due', 'void'] }
+			},
+			{ name: 'contract_reference', type: 'text', required: false, options: { max: 255 } },
+			{ name: 'notes', type: 'text', required: false }
+		],
+		listRule: '@request.auth.id != ""',
+		viewRule: '@request.auth.id != ""',
+		createRule: '@request.auth.id != ""',
+		updateRule: '@request.auth.id != ""',
+		deleteRule: '@request.auth.id != ""'
+	},
+	{
+		name: 'media_license_line_items',
+		type: 'base',
+		schema: [
+			{ name: 'deal', type: 'relation', required: true, options: { collectionId: 'media_license_deals', maxSelect: 1 } },
+			{ name: 'asset', type: 'relation', required: true, options: { collectionId: 'media_assets', maxSelect: 1 } },
+			{
+				name: 'usage_type',
+				type: 'select',
+				required: false,
+				options: { maxSelect: 1, values: ['broadcast', 'streaming', 'social', 'sponsor', 'commercial', 'other'] }
+			},
+			{ name: 'fee_amount', type: 'number', required: false },
+			{ name: 'revenue_share_pct', type: 'number', required: false },
+			{ name: 'restrictions', type: 'text', required: false }
+		],
+		listRule: '@request.auth.id != ""',
+		viewRule: '@request.auth.id != ""',
+		createRule: '@request.auth.id != ""',
+		updateRule: '@request.auth.id != ""',
+		deleteRule: '@request.auth.id != ""'
+	},
+	{
+		name: 'media_usage_logs',
+		type: 'base',
+		schema: [
+			{ name: 'asset', type: 'relation', required: true, options: { collectionId: 'media_assets', maxSelect: 1 } },
+			{ name: 'deal', type: 'relation', required: false, options: { collectionId: 'media_license_deals', maxSelect: 1 } },
+			{ name: 'used_by', type: 'text', required: false, options: { max: 255 } },
+			{ name: 'channel', type: 'text', required: false, options: { max: 120 } },
+			{ name: 'territory', type: 'text', required: false, options: { max: 120 } },
+			{ name: 'usage_date', type: 'date', required: false },
+			{ name: 'usage_context', type: 'text', required: false },
+			{ name: 'impression_count', type: 'number', required: false, options: { noDecimal: true, min: 0 } },
+			{ name: 'revenue_attributed', type: 'number', required: false },
+			{ name: 'notes', type: 'text', required: false }
+		],
+		listRule: '@request.auth.id != ""',
+		viewRule: '@request.auth.id != ""',
+		createRule: '@request.auth.id != ""',
+		updateRule: '@request.auth.id != ""',
+		deleteRule: '@request.auth.id != ""'
+	},
+
 	{
 		name: 'content_production',
 		type: 'base',

@@ -23,7 +23,11 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 			assetTeams,
 			assetSponsors,
 			assetEvents,
-			assetMarkers
+			assetMarkers,
+			rightsProfiles,
+			licenseLineItems,
+			licenseDeals,
+			usageLogs
 		] = await Promise.all([
 			adminFetch('media_assets', {
 				sort: '-created'
@@ -44,7 +48,11 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 			adminFetch('media_asset_teams').catch(() => []),
 			adminFetch('media_asset_sponsors').catch(() => []),
 			adminFetch('media_asset_events').catch(() => []),
-			adminFetch('media_asset_markers').catch(() => [])
+			adminFetch('media_asset_markers').catch(() => []),
+			adminFetch('media_rights_profiles').catch(() => []),
+			adminFetch('media_license_line_items').catch(() => []),
+			adminFetch('media_license_deals').catch(() => []),
+			adminFetch('media_usage_logs').catch(() => [])
 		]);
 
 		const assetTagMap = new Map<string, any[]>();
@@ -53,6 +61,9 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 		const assetSponsorsMap = new Map<string, any[]>();
 		const assetEventMap = new Map<string, any>();
 		const assetMarkerMap = new Map<string, any[]>();
+		const assetRightsMap = new Map<string, any[]>();
+		const assetLineItemsMap = new Map<string, any[]>();
+		const assetUsageMap = new Map<string, any[]>();
 
 		for (const row of assetTags as any[]) {
 			const list = assetTagMap.get(row.asset) || [];
@@ -90,6 +101,26 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 			assetMarkerMap.set(row.asset, list);
 		}
 
+		for (const row of rightsProfiles as any[]) {
+			const list = assetRightsMap.get(row.asset) || [];
+			list.push(row);
+			assetRightsMap.set(row.asset, list);
+		}
+
+		for (const row of licenseLineItems as any[]) {
+			const list = assetLineItemsMap.get(row.asset) || [];
+			list.push(row);
+			assetLineItemsMap.set(row.asset, list);
+		}
+
+		for (const row of usageLogs as any[]) {
+			const list = assetUsageMap.get(row.asset) || [];
+			list.push(row);
+			assetUsageMap.set(row.asset, list);
+		}
+
+		const dealsById = new Map((licenseDeals as any[]).map((item) => [item.id, item]));
+
 		const talentsById = new Map((talents as any[]).map((item) => [item.id, item]));
 		const sponsorsById = new Map((sponsors as any[]).map((item) => [item.id, item]));
 
@@ -104,6 +135,16 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 				sponsorRecord: sponsorsById.get(row.sponsor) || null
 			}));
 
+			const lineItemRows = (assetLineItemsMap.get(asset.id) || []).map((row) => ({
+				...row,
+				dealRecord: dealsById.get(row.deal) || null
+			}));
+
+			const usageRows = (assetUsageMap.get(asset.id) || []).map((row) => ({
+				...row,
+				dealRecord: row.deal ? dealsById.get(row.deal) || null : null
+			}));
+
 			return {
 				...asset,
 				taxonomy: {
@@ -113,6 +154,11 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 					sponsors: sponsorRows,
 					event: assetEventMap.get(asset.id) || null,
 					markers: assetMarkerMap.get(asset.id) || []
+				},
+				licensing: {
+					rightsProfiles: assetRightsMap.get(asset.id) || [],
+					lineItems: lineItemRows,
+					usageLogs: usageRows
 				}
 			};
 		});
