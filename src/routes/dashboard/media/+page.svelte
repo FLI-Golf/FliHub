@@ -6,7 +6,7 @@
 	import UploadMediaModal from '$lib/components/media/upload-media-modal.svelte';
 	import EditMediaModal from '$lib/components/media/edit-media-modal.svelte';
 	import MediaAssetDetailSheet from '$lib/components/media/media-asset-detail-sheet.svelte';
-	import { Upload, Search, Trash2, ExternalLink, Image, Pencil, Film, FileText, Mic, Archive, Eye, Plus, Download, ChevronUp, ChevronDown } from 'lucide-svelte';
+	import { Upload, Search, Trash2, ExternalLink, Image, Pencil, Film, FileText, Mic, Archive, Eye, Plus, Download, ChevronUp, ChevronDown, Save, RotateCcw } from 'lucide-svelte';
 	import {
 		highlightExportTargets,
 		highlightPackageStatuses,
@@ -72,6 +72,7 @@
 		export_target: 'social',
 		create_collection: true
 	});
+	let packageItemDrafts = $state<Record<string, { clip_in_seconds: string; clip_out_seconds: string; usage_role: string }>>({});
 	let searchQuery = $state('');
 	let typeFilter = $state('all');
 	let categoryFilter = $state('all');
@@ -234,6 +235,15 @@
 		}, 0)
 	);
 
+	const highlightUsageRoleOptions = [
+		{ value: 'opening', label: 'Opening' },
+		{ value: 'feature', label: 'Feature' },
+		{ value: 'sponsor_callout', label: 'Sponsor Callout' },
+		{ value: 'transition', label: 'Transition' },
+		{ value: 'closing', label: 'Closing' },
+		{ value: 'other', label: 'Other' }
+	];
+
 	function seasonLabel(asset: any) {
 		return asset.expand?.season?.name || asset.expand?.season?.year || '';
 	}
@@ -287,6 +297,53 @@
 		if (cached?.title) return cached.title;
 		const asset = assets.find((item: any) => item.id === row.asset);
 		return asset?.title || row.asset;
+	}
+
+	function ensureDraftForItem(row: any) {
+		if (packageItemDrafts[row.id]) return;
+		packageItemDrafts = {
+			...packageItemDrafts,
+			[row.id]: {
+				clip_in_seconds: row.clip_in_seconds != null ? String(row.clip_in_seconds) : '',
+				clip_out_seconds: row.clip_out_seconds != null ? String(row.clip_out_seconds) : '',
+				usage_role: row.usage_role || 'feature'
+			}
+		};
+	}
+
+	function updateDraftField(itemId: string, field: 'clip_in_seconds' | 'clip_out_seconds' | 'usage_role', value: string) {
+		const existing = packageItemDrafts[itemId] || {
+			clip_in_seconds: '',
+			clip_out_seconds: '',
+			usage_role: 'feature'
+		};
+		packageItemDrafts = {
+			...packageItemDrafts,
+			[itemId]: {
+				...existing,
+				[field]: value
+			}
+		};
+	}
+
+	function resetDraftForItem(row: any) {
+		packageItemDrafts = {
+			...packageItemDrafts,
+			[row.id]: {
+				clip_in_seconds: row.clip_in_seconds != null ? String(row.clip_in_seconds) : '',
+				clip_out_seconds: row.clip_out_seconds != null ? String(row.clip_out_seconds) : '',
+				usage_role: row.usage_role || 'feature'
+			}
+		};
+	}
+
+	function isDraftDirty(row: any) {
+		const draft = packageItemDrafts[row.id];
+		if (!draft) return false;
+		const currentIn = row.clip_in_seconds != null ? String(row.clip_in_seconds) : '';
+		const currentOut = row.clip_out_seconds != null ? String(row.clip_out_seconds) : '';
+		const currentRole = row.usage_role || 'feature';
+		return draft.clip_in_seconds !== currentIn || draft.clip_out_seconds !== currentOut || draft.usage_role !== currentRole;
 	}
 
 	async function createHighlightPackage() {
@@ -378,8 +435,59 @@
 				throw new Error(data.message || 'Failed to remove item');
 			}
 			highlightPackageItems = highlightPackageItems.filter((row: any) => row.id !== itemId);
+			const nextDrafts = { ...packageItemDrafts };
+			delete nextDrafts[itemId];
+			packageItemDrafts = nextDrafts;
 		} catch (error) {
 			phase5Error = error instanceof Error ? error.message : 'Failed to remove item';
+		} finally {
+			phase5Busy = false;
+		}
+	}
+
+	async function savePackageItemInline(row: any) {
+		const draft = packageItemDrafts[row.id];
+		if (!draft) return;
+
+		const clipIn = draft.clip_in_seconds.trim() === '' ? null : Number(draft.clip_in_seconds);
+		const clipOut = draft.clip_out_seconds.trim() === '' ? null : Number(draft.clip_out_seconds);
+
+		if (clipIn != null && (Number.isNaN(clipIn) || clipIn < 0)) {
+			phase5Error = 'Clip in must be a non-negative number.';
+			return;
+		}
+		if (clipOut != null && (Number.isNaN(clipOut) || clipOut < 0)) {
+			phase5Error = 'Clip out must be a non-negative number.';
+			return;
+		}
+		if (clipIn != null && clipOut != null && clipOut < clipIn) {
+			phase5Error = 'Clip out must be greater than or equal to clip in.';
+			return;
+		}
+
+		phase5Busy = true;
+		phase5Error = '';
+
+		try {
+			const res = await fetch(`/api/media/highlight-packages/items/${row.id}`, {
+				method: 'PATCH',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({
+					clip_in_seconds: clipIn,
+					clip_out_seconds: clipOut,
+					usage_role: draft.usage_role || 'feature'
+				})
+			});
+			if (!res.ok) {
+				const data = await res.json().catch(() => ({}));
+				throw new Error(data.message || 'Failed to update clip fields');
+			}
+
+			const updated = await res.json();
+			highlightPackageItems = highlightPackageItems.map((item: any) => (item.id === row.id ? { ...item, ...updated } : item));
+			resetDraftForItem({ ...row, ...updated });
+		} catch (error) {
+			phase5Error = error instanceof Error ? error.message : 'Failed to update clip fields';
 		} finally {
 			phase5Busy = false;
 		}
@@ -718,12 +826,45 @@
 				{:else}
 					<div class="space-y-2 max-h-56 overflow-y-auto pr-1">
 						{#each selectedPackageItems as row, index (row.id)}
+							{@const _ = ensureDraftForItem(row)}
 							<div class="flex items-center justify-between rounded border border-slate-700 bg-slate-950/70 px-2 py-1.5 gap-2">
-								<div class="min-w-0">
+								<div class="min-w-0 flex-1">
 									<p class="text-xs text-slate-100 truncate">{index + 1}. {highlightItemAssetLabel(row)}</p>
-									<p class="text-[10px] text-slate-400">{row.usage_role || 'feature'} · {row.clip_in_seconds || 0}s-{row.clip_out_seconds || 0}s</p>
+									<div class="grid grid-cols-1 md:grid-cols-3 gap-1.5 mt-1">
+										<Input
+											type="number"
+											min="0"
+											value={packageItemDrafts[row.id]?.clip_in_seconds || ''}
+											oninput={(event) => updateDraftField(row.id, 'clip_in_seconds', (event.currentTarget as HTMLInputElement).value)}
+											placeholder="Clip in"
+											class="h-7 text-[11px] bg-slate-900 border-slate-700 text-white"
+										/>
+										<Input
+											type="number"
+											min="0"
+											value={packageItemDrafts[row.id]?.clip_out_seconds || ''}
+											oninput={(event) => updateDraftField(row.id, 'clip_out_seconds', (event.currentTarget as HTMLInputElement).value)}
+											placeholder="Clip out"
+											class="h-7 text-[11px] bg-slate-900 border-slate-700 text-white"
+										/>
+										<select
+											value={packageItemDrafts[row.id]?.usage_role || 'feature'}
+											onchange={(event) => updateDraftField(row.id, 'usage_role', (event.currentTarget as HTMLSelectElement).value)}
+											class="h-7 rounded-md border border-slate-700 bg-slate-900 px-2 text-[11px] text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500"
+										>
+											{#each highlightUsageRoleOptions as option}
+												<option value={option.value}>{option.label}</option>
+											{/each}
+										</select>
+									</div>
 								</div>
 								<div class="flex items-center gap-1 shrink-0">
+									<button type="button" class="p-1 rounded bg-slate-800 border border-slate-700 text-slate-200 hover:bg-slate-700 disabled:opacity-50" onclick={() => resetDraftForItem(row)} disabled={phase5Busy || !isDraftDirty(row)}>
+										<RotateCcw class="size-3.5" />
+									</button>
+									<button type="button" class="p-1 rounded bg-violet-900/40 border border-violet-700/60 text-violet-200 hover:bg-violet-800/50 disabled:opacity-50" onclick={() => savePackageItemInline(row)} disabled={phase5Busy || !isDraftDirty(row)}>
+										<Save class="size-3.5" />
+									</button>
 									<button type="button" class="p-1 rounded bg-slate-800 border border-slate-700 text-slate-200 hover:bg-slate-700" onclick={() => movePackageItem(row.id, -1)} disabled={phase5Busy || index === 0}>
 										<ChevronUp class="size-3.5" />
 									</button>
