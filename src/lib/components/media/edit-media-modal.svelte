@@ -7,7 +7,10 @@
 	import {
 		mediaAssetTypes,
 		mediaCategories,
+		mediaMomentTypes,
 		mediaRightsStatuses,
+		mediaRoundTypes,
+		mediaShotTypes,
 		mediaSourceTypes,
 		mediaStatuses,
 		mediaStorageTiers,
@@ -18,8 +21,10 @@
 		open = $bindable(false),
 		asset,
 		franchises = [],
+		talents = [],
 		projects = [],
 		campaigns = [],
+		sponsors = [],
 		seasons = [],
 		tournaments = [],
 		specialEvents = [],
@@ -46,6 +51,15 @@
 		storage_tier: 'hot',
 		usage_scope: 'internal',
 		rights_status: 'owned',
+		structured_tags: '',
+		tag_domain: 'general',
+		people_ids: [] as string[],
+		team_ids: [] as string[],
+		sponsor_ids: [] as string[],
+		round_type: '',
+		shot_type: '',
+		moment_type: '',
+		hole_number: '',
 		tags: '',
 		notes: ''
 	});
@@ -75,6 +89,15 @@
 				storage_tier: asset.storage_tier || 'hot',
 				usage_scope: asset.usage_scope || 'internal',
 				rights_status: asset.rights_status || 'owned',
+				structured_tags: (asset.taxonomy?.tags || []).map((row: any) => row.tag).join(', '),
+				tag_domain: asset.taxonomy?.tags?.[0]?.domain || 'general',
+				people_ids: (asset.taxonomy?.people || []).map((row: any) => row.person).filter(Boolean),
+				team_ids: (asset.taxonomy?.teams || []).map((row: any) => row.team).filter(Boolean),
+				sponsor_ids: (asset.taxonomy?.sponsors || []).map((row: any) => row.sponsor).filter(Boolean),
+				round_type: asset.taxonomy?.event?.round_type || '',
+				shot_type: asset.taxonomy?.event?.shot_type || '',
+				moment_type: asset.taxonomy?.event?.moment_type || '',
+				hole_number: asset.taxonomy?.event?.hole_number ? String(asset.taxonomy.event.hole_number) : '',
 				tags:       asset.tags       || '',
 				notes:      asset.notes      || ''
 			};
@@ -95,7 +118,23 @@
 			const response = await fetch(`/api/media/${asset.id}`, {
 				method: 'PATCH',
 				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify(formData)
+				body: JSON.stringify({
+					...formData,
+					phase2Meta: {
+						structured_tags: formData.structured_tags,
+						tag_domain: formData.tag_domain,
+						people_ids: formData.people_ids,
+						team_ids: formData.team_ids,
+						sponsor_ids: formData.sponsor_ids,
+						round_type: formData.round_type,
+						shot_type: formData.shot_type,
+						moment_type: formData.moment_type,
+						hole_number: formData.hole_number,
+						season: formData.season,
+						tournament: formData.tournament,
+						special_event: formData.special_event
+					}
+				})
 			});
 
 			if (!response.ok) {
@@ -325,6 +364,80 @@
 							<option value={option.value}>{option.label}</option>
 						{/each}
 					</select>
+				</div>
+			</div>
+
+			<div class="rounded-lg border border-slate-700 p-4 space-y-4 bg-slate-900/40">
+				<div>
+					<p class="text-sm font-semibold text-slate-100">Phase 2 Taxonomy</p>
+					<p class="text-xs text-slate-400">Manage normalized metadata for people, teams, sponsors, and gameplay context.</p>
+				</div>
+
+				<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+					<div class="space-y-2 md:col-span-2">
+						<Label for="edit-media-structured-tags" class="text-slate-200">Structured Tags</Label>
+						<Input
+							id="edit-media-structured-tags"
+							bind:value={formData.structured_tags}
+							placeholder="e.g. crowd reaction, clutch putt, champions"
+							class="bg-slate-800 border-slate-700 text-white placeholder:text-slate-400"
+						/>
+					</div>
+					<div class="space-y-2">
+						<Label for="edit-media-round-type" class="text-slate-200">Round Type</Label>
+						<select id="edit-media-round-type" bind:value={formData.round_type} class="flex h-10 w-full rounded-md border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-500">
+							<option value="">None</option>
+							{#each mediaRoundTypes as option}
+								<option value={option.value}>{option.label}</option>
+							{/each}
+						</select>
+					</div>
+					<div class="space-y-2">
+						<Label for="edit-media-shot-type" class="text-slate-200">Shot Type</Label>
+						<select id="edit-media-shot-type" bind:value={formData.shot_type} class="flex h-10 w-full rounded-md border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-500">
+							<option value="">None</option>
+							{#each mediaShotTypes as option}
+								<option value={option.value}>{option.label}</option>
+							{/each}
+						</select>
+					</div>
+					<div class="space-y-2">
+						<Label for="edit-media-moment-type" class="text-slate-200">Moment Type</Label>
+						<select id="edit-media-moment-type" bind:value={formData.moment_type} class="flex h-10 w-full rounded-md border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-500">
+							<option value="">None</option>
+							{#each mediaMomentTypes as option}
+								<option value={option.value}>{option.label}</option>
+							{/each}
+						</select>
+					</div>
+					<div class="space-y-2">
+						<Label for="edit-media-hole-number" class="text-slate-200">Hole Number</Label>
+						<Input id="edit-media-hole-number" type="number" min="1" max="36" bind:value={formData.hole_number} class="bg-slate-800 border-slate-700 text-white" />
+					</div>
+					<div class="space-y-2">
+						<Label for="edit-media-people" class="text-slate-200">People (multi-select)</Label>
+						<select id="edit-media-people" bind:value={formData.people_ids} multiple size="4" class="flex w-full rounded-md border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-500">
+							{#each talents as person}
+								<option value={person.id}>{person.fullName || person.name || `${person.firstName || ''} ${person.lastName || ''}`.trim()}</option>
+							{/each}
+						</select>
+					</div>
+					<div class="space-y-2">
+						<Label for="edit-media-teams" class="text-slate-200">Teams (multi-select)</Label>
+						<select id="edit-media-teams" bind:value={formData.team_ids} multiple size="4" class="flex w-full rounded-md border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-500">
+							{#each franchises as team}
+								<option value={team.id}>{team.name}</option>
+							{/each}
+						</select>
+					</div>
+					<div class="space-y-2 md:col-span-2">
+						<Label for="edit-media-sponsors" class="text-slate-200">Sponsors (multi-select)</Label>
+						<select id="edit-media-sponsors" bind:value={formData.sponsor_ids} multiple size="4" class="flex w-full rounded-md border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-500">
+							{#each sponsors as sponsor}
+								<option value={sponsor.id}>{sponsor.name}</option>
+							{/each}
+						</select>
+					</div>
 				</div>
 			</div>
 

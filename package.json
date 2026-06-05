@@ -21,6 +21,7 @@
     "test:seed:marketing": "tsx scripts/seed-marketing-data.ts",
     "test:seed:vendors": "tsx scripts/seed-vendor-data.ts",
     "test:seed:media": "tsx scripts/seed-media-assets-phase1.ts",
+    "test:seed:media:phase2": "tsx scripts/seed-media-assets-phase2.ts",
     "test:restore": "tsx scripts/restore-from-seed-backup.ts latest",
     "test:flow": "npm run test:backup && npm run test:seed:quick",
     "seed:all": "tsx scripts/seed-all.ts",

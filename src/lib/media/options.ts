@@ -73,6 +73,47 @@ export const mediaRightsStatuses: MediaOption[] = [
 	{ value: 'expired', label: 'Expired' }
 ];
 
+export const mediaTagDomains: MediaOption[] = [
+	{ value: 'general', label: 'General' },
+	{ value: 'mood', label: 'Mood' },
+	{ value: 'scene', label: 'Scene' },
+	{ value: 'brand', label: 'Brand' },
+	{ value: 'competition', label: 'Competition' },
+	{ value: 'broadcast', label: 'Broadcast' },
+	{ value: 'location', label: 'Location' },
+	{ value: 'other', label: 'Other' }
+];
+
+export const mediaRoundTypes: MediaOption[] = [
+	{ value: 'practice', label: 'Practice' },
+	{ value: 'qualifier', label: 'Qualifier' },
+	{ value: 'round_1', label: 'Round 1' },
+	{ value: 'round_2', label: 'Round 2' },
+	{ value: 'round_3', label: 'Round 3' },
+	{ value: 'final_round', label: 'Final Round' },
+	{ value: 'playoff', label: 'Playoff' },
+	{ value: 'other', label: 'Other' }
+];
+
+export const mediaShotTypes: MediaOption[] = [
+	{ value: 'drive', label: 'Drive' },
+	{ value: 'approach', label: 'Approach' },
+	{ value: 'chip', label: 'Chip' },
+	{ value: 'putt', label: 'Putt' },
+	{ value: 'bunker', label: 'Bunker' },
+	{ value: 'penalty', label: 'Penalty' },
+	{ value: 'other', label: 'Other' }
+];
+
+export const mediaMomentTypes: MediaOption[] = [
+	{ value: 'crowd_reaction', label: 'Crowd Reaction' },
+	{ value: 'interview_segment', label: 'Interview Segment' },
+	{ value: 'award_ceremony', label: 'Award Ceremony' },
+	{ value: 'vip_hospitality', label: 'VIP / Hospitality' },
+	{ value: 'sponsor_activation', label: 'Sponsor Activation' },
+	{ value: 'other', label: 'Other' }
+];
+
 export function labelFor(options: MediaOption[], value: string | null | undefined): string {
 	return options.find((option) => option.value === value)?.label ?? value ?? '';
 }

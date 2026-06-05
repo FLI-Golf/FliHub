@@ -20,7 +20,10 @@
 		labelFor,
 		mediaAssetTypes,
 		mediaCategories,
+		mediaMomentTypes,
 		mediaRightsStatuses,
+		mediaRoundTypes,
+		mediaShotTypes,
 		mediaSourceTypes,
 		mediaStatuses,
 		mediaStorageTiers,
@@ -74,6 +77,12 @@
 
 	function relationLabel(record: any) {
 		return record?.name || record?.title || record?.year || 'Not set';
+	}
+
+	function personLabel(row: any) {
+		const person = row?.personRecord;
+		if (!person) return 'Unknown person';
+		return person.fullName || person.name || `${person.firstName || ''} ${person.lastName || ''}`.trim() || 'Unknown person';
 	}
 </script>
 
@@ -167,6 +176,45 @@
 						<div><div class="text-slate-400">Rights Status</div><div>{labelFor(mediaRightsStatuses, asset.rights_status || 'owned')}</div></div>
 					</div>
 				</div>
+
+				{#if asset.taxonomy?.tags?.length || asset.taxonomy?.people?.length || asset.taxonomy?.teams?.length || asset.taxonomy?.sponsors?.length || asset.taxonomy?.event}
+					<div class="rounded-xl border border-slate-800 bg-slate-900 p-4 space-y-3">
+						<h3 class="text-sm font-semibold text-slate-100">Structured Metadata</h3>
+						{#if asset.taxonomy?.tags?.length}
+							<div>
+								<div class="text-slate-400 text-sm mb-1">Structured Tags</div>
+								<p class="text-sm text-slate-200">{asset.taxonomy.tags.map((row: any) => row.tag).join(', ')}</p>
+							</div>
+						{/if}
+						<div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+							<div>
+								<div class="text-slate-400">People</div>
+								<div>{asset.taxonomy?.people?.length ? asset.taxonomy.people.map((row: any) => personLabel(row)).join(', ') : 'Not set'}</div>
+							</div>
+							<div>
+								<div class="text-slate-400">Teams</div>
+								<div>{asset.taxonomy?.teams?.length ? asset.taxonomy.teams.map((row: any) => relationLabel(asset.expand?.franchise && asset.expand.franchise.id === row.team ? asset.expand.franchise : { name: row.team })).join(', ') : 'Not set'}</div>
+							</div>
+							<div>
+								<div class="text-slate-400">Sponsors</div>
+								<div>{asset.taxonomy?.sponsors?.length ? asset.taxonomy.sponsors.map((row: any) => row.sponsorRecord?.name || row.sponsor).join(', ') : 'Not set'}</div>
+							</div>
+							<div>
+								<div class="text-slate-400">Event Context</div>
+								<div>
+									{asset.taxonomy?.event
+										? [
+											labelFor(mediaRoundTypes, asset.taxonomy.event.round_type),
+											labelFor(mediaShotTypes, asset.taxonomy.event.shot_type),
+											labelFor(mediaMomentTypes, asset.taxonomy.event.moment_type),
+											asset.taxonomy.event.hole_number ? `Hole ${asset.taxonomy.event.hole_number}` : ''
+										].filter(Boolean).join(' · ') || 'Not set'
+										: 'Not set'}
+								</div>
+							</div>
+						</div>
+					</div>
+				{/if}
 
 				{#if asset.tags || asset.notes}
 					<div class="rounded-xl border border-slate-800 bg-slate-900 p-4 space-y-3">

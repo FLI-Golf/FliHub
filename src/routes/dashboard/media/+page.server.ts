@@ -8,7 +8,23 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 	const { pb, userId, profile: userProfile, role } = ctx;
 	try {
 		
-		const [assets, franchises, projects, campaigns, seasons, tournaments, specialEvents] = await Promise.all([
+		const [
+			assets,
+			franchises,
+			projects,
+			campaigns,
+			seasons,
+			tournaments,
+			specialEvents,
+			talents,
+			sponsors,
+			assetTags,
+			assetPeople,
+			assetTeams,
+			assetSponsors,
+			assetEvents,
+			assetMarkers
+		] = await Promise.all([
 			adminFetch('media_assets', {
 				sort: '-created'
 			}).catch((err: any) => {
@@ -20,15 +36,105 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 			pb.collection('campaigns').getFullList({ sort: 'name', fields: 'id,name' }).catch(() => []),
 			pb.collection('seasons').getFullList({ sort: '-created', fields: 'id,name,year' }).catch(() => []),
 			pb.collection('tournaments').getFullList({ sort: 'name', fields: 'id,name' }).catch(() => []),
-			pb.collection('special_events').getFullList({ sort: 'name', fields: 'id,name' }).catch(() => [])
+			pb.collection('special_events').getFullList({ sort: 'name', fields: 'id,name' }).catch(() => []),
+			pb.collection('talent').getFullList({ sort: 'lastName,firstName', fields: 'id,firstName,lastName,name,fullName' }).catch(() => []),
+			pb.collection('sponsors').getFullList({ sort: 'name', fields: 'id,name' }).catch(() => []),
+			adminFetch('media_asset_tags').catch(() => []),
+			adminFetch('media_asset_people').catch(() => []),
+			adminFetch('media_asset_teams').catch(() => []),
+			adminFetch('media_asset_sponsors').catch(() => []),
+			adminFetch('media_asset_events').catch(() => []),
+			adminFetch('media_asset_markers').catch(() => [])
 		]);
+
+		const assetTagMap = new Map<string, any[]>();
+		const assetPeopleMap = new Map<string, any[]>();
+		const assetTeamsMap = new Map<string, any[]>();
+		const assetSponsorsMap = new Map<string, any[]>();
+		const assetEventMap = new Map<string, any>();
+		const assetMarkerMap = new Map<string, any[]>();
+
+		for (const row of assetTags as any[]) {
+			const list = assetTagMap.get(row.asset) || [];
+			list.push(row);
+			assetTagMap.set(row.asset, list);
+		}
+
+		for (const row of assetPeople as any[]) {
+			const list = assetPeopleMap.get(row.asset) || [];
+			list.push(row);
+			assetPeopleMap.set(row.asset, list);
+		}
+
+		for (const row of assetTeams as any[]) {
+			const list = assetTeamsMap.get(row.asset) || [];
+			list.push(row);
+			assetTeamsMap.set(row.asset, list);
+		}
+
+		for (const row of assetSponsors as any[]) {
+			const list = assetSponsorsMap.get(row.asset) || [];
+			list.push(row);
+			assetSponsorsMap.set(row.asset, list);
+		}
+
+		for (const row of assetEvents as any[]) {
+			if (!assetEventMap.has(row.asset)) {
+				assetEventMap.set(row.asset, row);
+			}
+		}
+
+		for (const row of assetMarkers as any[]) {
+			const list = assetMarkerMap.get(row.asset) || [];
+			list.push(row);
+			assetMarkerMap.set(row.asset, list);
+		}
+
+		const talentsById = new Map((talents as any[]).map((item) => [item.id, item]));
+		const sponsorsById = new Map((sponsors as any[]).map((item) => [item.id, item]));
+
+		const enrichedAssets = (assets as any[]).map((asset) => {
+			const peopleRows = (assetPeopleMap.get(asset.id) || []).map((row) => ({
+				...row,
+				personRecord: talentsById.get(row.person) || null
+			}));
+
+			const sponsorRows = (assetSponsorsMap.get(asset.id) || []).map((row) => ({
+				...row,
+				sponsorRecord: sponsorsById.get(row.sponsor) || null
+			}));
+
+			return {
+				...asset,
+				taxonomy: {
+					tags: assetTagMap.get(asset.id) || [],
+					people: peopleRows,
+					teams: assetTeamsMap.get(asset.id) || [],
+					sponsors: sponsorRows,
+					event: assetEventMap.get(asset.id) || null,
+					markers: assetMarkerMap.get(asset.id) || []
+				}
+			};
+		});
 	
 		// Pass PocketBase URL and auth token to the client so uploads go directly
 		// to PocketBase, bypassing Netlify's 1MB function body limit.
 		const pbUrl = env.POCKETBASE_URL || 'http://127.0.0.1:8090';
 		const authToken = locals.pb.authStore.token || '';
 	
-		return { assets, franchises, projects, campaigns, seasons, tournaments, specialEvents, pbUrl, authToken };
+		return {
+			assets: enrichedAssets,
+			franchises,
+			projects,
+			campaigns,
+			seasons,
+			tournaments,
+			specialEvents,
+			talents,
+			sponsors,
+			pbUrl,
+			authToken
+		};
 	} catch (err: any) {
 		console.error('media load error:', err?.message ?? err);
 		return {};

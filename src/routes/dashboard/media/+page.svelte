@@ -11,7 +11,10 @@
 		labelFor,
 		mediaAssetTypes,
 		mediaCategories,
+		mediaMomentTypes,
 		mediaRightsStatuses,
+		mediaRoundTypes,
+		mediaShotTypes,
 		mediaStatuses,
 		mediaUsageScopes,
 		isImageLikeAsset
@@ -26,6 +29,8 @@
 	const seasonMap = new Map((data.seasons || []).map((item: any) => [item.id, item]));
 	const tournamentMap = new Map((data.tournaments || []).map((item: any) => [item.id, item]));
 	const specialEventMap = new Map((data.specialEvents || []).map((item: any) => [item.id, item]));
+	const talentMap = new Map((data.talents || []).map((item: any) => [item.id, item]));
+	const sponsorMap = new Map((data.sponsors || []).map((item: any) => [item.id, item]));
 
 	function decorateAsset(asset: any) {
 		if (!asset) return asset;
@@ -58,6 +63,22 @@
 	let statusFilter = $state('all');
 	let seasonFilter = $state('all');
 	let franchiseFilter = $state('all');
+	let personFilter = $state('all');
+	let teamFilter = $state('all');
+	let sponsorFilter = $state('all');
+	let roundTypeFilter = $state('all');
+	let shotTypeFilter = $state('all');
+	let momentTypeFilter = $state('all');
+
+	function personLabel(id: string) {
+		const person = talentMap.get(id);
+		if (!person) return '';
+		return person.fullName || person.name || `${person.firstName || ''} ${person.lastName || ''}`.trim();
+	}
+
+	function sponsorLabel(id: string) {
+		return sponsorMap.get(id)?.name || '';
+	}
 
 	const assetTypeColors: Record<string, string> = {
 		flyer:   'bg-purple-900/40 text-purple-300 border-purple-700',
@@ -95,6 +116,12 @@
 		if (statusFilter !== 'all' && (a.status || 'uploaded') !== statusFilter) return false;
 		if (seasonFilter !== 'all' && a.season !== seasonFilter) return false;
 		if (franchiseFilter !== 'all' && a.franchise !== franchiseFilter) return false;
+		if (personFilter !== 'all' && !(a.taxonomy?.people || []).some((row: any) => row.person === personFilter)) return false;
+		if (teamFilter !== 'all' && !(a.taxonomy?.teams || []).some((row: any) => row.team === teamFilter)) return false;
+		if (sponsorFilter !== 'all' && !(a.taxonomy?.sponsors || []).some((row: any) => row.sponsor === sponsorFilter)) return false;
+		if (roundTypeFilter !== 'all' && a.taxonomy?.event?.round_type !== roundTypeFilter) return false;
+		if (shotTypeFilter !== 'all' && a.taxonomy?.event?.shot_type !== shotTypeFilter) return false;
+		if (momentTypeFilter !== 'all' && a.taxonomy?.event?.moment_type !== momentTypeFilter) return false;
 		if (searchQuery) {
 			const q = searchQuery.toLowerCase();
 			const haystack = [
@@ -104,7 +131,14 @@
 				a.resolution,
 				a.expand?.tournament?.name,
 				a.expand?.special_event?.name,
-				a.expand?.season?.name
+				a.expand?.season?.name,
+				...(a.taxonomy?.tags || []).map((tag: any) => tag.tag),
+				...(a.taxonomy?.people || []).map((row: any) => personLabel(row.person)),
+				...(a.taxonomy?.teams || []).map((row: any) => franchiseName(row.team)),
+				...(a.taxonomy?.sponsors || []).map((row: any) => sponsorLabel(row.sponsor)),
+				a.taxonomy?.event?.round_type,
+				a.taxonomy?.event?.shot_type,
+				a.taxonomy?.event?.moment_type
 			].filter(Boolean).join(' ').toLowerCase();
 			if (!haystack.includes(q)) return false;
 		}
@@ -175,6 +209,12 @@
 				statusFilter,
 				seasonFilter,
 				franchiseFilter,
+				personFilter,
+				teamFilter,
+				sponsorFilter,
+				roundTypeFilter,
+				shotTypeFilter,
+				momentTypeFilter,
 				searchQuery
 			},
 			lookupCounts: {
@@ -183,7 +223,9 @@
 				campaigns: data.campaigns?.length || 0,
 				seasons: data.seasons?.length || 0,
 				tournaments: data.tournaments?.length || 0,
-				specialEvents: data.specialEvents?.length || 0
+				specialEvents: data.specialEvents?.length || 0,
+				talents: data.talents?.length || 0,
+				sponsors: data.sponsors?.length || 0
 			}
 		});
 	});
@@ -223,7 +265,7 @@
 	</div>
 
 	<!-- Filters -->
-	<div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-3 mb-6">
+	<div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-3 mb-3">
 		<div class="relative flex-1 max-w-sm">
 			<Search class="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-slate-400" />
 			<Input
@@ -261,6 +303,45 @@
 				{/each}
 			</select>
 		{/if}
+	</div>
+
+	<div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-6 gap-3 mb-6">
+		<select bind:value={personFilter} class="flex h-10 rounded-md border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-500">
+			<option value="all">All People</option>
+			{#each data.talents || [] as person}
+				<option value={person.id}>{personLabel(person.id)}</option>
+			{/each}
+		</select>
+		<select bind:value={teamFilter} class="flex h-10 rounded-md border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-500">
+			<option value="all">All Teams</option>
+			{#each data.franchises || [] as team}
+				<option value={team.id}>{team.name}</option>
+			{/each}
+		</select>
+		<select bind:value={sponsorFilter} class="flex h-10 rounded-md border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-500">
+			<option value="all">All Sponsors</option>
+			{#each data.sponsors || [] as sponsor}
+				<option value={sponsor.id}>{sponsor.name}</option>
+			{/each}
+		</select>
+		<select bind:value={roundTypeFilter} class="flex h-10 rounded-md border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-500">
+			<option value="all">All Rounds</option>
+			{#each mediaRoundTypes as option}
+				<option value={option.value}>{option.label}</option>
+			{/each}
+		</select>
+		<select bind:value={shotTypeFilter} class="flex h-10 rounded-md border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-500">
+			<option value="all">All Shot Types</option>
+			{#each mediaShotTypes as option}
+				<option value={option.value}>{option.label}</option>
+			{/each}
+		</select>
+		<select bind:value={momentTypeFilter} class="flex h-10 rounded-md border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-500">
+			<option value="all">All Moments</option>
+			{#each mediaMomentTypes as option}
+				<option value={option.value}>{option.label}</option>
+			{/each}
+		</select>
 	</div>
 
 	<div class="flex flex-wrap gap-2 mb-6">
@@ -383,6 +464,15 @@
 						{#if asset.rights_status || asset.usage_scope}
 							<p class="text-[10px] text-slate-500 mt-1 truncate">{[labelFor(mediaRightsStatuses, asset.rights_status), labelFor(mediaUsageScopes, asset.usage_scope)].filter(Boolean).join(' · ')}</p>
 						{/if}
+						{#if asset.taxonomy?.people?.length || asset.taxonomy?.sponsors?.length || asset.taxonomy?.event?.moment_type}
+							<p class="text-[10px] text-slate-400 mt-1 truncate">
+								{[
+									asset.taxonomy?.people?.length ? `${asset.taxonomy.people.length} people` : '',
+									asset.taxonomy?.sponsors?.length ? `${asset.taxonomy.sponsors.length} sponsors` : '',
+									labelFor(mediaMomentTypes, asset.taxonomy?.event?.moment_type)
+								].filter(Boolean).join(' · ')}
+							</p>
+						{/if}
 						{#if asset.tags}
 							<p class="text-xs text-slate-500 mt-1 truncate">{asset.tags}</p>
 						{/if}
@@ -396,8 +486,10 @@
 <UploadMediaModal
 	bind:open={showUploadModal}
 	franchises={data.franchises}
+	talents={data.talents}
 	projects={data.projects}
 	campaigns={data.campaigns}
+	sponsors={data.sponsors}
 	seasons={data.seasons}
 	tournaments={data.tournaments}
 	specialEvents={data.specialEvents}
@@ -418,8 +510,10 @@
 		bind:open={showEditModal}
 		asset={editingAsset}
 		franchises={data.franchises}
+		talents={data.talents}
 		projects={data.projects}
 		campaigns={data.campaigns}
+		sponsors={data.sponsors}
 		seasons={data.seasons}
 		tournaments={data.tournaments}
 		specialEvents={data.specialEvents}
