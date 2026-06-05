@@ -28,6 +28,35 @@ async function auth() {
 	await pb.admins.authWithPassword(email, password);
 }
 
+async function requestJson(url: string, options: RequestInit = {}) {
+	const response = await fetch(url, options);
+	const payload = await response.json().catch(() => ({}));
+	if (!response.ok) {
+		throw new Error(`${response.status} ${JSON.stringify(payload)}`);
+	}
+	return payload;
+}
+
+async function fetchAssetsViaRest() {
+	const url = process.env.POCKETBASE_URL || 'http://127.0.0.1:8090';
+	const email = process.env.POCKETBASE_ADMIN_EMAIL || '';
+	const password = process.env.POCKETBASE_ADMIN_PASSWORD || '';
+	const baseUrl = url.replace(/\/$/, '');
+
+	const authRes = await requestJson(`${baseUrl}/api/collections/_superusers/auth-with-password`, {
+		method: 'POST',
+		headers: { 'Content-Type': 'application/json' },
+		body: JSON.stringify({ identity: email, password })
+	});
+
+	const records = await requestJson(
+		`${baseUrl}/api/collections/media_assets/records?page=1&perPage=200`,
+		{ headers: { Authorization: authRes.token } }
+	);
+
+	return records.items || [];
+}
+
 async function safeList(collection: string, options: Record<string, any> = {}) {
 	try {
 		const page = await pb.collection(collection).getList(1, 200, options);
@@ -55,8 +84,9 @@ function nonEmpty<T>(value: T | null | undefined): value is T {
 async function main() {
 	await auth();
 
-	const [assets, talent, sponsors, franchises, seasons, tournaments, specialEvents] = await Promise.all([
-		safeList('media_assets', { sort: '-created', fields: 'id,title,media_category,season,tournament,special_event,franchise' }),
+	const assets = await fetchAssetsViaRest();
+
+	const [talent, sponsors, franchises, seasons, tournaments, specialEvents] = await Promise.all([
 		safeList('talent', { sort: 'lastName,firstName', fields: 'id' }),
 		safeList('sponsors', { sort: 'name', fields: 'id' }),
 		safeList('franchises', { sort: 'name', fields: 'id' }),
