@@ -35,7 +35,7 @@ export const GET: RequestHandler = async ({ locals }) => {
 		const stats = [
 			{ label: 'Assets Stored', value: String(assets.length) },
 			{ label: 'Hours of Footage', value: formatHours(totalSeconds) },
-			{ label: 'Photo Count', value: String(assets.filter((asset: any) => asset.asset_type === 'photo').length) },
+			{ label: 'Photo Count', value: String(assets.filter((asset: any) => (asset.media_category ?? asset.asset_type) === 'photo').length) },
 			{ label: 'Deliverables Completed', value: String(approvedTranscripts.length) },
 			{ label: 'Licensing Revenue', value: formatCurrency(totalRevenue) },
 			{ label: 'Downloads', value: String(totalDownloads) },

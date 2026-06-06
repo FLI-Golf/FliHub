@@ -180,7 +180,7 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 					title: `${asset.title || 'Untitled'} · ${resolvedQueueType}`,
 					sourceAsset: asset.id,
 					transcriptType: resolvedQueueType,
-					status: 'reviewed',
+					status: 'pending',
 					summary: `Queue item generated from media asset ${asset.title || asset.id}`,
 					tags: asset.tags || '',
 					language: 'en',
@@ -220,7 +220,7 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 				}
 
 				return pb.collection('media_ai_transcripts').update(record.id, {
-					status: 'reviewed',
+					status: 'pending',
 					requestCount: Number(record.requestCount || 0) + 1,
 					reviewNotes: reviewNotes || record.reviewNotes || '',
 				});

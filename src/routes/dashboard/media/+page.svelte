@@ -190,6 +190,10 @@
 	const aiQueueTypes = ['metadata_suggestion', 'clip_summarization', 'transcript_extractions', 'scene_detection', 'logo_recognition', 'player_recognition'];
 	const packageTypes = ['Reel', 'Event Recap', 'Player Package', 'Sponsor Package', 'Social Export', 'Other', 'Broadcast', 'Social', 'Internal', 'Sponsor', 'Editorial', 'Other'];
 
+	function queueTypeLabel(value: string): string {
+		return value.replaceAll('_', ' ');
+	}
+
 	const marketplaceStats = [
 		{ label: 'Assets Stored', value: '87' },
 		{ label: 'Hours of Footage', value: '0' },
@@ -365,7 +369,8 @@
 		void mutatePhase5Package('publish', id);
 	}
 
-	async function loadAiQueue() {
+	async function loadAiQueue(queueType: string = aiQueueType) {
+		aiQueueType = queueType;
 		aiQueueLoading = true;
 		aiQueueError = '';
 
@@ -376,7 +381,7 @@
 				params.set('query', aiSearchQuery.trim());
 			}
 
-			params.set('queueType', aiQueueType);
+			params.set('queueType', queueType);
 			params.set('limit', '8');
 
 			const response = await fetch(`/api/media/phase7?${params.toString()}`);
@@ -389,6 +394,13 @@
 			aiQueueSummary = payload;
 			aiQueueJobs = payload.jobs ?? [];
 			aiQueueCounts = payload.counts ?? aiQueueCounts;
+			console.log('[media][phase7] queue loaded', {
+				queueType,
+				query: aiSearchQuery.trim(),
+				matched: aiQueueCounts.matched,
+				total: aiQueueCounts.total,
+				jobs: aiQueueJobs.length,
+			});
 		} catch (error: any) {
 			aiQueueError = error?.message || 'Failed to load Phase 7 queue';
 			// Use seeded placeholders only when live API fetch fails.
@@ -668,7 +680,16 @@
 
 		<div class="mt-6 flex flex-wrap gap-2">
 			{#each aiQueueTypes as tag}
-				<button type="button" class="rounded-full border border-slate-700 bg-slate-800 px-3 py-1.5 text-xs font-medium text-slate-200 transition-colors hover:border-slate-500 hover:bg-slate-700">{tag}</button>
+				<button
+					type="button"
+					onclick={() => void loadAiQueue(tag)}
+					aria-pressed={aiQueueType === tag}
+					class="rounded-full border px-3 py-1.5 text-xs font-medium transition-colors {aiQueueType === tag
+						? 'border-white bg-white text-slate-900'
+						: 'border-slate-700 bg-slate-800 text-slate-200 hover:border-slate-500 hover:bg-slate-700'}"
+				>
+					{queueTypeLabel(tag)}
+				</button>
 			{/each}
 		</div>
 
@@ -678,7 +699,7 @@
 					<p class="text-sm font-medium text-slate-300">Queue Type for new jobs from search results and asset cards.</p>
 					<select bind:value={aiQueueType} class="h-10 rounded-md border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-500">
 						{#each aiQueueTypes as tag}
-							<option value={tag}>{tag}</option>
+							<option value={tag}>{queueTypeLabel(tag)}</option>
 						{/each}
 					</select>
 				</div>

@@ -27,6 +27,7 @@
     "test:seed:media:phase5": "tsx scripts/seed-media-assets-phase5.ts",
     "test:seed:media:phase6": "tsx scripts/seed-media-assets-phase6.ts",
     "test:seed:media:phase7": "tsx scripts/seed-media-assets-phase7.ts",
+    "test:seed:media:phase7:demo": "tsx scripts/seed-media-assets-phase7-demo.ts",
     "test:restore": "tsx scripts/restore-from-seed-backup.ts latest",
     "test:flow": "npm run test:backup && npm run test:seed:quick",
     "seed:all": "tsx scripts/seed-all.ts",
