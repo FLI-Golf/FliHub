@@ -759,6 +759,13 @@
 										<p class="font-medium text-white">{job.title}</p>
 										<p class="mt-1 text-xs text-slate-400">{job.type} · {job.source} · {job.confidence ?? 'N/A'}</p>
 										<p class="mt-2 text-[11px] uppercase tracking-[0.22em] text-slate-500">Recommended: {job.recommendationLabel ?? job.recommendedAction} ({job.recommendationScore ?? 'N/A'}/100)</p>
+										{#if job.mockTags?.length}
+											<div class="mt-2 flex flex-wrap gap-1.5">
+												{#each job.mockTags.slice(0, 5) as tag}
+													<span class="rounded-full border border-blue-700/70 bg-blue-950/30 px-2 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-blue-200">{tag.replaceAll('_', ' ')}</span>
+												{/each}
+											</div>
+										{/if}
 										{#if job.recommendationReasons?.length}
 											<div class="mt-2 flex flex-wrap gap-1.5">
 												{#each job.recommendationReasons as reason}

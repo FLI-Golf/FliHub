@@ -12,11 +12,16 @@ const TRANSCRIPT_TYPES = new Set([
 ]);
 
 function normalizeTranscript(record: any) {
+	const rawJobType = record?.jobType || record?.job_type || '';
+	const transcriptType = record?.transcriptType || record?.transcript_type || rawJobType || 'metadata_suggestion';
+	const normalizedType = transcriptType === 'transcript_extraction' ? 'transcript_extractions' : transcriptType;
+
 	return {
 		...record,
-		transcriptType: record?.transcriptType || record?.transcript_type || 'metadata_suggestion',
+		transcriptType: normalizedType,
 		sourceAsset: record?.sourceAsset || record?.source_asset || record?.asset || null,
 		transcriptText: record?.transcriptText || record?.transcript_text || '',
+		jobId: record?.jobId || record?.job || null,
 	};
 }
 
@@ -77,8 +82,149 @@ async function listTranscripts(pb: any) {
 	}
 }
 
+async function listAssets(pb: any) {
+	try {
+		const rows = await pb.collection('media_assets').getFullList();
+		return Array.isArray(rows) ? rows : [];
+	} catch {
+		try {
+			const fallback = await pb.send('/api/collections/media_assets/records', {
+				method: 'GET',
+				query: { page: 1, perPage: 200 },
+			}) as { items?: any[] };
+			return fallback?.items || [];
+		} catch {
+			return [];
+		}
+	}
+}
+
+async function listAiJobs(pb: any) {
+	try {
+		const rows = await pb.collection('media_ai_jobs').getFullList();
+		return Array.isArray(rows) ? rows : [];
+	} catch {
+		try {
+			const fallback = await pb.send('/api/collections/media_ai_jobs/records', {
+				method: 'GET',
+				query: { page: 1, perPage: 200 },
+			}) as { items?: any[] };
+			return fallback?.items || [];
+		} catch {
+			return [];
+		}
+	}
+}
+
+async function hydrateTranscripts(pb: any, records: any[]) {
+	if (!records.length) return records;
+
+	const [assets, jobs] = await Promise.all([listAssets(pb), listAiJobs(pb)]);
+	const assetMap = new Map(assets.map((asset: any) => [asset.id, asset]));
+	const jobMap = new Map(jobs.map((job: any) => [job.id, job]));
+
+	return records.map((record: any) => {
+		const linkedJob = jobMap.get(record.jobId || record.job || '');
+		const sourceAssetId = record.sourceAsset || record.source_asset || record.asset || linkedJob?.asset || null;
+		const sourceAsset = sourceAssetId ? assetMap.get(sourceAssetId) : null;
+		const hasExpand = Boolean(record.expand?.sourceAsset);
+		const title = record.title || record.summary || record.transcriptText || sourceAsset?.title || 'Untitled transcript';
+
+		return {
+			...record,
+			title,
+			sourceAsset: sourceAssetId,
+			transcriptType: record.transcriptType || (linkedJob?.job_type === 'transcript_extraction' ? 'transcript_extractions' : linkedJob?.job_type) || 'metadata_suggestion',
+			confidence: record.confidence ?? null,
+			provider: record.provider || linkedJob?.provider || null,
+			expand: hasExpand || !sourceAsset
+				? record.expand
+				: {
+					...(record.expand || {}),
+					sourceAsset,
+				},
+		};
+	});
+}
+
 function normalize(value: unknown): string {
 	return String(value ?? '').trim().toLowerCase();
+}
+
+const TAG_RULES = [
+	{ tag: 'sponsor', reason: 'Sponsor terms detected', weight: 14, terms: ['sponsor', 'brand', 'partner', 'activation', 'logo'] },
+	{ tag: 'player', reason: 'Player terms detected', weight: 12, terms: ['player', 'pro', 'golfer', 'athlete', 'roster'] },
+	{ tag: 'highlight', reason: 'Highlight terms detected', weight: 10, terms: ['highlight', 'recap', 'best shot', 'moment', 'feature'] },
+	{ tag: 'equipment', reason: 'Equipment terms detected', weight: 9, terms: ['shoe', 'club', 'driver', 'putter', 'ball'] },
+	{ tag: 'interview', reason: 'Interview terms detected', weight: 8, terms: ['interview', 'quote', 'press', 'post-round'] },
+	{ tag: 'broadcast', reason: 'Broadcast terms detected', weight: 8, terms: ['broadcast', 'segment', 'camera', 'b-roll', 'live'] },
+	{ tag: 'scene', reason: 'Scene terms detected', weight: 7, terms: ['scene', 'course', 'crowd', 'fairway', 'green'] },
+];
+
+function splitTags(value: unknown): string[] {
+	return String(value || '')
+		.split(',')
+		.map((v) => normalize(v))
+		.filter(Boolean);
+}
+
+function deriveMockMetadata(record: any) {
+	const sourceAsset = record.expand?.sourceAsset;
+	const transcriptType = normalize(record.transcriptType || record.transcript_type);
+	const bag = [
+		record.title,
+		record.summary,
+		record.transcriptText,
+		record.transcript_text,
+		record.tags,
+		record.provider,
+		sourceAsset?.title,
+		sourceAsset?.asset_type,
+		sourceAsset?.media_category,
+		transcriptType,
+	]
+		.map((value) => normalize(value))
+		.join(' ');
+
+	const tagWeights = new Map<string, number>();
+	const reasons: string[] = [];
+
+	for (const explicitTag of splitTags(record.tags)) {
+		tagWeights.set(explicitTag, Math.max(tagWeights.get(explicitTag) || 0, 8));
+	}
+
+	for (const rule of TAG_RULES) {
+		if (rule.terms.some((term) => bag.includes(term))) {
+			tagWeights.set(rule.tag, Math.max(tagWeights.get(rule.tag) || 0, rule.weight));
+			reasons.push(rule.reason);
+		}
+	}
+
+	if (transcriptType === 'logo_recognition') {
+		tagWeights.set('branding', Math.max(tagWeights.get('branding') || 0, 12));
+		reasons.push('Queue type aligns with branding metadata');
+	}
+	if (transcriptType === 'player_recognition') {
+		tagWeights.set('player_feature', Math.max(tagWeights.get('player_feature') || 0, 12));
+		reasons.push('Queue type aligns with player metadata');
+	}
+	if (transcriptType === 'clip_summarization') {
+		tagWeights.set('summary', Math.max(tagWeights.get('summary') || 0, 9));
+		reasons.push('Queue type aligns with summary metadata');
+	}
+
+	const rankedTags = [...tagWeights.entries()]
+		.sort((a, b) => b[1] - a[1])
+		.map(([tag]) => tag);
+
+	const signalScore = [...tagWeights.values()].reduce((acc, value) => acc + value, 0);
+	const signalBoost = Math.min(32, Math.round(signalScore / 3));
+
+	return {
+		tags: rankedTags,
+		reasons,
+		signalBoost,
+	};
 }
 
 function resolveQueueType(value: string): string {
@@ -112,10 +258,19 @@ function normalizeReviewStatus(value: unknown): 'pending' | 'reviewed' | 'approv
 }
 
 function buildRecommendation(record: any, status: 'pending' | 'reviewed' | 'approved' | 'rejected') {
+	const mockMeta = deriveMockMetadata(record);
 	const reasons: string[] = [];
-	let score = 52;
+	let score = 44 + mockMeta.signalBoost;
 
-	const confidence = Number(record.confidence || 0);
+	if (mockMeta.reasons.length > 0) {
+		reasons.push(...mockMeta.reasons.slice(0, 3));
+	}
+
+	const rawConfidence = Number(record.confidence || 0);
+	const confidence = rawConfidence > 0
+		? rawConfidence
+		: Math.min(0.91, 0.48 + mockMeta.signalBoost / 100 + (status === 'reviewed' ? 0.08 : 0));
+
 	if (confidence >= 0.9) {
 		score += 26;
 		reasons.push('Very high confidence signal');
@@ -129,30 +284,35 @@ function buildRecommendation(record: any, status: 'pending' | 'reviewed' | 'appr
 		reasons.push('Low confidence; review manually');
 	}
 
-	const tags = normalize(record.tags);
-	if (tags.includes('sponsor') || tags.includes('player') || tags.includes('highlight')) {
+	const tags = new Set([normalize(record.tags), ...mockMeta.tags].join(',').split(',').map((tag) => normalize(tag)).filter(Boolean));
+	if (tags.has('sponsor') || tags.has('player') || tags.has('highlight')) {
 		score += 8;
 		reasons.push('Priority keyword match');
 	}
 
+	if (mockMeta.tags.length >= 3) {
+		score += 6;
+		reasons.push('Multiple metadata signals agree');
+	}
+
 	if (status === 'approved') {
 		reasons.push('Already approved');
-		return { action: 'approved', label: 'already approved', score: 100, reasons };
+		return { action: 'approved', label: 'already approved', score: 100, reasons, tags: mockMeta.tags };
 	}
 
 	if (status === 'rejected') {
 		reasons.push('Already rejected');
-		return { action: 'rejected', label: 'already rejected', score: 12, reasons };
+		return { action: 'rejected', label: 'already rejected', score: 12, reasons, tags: mockMeta.tags };
 	}
 
 	const clamped = Math.max(1, Math.min(99, Math.round(score)));
 	if (clamped >= 78 || status === 'reviewed') {
 		reasons.push('Ready for human approval');
-		return { action: 'approve', label: 'approve candidate', score: clamped, reasons };
+		return { action: 'approve', label: 'approve candidate', score: clamped, reasons, tags: mockMeta.tags };
 	}
 
 	reasons.push('Needs additional review');
-	return { action: 'review', label: 'needs review', score: clamped, reasons };
+	return { action: 'review', label: 'needs review', score: clamped, reasons, tags: mockMeta.tags };
 }
 
 function buildJob(record: any) {
@@ -165,13 +325,14 @@ function buildJob(record: any) {
 		id: record.id,
 		title: record.title || record.summary || sourceAsset?.title || 'Untitled transcript',
 		type: record.transcriptType || 'metadata_suggestion',
-		source: sourceAsset?.title || sourceAsset?.name || 'media_ai_transcripts',
+		source: sourceAsset?.title || sourceAsset?.name || record.provider || 'media_ai_transcripts',
 		status,
 		confidence,
 		recommendedAction: recommendation.action,
 		recommendationLabel: recommendation.label,
 		recommendationScore: recommendation.score,
 		recommendationReasons: recommendation.reasons,
+		mockTags: recommendation.tags,
 		tags: record.tags || '',
 		approvedBy: record.approvedBy || null,
 		approvedAt: record.approvedAt || null,
@@ -196,7 +357,8 @@ export const GET: RequestHandler = async ({ locals, url }) => {
 		const queueType = normalize(url.searchParams.get('queueType'));
 		const limit = Math.min(Math.max(Number(url.searchParams.get('limit') ?? 8) || 8, 1), 25);
 
-		const records = await listTranscripts(pb);
+		const rawRecords = await listTranscripts(pb);
+		const records = await hydrateTranscripts(pb, rawRecords);
 
 		const filtered = records.filter((record: any) => {
 			if (queueType && queueType !== 'all' && normalize(record.transcriptType || record.transcript_type) !== queueType) {
@@ -263,7 +425,7 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 		const actor = ctx.userId || ctx.profile?.id || 'system';
 		const reviewNotes = String(body.reviewNotes ?? '').trim();
 
-		const allRecords = await listTranscripts(pb);
+		const allRecords = await hydrateTranscripts(pb, await listTranscripts(pb));
 
 		const selected = allRecords.filter((record: any) => {
 			if (ids.length > 0) {
@@ -350,7 +512,7 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 
 		await Promise.all(updates);
 
-		const refreshed = await listTranscripts(pb);
+		const refreshed = await hydrateTranscripts(pb, await listTranscripts(pb));
 
 		const filtered = refreshed.filter((record: any) => {
 			if (queueType && queueType !== 'all' && normalize(record.transcriptType || record.transcript_type) !== queueType) {
