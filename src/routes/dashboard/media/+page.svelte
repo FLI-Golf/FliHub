@@ -59,6 +59,7 @@
 	let aiQueueLoading = $state(true);
 	let aiQueueError = $state('');
 	let aiQueueActionMessage = $state('');
+	let aiQueueLocalStatusOverrides = $state<Record<string, 'pending' | 'reviewed' | 'approved' | 'rejected'>>({});
 	let phase5Summary = $state<any>(null);
 	let packageLoading = $state(true);
 	let packageError = $state('');
@@ -235,6 +236,35 @@
 		approved: 0,
 		rejected: 0,
 	});
+
+	function applyAiQueueLocalOverrides(jobs: any[]): any[] {
+		return jobs.map((job: any) => {
+			const localStatus = aiQueueLocalStatusOverrides[job.id];
+			if (!localStatus) return job;
+
+			return {
+				...job,
+				status: localStatus,
+				recommendedAction: localStatus,
+				recommendationLabel: `already ${localStatus}`,
+				recommendationScore: localStatus === 'approved' ? 100 : localStatus === 'rejected' ? 12 : job.recommendationScore,
+			};
+		});
+	}
+
+	function updateAiQueueCountsForStatusChange(previousStatus: string, nextStatus: string) {
+		if (!previousStatus || !nextStatus || previousStatus === nextStatus) return;
+
+		const nextCounts = { ...aiQueueCounts } as any;
+		if (typeof nextCounts[previousStatus] === 'number') {
+			nextCounts[previousStatus] = Math.max(0, nextCounts[previousStatus] - 1);
+		}
+		if (typeof nextCounts[nextStatus] === 'number') {
+			nextCounts[nextStatus] = nextCounts[nextStatus] + 1;
+		}
+
+		aiQueueCounts = nextCounts;
+	}
 
 	const highlightQueue = [
 		{ order: 1, title: 'Chris Dickerson', phase: 'Opening', tag: 'Feature' },
@@ -430,7 +460,18 @@
 
 			const payload = await response.json();
 			aiQueueSummary = payload;
-			aiQueueJobs = payload.jobs ?? [];
+			const serverJobs = payload.jobs ?? [];
+			const nextOverrides: Record<string, 'pending' | 'reviewed' | 'approved' | 'rejected'> = {};
+			for (const [id, localStatus] of Object.entries(aiQueueLocalStatusOverrides)) {
+				const serverJob = serverJobs.find((job: any) => job.id === id);
+				if (!serverJob) continue;
+				const serverStatus = String(serverJob.status || '').toLowerCase();
+				if (serverStatus !== localStatus) {
+					nextOverrides[id] = localStatus;
+				}
+			}
+			aiQueueLocalStatusOverrides = nextOverrides;
+			aiQueueJobs = applyAiQueueLocalOverrides(serverJobs);
 			aiQueueCounts = payload.counts ?? aiQueueCounts;
 			console.log('[media][phase7] queue loaded', {
 				queueType,
@@ -480,7 +521,7 @@
 
 			const payload = await response.json();
 			aiQueueSummary = payload;
-			aiQueueJobs = payload.jobs ?? aiQueueJobs;
+			aiQueueJobs = applyAiQueueLocalOverrides(payload.jobs ?? aiQueueJobs);
 			aiQueueCounts = payload.counts ?? aiQueueCounts;
 			if (action === 'approve') {
 				const updated = Number(payload?.updated ?? 0);
@@ -542,10 +583,29 @@
 				});
 			}
 			aiQueueSummary = payload;
-			aiQueueJobs = payload.jobs ?? aiQueueJobs;
+			aiQueueJobs = applyAiQueueLocalOverrides(payload.jobs ?? aiQueueJobs);
 			aiQueueCounts = payload.counts ?? aiQueueCounts;
 			const updated = Number(payload?.updated ?? 0);
 			if (updated > 0) {
+				const nextStatus = action === 'approve' ? 'approved' : 'rejected';
+				const previousStatus = (aiQueueJobs.find((job: any) => job.id === id)?.status || '').toLowerCase();
+				aiQueueLocalStatusOverrides = {
+					...aiQueueLocalStatusOverrides,
+					[id]: nextStatus,
+				};
+				aiQueueJobs = aiQueueJobs.map((job: any) =>
+					job.id === id
+						? {
+							...job,
+							status: nextStatus,
+							recommendedAction: nextStatus,
+							recommendationLabel: `already ${nextStatus}`,
+							recommendationScore: nextStatus === 'approved' ? 100 : 12,
+						}
+						: job
+				);
+				updateAiQueueCountsForStatusChange(previousStatus, nextStatus);
+
 				aiQueueActionMessage = `${action === 'approve' ? 'Approved' : 'Rejected'} ${updated} item${updated === 1 ? '' : 's'}.`;
 			} else {
 				aiQueueActionMessage = `No change for this item. It may already be ${action === 'approve' ? 'approved' : 'rejected'}.`;
