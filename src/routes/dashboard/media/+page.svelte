@@ -67,6 +67,7 @@
 	let showPhase6Card = $state(false);
 	let showPhase7Card = $state(false);
 	let showPhase5Card = $state(false);
+	let seedDataLoading = $state(false);
 	let clearDataLoading = $state(false);
 	let clearDataMessage = $state('');
 	let clearDataError = $state('');
@@ -221,13 +222,6 @@
 		{ title: 'Phase 6 Listing 2026-06-05', status: 'active', pricing: 'flat_fee', amount: '$3,500', requests: 1 },
 	];
 
-	const queuedJobs = [
-		{ title: 'White Flip Footware', type: 'clip_summarization', source: 'seed-engine', status: 'completed' },
-		{ title: 'White Flip Footware', type: 'metadata_suggestion', source: 'smoke-rest', status: 'completed' },
-		{ title: 'White Flip Footware', type: 'metadata_suggestion', source: 'process-endpoint-smoke', status: 'completed' },
-		{ title: 'White Flip Footware', type: 'metadata_suggestion', source: 'one-shot', status: 'completed' },
-	];
-
 	let aiQueueJobs = $state<any[]>([]);
 	let aiQueueCounts = $state({
 		total: 0,
@@ -273,6 +267,33 @@
 			console.error('Failed to clear test data:', error);
 		} finally {
 			clearDataLoading = false;
+		}
+	}
+
+	async function seedTestData() {
+		if (seedDataLoading) return;
+
+		seedDataLoading = true;
+		clearDataMessage = '';
+		clearDataError = '';
+
+		try {
+			const response = await fetch('/api/media/phase7/seed', { method: 'POST' });
+			const payload = await response.json().catch(() => ({}));
+
+			if (!response.ok) {
+				throw new Error(payload?.message || `Seed test data failed (${response.status})`);
+			}
+
+			const createdJobs = payload?.jobsCreated ?? payload?.created?.jobs ?? 0;
+			const createdTranscripts = payload?.transcriptsCreated ?? payload?.created?.transcripts ?? 0;
+			clearDataMessage = `Seeded ${createdJobs} jobs and ${createdTranscripts} transcripts for Phase 7.`;
+			await loadAiQueue();
+		} catch (error: any) {
+			clearDataError = error?.message || 'Failed to seed test data';
+			console.error('Failed to seed test data:', error);
+		} finally {
+			seedDataLoading = false;
 		}
 	}
 
@@ -403,14 +424,13 @@
 			});
 		} catch (error: any) {
 			aiQueueError = error?.message || 'Failed to load Phase 7 queue';
-			// Use seeded placeholders only when live API fetch fails.
-			aiQueueJobs = [...queuedJobs];
+			aiQueueJobs = [];
 			aiQueueCounts = {
-				total: queuedJobs.length,
-				matched: queuedJobs.length,
+				total: 0,
+				matched: 0,
 				pending: 0,
 				reviewed: 0,
-				approved: queuedJobs.length,
+				approved: 0,
 				rejected: 0,
 			};
 			console.error('Failed to load Phase 7 queue:', error);
@@ -674,6 +694,7 @@
 				<button type="button" onclick={loadAiQueue} class="rounded-md border border-slate-700 bg-slate-800 px-4 py-2 text-sm font-medium text-slate-100 transition-colors hover:bg-slate-700">Search</button>
 				<button type="button" onclick={processAiQueue} class="rounded-md border border-slate-700 bg-slate-800 px-4 py-2 text-sm font-medium text-slate-100 transition-colors hover:bg-slate-700">Process Queue</button>
 				<button type="button" onclick={refreshAiQueue} class="rounded-md border border-slate-700 bg-slate-800 px-4 py-2 text-sm font-medium text-slate-100 transition-colors hover:bg-slate-700">Refresh Jobs</button>
+				<button type="button" onclick={seedTestData} disabled={seedDataLoading} class="rounded-md border border-emerald-700 bg-emerald-950/40 px-4 py-2 text-sm font-medium text-emerald-200 transition-colors hover:bg-emerald-900/60 disabled:cursor-not-allowed disabled:opacity-60">{seedDataLoading ? 'Seeding...' : 'Seed Test Data'}</button>
 				<button type="button" onclick={clearTestData} disabled={clearDataLoading} class="rounded-md border border-red-700 bg-red-950/40 px-4 py-2 text-sm font-medium text-red-200 transition-colors hover:bg-red-900/60 disabled:cursor-not-allowed disabled:opacity-60">{clearDataLoading ? 'Clearing...' : 'Clear Test Data'}</button>
 			</div>
 		</div>
@@ -737,7 +758,14 @@
 									<div>
 										<p class="font-medium text-white">{job.title}</p>
 										<p class="mt-1 text-xs text-slate-400">{job.type} · {job.source} · {job.confidence ?? 'N/A'}</p>
-										<p class="mt-2 text-[11px] uppercase tracking-[0.22em] text-slate-500">Recommended: {job.recommendedAction}</p>
+										<p class="mt-2 text-[11px] uppercase tracking-[0.22em] text-slate-500">Recommended: {job.recommendationLabel ?? job.recommendedAction} ({job.recommendationScore ?? 'N/A'}/100)</p>
+										{#if job.recommendationReasons?.length}
+											<div class="mt-2 flex flex-wrap gap-1.5">
+												{#each job.recommendationReasons as reason}
+													<span class="rounded-full border border-slate-700/80 bg-slate-950/70 px-2 py-1 text-[11px] text-slate-300">{reason}</span>
+												{/each}
+											</div>
+										{/if}
 									</div>
 									<span class="rounded-full border {job.status === 'approved' ? 'border-emerald-700 bg-emerald-900/40 text-emerald-200' : job.status === 'rejected' ? 'border-rose-700 bg-rose-900/40 text-rose-200' : 'border-amber-700 bg-amber-900/40 text-amber-200'} px-2 py-1 text-[11px] font-semibold uppercase tracking-[0.2em]">{job.status}</span>
 								</div>
