@@ -75,9 +75,9 @@
 	$: currentLabel = routeLabels[$page.url.pathname] ?? 'Dashboard';
 </script>
 
-<Sidebar.Provider>
+<Sidebar.Provider class="h-svh overflow-hidden">
 	<FliHubSidebar collapsible="none" />
-	<Sidebar.Inset>
+	<Sidebar.Inset class="h-svh overflow-hidden">
 		<header class="flex h-14 shrink-0 items-center gap-2 border-b bg-card/80 backdrop-blur-sm sticky top-0 z-10">
 			<div class="flex items-center gap-3 px-4 flex-1 min-w-0">
 				<!-- Larger tap target on mobile -->
@@ -158,7 +158,7 @@
 			</div>
 		</header>
 
-		<div class="flex flex-1 flex-col gap-6 p-6 min-w-0">
+		<div class="flex flex-1 min-h-0 flex-col gap-6 overflow-y-auto p-6 min-w-0">
 			<slot />
 		</div>
 	</Sidebar.Inset>
