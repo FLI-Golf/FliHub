@@ -17,6 +17,7 @@
 		Package,
 		Pencil,
 		PlayCircle,
+		Loader2,
 		RefreshCw,
 		Search,
 		ShieldCheck,
@@ -59,7 +60,7 @@
 	let aiQueueLoading = $state(true);
 	let aiQueueError = $state('');
 	let aiQueueActionMessage = $state('');
-	let aiQueueLocalStatusOverrides = $state<Record<string, 'pending' | 'reviewed' | 'approved' | 'rejected'>>({});
+	let aiQueuePendingActions = $state<Record<string, 'approve' | 'reject'>>({});
 	let phase5Summary = $state<any>(null);
 	let packageLoading = $state(true);
 	let packageError = $state('');
@@ -79,6 +80,12 @@
 	let phase6Listings = $derived(phase6Summary?.latestListings ?? []);
 	let phase6NoLiveData = $derived(!phase6Loading && !phase6Error && phase6Summary !== null && phase6Listings.length === 0);
 	let aiQueueNoLiveData = $derived(!aiQueueLoading && !aiQueueError && aiQueueJobs.length === 0);
+	let aiQueuePendingCount = $derived(Object.keys(aiQueuePendingActions).length);
+	let aiQueueIsApplyingAction = $derived(
+		aiQueuePendingCount > 0 ||
+		aiQueueActionMessage.startsWith('Approving') ||
+		aiQueueActionMessage.startsWith('Rejecting')
+	);
 	let packageNoLiveData = $derived(!packageLoading && !packageError && packageOptions.length === 0 && packageItems.length === 0);
 
 	const assetTypeLabels: Record<string, string> = {
@@ -236,34 +243,31 @@
 		approved: 0,
 		rejected: 0,
 	});
+	let aiQueueMatchedCount = $derived(aiQueueCounts.matched ?? 0);
+	let aiQueueApprovedCount = $derived(aiQueueCounts.approved ?? 0);
+	let aiQueueResolvedCount = $derived((aiQueueCounts.approved ?? 0) + (aiQueueCounts.rejected ?? 0));
+	let aiQueueApprovalPercent = $derived(
+		aiQueueMatchedCount > 0
+			? Math.max(0, Math.min(100, Math.round((aiQueueApprovedCount / aiQueueMatchedCount) * 100)))
+			: 0
+	);
+	let aiQueueResolvedPercent = $derived(
+		aiQueueMatchedCount > 0
+			? Math.max(0, Math.min(100, Math.round((aiQueueResolvedCount / aiQueueMatchedCount) * 100)))
+			: 0
+	);
+	const phase7Debug = true;
 
-	function applyAiQueueLocalOverrides(jobs: any[]): any[] {
-		return jobs.map((job: any) => {
-			const localStatus = aiQueueLocalStatusOverrides[job.id];
-			if (!localStatus) return job;
-
-			return {
-				...job,
-				status: localStatus,
-				recommendedAction: localStatus,
-				recommendationLabel: `already ${localStatus}`,
-				recommendationScore: localStatus === 'approved' ? 100 : localStatus === 'rejected' ? 12 : job.recommendationScore,
-			};
-		});
-	}
-
-	function updateAiQueueCountsForStatusChange(previousStatus: string, nextStatus: string) {
-		if (!previousStatus || !nextStatus || previousStatus === nextStatus) return;
-
-		const nextCounts = { ...aiQueueCounts } as any;
-		if (typeof nextCounts[previousStatus] === 'number') {
-			nextCounts[previousStatus] = Math.max(0, nextCounts[previousStatus] - 1);
-		}
-		if (typeof nextCounts[nextStatus] === 'number') {
-			nextCounts[nextStatus] = nextCounts[nextStatus] + 1;
+	async function confirmQueueStatus(id: string, expectedStatus: 'approved' | 'rejected'): Promise<boolean> {
+		for (let attempt = 0; attempt < 3; attempt++) {
+			await loadAiQueue(aiQueueFilterType);
+			const current = aiQueueJobs.find((job: any) => job.id === id);
+			if (!current) return true;
+			if (String(current.status || '').toLowerCase() === expectedStatus) return true;
+			await new Promise((resolve) => setTimeout(resolve, 300));
 		}
 
-		aiQueueCounts = nextCounts;
+		return false;
 	}
 
 	const highlightQueue = [
@@ -460,18 +464,7 @@
 
 			const payload = await response.json();
 			aiQueueSummary = payload;
-			const serverJobs = payload.jobs ?? [];
-			const nextOverrides: Record<string, 'pending' | 'reviewed' | 'approved' | 'rejected'> = {};
-			for (const [id, localStatus] of Object.entries(aiQueueLocalStatusOverrides)) {
-				const serverJob = serverJobs.find((job: any) => job.id === id);
-				if (!serverJob) continue;
-				const serverStatus = String(serverJob.status || '').toLowerCase();
-				if (serverStatus !== localStatus) {
-					nextOverrides[id] = localStatus;
-				}
-			}
-			aiQueueLocalStatusOverrides = nextOverrides;
-			aiQueueJobs = applyAiQueueLocalOverrides(serverJobs);
+			aiQueueJobs = payload.jobs ?? [];
 			aiQueueCounts = payload.counts ?? aiQueueCounts;
 			console.log('[media][phase7] queue loaded', {
 				queueType,
@@ -504,25 +497,35 @@
 		const requestQueueType = action === 'process' ? aiQueueType : aiQueueFilterType;
 
 		try {
+			const requestBody = {
+				action,
+				queueType: requestQueueType,
+				query: aiSearchQuery.trim(),
+				ids: aiQueueJobs.map((job: any) => job.id).filter(Boolean),
+				debug: phase7Debug,
+			};
+			console.log('[media][phase7][ui] bulk request', requestBody);
+
 			const response = await fetch('/api/media/phase7', {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({
-					action,
-					queueType: requestQueueType,
-					query: aiSearchQuery.trim(),
-					ids: aiQueueJobs.map((job: any) => job.id).filter(Boolean),
-				}),
+				body: JSON.stringify(requestBody),
 			});
 
 			if (!response.ok) {
-				throw new Error(`Phase 7 ${action} failed (${response.status})`);
+				const errorPayload = await response.json().catch(() => ({}));
+				throw new Error(
+					errorPayload?.message ||
+					errorPayload?.error ||
+					`Phase 7 ${action} failed (${response.status})`
+				);
 			}
 
 			const payload = await response.json();
 			aiQueueSummary = payload;
-			aiQueueJobs = applyAiQueueLocalOverrides(payload.jobs ?? aiQueueJobs);
+			aiQueueJobs = payload.jobs ?? aiQueueJobs;
 			aiQueueCounts = payload.counts ?? aiQueueCounts;
+			await loadAiQueue(aiQueueFilterType);
 			if (action === 'approve') {
 				const updated = Number(payload?.updated ?? 0);
 				aiQueueActionMessage = updated > 0
@@ -538,9 +541,15 @@
 	}
 
 	async function reviewAiQueueItem(id: string, action: 'approve' | 'reject') {
+		aiQueuePendingActions = {
+			...aiQueuePendingActions,
+			[id]: action,
+		};
 		aiQueueLoading = true;
 		aiQueueError = '';
-		aiQueueActionMessage = '';
+		aiQueueActionMessage = `${action === 'approve' ? 'Approving' : 'Rejecting'} 1 item...`;
+		const nextStatus = action === 'approve' ? 'approved' : 'rejected';
+
 		console.log('[media][phase7][ui] review click', {
 			id,
 			action,
@@ -555,6 +564,7 @@
 				ids: [id],
 				queueType: aiQueueFilterType,
 				query: aiSearchQuery.trim(),
+				debug: phase7Debug,
 			};
 			console.log('[media][phase7][ui] review request', requestBody);
 
@@ -565,11 +575,17 @@
 			});
 
 			if (!response.ok) {
+				const errorPayload = await response.json().catch(() => ({}));
 				console.error('[media][phase7][ui] review http failure', {
 					status: response.status,
 					statusText: response.statusText,
+					errorPayload,
 				});
-				throw new Error(`Phase 7 item ${action} failed (${response.status})`);
+				throw new Error(
+					errorPayload?.message ||
+					errorPayload?.error ||
+					`Phase 7 item ${action} failed (${response.status})`
+				);
 			}
 
 			const payload = await response.json();
@@ -583,37 +599,24 @@
 				});
 			}
 			aiQueueSummary = payload;
-			aiQueueJobs = applyAiQueueLocalOverrides(payload.jobs ?? aiQueueJobs);
+			aiQueueJobs = payload.jobs ?? aiQueueJobs;
 			aiQueueCounts = payload.counts ?? aiQueueCounts;
+			const confirmed = await confirmQueueStatus(id, nextStatus);
 			const updated = Number(payload?.updated ?? 0);
+			const requestId = payload?.debug?.requestId ? ` req ${payload.debug.requestId}` : '';
 			if (updated > 0) {
-				const nextStatus = action === 'approve' ? 'approved' : 'rejected';
-				const previousStatus = (aiQueueJobs.find((job: any) => job.id === id)?.status || '').toLowerCase();
-				aiQueueLocalStatusOverrides = {
-					...aiQueueLocalStatusOverrides,
-					[id]: nextStatus,
-				};
-				aiQueueJobs = aiQueueJobs.map((job: any) =>
-					job.id === id
-						? {
-							...job,
-							status: nextStatus,
-							recommendedAction: nextStatus,
-							recommendationLabel: `already ${nextStatus}`,
-							recommendationScore: nextStatus === 'approved' ? 100 : 12,
-						}
-						: job
-				);
-				updateAiQueueCountsForStatusChange(previousStatus, nextStatus);
-
-				aiQueueActionMessage = `${action === 'approve' ? 'Approved' : 'Rejected'} ${updated} item${updated === 1 ? '' : 's'}.`;
+				aiQueueActionMessage = confirmed
+					? `${action === 'approve' ? 'Approved' : 'Rejected'} ${updated} item${updated === 1 ? '' : 's'}${requestId}.`
+					: `Saved on server${requestId}, but queue is still refreshing. Click Refresh Jobs once.`;
 			} else {
-				aiQueueActionMessage = `No change for this item. It may already be ${action === 'approve' ? 'approved' : 'rejected'}.`;
+				aiQueueActionMessage = `No change for this item${requestId}. It may already be ${action === 'approve' ? 'approved' : 'rejected'}.`;
 			}
 		} catch (error: any) {
 			aiQueueError = error?.message || `Failed to ${action} transcript`;
 			console.error(`[media][phase7][ui] review error (${action})`, error);
 		} finally {
+			const { [id]: _ignored, ...remaining } = aiQueuePendingActions;
+			aiQueuePendingActions = remaining;
 			aiQueueLoading = false;
 		}
 	}
@@ -872,6 +875,28 @@
 					</select>
 					<p class="mt-2 text-xs text-slate-500">{aiQueueCounts.matched} shown of {aiQueueCounts.total}</p>
 				</div>
+				<div class="mt-3 rounded-lg border border-slate-800 bg-slate-900/70 px-3 py-3">
+					<div class="flex items-center justify-between gap-2 text-[11px] uppercase tracking-[0.14em] text-slate-400">
+						<span>Approval Progress</span>
+						<span>{aiQueueApprovedCount}/{aiQueueMatchedCount} approved ({aiQueueApprovalPercent}%)</span>
+					</div>
+					<div class="mt-2 h-2 overflow-hidden rounded-full bg-slate-800">
+						<div
+							class="h-full rounded-full bg-emerald-400 transition-all duration-500"
+							style={`width: ${aiQueueApprovalPercent}%`}
+						></div>
+					</div>
+					<div class="mt-2 flex items-center justify-between gap-2 text-[11px] uppercase tracking-[0.14em] text-slate-500">
+						<span>Resolved</span>
+						<span>{aiQueueResolvedCount}/{aiQueueMatchedCount} ({aiQueueResolvedPercent}%)</span>
+					</div>
+					<div class="mt-1 h-1.5 overflow-hidden rounded-full bg-slate-800">
+						<div
+							class="h-full rounded-full bg-blue-400/90 transition-all duration-500"
+							style={`width: ${aiQueueResolvedPercent}%`}
+						></div>
+					</div>
+				</div>
 				{#if aiQueueJobs.length === 0}
 					<div class="mt-4 rounded-xl border border-slate-800 bg-slate-900/80 p-4">
 						<p class="text-sm font-medium text-slate-200">No queued jobs yet.</p>
@@ -904,18 +929,43 @@
 									<span class="rounded-full border {job.status === 'approved' ? 'border-emerald-700 bg-emerald-900/40 text-emerald-200' : job.status === 'rejected' ? 'border-rose-700 bg-rose-900/40 text-rose-200' : 'border-amber-700 bg-amber-900/40 text-amber-200'} px-2 py-1 text-[11px] font-semibold uppercase tracking-[0.2em]">{job.status}</span>
 								</div>
 								<div class="mt-3 flex flex-wrap gap-2">
-									<button type="button" disabled={job.status === 'approved'} onclick={() => reviewAiQueueItem(job.id, 'approve')} class="rounded-md border border-emerald-700 bg-emerald-950/40 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.18em] text-emerald-200 transition-colors hover:bg-emerald-900/60 disabled:cursor-not-allowed disabled:opacity-50">
-										{job.status === 'approved' ? 'Approved' : 'Approve'}
+									<button type="button" disabled={job.status === 'approved' || aiQueuePendingActions[job.id] === 'approve'} onclick={() => reviewAiQueueItem(job.id, 'approve')} class="rounded-md border border-emerald-700 bg-emerald-950/40 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.18em] text-emerald-200 transition-colors hover:bg-emerald-900/60 disabled:cursor-not-allowed disabled:opacity-50">
+										{#if job.status === 'approved'}
+											Approved
+										{:else if aiQueuePendingActions[job.id] === 'approve'}
+											<span class="inline-flex items-center gap-1.5">
+												<Loader2 class="size-3.5 animate-spin" />
+												Approving...
+											</span>
+										{:else}
+											Approve
+										{/if}
 									</button>
-									<button type="button" disabled={job.status === 'rejected'} onclick={() => reviewAiQueueItem(job.id, 'reject')} class="rounded-md border border-rose-700 bg-rose-950/40 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.18em] text-rose-200 transition-colors hover:bg-rose-900/60 disabled:cursor-not-allowed disabled:opacity-50">
-										{job.status === 'rejected' ? 'Rejected' : 'Reject'}
+									<button type="button" disabled={job.status === 'rejected' || aiQueuePendingActions[job.id] === 'reject'} onclick={() => reviewAiQueueItem(job.id, 'reject')} class="rounded-md border border-rose-700 bg-rose-950/40 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.18em] text-rose-200 transition-colors hover:bg-rose-900/60 disabled:cursor-not-allowed disabled:opacity-50">
+										{#if job.status === 'rejected'}
+											Rejected
+										{:else if aiQueuePendingActions[job.id] === 'reject'}
+											<span class="inline-flex items-center gap-1.5">
+												<Loader2 class="size-3.5 animate-spin" />
+												Rejecting...
+											</span>
+										{:else}
+											Reject
+										{/if}
 									</button>
 								</div>
 							</div>
 						{/each}
 					</div>
 				{/if}
-				{#if aiQueueLoading}
+				{#if aiQueueIsApplyingAction}
+					<div class="mt-3 rounded-lg border border-emerald-800/60 bg-emerald-950/20 px-3 py-2">
+						<div class="h-2 overflow-hidden rounded-full bg-slate-800">
+							<div class="h-full w-2/5 rounded-full bg-emerald-400/90 animate-pulse"></div>
+						</div>
+						<p class="mt-2 text-[11px] uppercase tracking-[0.16em] text-emerald-300">{aiQueueActionMessage || 'Applying review action...'}</p>
+					</div>
+				{:else if aiQueueLoading}
 					<p class="mt-3 text-xs uppercase tracking-[0.2em] text-slate-500">Updating AI queue...</p>
 				{:else if aiQueueActionMessage}
 					<p class="mt-3 text-xs uppercase tracking-[0.2em] text-emerald-300">{aiQueueActionMessage}</p>

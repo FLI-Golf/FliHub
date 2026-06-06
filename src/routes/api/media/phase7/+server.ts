@@ -193,6 +193,11 @@ function normalize(value: unknown): string {
 	return String(value ?? '').trim().toLowerCase();
 }
 
+function parseDebugFlag(value: unknown): boolean {
+	const normalized = normalize(value);
+	return normalized === '1' || normalized === 'true' || normalized === 'yes' || normalized === 'on';
+}
+
 const TAG_RULES = [
 	{ tag: 'sponsor', reason: 'Sponsor terms detected', weight: 14, terms: ['sponsor', 'brand', 'partner', 'activation', 'logo'] },
 	{ tag: 'player', reason: 'Player terms detected', weight: 12, terms: ['player', 'pro', 'golfer', 'athlete', 'roster'] },
@@ -451,17 +456,18 @@ async function persistReviewState(pb: any, record: any, action: string, actor: s
 			};
 
 	const candidates = [
-		{ status: nextStatus, requestCount, reviewNotes: notes, ...approvalPayload },
-		{ status: nextStatus, request_count: requestCount, review_notes: notes, ...approvalPayload },
 		{ reviewStatus: nextStatus, requestCount, reviewNotes: notes, ...approvalPayload },
 		{ review_status: nextStatus, request_count: requestCount, review_notes: notes, ...approvalPayload },
 		{ reviewState: nextStatus, requestCount, reviewNotes: notes, ...approvalPayload },
 		{ review_state: nextStatus, request_count: requestCount, review_notes: notes, ...approvalPayload },
-		{ status: nextStatus },
 		{ reviewStatus: nextStatus },
 		{ review_status: nextStatus },
 		{ reviewState: nextStatus },
 		{ review_state: nextStatus },
+		// Legacy fallback for older transcript schemas that only expose a status field.
+		{ status: nextStatus, requestCount, reviewNotes: notes, ...approvalPayload },
+		{ status: nextStatus, request_count: requestCount, review_notes: notes, ...approvalPayload },
+		{ status: nextStatus },
 	];
 
 	for (const payload of candidates) {
@@ -513,7 +519,7 @@ async function persistReviewState(pb: any, record: any, action: string, actor: s
 				throw new Error('Missing asset relation for media_ai_jobs update');
 			}
 
-			await pb.collection('media_ai_jobs').update(jobId, {
+			const jobUpdatePayload = {
 				asset,
 				job_type: jobType,
 				status: jobStatus,
@@ -521,7 +527,47 @@ async function persistReviewState(pb: any, record: any, action: string, actor: s
 				model_name: job?.model_name || job?.modelName || 'phase7-review',
 				result_json: nextResult,
 				completed_at: timestamp,
-			});
+			};
+
+			await pb.collection('media_ai_jobs').update(jobId, jobUpdatePayload);
+
+			const readBackStatus = async () => {
+				const verifyJob = await pb.collection('media_ai_jobs').getOne(jobId).catch(() => null);
+				if (!verifyJob) return null;
+
+				let verifyResult: any = {};
+				try {
+					verifyResult = typeof verifyJob?.result_json === 'string'
+						? JSON.parse(verifyJob.result_json || '{}')
+						: (verifyJob?.result_json || {});
+				} catch {
+					verifyResult = {};
+				}
+
+				return normalize(
+					verifyResult?.reviewStatus ||
+					verifyResult?.review_status ||
+					verifyResult?.status ||
+					''
+				);
+			};
+
+			let confirmed = false;
+			for (let attempt = 0; attempt < 3; attempt++) {
+				const persistedStatus = await readBackStatus();
+				if (persistedStatus === nextStatus) {
+					confirmed = true;
+					break;
+				}
+
+				if (attempt < 2) {
+					await pb.collection('media_ai_jobs').update(jobId, jobUpdatePayload).catch(() => null);
+				}
+			}
+
+			if (!confirmed) {
+				throw new Error(`Job review status verification failed for ${jobId}`);
+			}
 
 			console.log('[media][phase7][api] job fallback persisted', {
 				jobId,
@@ -617,9 +663,18 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 	}
 
 	const pb = ctx.pb;
+	const requestId = `phase7-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 
 	try {
-		const body = await request.json().catch(() => ({}));
+		const body: {
+			debug?: unknown;
+			action?: unknown;
+			ids?: unknown[];
+			query?: unknown;
+			queueType?: unknown;
+			reviewNotes?: unknown;
+		} = await request.json().catch(() => ({}));
+		const debug = parseDebugFlag(body.debug) || parseDebugFlag(request.headers.get('x-phase7-debug'));
 		const action = normalize(body.action);
 		const ids = Array.isArray(body.ids) ? body.ids.map((id) => String(id)).filter(Boolean) : [];
 		const query = normalize(body.query);
@@ -628,12 +683,23 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 		const actor = ctx.userId || ctx.profile?.id || 'system';
 		const reviewNotes = String(body.reviewNotes ?? '').trim();
 		console.log('[media][phase7][api] post start', {
+			requestId,
 			action,
 			ids,
 			queueType,
 			query,
 			actor,
+			role,
+			debug,
 		});
+		if (debug) {
+			console.log('[media][phase7][api] debug body snapshot', {
+				requestId,
+				keys: Object.keys(body || {}),
+				idsCount: ids.length,
+				reviewNotesLength: reviewNotes.length,
+			});
+		}
 
 		const allRecords = await hydrateTranscripts(pb, await listTranscripts(pb));
 
@@ -648,6 +714,24 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 
 			return matchesQuery(record, query);
 		});
+
+		if (debug) {
+			const selectedSet = new Set(selected.map((record: any) => record.id));
+			const missingIds = ids.filter((id: string) => !selectedSet.has(id));
+			console.log('[media][phase7][api] debug selection', {
+				requestId,
+				allRecords: allRecords.length,
+				selected: selected.length,
+				idsRequested: ids.length,
+				missingIds,
+				selectedPreview: selected.slice(0, 8).map((record: any) => ({
+					id: record.id,
+					status: normalizeReviewStatusFromRecord(record),
+					transcriptType: normalize(record.transcriptType || record.transcript_type),
+					jobId: record.jobId || record.job || record.job_id || record.aiJob || record.ai_job || null,
+				})),
+			});
+		}
 
 		if (action === 'process' && selected.length === 0) {
 			const assets = await pb.collection('media_assets').getFullList({
@@ -687,20 +771,31 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 			}
 		}
 
-		const updates = await Promise.all(
-			selected
-				.filter((record: any) => {
-					const status = normalizeReviewStatusFromRecord(record);
-					if (action === 'approve') return status !== 'approved';
-					if (action === 'reject') return status !== 'rejected';
-					return true;
-				})
-				.map((record: any) => persistReviewState(pb, record, action, actor, reviewNotes))
+		const selectedForUpdate = selected.filter((record: any) => {
+			const status = normalizeReviewStatusFromRecord(record);
+			if (action === 'approve') return status !== 'approved';
+			if (action === 'reject') return status !== 'rejected';
+			return true;
+		});
+
+		const updateResults = await Promise.all(
+			selectedForUpdate.map(async (record: any) => {
+				const changed = await persistReviewState(pb, record, action, actor, reviewNotes);
+				return {
+					id: record.id,
+					statusBefore: normalizeReviewStatusFromRecord(record),
+					jobId: record.jobId || record.job || record.job_id || record.aiJob || record.ai_job || null,
+					changed,
+				};
+			})
 		);
+		const updates = updateResults.map((row) => row.changed);
 
 		console.log('[media][phase7][api] post update results', {
+			requestId,
 			action,
 			selected: selected.length,
+			selectedForUpdate: selectedForUpdate.length,
 			updated: updates.filter(Boolean).length,
 			ids,
 			selectedStatuses: selected.map((record: any) => ({
@@ -709,6 +804,17 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 				jobId: record.jobId || null,
 			})),
 		});
+
+		if (debug) {
+			const failed = updateResults.filter((row) => !row.changed);
+			console.log('[media][phase7][api] debug persistence summary', {
+				requestId,
+				attempted: updateResults.length,
+				failed: failed.length,
+				failedIds: failed.map((row) => row.id),
+				failedRows: failed,
+			});
+		}
 
 		const refreshed = await hydrateTranscripts(pb, await listTranscripts(pb));
 
@@ -745,6 +851,17 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 		return json({
 			action,
 			updated: updates.filter(Boolean).length,
+			...(debug
+				? {
+					debug: {
+						requestId,
+						idsRequested: ids,
+						selectedIds: selected.map((record: any) => record.id),
+						attemptedIds: selectedForUpdate.map((record: any) => record.id),
+						failedIds: updateResults.filter((row) => !row.changed).map((row) => row.id),
+					},
+				}
+				: {}),
 			counts: {
 				total: refreshed.length,
 				matched: filtered.length,
@@ -756,7 +873,7 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 			jobs: responseJobs.slice(0, 8).map(buildJob),
 		});
 	} catch (error) {
-		console.error('[media][phase7][api] post error', error);
+		console.error('[media][phase7][api] post error', { requestId, error });
 		return json({ message: 'Failed to update Phase 7 queue', error: String(error) }, { status: 500 });
 	}
 };
