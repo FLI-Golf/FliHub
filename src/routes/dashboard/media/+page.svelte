@@ -51,6 +51,7 @@
 	let visibilityFilter = $state('all');
 	let aiSearchQuery = $state('');
 	let aiQueueType = $state('metadata_suggestion');
+	let aiQueueFilterType = $state('all');
 	let phase6Summary = $state<any>(null);
 	let phase6Loading = $state(true);
 	let phase6Error = $state('');
@@ -189,9 +190,11 @@
 	const momentOptions = ['Crowd Reaction', 'Interview Segment', 'Award Ceremony', 'VIP / Hospitality', 'Sponsor Activation', 'Other'];
 	const visibilityOptions = ['Internal', 'Sponsor', 'Broadcast', 'Restricted', 'Owned', 'Shared Rights', 'Expired'];
 	const aiQueueTypes = ['metadata_suggestion', 'clip_summarization', 'transcript_extractions', 'scene_detection', 'logo_recognition', 'player_recognition'];
+	const aiQueueFilterTypes = ['all', ...aiQueueTypes];
 	const packageTypes = ['Reel', 'Event Recap', 'Player Package', 'Sponsor Package', 'Social Export', 'Other', 'Broadcast', 'Social', 'Internal', 'Sponsor', 'Editorial', 'Other'];
 
 	function queueTypeLabel(value: string): string {
+		if (value === 'all') return 'all queue types';
 		return value.replaceAll('_', ' ');
 	}
 
@@ -390,8 +393,8 @@
 		void mutatePhase5Package('publish', id);
 	}
 
-	async function loadAiQueue(queueType: string = aiQueueType) {
-		aiQueueType = queueType;
+	async function loadAiQueue(queueType: string = aiQueueFilterType) {
+		aiQueueFilterType = queueType;
 		aiQueueLoading = true;
 		aiQueueError = '';
 
@@ -442,6 +445,7 @@
 	async function mutateAiQueue(action: 'process' | 'approve') {
 		aiQueueLoading = true;
 		aiQueueError = '';
+		const requestQueueType = action === 'process' ? aiQueueType : aiQueueFilterType;
 
 		try {
 			const response = await fetch('/api/media/phase7', {
@@ -449,7 +453,7 @@
 				headers: { 'Content-Type': 'application/json' },
 				body: JSON.stringify({
 					action,
-					queueType: aiQueueType,
+					queueType: requestQueueType,
 					query: aiSearchQuery.trim(),
 					ids: aiQueueJobs.map((job: any) => job.id).filter(Boolean),
 				}),
@@ -474,30 +478,68 @@
 	async function reviewAiQueueItem(id: string, action: 'approve' | 'reject') {
 		aiQueueLoading = true;
 		aiQueueError = '';
+		console.log('[media][phase7][ui] review click', {
+			id,
+			action,
+			queueType: aiQueueType,
+			filterType: aiQueueFilterType,
+			query: aiSearchQuery.trim(),
+		});
 
 		try {
+			const requestBody = {
+				action,
+				ids: [id],
+				queueType: aiQueueFilterType,
+				query: aiSearchQuery.trim(),
+			};
+			console.log('[media][phase7][ui] review request', requestBody);
+
 			const response = await fetch('/api/media/phase7', {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({
-					action,
-					ids: [id],
-					queueType: aiQueueType,
-					query: aiSearchQuery.trim(),
-				}),
+				body: JSON.stringify(requestBody),
 			});
 
 			if (!response.ok) {
+				console.error('[media][phase7][ui] review http failure', {
+					status: response.status,
+					statusText: response.statusText,
+				});
 				throw new Error(`Phase 7 item ${action} failed (${response.status})`);
 			}
 
 			const payload = await response.json();
+			console.log('[media][phase7][ui] review response', payload);
+			if (!payload?.updated) {
+				console.warn('[media][phase7][ui] review no-op', {
+					id,
+					action,
+					updated: payload?.updated,
+					counts: payload?.counts,
+				});
+			}
 			aiQueueSummary = payload;
 			aiQueueJobs = payload.jobs ?? aiQueueJobs;
 			aiQueueCounts = payload.counts ?? aiQueueCounts;
+
+			// Keep the acted-on row visually updated even if API paging returns lookalike rows first.
+			if ((payload?.updated ?? 0) > 0) {
+				aiQueueJobs = aiQueueJobs.map((job: any) =>
+					job.id === id
+						? {
+							...job,
+							status: action === 'approve' ? 'approved' : 'rejected',
+							recommendationLabel: action === 'approve' ? 'already approved' : 'already rejected',
+							recommendedAction: action,
+							recommendationScore: action === 'approve' ? 100 : 12,
+						}
+						: job
+				);
+			}
 		} catch (error: any) {
 			aiQueueError = error?.message || `Failed to ${action} transcript`;
-			console.error(`Failed to ${action} transcript:`, error);
+			console.error(`[media][phase7][ui] review error (${action})`, error);
 		} finally {
 			aiQueueLoading = false;
 		}
@@ -508,7 +550,7 @@
 	}
 
 	function refreshAiQueue() {
-		void loadAiQueue();
+		void loadAiQueue(aiQueueFilterType);
 	}
 
 	function approveAiSuggestions() {
@@ -541,7 +583,7 @@
 
 	onMount(() => {
 		void loadPhase6Summary();
-		void loadAiQueue();
+		void loadAiQueue(aiQueueFilterType);
 		void loadPhase5Summary();
 	});
 
@@ -704,8 +746,8 @@
 				<button
 					type="button"
 					onclick={() => void loadAiQueue(tag)}
-					aria-pressed={aiQueueType === tag}
-					class="rounded-full border px-3 py-1.5 text-xs font-medium transition-colors {aiQueueType === tag
+					aria-pressed={aiQueueFilterType === tag}
+					class="rounded-full border px-3 py-1.5 text-xs font-medium transition-colors {aiQueueFilterType === tag
 						? 'border-white bg-white text-slate-900'
 						: 'border-slate-700 bg-slate-800 text-slate-200 hover:border-slate-500 hover:bg-slate-700'}"
 				>
@@ -714,37 +756,41 @@
 			{/each}
 		</div>
 
-		<div class="mt-6 grid gap-4 lg:grid-cols-[1.4fr_0.6fr]">
+		<div class="mt-6">
 			<div class="rounded-2xl border border-slate-800 bg-slate-950/60 p-4">
-				<div class="flex items-center justify-between gap-3">
+				<div>
 					<p class="text-sm font-medium text-slate-300">Queue Type for new jobs from search results and asset cards.</p>
-					<select bind:value={aiQueueType} class="h-10 rounded-md border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-500">
+					<select bind:value={aiQueueType} class="mt-2 h-10 w-full rounded-md border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-500">
 						{#each aiQueueTypes as tag}
 							<option value={tag}>{queueTypeLabel(tag)}</option>
 						{/each}
 					</select>
 				</div>
-				<div class="mt-4 flex gap-3">
-					<div class="relative flex-1">
+				<div class="mt-4">
+					<div class="relative">
 						<Search class="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
 						<Input bind:value={aiSearchQuery} placeholder="Search transcripts, logos, players, moments..." class="pl-9 bg-slate-800 border-slate-700 text-white placeholder:text-slate-400" />
 					</div>
+				</div>
+				<div class="mt-3">
 					<button type="button" onclick={approveAiSuggestions} class="flex h-10 items-center gap-2 rounded-md border border-slate-700 bg-slate-800 px-4 py-2 text-sm font-medium text-slate-100 transition-colors hover:bg-slate-700">
 						<Sparkles class="size-4" />
 						Approve Suggestions
 					</button>
 				</div>
-				{#if aiQueueLoading}
-					<p class="mt-3 text-xs uppercase tracking-[0.2em] text-slate-500">Updating AI queue...</p>
-				{:else if aiQueueError}
-					<p class="mt-3 text-xs uppercase tracking-[0.2em] text-red-300">{aiQueueError}</p>
-				{:else if aiQueueNoLiveData}
-					<p class="mt-3 rounded-lg border border-amber-700/60 bg-amber-900/20 px-3 py-2 text-xs uppercase tracking-[0.14em] text-amber-200">Live data unavailable or permissions limited. Queue is currently empty.</p>
-				{/if}
-			</div>
-			<div class="rounded-2xl border border-slate-800 bg-slate-950/60 p-4">
-				<p class="text-sm font-medium text-slate-300">Queued Jobs</p>
-				<p class="mt-1 text-xs text-slate-500">{aiQueueCounts.matched} shown of {aiQueueCounts.total}</p>
+				<div class="mt-4 rounded-lg border border-slate-800 bg-slate-900/70 px-3 py-3">
+					<p class="text-xs font-medium uppercase tracking-[0.14em] text-slate-400">Queued Jobs</p>
+					<select
+						bind:value={aiQueueFilterType}
+						onchange={() => void loadAiQueue(aiQueueFilterType)}
+						class="mt-2 h-8 w-full rounded-md border border-slate-700 bg-slate-800 px-2 text-xs text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-500"
+					>
+						{#each aiQueueFilterTypes as tag}
+							<option value={tag}>{queueTypeLabel(tag)}</option>
+						{/each}
+					</select>
+					<p class="mt-2 text-xs text-slate-500">{aiQueueCounts.matched} shown of {aiQueueCounts.total}</p>
+				</div>
 				{#if aiQueueJobs.length === 0}
 					<div class="mt-4 rounded-xl border border-slate-800 bg-slate-900/80 p-4">
 						<p class="text-sm font-medium text-slate-200">No queued jobs yet.</p>
@@ -787,6 +833,13 @@
 							</div>
 						{/each}
 					</div>
+				{/if}
+				{#if aiQueueLoading}
+					<p class="mt-3 text-xs uppercase tracking-[0.2em] text-slate-500">Updating AI queue...</p>
+				{:else if aiQueueError}
+					<p class="mt-3 text-xs uppercase tracking-[0.2em] text-red-300">{aiQueueError}</p>
+				{:else if aiQueueNoLiveData}
+					<p class="mt-3 rounded-lg border border-amber-700/60 bg-amber-900/20 px-3 py-2 text-xs uppercase tracking-[0.14em] text-amber-200">Live data unavailable or permissions limited. Queue is currently empty.</p>
 				{/if}
 			</div>
 		</div>

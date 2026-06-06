@@ -15,13 +15,24 @@ function normalizeTranscript(record: any) {
 	const rawJobType = record?.jobType || record?.job_type || '';
 	const transcriptType = record?.transcriptType || record?.transcript_type || rawJobType || 'metadata_suggestion';
 	const normalizedType = transcriptType === 'transcript_extraction' ? 'transcript_extractions' : transcriptType;
+	const statusCandidates = [
+		record?.reviewStatus,
+		record?.review_status,
+		record?.reviewState,
+		record?.review_state,
+		record?.status,
+	];
+	const status = statusCandidates
+		.map((value) => normalize(value))
+		.find((value) => value === 'approved' || value === 'rejected' || value === 'reviewed' || value === 'pending' || value === 'completed') || 'pending';
 
 	return {
 		...record,
 		transcriptType: normalizedType,
 		sourceAsset: record?.sourceAsset || record?.source_asset || record?.asset || null,
 		transcriptText: record?.transcriptText || record?.transcript_text || '',
-		jobId: record?.jobId || record?.job || null,
+		jobId: record?.jobId || record?.job || record?.job_id || record?.aiJob || record?.ai_job || null,
+		status,
 	};
 }
 
@@ -122,21 +133,50 @@ async function hydrateTranscripts(pb: any, records: any[]) {
 	const [assets, jobs] = await Promise.all([listAssets(pb), listAiJobs(pb)]);
 	const assetMap = new Map(assets.map((asset: any) => [asset.id, asset]));
 	const jobMap = new Map(jobs.map((job: any) => [job.id, job]));
+	const jobsByAssetAndType = new Map<string, any>();
+
+	for (const job of sortByCreatedDesc(jobs as any[])) {
+		const jobType = normalize(job?.job_type || job?.jobType);
+		const normalizedType = jobType === 'transcript_extraction' ? 'transcript_extractions' : jobType;
+		const assetId = String(job?.asset || '').trim();
+		if (!assetId || !normalizedType) continue;
+		const key = `${assetId}:${normalizedType}`;
+		if (!jobsByAssetAndType.has(key)) jobsByAssetAndType.set(key, job);
+	}
 
 	return records.map((record: any) => {
-		const linkedJob = jobMap.get(record.jobId || record.job || '');
+		const explicitJobId = record.jobId || record.job || record.job_id || record.aiJob || record.ai_job || record.expand?.job?.id || '';
+		let linkedJob = jobMap.get(explicitJobId);
+		let jobResult: any = null;
+		try {
+			if (linkedJob?.result_json && typeof linkedJob.result_json === 'string') {
+				jobResult = JSON.parse(linkedJob.result_json);
+			} else if (linkedJob?.result_json && typeof linkedJob.result_json === 'object') {
+				jobResult = linkedJob.result_json;
+			}
+		} catch {
+			jobResult = null;
+		}
 		const sourceAssetId = record.sourceAsset || record.source_asset || record.asset || linkedJob?.asset || null;
+		if (!linkedJob && sourceAssetId) {
+			const key = `${sourceAssetId}:${normalize(record.transcriptType || record.transcript_type)}`;
+			linkedJob = jobsByAssetAndType.get(key) || null;
+		}
 		const sourceAsset = sourceAssetId ? assetMap.get(sourceAssetId) : null;
 		const hasExpand = Boolean(record.expand?.sourceAsset);
 		const title = record.title || record.summary || record.transcriptText || sourceAsset?.title || 'Untitled transcript';
+		const jobReviewStatus = jobResult?.reviewStatus || jobResult?.review_status || jobResult?.status || null;
 
 		return {
 			...record,
 			title,
+			jobId: linkedJob?.id || explicitJobId || null,
 			sourceAsset: sourceAssetId,
 			transcriptType: record.transcriptType || (linkedJob?.job_type === 'transcript_extraction' ? 'transcript_extractions' : linkedJob?.job_type) || 'metadata_suggestion',
 			confidence: record.confidence ?? null,
 			provider: record.provider || linkedJob?.provider || null,
+			jobReviewStatus,
+			jobStatus: linkedJob?.status || null,
 			expand: hasExpand || !sourceAsset
 				? record.expand
 				: {
@@ -257,6 +297,32 @@ function normalizeReviewStatus(value: unknown): 'pending' | 'reviewed' | 'approv
 	return 'pending';
 }
 
+function normalizeReviewStatusFromRecord(record: any): 'pending' | 'reviewed' | 'approved' | 'rejected' {
+	if (record?.rejectedAt || record?.rejected_at) return 'rejected';
+	if (record?.approvedAt || record?.approved_at) return 'approved';
+
+	const candidates = [
+		record?.jobReviewStatus,
+		record?.reviewStatus,
+		record?.review_status,
+		record?.reviewState,
+		record?.review_state,
+		record?.status,
+	];
+	const normalized = candidates
+		.map((candidate) => normalizeReviewStatus(candidate));
+
+	if (normalized.includes('approved')) return 'approved';
+	if (normalized.includes('rejected')) return 'rejected';
+	if (normalized.includes('reviewed')) return 'reviewed';
+	if (normalized.includes('pending')) return 'pending';
+
+	const raw = candidates.map((candidate) => normalize(candidate));
+	if (raw.includes('completed')) return 'pending';
+
+	return 'pending';
+}
+
 function buildRecommendation(record: any, status: 'pending' | 'reviewed' | 'approved' | 'rejected') {
 	const mockMeta = deriveMockMetadata(record);
 	const reasons: string[] = [];
@@ -318,7 +384,7 @@ function buildRecommendation(record: any, status: 'pending' | 'reviewed' | 'appr
 function buildJob(record: any) {
 	const sourceAsset = record.expand?.sourceAsset;
 	const confidence = record.confidence != null ? `${Math.round(Number(record.confidence) * 100)}%` : null;
-	const status = normalizeReviewStatus(record.status);
+	const status = normalizeReviewStatusFromRecord(record);
 	const recommendation = buildRecommendation(record, status);
 
 	return {
@@ -337,6 +403,116 @@ function buildJob(record: any) {
 		approvedBy: record.approvedBy || null,
 		approvedAt: record.approvedAt || null,
 	};
+}
+
+async function persistReviewState(pb: any, record: any, action: string, actor: string, reviewNotes: string) {
+	const nextStatus = action === 'approve'
+		? 'approved'
+		: action === 'reject'
+			? 'rejected'
+			: 'pending';
+
+	const timestamp = new Date().toISOString();
+	const requestCount = Number(record.requestCount || record.request_count || 0) + 1;
+	const notes = reviewNotes || record.reviewNotes || record.review_notes || '';
+	const approvalPayload = action === 'approve'
+		? {
+			approvedBy: actor,
+			approvedAt: timestamp,
+			approved_by: actor,
+			approved_at: timestamp,
+			rejectedBy: null,
+			rejectedAt: null,
+			rejected_by: null,
+			rejected_at: null,
+		}
+		: action === 'reject'
+			? {
+				rejectedBy: actor,
+				rejectedAt: timestamp,
+				rejected_by: actor,
+				rejected_at: timestamp,
+				approvedBy: null,
+				approvedAt: null,
+				approved_by: null,
+				approved_at: null,
+			}
+			: {
+				approvedBy: null,
+				approvedAt: null,
+				approved_by: null,
+				approved_at: null,
+				rejectedBy: null,
+				rejectedAt: null,
+				rejected_by: null,
+				rejected_at: null,
+			};
+
+	const candidates = [
+		{ status: nextStatus, requestCount, reviewNotes: notes, ...approvalPayload },
+		{ status: nextStatus, request_count: requestCount, review_notes: notes, ...approvalPayload },
+		{ reviewStatus: nextStatus, requestCount, reviewNotes: notes, ...approvalPayload },
+		{ review_status: nextStatus, request_count: requestCount, review_notes: notes, ...approvalPayload },
+		{ reviewState: nextStatus, requestCount, reviewNotes: notes, ...approvalPayload },
+		{ review_state: nextStatus, request_count: requestCount, review_notes: notes, ...approvalPayload },
+		{ status: nextStatus },
+		{ reviewStatus: nextStatus },
+		{ review_status: nextStatus },
+		{ reviewState: nextStatus },
+		{ review_state: nextStatus },
+	];
+
+	for (const payload of candidates) {
+		try {
+			await pb.collection('media_ai_transcripts').update(record.id, payload);
+
+			// Verify the persisted status so we don't treat partial/no-op writes as success.
+			const verifyRow = await pb.collection('media_ai_transcripts').getOne(record.id).catch(() => null);
+			if (!verifyRow) continue;
+
+			const persisted = normalizeTranscript(verifyRow);
+			const persistedStatus = normalizeReviewStatusFromRecord(persisted);
+			if (persistedStatus === nextStatus) {
+				return true;
+			}
+		} catch {
+			// Try next compatibility payload.
+		}
+	}
+
+	const jobId = record.jobId || record.job || null;
+	if (jobId) {
+		try {
+			const job = await pb.collection('media_ai_jobs').getOne(jobId);
+			let existingResult: any = {};
+			try {
+				existingResult = typeof job?.result_json === 'string'
+					? JSON.parse(job.result_json || '{}')
+					: (job?.result_json || {});
+			} catch {
+				existingResult = {};
+			}
+
+			const nextResult = {
+				...existingResult,
+				reviewStatus: nextStatus,
+				reviewedBy: actor,
+				reviewedAt: timestamp,
+				reviewNotes: notes,
+			};
+
+			await pb.collection('media_ai_jobs').update(jobId, {
+				result_json: nextResult,
+				completed_at: timestamp,
+			});
+
+			return true;
+		} catch {
+			// ignore job fallback failure
+		}
+	}
+
+	return false;
 }
 
 export const GET: RequestHandler = async ({ locals, url }) => {
@@ -371,15 +547,15 @@ export const GET: RequestHandler = async ({ locals, url }) => {
 		const counts = {
 			total: records.length,
 			matched: filtered.length,
-			pending: filtered.filter((record: any) => normalizeReviewStatus(record.status) === 'pending').length,
-			reviewed: filtered.filter((record: any) => normalizeReviewStatus(record.status) === 'reviewed').length,
-			approved: filtered.filter((record: any) => normalizeReviewStatus(record.status) === 'approved').length,
-			rejected: filtered.filter((record: any) => normalizeReviewStatus(record.status) === 'rejected').length,
+			pending: filtered.filter((record: any) => normalizeReviewStatusFromRecord(record) === 'pending').length,
+			reviewed: filtered.filter((record: any) => normalizeReviewStatusFromRecord(record) === 'reviewed').length,
+			approved: filtered.filter((record: any) => normalizeReviewStatusFromRecord(record) === 'approved').length,
+			rejected: filtered.filter((record: any) => normalizeReviewStatusFromRecord(record) === 'rejected').length,
 		};
 
 		filtered.sort((a: any, b: any) => {
 			const rank = (record: any) => {
-				const status = normalizeReviewStatus(record.status);
+				const status = normalizeReviewStatusFromRecord(record);
 				if (status === 'pending') return 0;
 				if (status === 'reviewed') return 1;
 				if (status === 'approved') return 2;
@@ -424,6 +600,13 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 		const resolvedQueueType = resolveQueueType(queueType);
 		const actor = ctx.userId || ctx.profile?.id || 'system';
 		const reviewNotes = String(body.reviewNotes ?? '').trim();
+		console.log('[media][phase7][api] post start', {
+			action,
+			ids,
+			queueType,
+			query,
+			actor,
+		});
 
 		const allRecords = await hydrateTranscripts(pb, await listTranscripts(pb));
 
@@ -477,40 +660,28 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 			}
 		}
 
-		const updates = selected
-			.filter((record: any) => {
-				const status = normalize(record.status);
-				return status !== 'approved' && status !== 'rejected';
-			})
-			.map(async (record: any) => {
-				if (action === 'approve') {
-					return pb.collection('media_ai_transcripts').update(record.id, {
-						status: 'approved',
-						approvedBy: actor,
-						approvedAt: new Date().toISOString(),
-						requestCount: Number(record.requestCount || 0) + 1,
-						reviewNotes: reviewNotes || record.reviewNotes || '',
-					});
-				}
+		const updates = await Promise.all(
+			selected
+				.filter((record: any) => {
+					const status = normalizeReviewStatusFromRecord(record);
+					if (action === 'approve') return status !== 'approved';
+					if (action === 'reject') return status !== 'rejected';
+					return true;
+				})
+				.map((record: any) => persistReviewState(pb, record, action, actor, reviewNotes))
+		);
 
-				if (action === 'reject') {
-					return pb.collection('media_ai_transcripts').update(record.id, {
-						status: 'rejected',
-						approvedBy: actor,
-						approvedAt: new Date().toISOString(),
-						requestCount: Number(record.requestCount || 0) + 1,
-						reviewNotes: reviewNotes || record.reviewNotes || '',
-					});
-				}
-
-				return pb.collection('media_ai_transcripts').update(record.id, {
-					status: 'pending',
-					requestCount: Number(record.requestCount || 0) + 1,
-					reviewNotes: reviewNotes || record.reviewNotes || '',
-				});
-			});
-
-		await Promise.all(updates);
+		console.log('[media][phase7][api] post update results', {
+			action,
+			selected: selected.length,
+			updated: updates.filter(Boolean).length,
+			ids,
+			selectedStatuses: selected.map((record: any) => ({
+				id: record.id,
+				status: normalizeReviewStatusFromRecord(record),
+				jobId: record.jobId || null,
+			})),
+		});
 
 		const refreshed = await hydrateTranscripts(pb, await listTranscripts(pb));
 
@@ -522,21 +693,26 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 			return matchesQuery(record, query);
 		});
 
+		const prioritizedIds = new Set(ids);
+		const prioritized = filtered.filter((record: any) => prioritizedIds.has(record.id));
+		const remainder = filtered.filter((record: any) => !prioritizedIds.has(record.id));
+		const responseJobs = [...prioritized, ...remainder];
+
 		return json({
 			action,
-			updated: updates.length,
+			updated: updates.filter(Boolean).length,
 			counts: {
 				total: refreshed.length,
 				matched: filtered.length,
-				pending: filtered.filter((record: any) => normalizeReviewStatus(record.status) === 'pending').length,
-				reviewed: filtered.filter((record: any) => normalizeReviewStatus(record.status) === 'reviewed').length,
-				approved: filtered.filter((record: any) => normalizeReviewStatus(record.status) === 'approved').length,
-				rejected: filtered.filter((record: any) => normalizeReviewStatus(record.status) === 'rejected').length,
+				pending: filtered.filter((record: any) => normalizeReviewStatusFromRecord(record) === 'pending').length,
+				reviewed: filtered.filter((record: any) => normalizeReviewStatusFromRecord(record) === 'reviewed').length,
+				approved: filtered.filter((record: any) => normalizeReviewStatusFromRecord(record) === 'approved').length,
+				rejected: filtered.filter((record: any) => normalizeReviewStatusFromRecord(record) === 'rejected').length,
 			},
-			jobs: filtered.slice(0, 8).map(buildJob),
+			jobs: responseJobs.slice(0, 8).map(buildJob),
 		});
 	} catch (error) {
-		console.error('Error updating Phase 7 queue:', error);
+		console.error('[media][phase7][api] post error', error);
 		return json({ message: 'Failed to update Phase 7 queue', error: String(error) }, { status: 500 });
 	}
 };
