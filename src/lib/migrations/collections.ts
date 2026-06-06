@@ -1961,6 +1961,42 @@ export const collections = [
 		deleteRule: null
 	},
 
+	// ─── Media AI transcripts ────────────────────────────────────────────────
+	{
+		name: 'media_ai_transcripts',
+		type: 'base',
+		schema: [
+			{ name: 'title', type: 'text', required: true, options: { min: 1, max: 255 } },
+			{ name: 'sourceAsset', type: 'relation', required: false, options: { collectionId: 'media_assets', maxSelect: 1 } },
+			{ name: 'transcriptType', type: 'select', required: true, options: { maxSelect: 1, values: ['metadata_suggestion', 'clip_summarization', 'transcript_extractions', 'scene_detection', 'logo_recognition', 'player_recognition'] } },
+			{ name: 'status', type: 'select', required: true, options: { maxSelect: 1, values: ['pending', 'reviewed', 'approved', 'rejected'] } },
+			{ name: 'transcriptText', type: 'editor', required: false },
+			{ name: 'summary', type: 'editor', required: false },
+			{ name: 'tags', type: 'text', required: false },
+			{ name: 'language', type: 'text', required: false },
+			{ name: 'durationSeconds', type: 'number', required: false },
+			{ name: 'speakerCount', type: 'number', required: false },
+			{ name: 'confidence', type: 'number', required: false },
+			{ name: 'estimatedRevenue', type: 'number', required: false },
+			{ name: 'downloadCount', type: 'number', required: false },
+			{ name: 'requestCount', type: 'number', required: false },
+			{ name: 'approvedBy', type: 'text', required: false },
+			{ name: 'approvedAt', type: 'date', required: false },
+			{ name: 'reviewNotes', type: 'editor', required: false },
+			{ name: 'createdBy', type: 'text', required: false }
+		],
+		indexes: [
+			'CREATE INDEX idx_media_ai_transcripts_status ON media_ai_transcripts (status)',
+			'CREATE INDEX idx_media_ai_transcripts_type ON media_ai_transcripts (transcriptType)',
+			'CREATE INDEX idx_media_ai_transcripts_source_asset ON media_ai_transcripts (sourceAsset)'
+		],
+		listRule: '@request.auth.id != ""',
+		viewRule: '@request.auth.id != ""',
+		createRule: '@request.auth.id != ""',
+		updateRule: '@request.auth.id != ""',
+		deleteRule: '@request.auth.id != ""'
+	},
+
 	// ─── Tournament ops checklist ─────────────────────────────────────────────
 	{
 		name: 'tournament_ops_checklist',

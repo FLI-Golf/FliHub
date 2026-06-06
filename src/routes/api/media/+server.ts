@@ -1,6 +1,56 @@
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 
+const MAX_FILE_SIZE_BYTES = 50 * 1024 * 1024;
+
+function normalize(value: unknown): string {
+	return String(value ?? '').trim().toLowerCase();
+}
+
+function allowedMimeTypesForAssetType(assetType: string): string[] {
+	switch (normalize(assetType)) {
+		case 'social':
+			return [
+				'image/jpeg',
+				'image/png',
+				'image/webp',
+				'image/gif',
+				'image/svg+xml',
+				'video/mp4',
+				'video/quicktime',
+				'video/webm',
+				'audio/mpeg',
+				'audio/wav',
+				'audio/mp4'
+			];
+		case 'other':
+			return [
+				'image/jpeg',
+				'image/png',
+				'image/webp',
+				'image/gif',
+				'image/svg+xml',
+				'video/mp4',
+				'video/quicktime',
+				'video/webm',
+				'audio/mpeg',
+				'audio/wav',
+				'audio/mp4',
+				'application/pdf',
+				'text/plain'
+			];
+		default:
+			return [
+				'image/jpeg',
+				'image/png',
+				'image/webp',
+				'image/gif',
+				'image/svg+xml',
+				'application/pdf'
+			];
+	}
+}
+
 export const GET: RequestHandler = async ({ locals, url }) => {
 	const pb = locals.pb;
 
@@ -58,6 +108,33 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 	try {
 		// File uploads require FormData, not JSON
 		const formData = await request.formData();
+		const title = String(formData.get('title') || '').trim();
+		const assetType = String(formData.get('asset_type') || '').trim();
+		const file = formData.get('file');
+
+		if (!title) {
+			return json({ message: 'title is required' }, { status: 400 });
+		}
+
+		if (!assetType) {
+			return json({ message: 'asset_type is required' }, { status: 400 });
+		}
+
+		if (!(file instanceof File)) {
+			return json({ message: 'file is required' }, { status: 400 });
+		}
+
+		if (file.size > MAX_FILE_SIZE_BYTES) {
+			return json({ message: 'file exceeds the 50MB limit' }, { status: 400 });
+		}
+
+		const allowedMimeTypes = allowedMimeTypesForAssetType(assetType);
+		if (!allowedMimeTypes.includes(file.type)) {
+			return json({
+				message: `Unsupported file type for ${assetType}`,
+				allowedMimeTypes,
+			}, { status: 400 });
+		}
 
 		const asset = await pb.collection('media_assets').create(formData);
 
