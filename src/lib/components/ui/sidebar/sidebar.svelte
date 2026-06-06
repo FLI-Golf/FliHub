@@ -50,7 +50,7 @@
 				<Sheet.Title>Sidebar</Sheet.Title>
 				<Sheet.Description>Displays the mobile sidebar.</Sheet.Description>
 			</Sheet.Header>
-			<div class="flex h-full w-full flex-col">
+			<div class="flex h-full min-h-0 w-full flex-col">
 				{@render children?.()}
 			</div>
 		</Sheet.Content>
@@ -96,7 +96,7 @@
 			<div
 				data-sidebar="sidebar"
 				data-slot="sidebar-inner"
-				class="bg-sidebar group-data-[variant=floating]:border-sidebar-border flex h-full w-full flex-col overflow-hidden group-data-[variant=floating]:rounded-lg group-data-[variant=floating]:border group-data-[variant=floating]:shadow-sm"
+				class="bg-sidebar group-data-[variant=floating]:border-sidebar-border flex h-full min-h-0 w-full flex-col overflow-hidden group-data-[variant=floating]:rounded-lg group-data-[variant=floating]:border group-data-[variant=floating]:shadow-sm"
 			>
 				{@render children?.()}
 			</div>

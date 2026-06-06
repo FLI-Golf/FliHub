@@ -341,7 +341,7 @@
 	</Sidebar.Header>
 
 	<!-- flex-1 + min-h-0 + overflow-y-auto ensures the nav scrolls independently -->
-	<Sidebar.Content class="px-2 py-2 gap-0 flex-1 min-h-0 overflow-y-auto overscroll-contain bg-sidebar">
+	<Sidebar.Content class="px-2 py-2 gap-0 flex-1 h-0 min-h-0 overflow-y-scroll overscroll-contain bg-sidebar">
 		{#each visibleGroups as group (group.id)}
 			{@const visibleItems = group.items.filter(canSeeItem)}
 			{#if visibleItems.length > 0}

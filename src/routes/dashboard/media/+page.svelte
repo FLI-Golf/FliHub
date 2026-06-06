@@ -52,13 +52,13 @@
 	let aiSearchQuery = $state('');
 	let aiQueueType = $state('metadata_suggestion');
 	let phase6Summary = $state<any>(null);
-	let phase6Loading = $state(false);
+	let phase6Loading = $state(true);
 	let phase6Error = $state('');
 	let aiQueueSummary = $state<any>(null);
-	let aiQueueLoading = $state(false);
+	let aiQueueLoading = $state(true);
 	let aiQueueError = $state('');
 	let phase5Summary = $state<any>(null);
-	let packageLoading = $state(false);
+	let packageLoading = $state(true);
 	let packageError = $state('');
 	let packageItems = $state<any[]>([]);
 	let packageOptions = $state<any[]>([]);
@@ -71,8 +71,11 @@
 	let clearDataMessage = $state('');
 	let clearDataError = $state('');
 
-	let phase6Stats = $derived(phase6Summary?.stats ?? marketplaceStats);
-	let phase6Listings = $derived(phase6Summary?.latestListings ?? latestListings);
+	let phase6Stats = $derived(phase6Summary?.stats ?? []);
+	let phase6Listings = $derived(phase6Summary?.latestListings ?? []);
+	let phase6NoLiveData = $derived(!phase6Loading && !phase6Error && phase6Summary !== null && phase6Listings.length === 0);
+	let aiQueueNoLiveData = $derived(!aiQueueLoading && !aiQueueError && aiQueueJobs.length === 0);
+	let packageNoLiveData = $derived(!packageLoading && !packageError && packageOptions.length === 0 && packageItems.length === 0);
 
 	const assetTypeLabels: Record<string, string> = {
 		flyer: 'Flyer', jersey: 'Jersey', shoe: 'Shoe',
@@ -221,13 +224,13 @@
 		{ title: 'White Flip Footware', type: 'metadata_suggestion', source: 'one-shot', status: 'completed' },
 	];
 
-	let aiQueueJobs = $state([...queuedJobs]);
+	let aiQueueJobs = $state<any[]>([]);
 	let aiQueueCounts = $state({
-		total: queuedJobs.length,
-		matched: queuedJobs.length,
+		total: 0,
+		matched: 0,
 		pending: 0,
 		reviewed: 0,
-		approved: queuedJobs.length,
+		approved: 0,
 		rejected: 0,
 	});
 
@@ -295,6 +298,7 @@
 			}
 		} catch (error: any) {
 			packageError = error?.message || 'Failed to load Phase 5 packages';
+			// Use seeded placeholders only when live API fetch fails.
 			packageItems = [...highlightQueue];
 			packageOptions = [{ title: 'Phase 5 Highlight Package 2026-06-05', count: highlightQueue.length }];
 			console.error('Failed to load Phase 5 packages:', error);
@@ -387,6 +391,16 @@
 			aiQueueCounts = payload.counts ?? aiQueueCounts;
 		} catch (error: any) {
 			aiQueueError = error?.message || 'Failed to load Phase 7 queue';
+			// Use seeded placeholders only when live API fetch fails.
+			aiQueueJobs = [...queuedJobs];
+			aiQueueCounts = {
+				total: queuedJobs.length,
+				matched: queuedJobs.length,
+				pending: 0,
+				reviewed: 0,
+				approved: queuedJobs.length,
+				rejected: 0,
+			};
 			console.error('Failed to load Phase 7 queue:', error);
 		} finally {
 			aiQueueLoading = false;
@@ -482,6 +496,11 @@
 			phase6Summary = await response.json();
 		} catch (error: any) {
 			phase6Error = error?.message || 'Failed to load Phase 6 summary';
+			// Use seeded placeholders only when live API fetch fails.
+			phase6Summary = {
+				stats: marketplaceStats,
+				latestListings,
+			};
 			console.error('Failed to load Phase 6 summary:', error);
 		} finally {
 			phase6Loading = false;
@@ -564,17 +583,28 @@
 		</div>
 
 		<div class="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-			{#each phase6Stats as stat}
-				<div class="rounded-2xl border border-slate-800 bg-slate-950/60 p-4">
-					<p class="text-[11px] uppercase tracking-[0.24em] text-slate-500">{stat.label}</p>
-					<p class="mt-2 text-lg font-semibold text-white">{stat.value}</p>
-				</div>
-			{/each}
+			{#if phase6Loading && phase6Summary === null}
+				{#each Array(4) as _}
+					<div class="animate-pulse rounded-2xl border border-slate-800 bg-slate-950/60 p-4">
+						<div class="h-3 w-28 rounded bg-slate-800"></div>
+						<div class="mt-3 h-6 w-20 rounded bg-slate-800"></div>
+					</div>
+				{/each}
+			{:else}
+				{#each phase6Stats as stat}
+					<div class="rounded-2xl border border-slate-800 bg-slate-950/60 p-4">
+						<p class="text-[11px] uppercase tracking-[0.24em] text-slate-500">{stat.label}</p>
+						<p class="mt-2 text-lg font-semibold text-white">{stat.value}</p>
+					</div>
+				{/each}
+			{/if}
 		</div>
 		{#if phase6Loading}
 			<p class="mt-4 text-xs uppercase tracking-[0.2em] text-slate-500">Refreshing Phase 6 summary...</p>
 		{:else if phase6Error}
 			<p class="mt-4 text-xs uppercase tracking-[0.2em] text-red-300">{phase6Error}</p>
+		{:else if phase6NoLiveData}
+			<p class="mt-4 rounded-lg border border-amber-700/60 bg-amber-900/20 px-3 py-2 text-xs uppercase tracking-[0.14em] text-amber-200">Live data unavailable or permissions limited. Showing current API result.</p>
 		{/if}
 
 		<div class="mt-6">
@@ -666,6 +696,8 @@
 					<p class="mt-3 text-xs uppercase tracking-[0.2em] text-slate-500">Updating AI queue...</p>
 				{:else if aiQueueError}
 					<p class="mt-3 text-xs uppercase tracking-[0.2em] text-red-300">{aiQueueError}</p>
+				{:else if aiQueueNoLiveData}
+					<p class="mt-3 rounded-lg border border-amber-700/60 bg-amber-900/20 px-3 py-2 text-xs uppercase tracking-[0.14em] text-amber-200">Live data unavailable or permissions limited. Queue is currently empty.</p>
 				{/if}
 			</div>
 			<div class="rounded-2xl border border-slate-800 bg-slate-950/60 p-4">
@@ -796,6 +828,8 @@
 					<p class="mt-3 text-xs uppercase tracking-[0.2em] text-slate-500">Updating package manager...</p>
 				{:else if packageError}
 					<p class="mt-3 text-xs uppercase tracking-[0.2em] text-red-300">{packageError}</p>
+				{:else if packageNoLiveData}
+					<p class="mt-3 rounded-lg border border-amber-700/60 bg-amber-900/20 px-3 py-2 text-xs uppercase tracking-[0.14em] text-amber-200">Live data unavailable or permissions limited. No packages were returned.</p>
 				{/if}
 			</div>
 			<div class="rounded-2xl border border-slate-800 bg-slate-950/60 p-4">
