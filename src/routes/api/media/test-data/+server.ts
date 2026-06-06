@@ -6,6 +6,8 @@ const TRANSCRIPT_TEST_SOURCES = new Set([
 	'smoke-rest',
 	'process-endpoint-smoke',
 	'one-shot',
+	'phase7-demo',
+	'phase7_queue',
 ]);
 
 const TEST_TERMS = [
@@ -33,11 +35,16 @@ function includesTestTerm(value: unknown): boolean {
 
 function isTestTranscript(record: any): boolean {
 	return (
+		normalize(record.createdBy) === 'phase7-demo' ||
+		normalize(record.created_by) === 'phase7-demo' ||
+		TRANSCRIPT_TEST_SOURCES.has(normalize(record.provider)) ||
 		TRANSCRIPT_TEST_SOURCES.has(normalize(record.source)) ||
 		includesTestTerm(record.title) ||
 		includesTestTerm(record.summary) ||
 		includesTestTerm(record.tags) ||
-		includesTestTerm(record.reviewNotes)
+		includesTestTerm(record.reviewNotes) ||
+		includesTestTerm(record.transcriptText) ||
+		includesTestTerm(record.transcript_text)
 	);
 }
 

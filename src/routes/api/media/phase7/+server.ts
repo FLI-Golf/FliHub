@@ -147,6 +147,12 @@ async function hydrateTranscripts(pb: any, records: any[]) {
 	return records.map((record: any) => {
 		const explicitJobId = record.jobId || record.job || record.job_id || record.aiJob || record.ai_job || record.expand?.job?.id || '';
 		let linkedJob = jobMap.get(explicitJobId);
+		const sourceAssetId = record.sourceAsset || record.source_asset || record.asset || linkedJob?.asset || null;
+		if (!linkedJob && sourceAssetId) {
+			const key = `${sourceAssetId}:${normalize(record.transcriptType || record.transcript_type)}`;
+			linkedJob = jobsByAssetAndType.get(key) || null;
+		}
+
 		let jobResult: any = null;
 		try {
 			if (linkedJob?.result_json && typeof linkedJob.result_json === 'string') {
@@ -157,11 +163,7 @@ async function hydrateTranscripts(pb: any, records: any[]) {
 		} catch {
 			jobResult = null;
 		}
-		const sourceAssetId = record.sourceAsset || record.source_asset || record.asset || linkedJob?.asset || null;
-		if (!linkedJob && sourceAssetId) {
-			const key = `${sourceAssetId}:${normalize(record.transcriptType || record.transcript_type)}`;
-			linkedJob = jobsByAssetAndType.get(key) || null;
-		}
+
 		const sourceAsset = sourceAssetId ? assetMap.get(sourceAssetId) : null;
 		const hasExpand = Boolean(record.expand?.sourceAsset);
 		const title = record.title || record.summary || record.transcriptText || sourceAsset?.title || 'Untitled transcript';
@@ -480,7 +482,7 @@ async function persistReviewState(pb: any, record: any, action: string, actor: s
 		}
 	}
 
-	const jobId = record.jobId || record.job || null;
+	const jobId = record.jobId || record.job || record.job_id || record.aiJob || record.ai_job || null;
 	if (jobId) {
 		try {
 			const job = await pb.collection('media_ai_jobs').getOne(jobId);
@@ -496,19 +498,44 @@ async function persistReviewState(pb: any, record: any, action: string, actor: s
 			const nextResult = {
 				...existingResult,
 				reviewStatus: nextStatus,
+				review_status: nextStatus,
 				reviewedBy: actor,
 				reviewedAt: timestamp,
 				reviewNotes: notes,
 			};
 
+			const existingStatus = normalize(job?.status || 'completed');
+			const jobStatus = existingStatus || 'completed';
+			const jobType = job?.job_type || job?.jobType || 'metadata_suggestion';
+			const asset = job?.asset || record.sourceAsset || record.source_asset || record.asset || null;
+
+			if (!asset) {
+				throw new Error('Missing asset relation for media_ai_jobs update');
+			}
+
 			await pb.collection('media_ai_jobs').update(jobId, {
+				asset,
+				job_type: jobType,
+				status: jobStatus,
+				provider: job?.provider || 'phase7-review',
+				model_name: job?.model_name || job?.modelName || 'phase7-review',
 				result_json: nextResult,
 				completed_at: timestamp,
 			});
 
+			console.log('[media][phase7][api] job fallback persisted', {
+				jobId,
+				nextStatus,
+				jobStatus,
+				asset,
+			});
+
 			return true;
-		} catch {
-			// ignore job fallback failure
+		} catch (error) {
+			console.warn('[media][phase7][api] job fallback failed', {
+				jobId,
+				error: String(error),
+			});
 		}
 	}
 
@@ -696,6 +723,23 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 		const prioritizedIds = new Set(ids);
 		const prioritized = filtered.filter((record: any) => prioritizedIds.has(record.id));
 		const remainder = filtered.filter((record: any) => !prioritizedIds.has(record.id));
+		remainder.sort((a: any, b: any) => {
+			const rank = (record: any) => {
+				const status = normalizeReviewStatusFromRecord(record);
+				if (status === 'pending') return 0;
+				if (status === 'reviewed') return 1;
+				if (status === 'approved') return 2;
+				if (status === 'rejected') return 3;
+				return 4;
+			};
+
+			const byStatus = rank(a) - rank(b);
+			if (byStatus !== 0) return byStatus;
+
+			const aCreated = Date.parse(a?.created || '') || 0;
+			const bCreated = Date.parse(b?.created || '') || 0;
+			return bCreated - aCreated;
+		});
 		const responseJobs = [...prioritized, ...remainder];
 
 		return json({

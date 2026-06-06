@@ -58,6 +58,7 @@
 	let aiQueueSummary = $state<any>(null);
 	let aiQueueLoading = $state(true);
 	let aiQueueError = $state('');
+	let aiQueueActionMessage = $state('');
 	let phase5Summary = $state<any>(null);
 	let packageLoading = $state(true);
 	let packageError = $state('');
@@ -256,14 +257,27 @@
 		clearDataError = '';
 
 		try {
-			const response = await fetch('/api/media/test-data', { method: 'DELETE' });
-			const payload = await response.json().catch(() => ({}));
+			const [phase7Response, genericResponse] = await Promise.all([
+				fetch('/api/media/phase7/clear', { method: 'POST' }),
+				fetch('/api/media/test-data', { method: 'DELETE' }),
+			]);
 
-			if (!response.ok) {
-				throw new Error(payload?.message || `Clear test data failed (${response.status})`);
+			const phase7Payload = await phase7Response.json().catch(() => ({}));
+			const genericPayload = await genericResponse.json().catch(() => ({}));
+
+			if (!phase7Response.ok && !genericResponse.ok) {
+				throw new Error(
+					phase7Payload?.message ||
+					genericPayload?.message ||
+					`Clear test data failed (${phase7Response.status}/${genericResponse.status})`
+				);
 			}
 
-			clearDataMessage = `Removed ${payload.deletedTotal ?? 0} test records (${payload.transcripts?.deleted ?? 0} transcripts, ${payload.packages?.deleted ?? 0} packages).`;
+			const phase7Deleted = Number(phase7Payload?.deletedTotal ?? 0);
+			const genericDeleted = Number(genericPayload?.deletedTotal ?? 0);
+			const combined = phase7Deleted + genericDeleted;
+
+			clearDataMessage = `Removed ${combined} test records (${phase7Deleted} Phase 7 rows, ${genericDeleted} general test rows).`;
 			await Promise.all([loadPhase6Summary(), loadAiQueue(), loadPhase5Summary()]);
 		} catch (error: any) {
 			clearDataError = error?.message || 'Failed to clear test data';
@@ -445,6 +459,7 @@
 	async function mutateAiQueue(action: 'process' | 'approve') {
 		aiQueueLoading = true;
 		aiQueueError = '';
+		aiQueueActionMessage = '';
 		const requestQueueType = action === 'process' ? aiQueueType : aiQueueFilterType;
 
 		try {
@@ -467,6 +482,12 @@
 			aiQueueSummary = payload;
 			aiQueueJobs = payload.jobs ?? aiQueueJobs;
 			aiQueueCounts = payload.counts ?? aiQueueCounts;
+			if (action === 'approve') {
+				const updated = Number(payload?.updated ?? 0);
+				aiQueueActionMessage = updated > 0
+					? `Approved ${updated} visible item${updated === 1 ? '' : 's'}.`
+					: 'No items changed. Some visible rows may already be approved.';
+			}
 		} catch (error: any) {
 			aiQueueError = error?.message || `Failed to ${action} Phase 7 queue`;
 			console.error(`Failed to ${action} Phase 7 queue:`, error);
@@ -478,6 +499,7 @@
 	async function reviewAiQueueItem(id: string, action: 'approve' | 'reject') {
 		aiQueueLoading = true;
 		aiQueueError = '';
+		aiQueueActionMessage = '';
 		console.log('[media][phase7][ui] review click', {
 			id,
 			action,
@@ -522,20 +544,11 @@
 			aiQueueSummary = payload;
 			aiQueueJobs = payload.jobs ?? aiQueueJobs;
 			aiQueueCounts = payload.counts ?? aiQueueCounts;
-
-			// Keep the acted-on row visually updated even if API paging returns lookalike rows first.
-			if ((payload?.updated ?? 0) > 0) {
-				aiQueueJobs = aiQueueJobs.map((job: any) =>
-					job.id === id
-						? {
-							...job,
-							status: action === 'approve' ? 'approved' : 'rejected',
-							recommendationLabel: action === 'approve' ? 'already approved' : 'already rejected',
-							recommendedAction: action,
-							recommendationScore: action === 'approve' ? 100 : 12,
-						}
-						: job
-				);
+			const updated = Number(payload?.updated ?? 0);
+			if (updated > 0) {
+				aiQueueActionMessage = `${action === 'approve' ? 'Approved' : 'Rejected'} ${updated} item${updated === 1 ? '' : 's'}.`;
+			} else {
+				aiQueueActionMessage = `No change for this item. It may already be ${action === 'approve' ? 'approved' : 'rejected'}.`;
 			}
 		} catch (error: any) {
 			aiQueueError = error?.message || `Failed to ${action} transcript`;
@@ -554,6 +567,14 @@
 	}
 
 	function approveAiSuggestions() {
+		const totalVisible = aiQueueJobs.length;
+		if (totalVisible === 0) return;
+
+		const confirmed = confirm(
+			`Approve all visible queue items? This will approve ${totalVisible} currently shown item${totalVisible === 1 ? '' : 's'}.`
+		);
+		if (!confirmed) return;
+
 		void mutateAiQueue('approve');
 	}
 
@@ -775,7 +796,7 @@
 				<div class="mt-3">
 					<button type="button" onclick={approveAiSuggestions} class="flex h-10 items-center gap-2 rounded-md border border-slate-700 bg-slate-800 px-4 py-2 text-sm font-medium text-slate-100 transition-colors hover:bg-slate-700">
 						<Sparkles class="size-4" />
-						Approve Suggestions
+						Approve All Visible
 					</button>
 				</div>
 				<div class="mt-4 rounded-lg border border-slate-800 bg-slate-900/70 px-3 py-3">
@@ -823,11 +844,11 @@
 									<span class="rounded-full border {job.status === 'approved' ? 'border-emerald-700 bg-emerald-900/40 text-emerald-200' : job.status === 'rejected' ? 'border-rose-700 bg-rose-900/40 text-rose-200' : 'border-amber-700 bg-amber-900/40 text-amber-200'} px-2 py-1 text-[11px] font-semibold uppercase tracking-[0.2em]">{job.status}</span>
 								</div>
 								<div class="mt-3 flex flex-wrap gap-2">
-									<button type="button" onclick={() => reviewAiQueueItem(job.id, 'approve')} class="rounded-md border border-emerald-700 bg-emerald-950/40 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.18em] text-emerald-200 transition-colors hover:bg-emerald-900/60">
-										Approve
+									<button type="button" disabled={job.status === 'approved'} onclick={() => reviewAiQueueItem(job.id, 'approve')} class="rounded-md border border-emerald-700 bg-emerald-950/40 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.18em] text-emerald-200 transition-colors hover:bg-emerald-900/60 disabled:cursor-not-allowed disabled:opacity-50">
+										{job.status === 'approved' ? 'Approved' : 'Approve'}
 									</button>
-									<button type="button" onclick={() => reviewAiQueueItem(job.id, 'reject')} class="rounded-md border border-rose-700 bg-rose-950/40 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.18em] text-rose-200 transition-colors hover:bg-rose-900/60">
-										Reject
+									<button type="button" disabled={job.status === 'rejected'} onclick={() => reviewAiQueueItem(job.id, 'reject')} class="rounded-md border border-rose-700 bg-rose-950/40 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.18em] text-rose-200 transition-colors hover:bg-rose-900/60 disabled:cursor-not-allowed disabled:opacity-50">
+										{job.status === 'rejected' ? 'Rejected' : 'Reject'}
 									</button>
 								</div>
 							</div>
@@ -836,6 +857,8 @@
 				{/if}
 				{#if aiQueueLoading}
 					<p class="mt-3 text-xs uppercase tracking-[0.2em] text-slate-500">Updating AI queue...</p>
+				{:else if aiQueueActionMessage}
+					<p class="mt-3 text-xs uppercase tracking-[0.2em] text-emerald-300">{aiQueueActionMessage}</p>
 				{:else if aiQueueError}
 					<p class="mt-3 text-xs uppercase tracking-[0.2em] text-red-300">{aiQueueError}</p>
 				{:else if aiQueueNoLiveData}
