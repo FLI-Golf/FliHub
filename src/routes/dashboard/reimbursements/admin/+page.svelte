@@ -25,11 +25,37 @@
 	}
 	function workOrderForClaim(claim: any) {
 		const workOrders = (data.workOrders ?? []) as any[];
-		return workOrders.find((wo: any) =>
-			wo.claimId === claim.id ||
-			(wo.work_order_number && (wo.work_order_number === claim.work_order_number || wo.work_order_number === claim.referenceNumber))
-		) ?? null;
+		const claimId = String(claim?.id || '').trim();
+		const byClaim = workOrders.find((wo: any) => String(wo?.claimId || '').trim() === claimId);
+		if (byClaim) return byClaim;
+
+		const ref = String(claim?.work_order_number || claim?.referenceNumber || '').trim().toLowerCase();
+		if (!ref) return null;
+
+		return workOrders.find((wo: any) => String(wo?.work_order_number || '').trim().toLowerCase() === ref) ?? null;
 	}
+
+	function debugPaidClaimQB(claim: any, wo: any) {
+		if (!import.meta.env.DEV || claim?.status !== 'paid') return;
+		console.log('[reimb-admin-ui] paid claim qb render', {
+			claimId: claim?.id,
+			claimRef: claim?.referenceNumber || null,
+			claimWO: claim?.work_order_number || null,
+			matchedWOId: wo?.id || null,
+			matchedWONumber: wo?.work_order_number || null,
+			matchedClaimId: wo?.claimId || null,
+			qbTransactionId: wo?.qb_transaction_id || null,
+			loadedWorkOrders: (data.workOrders ?? []).length
+		});
+	}
+
+	$effect(() => {
+		if (!import.meta.env.DEV) return;
+		for (const claim of data.claims as any[]) {
+			if (claim?.status !== 'paid') continue;
+			debugPaidClaimQB(claim, workOrderForClaim(claim));
+		}
+	});
 
 	// ── Filters / search ──────────────────────────────────────────────────────
 	let search    = $state('');
