@@ -6,7 +6,7 @@
 	import {
 		Search, ChevronDown, ChevronUp, CheckCircle2, Clock,
 		AlertCircle, XCircle, DollarSign, FileText, ArrowRight,
-		ChevronsUpDown, ChevronRight, Receipt, FlaskConical, Trash2, RefreshCw, Plus
+		ChevronsUpDown, ChevronRight, Receipt
 	} from 'lucide-svelte';
 	import type { PageData } from './$types';
 
@@ -38,7 +38,7 @@
 		else { sortCol = col; sortDir = 'asc'; }
 	}
 
-	const STATUS_ORDER: Record<string,number> = { submitted: 0, under_review: 1, approved: 2, draft: 3, paid: 4, rejected: 5 };
+	const STATUS_ORDER: Record<string,number> = { submitted: 0, under_review: 1, approved: 2, approval_submittedto: 3, paid: 4, rejected: 5, draft: 6 };
 
 	// ── Unique claimants for filter ───────────────────────────────────────────
 	let claimants = $derived(
@@ -94,24 +94,6 @@
 	let deletingItem = $state<string|null>(null);
 	let bulkDeletingClaim = $state<string|null>(null);
 	let selectedItemIds = $state<Record<string, boolean>>({});
-
-	async function action(claimId: string, status: string) {
-		saving = claimId;
-		const f = form(claimId);
-		const body: Record<string,any> = { status, reviewNotes: f.reviewNotes };
-		if (status === 'paid') {
-			if (!f.refNum.trim()) { alert('Reference number required'); saving = null; return; }
-			body.referenceNumber = f.refNum.trim();
-			body.paymentMethod   = f.payMethod;
-			body.paidDate        = f.paidDate;
-		}
-		await fetch(`/api/reimbursements/${claimId}`, {
-			method: 'PATCH', headers: { 'Content-Type': 'application/json' },
-			body: JSON.stringify(body)
-		});
-		await invalidateAll();
-		saving = null;
-	}
 
 	async function deleteLineItem(claimId: string, itemId: string, description: string) {
 		const willDeleteClaim = itemsFor(claimId).length === 1;
@@ -188,14 +170,15 @@
 
 	// ── Status display ────────────────────────────────────────────────────────
 	const STATUS_LABEL: Record<string,string> = {
-		draft: 'Draft', submitted: 'Submitted', under_review: 'Under Review',
-		approved: 'Approved', paid: 'Paid', rejected: 'Rejected'
+		draft: 'Draft', submitted: 'Pending Approvals', under_review: 'Under Review',
+		approved: 'Approved', approval_submittedto: 'Approved → QB', paid: 'Paid', rejected: 'Rejected'
 	};
 	const STATUS_CLASS: Record<string,string> = {
 		draft:        'bg-slate-700 text-slate-300',
 		submitted:    'bg-blue-900/60 text-blue-300 border border-blue-700/50',
 		under_review: 'bg-yellow-900/60 text-yellow-300 border border-yellow-700/50',
 		approved:     'bg-violet-900/60 text-violet-300 border border-violet-700/50',
+		approval_submittedto: 'bg-amber-900/60 text-amber-300 border border-amber-700/50',
 		paid:         'bg-emerald-900/60 text-emerald-300 border border-emerald-700/50',
 		rejected:     'bg-red-900/60 text-red-300 border border-red-700/50',
 	};
@@ -203,57 +186,10 @@
 	const INPUT = 'w-full rounded-md border border-slate-600 bg-slate-800 text-slate-100 px-3 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-emerald-500 placeholder:text-slate-500';
 	const LABEL = 'block text-[10px] font-medium text-slate-400 mb-1 uppercase tracking-wide';
 
-	// ── Test data panel ───────────────────────────────────────────────────────
-	let showTestPanel  = $state(false);
-	let seedCount      = $state(20);
-	let seedStatuses   = $state({ draft: true, submitted: true, under_review: true, approved: true, paid: true, rejected: true });
-	let testBusy       = $state<'seed'|'reset'|'reset-seed'|null>(null);
-	let testMsg        = $state('');
-
-	async function seedData() {
-		testBusy = 'seed'; testMsg = '';
-		const statuses = Object.entries(seedStatuses).filter(([,v]) => v).map(([k]) => k);
-		if (!statuses.length) { testMsg = 'Select at least one status.'; testBusy = null; return; }
-		const r = await fetch('/api/reimbursements/test-data', {
-			method: 'POST', headers: { 'Content-Type': 'application/json' },
-			body: JSON.stringify({ count: seedCount, statuses })
-		});
-		const d = await r.json();
-		testMsg = r.ok ? `✅ Created ${d.created} claims.` : `❌ ${d.message}`;
-		testBusy = null;
-		await invalidateAll();
-	}
-
-	async function resetData() {
-		if (!confirm(`Delete ALL ${(data.claims as any[]).length} claims and their items? This cannot be undone.`)) return;
-		testBusy = 'reset'; testMsg = '';
-		const r = await fetch('/api/reimbursements/test-data', { method: 'DELETE' });
-		const d = await r.json();
-		testMsg = r.ok ? `✅ Deleted ${d.deleted} claims.` : `❌ ${d.message}`;
-		testBusy = null;
-		await invalidateAll();
-	}
-
-	async function resetAndSeed() {
-		if (!confirm(`Delete ALL ${(data.claims as any[]).length} claims then seed ${seedCount} fresh ones?`)) return;
-		testBusy = 'reset-seed'; testMsg = '';
-		const del = await fetch('/api/reimbursements/test-data', { method: 'DELETE' });
-		if (!del.ok) { testMsg = '❌ Reset failed.'; testBusy = null; return; }
-		const statuses = Object.entries(seedStatuses).filter(([,v]) => v).map(([k]) => k);
-		const seed = await fetch('/api/reimbursements/test-data', {
-			method: 'POST', headers: { 'Content-Type': 'application/json' },
-			body: JSON.stringify({ count: seedCount, statuses })
-		});
-		const d = await seed.json();
-		testMsg = seed.ok ? `✅ Reset & seeded ${d.created} claims.` : `❌ ${d.message}`;
-		testBusy = null;
-		await invalidateAll();
-	}
-
 	// ── Pipeline counts for header ────────────────────────────────────────────
 	const PIPELINE = [
-		{ key: 'submitted',    label: 'Submitted',    color: 'text-blue-400',    bg: 'bg-blue-950/40 border-blue-800/50' },
 		{ key: 'under_review', label: 'Under Review', color: 'text-yellow-400',  bg: 'bg-yellow-950/40 border-yellow-800/50' },
+		{ key: 'submitted',    label: 'Pending Approvals', color: 'text-blue-400',    bg: 'bg-blue-950/40 border-blue-800/50' },
 		{ key: 'approved',     label: 'Approved',     color: 'text-violet-400',  bg: 'bg-violet-950/40 border-violet-800/50' },
 		{ key: 'paid',         label: 'Paid',         color: 'text-emerald-400', bg: 'bg-emerald-950/40 border-emerald-800/50' },
 	];
@@ -270,97 +206,6 @@
 			<p class="text-sm text-slate-400 mt-0.5">Review, approve, and process reimbursement claims</p>
 		</div>
 		<a href="/dashboard/reimbursements" class="text-xs text-slate-400 hover:text-slate-200 underline underline-offset-2">← Claimant view</a>
-	</div>
-
-	<!-- Test data panel -->
-	<div class="rounded-xl border border-amber-700/40 bg-amber-950/20 overflow-hidden">
-		<button onclick={() => showTestPanel = !showTestPanel}
-			class="w-full flex items-center justify-between px-5 py-3 hover:bg-amber-900/20 transition-colors text-left">
-			<div class="flex items-center gap-2.5">
-				<FlaskConical class="size-4 text-amber-400 shrink-0" />
-				<span class="text-sm font-medium text-amber-300">Test Data Tools</span>
-				<span class="text-xs text-amber-600 bg-amber-900/40 border border-amber-700/40 px-2 py-0.5 rounded">dev only</span>
-			</div>
-			<ChevronDown class="size-4 text-amber-600 transition-transform {showTestPanel ? 'rotate-180' : ''}" />
-		</button>
-
-		{#if showTestPanel}
-		<div class="border-t border-amber-700/30 px-5 py-4 space-y-4">
-			<div class="grid grid-cols-1 sm:grid-cols-2 gap-5">
-
-				<!-- Seed controls -->
-				<div class="space-y-3">
-					<p class="text-xs font-semibold text-amber-400 uppercase tracking-wide">Seed Claims</p>
-
-					<div class="flex items-center gap-3">
-						<label class="text-xs text-slate-400 whitespace-nowrap">Count</label>
-						<input type="number" bind:value={seedCount} min="1" max="200"
-							class="w-24 rounded-md border border-slate-600 bg-slate-900 text-slate-100 px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-amber-500 [color-scheme:dark]" />
-					</div>
-
-					<div>
-						<p class="text-xs text-slate-400 mb-2">Include statuses</p>
-						<div class="flex flex-wrap gap-2">
-							{#each [
-								['draft','Draft','bg-slate-700 text-slate-300'],
-								['submitted','Submitted','bg-blue-900/60 text-blue-300'],
-								['under_review','Under Review','bg-yellow-900/60 text-yellow-300'],
-								['approved','Approved','bg-violet-900/60 text-violet-300'],
-								['paid','Paid','bg-emerald-900/60 text-emerald-300'],
-								['rejected','Rejected','bg-red-900/60 text-red-300'],
-							] as [key, label, cls]}
-								<label class="flex items-center gap-1.5 cursor-pointer">
-									<input type="checkbox" bind:checked={seedStatuses[key as keyof typeof seedStatuses]}
-										class="rounded border-slate-600 accent-amber-500" />
-									<span class="text-xs px-2 py-0.5 rounded {cls}">{label}</span>
-								</label>
-							{/each}
-						</div>
-					</div>
-
-					<button onclick={seedData} disabled={!!testBusy}
-						class="flex items-center gap-2 text-sm px-4 py-2 rounded-lg bg-amber-700/50 border border-amber-600/50 text-amber-200 hover:bg-amber-700/70 transition-colors disabled:opacity-50">
-						{#if testBusy === 'seed'}
-							<RefreshCw class="size-4 animate-spin" /> Seeding…
-						{:else}
-							<Plus class="size-4" /> Seed {seedCount} Claims
-						{/if}
-					</button>
-				</div>
-
-				<!-- Reset controls -->
-				<div class="space-y-3">
-					<p class="text-xs font-semibold text-red-400 uppercase tracking-wide">Danger Zone</p>
-					<p class="text-xs text-slate-400">Currently <strong class="text-slate-200">{(data.claims as any[]).length}</strong> claims in the database.</p>
-
-
-					<div class="flex flex-col gap-2">
-						<button onclick={resetAndSeed} disabled={!!testBusy}
-							class="flex items-center gap-2 text-sm px-4 py-2 rounded-lg bg-amber-900/40 border border-amber-700/40 text-amber-300 hover:bg-amber-900/60 transition-colors disabled:opacity-50">
-							{#if testBusy === 'reset-seed'}
-								<RefreshCw class="size-4 animate-spin" /> Working…
-							{:else}
-								<RefreshCw class="size-4" /> Reset & Seed {seedCount} Fresh
-							{/if}
-						</button>
-
-						<button onclick={resetData} disabled={!!testBusy}
-							class="flex items-center gap-2 text-sm px-4 py-2 rounded-lg bg-red-950/40 border border-red-800/40 text-red-400 hover:bg-red-900/40 transition-colors disabled:opacity-50">
-							{#if testBusy === 'reset'}
-								<RefreshCw class="size-4 animate-spin" /> Deleting…
-							{:else}
-								<Trash2 class="size-4" /> Delete All Claims
-							{/if}
-						</button>
-					</div>
-				</div>
-			</div>
-
-			{#if testMsg}
-				<p class="text-sm {testMsg.startsWith('✅') ? 'text-emerald-400' : 'text-red-400'}">{testMsg}</p>
-			{/if}
-		</div>
-		{/if}
 	</div>
 
 	<!-- Pipeline metrics -->
@@ -396,9 +241,10 @@
 				class="h-9 rounded-md border border-slate-600 bg-slate-900 text-slate-200 text-sm px-3 focus:outline-none [color-scheme:dark]">
 				<option value="all">All Statuses</option>
 				<option value="draft">Draft</option>
-				<option value="submitted">Submitted</option>
+				<option value="submitted">Pending Approvals</option>
 				<option value="under_review">Under Review</option>
 				<option value="approved">Approved</option>
+						<option value="approval_submittedto">Approved → QB</option>
 				<option value="paid">Paid</option>
 				<option value="rejected">Rejected</option>
 			</select>
@@ -495,10 +341,13 @@
 												{busy ? '…' : 'Reject'}
 											</button>
 										{:else if claim.status === 'approved'}
-											<button onclick={() => expanded = isOpen ? null : claim.id}
-												class="text-xs px-2 py-1 rounded bg-emerald-900/50 border border-emerald-700/50 text-emerald-300 hover:bg-emerald-800/60 transition-colors whitespace-nowrap">
-												Mark Paid ↓
-											</button>
+											<span class="text-xs px-2 py-1 rounded bg-slate-700 border border-slate-600 text-slate-300 whitespace-nowrap">
+												Paid disabled - submit to QB first
+											</span>
+										{:else if claim.status === 'approval_submittedto'}
+											<span class="text-xs px-2 py-1 rounded bg-amber-900/50 border border-amber-700/50 text-amber-300 whitespace-nowrap">
+												Work order created
+											</span>
 										{:else if claim.status === 'draft'}
 											<span class="text-xs text-slate-600 italic">awaiting submission</span>
 										{:else if claim.status === 'paid'}
@@ -623,26 +472,11 @@
 														class="{INPUT} resize-none" placeholder="Feedback or approval notes…"></textarea>
 												</div>
 
-												{#if claim.status === 'approved'}
-													<div class="grid grid-cols-3 gap-2">
-														<div>
-															<label class={LABEL}>Reference # *</label>
-															<input bind:value={f.refNum} class={INPUT} placeholder="WO-001" />
-														</div>
-														<div>
-															<label class={LABEL}>Method</label>
-															<select bind:value={f.payMethod} class="{INPUT} [color-scheme:dark]">
-																<option value="bank_transfer">Bank Transfer</option>
-																<option value="check">Check</option>
-																<option value="zelle">Zelle</option>
-																<option value="paypal">PayPal</option>
-																<option value="cash">Cash</option>
-															</select>
-														</div>
-														<div>
-															<label class={LABEL}>Paid Date</label>
-															<input type="date" bind:value={f.paidDate} class="{INPUT} [color-scheme:dark]" />
-														</div>
+												{#if claim.status === 'approved' || claim.status === 'approval_submittedto'}
+													<div class="p-3 rounded-lg bg-slate-900/50 border border-slate-700 text-xs text-slate-300">
+														<p class="font-semibold text-slate-200">QuickBooks handoff required</p>
+														<p class="mt-1">This claim now creates a work order. Enter the QB check number on the Work Orders page after the work order is created.</p>
+														{#if claim.referenceNumber}<p class="mt-1 font-mono text-slate-400">WO: {claim.referenceNumber}</p>{/if}
 													</div>
 												{/if}
 
@@ -663,20 +497,29 @@
 														</button>
 														<button onclick={() => action(claim.id, 'submitted')} disabled={busy}
 															class="text-xs px-3 py-1.5 rounded bg-slate-700 border border-slate-600 text-slate-300 hover:bg-slate-600 disabled:opacity-50">
-															{busy ? '…' : '← Back to Submitted'}
+															{busy ? '…' : '← Back to Pending Approvals'}
 														</button>
 														<button onclick={() => action(claim.id, 'rejected')} disabled={busy}
 															class="text-xs px-3 py-1.5 rounded bg-red-900/40 border border-red-700/40 text-red-400 hover:bg-red-900/60 disabled:opacity-50">
 															{busy ? '…' : 'Reject'}
 														</button>
 													{:else if claim.status === 'approved'}
-														<button onclick={() => action(claim.id, 'paid')} disabled={busy}
-															class="text-xs px-3 py-1.5 rounded bg-emerald-900/50 border border-emerald-700/50 text-emerald-300 hover:bg-emerald-800/60 disabled:opacity-50 font-semibold">
-															{busy ? 'Saving…' : '✓ Mark as Paid'}
+														<button disabled
+															class="text-xs px-3 py-1.5 rounded bg-slate-700 border border-slate-600 text-slate-400 cursor-not-allowed font-semibold">
+															Paid disabled - use QuickBooks handoff
+														</button>
+														<button onclick={() => action(claim.id, 'approved')} disabled={busy}
+															class="text-xs px-3 py-1.5 rounded bg-amber-900/50 border border-amber-700/50 text-amber-300 hover:bg-amber-800/60 disabled:opacity-50">
+															{busy ? 'Saving…' : 'Create Work Order'}
 														</button>
 														<button onclick={() => action(claim.id, 'under_review')} disabled={busy}
 															class="text-xs px-3 py-1.5 rounded bg-slate-700 border border-slate-600 text-slate-300 hover:bg-slate-600 disabled:opacity-50">
 															{busy ? '…' : '← Back to Review'}
+														</button>
+													{:else if claim.status === 'approval_submittedto'}
+														<button onclick={() => window.location.href = '/dashboard/work-orders'}
+															class="text-xs px-3 py-1.5 rounded bg-amber-900/50 border border-amber-700/50 text-amber-300 hover:bg-amber-800/60">
+															Open Work Orders
 														</button>
 													{:else if claim.status === 'draft'}
 														<button onclick={() => action(claim.id, 'submitted')} disabled={busy}

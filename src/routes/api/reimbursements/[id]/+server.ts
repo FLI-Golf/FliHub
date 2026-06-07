@@ -3,6 +3,22 @@ import { RequestContext } from '$lib/infra/RequestContext';
 import { getAdminPocketBase } from '$lib/infra/pocketbase/pbClient';
 import type { RequestHandler } from './$types';
 
+async function getNextReimbursementWorkOrderNumber(adminPb: any): Promise<string> {
+	const workOrders = await adminPb.collection('work_orders')
+		.getFullList({ fields: 'work_order_number', sort: '-created' })
+		.catch(() => []) as any[];
+
+	let max = 0;
+	for (const workOrder of workOrders) {
+		const match = String(workOrder.work_order_number ?? '').match(/^WO-(\d+)$/);
+		if (match) {
+			max = Math.max(max, Number(match[1]));
+		}
+	}
+
+	return `WO-${String(max + 1).padStart(3, '0')}`;
+}
+
 // PATCH /api/reimbursements/:id — update status, reference number, review notes, payment info
 export const PATCH: RequestHandler = async ({ locals, url, params, request }) => {
 	const ctx  = await RequestContext.from(locals, url);
@@ -19,6 +35,15 @@ export const PATCH: RequestHandler = async ({ locals, url, params, request }) =>
 		if (body.paidDate        !== undefined) update.paidDate        = body.paidDate || null;
 		if (body.paidBy          !== undefined) update.paidBy          = body.paidBy  || null;
 
+		if (body.status === 'paid') {
+			return json({ message: 'Reimbursement claims must be approved and handed off to QuickBooks through a work order before payment.' }, { status: 400 });
+		}
+
+		const isApprovalHandoff = body.status === 'approved' || body.status === 'approval_submittedto';
+		if (isApprovalHandoff) {
+			update.status = 'approval_submittedto';
+		}
+
 		const adminPb = await getAdminPocketBase();
 
 		// Recalculate total from items if requested
@@ -30,11 +55,12 @@ export const PATCH: RequestHandler = async ({ locals, url, params, request }) =>
 
 		const record = await adminPb.collection('reimbursement_claims').update(params.id, update);
 
-		// When marking paid: create work order, stamp WO number everywhere, debit dept budget
-		if (body.status === 'paid') {
+		// When a claim is approved, create the reimbursement work order and
+		// hand it off to QuickBooks instead of paying it directly from the claim.
+		if (isApprovalHandoff) {
 			const woErrors: string[] = [];
 			try {
-				const woNumber = record.referenceNumber;
+				const woNumber = record.work_order_number || record.referenceNumber || await getNextReimbursementWorkOrderNumber(adminPb);
 
 				if (!woNumber) {
 					woErrors.push('referenceNumber is blank — work order not created');
@@ -56,10 +82,10 @@ export const PATCH: RequestHandler = async ({ locals, url, params, request }) =>
 							description:   record.title || '',
 							amount:        record.totalAmount || 0,
 							approvedDate:  new Date().toISOString(),
-							paidDate:      body.paidDate || new Date().toISOString(),
-							paymentMethod: body.paymentMethod || '',
-							status:        'paid',
-							notes:         `Reimbursement claim paid via ${(body.paymentMethod || 'bank_transfer').replace(/_/g, ' ')}`,
+							paidDate:      null,
+							paymentMethod: '',
+							status:        'open',
+							notes:         'Reimbursement claim approved and submitted to QuickBooks for payment processing.',
 						});
 						console.log(`[reimb] work order created: ${woNumber} (${wo.id})`);
 					} else {
@@ -68,7 +94,9 @@ export const PATCH: RequestHandler = async ({ locals, url, params, request }) =>
 
 					// 2. Stamp WO number on the claim itself
 					await adminPb.collection('reimbursement_claims').update(record.id, {
-						work_order_number: woNumber
+						work_order_number: woNumber,
+						referenceNumber: record.referenceNumber || woNumber,
+						status: 'approval_submittedto',
 					}).catch((e: any) => woErrors.push('stamp claim: ' + e?.message));
 
 					// 3. Stamp WO number on every line item
@@ -81,26 +109,6 @@ export const PATCH: RequestHandler = async ({ locals, url, params, request }) =>
 						}).catch(() => {});
 					}
 					console.log(`[reimb] stamped WO ${woNumber} on claim + ${items.length} items`);
-				}
-
-				// 4. Debit department actual spend
-				const claimFull = await adminPb.collection('reimbursement_claims')
-					.getOne(record.id, { fields: 'id,department,totalAmount' })
-					.catch(() => null);
-
-				if (claimFull?.department) {
-					const dept = await adminPb.collection('departments')
-						.getOne(claimFull.department, { fields: 'id,department_actual_expenses' })
-						.catch(() => null);
-
-					if (dept) {
-						const current = dept.department_actual_expenses ?? 0;
-						const claimTotal = claimFull.totalAmount ?? record.totalAmount ?? 0;
-						await adminPb.collection('departments').update(dept.id, {
-							department_actual_expenses: current + claimTotal
-						});
-						console.log(`[reimb] dept ${dept.id} actuals +${claimTotal} → ${current + claimTotal}`);
-					}
 				}
 
 			} catch (e: any) {
