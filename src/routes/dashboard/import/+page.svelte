@@ -24,6 +24,13 @@
 	const deptNames   = $derived(((data.departments   ?? []) as any[]).map((d: any) => d.name).join(' · '));
 	const userEmails  = $derived(((data.userProfiles  ?? []) as any[]).map((u: any) => u.email).filter(Boolean).join(', '));
 	const vendorNames = $derived(((data.vendors       ?? []) as any[]).map((v: any) => v.name).join(', '));
+	const firstUserEmail = $derived(((data.userProfiles ?? []) as any[]).map((u: any) => u.email).find(Boolean) || 'jane@example.com');
+	const firstVendorName = $derived(((data.vendors ?? []) as any[]).map((v: any) => v.name).find(Boolean) || '');
+	const reimbursementDeptName = $derived(
+		(((data.departments ?? []) as any[]).find((d: any) => d.name === 'Tax-Exempt Reimbursements')?.name)
+		|| (((data.departments ?? []) as any[]).map((d: any) => d.name).find(Boolean))
+		|| 'Tax-Exempt Reimbursements'
+	);
 
 	const aiPrompt = $derived(`You are helping me import historical reimbursement records into FliHub, a golf operations management app.
 
@@ -37,8 +44,10 @@ RULES:
 - itemDate: YYYY-MM-DD format
 - itemCategory: one of → travel · meals · equipment · software · marketing · legal · office · other
 - vendorName: optional, match exactly to one of → ${vendorNames || 'vendor name as written'}
+- If vendorName is not in the list, leave vendorName blank instead of inventing a new name
 - claimStatus: use "paid" for already-reimbursed items, "submitted" for pending
 - departmentName: one of → ${deptNames || 'department name'}
+- If departmentName is unknown, use "Tax-Exempt Reimbursements"
 - isHistorical: true for all records that existed before FliHub was set up, false for new claims
 - claimNotes: add "Historical import — pre-FliHub" for historical records
 - Wrap all values in double quotes
@@ -135,9 +144,29 @@ Here are the records to convert:
 	const cols   = $derived(schema.map(s => s.col));
 
 	// Sample CSV for the selected type
-	const sampleCSV = $derived(
-		cols.join(',') + '\n' + schema.map(s => `"${s.example}"`).join(',')
-	);
+	const sampleCSV = $derived.by(() => {
+		if (selectedType !== 'reimbursements') {
+			return cols.join(',') + '\n' + schema.map(s => `"${s.example}"`).join(',');
+		}
+
+		const headers = cols.join(',');
+		const row = [
+			'Q1 Travel Expenses',
+			firstUserEmail,
+			'Flight to Phoenix',
+			'342.50',
+			'2025-03-15',
+			'travel',
+			firstVendorName,
+			'Round trip, economy',
+			'paid',
+			'Historical import — pre-FliHub',
+			reimbursementDeptName,
+			'true'
+		].map(v => `"${v}"`).join(',');
+
+		return `${headers}\n${row}`;
+	});
 
 	let copied = $state(false);
 	async function copySample() {
