@@ -594,7 +594,7 @@ export const GET: RequestHandler = async ({ locals, url }) => {
 		return json({ message: 'Unauthorized' }, { status: 401 });
 	}
 
-	const role = ctx.profile?.role || '';
+	const role = String(ctx.role || '').toLowerCase();
 	if (!['admin', 'leader', 'marketing', 'marketing_lead'].includes(role)) {
 		return json({ message: 'Forbidden' }, { status: 403 });
 	}
@@ -657,7 +657,7 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 		return json({ message: 'Unauthorized' }, { status: 401 });
 	}
 
-	const role = ctx.profile?.role || '';
+	const role = String(ctx.role || '').toLowerCase();
 	if (!['admin', 'leader', 'marketing', 'marketing_lead'].includes(role)) {
 		return json({ message: 'Forbidden' }, { status: 403 });
 	}

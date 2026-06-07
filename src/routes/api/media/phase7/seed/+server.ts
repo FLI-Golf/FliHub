@@ -156,8 +156,8 @@ export const POST: RequestHandler = async ({ locals }) => {
 	const ctx = await RequestContext.fromApi(locals);
 	if (!ctx) return json({ message: 'Unauthorized' }, { status: 401 });
 
-	const role = ctx.profile?.role || '';
-	if (!['admin', 'leader'].includes(role)) {
+	const role = String(ctx.role || '').toLowerCase();
+	if (!['admin', 'leader', 'marketing', 'marketing_lead'].includes(role)) {
 		return json({ message: 'Forbidden' }, { status: 403 });
 	}
 

@@ -51,6 +51,7 @@
     "test:pipelines:sponsor": "tsx scripts/test-pipelines.ts --suite=sponsor",
     "test:pipelines:tournament": "tsx scripts/test-pipelines.ts --suite=tournament",
     "test:pipelines:content": "tsx scripts/test-pipelines.ts --suite=content",
+    "test:phase7:approval": "tsx scripts/test-phase7-approval-persistence.ts",
     "jobs:media-ai:process": "tsx scripts/process-media-ai-jobs.ts",
     "jobs:media-ai:one-shot": "tsx scripts/media-ai-one-shot.ts",
     "migrate:media:module8-10": "tsx scripts/migrate-media-module8-10.ts"
