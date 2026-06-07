@@ -38,7 +38,7 @@
 		else { sortCol = col; sortDir = 'asc'; }
 	}
 
-	const STATUS_ORDER: Record<string,number> = { submitted: 0, under_review: 1, approved: 2, approval_submittedto: 3, paid: 4, rejected: 5, draft: 6 };
+	const STATUS_ORDER: Record<string,number> = { submitted: 0, under_review: 1, approved: 2, paid: 3, rejected: 4, draft: 5 };
 
 	// ── Unique claimants for filter ───────────────────────────────────────────
 	let claimants = $derived(
@@ -91,6 +91,7 @@
 
 	// ── Saving state ──────────────────────────────────────────────────────────
 	let saving = $state<string|null>(null);
+	let actionNotice = $state<string>('');
 	let deletingItem = $state<string|null>(null);
 	let bulkDeletingClaim = $state<string|null>(null);
 	let selectedItemIds = $state<Record<string, boolean>>({});
@@ -168,17 +169,91 @@
 		}
 	}
 
+	async function action(claimId: string, status: string) {
+		if (saving) return;
+		saving = claimId;
+		actionNotice = '';
+		const f = form(claimId);
+		try {
+			if (status === 'under_review') {
+				const approvalRes = await fetch(`/api/reimbursements/${claimId}/request-approval`, {
+					method: 'POST',
+					headers: { 'content-type': 'application/json' }
+				});
+				const approvalPayload = await approvalRes.json().catch(() => ({}));
+				if (!approvalRes.ok) {
+					const msg = approvalPayload?.error || approvalPayload?.message || 'Failed to create approval';
+					actionNotice = `Approval request failed: ${msg}`;
+					alert(msg);
+					return;
+				}
+				actionNotice = `Approval requested successfully (ID: ${approvalPayload?.approvalId || 'created'}).`;
+				await invalidateAll();
+				return;
+			}
+
+			const res = await fetch(`/api/reimbursements/${claimId}`, {
+				method: 'PATCH',
+				headers: { 'content-type': 'application/json' },
+				body: JSON.stringify({
+					status,
+					reviewNotes: f.reviewNotes || '',
+					referenceNumber: f.refNum || undefined,
+					paymentMethod: f.payMethod || undefined,
+					paidDate: f.paidDate || undefined
+				})
+			});
+
+			if (!res.ok) {
+				const err = await res.json().catch(() => ({}));
+				alert(err?.message || 'Failed to update claim');
+				return;
+			}
+
+			const payload = await res.json().catch(() => ({}));
+			if (Array.isArray(payload?._woWarnings) && payload._woWarnings.length) {
+				alert(`Saved with warning:\n- ${payload._woWarnings.join('\n- ')}`);
+			}
+
+			await invalidateAll();
+		} finally {
+			saving = null;
+		}
+	}
+
+	async function openApprovalsForClaim(claimId: string) {
+		if (saving) return;
+		saving = claimId;
+		actionNotice = '';
+		try {
+			const approvalRes = await fetch(`/api/reimbursements/${claimId}/request-approval`, {
+				method: 'POST',
+				headers: { 'content-type': 'application/json' }
+			});
+			const payload = await approvalRes.json().catch(() => ({}));
+			if (!approvalRes.ok) {
+				const msg = payload?.error || payload?.message || 'Failed to open approvals';
+				actionNotice = `Approval request failed: ${msg}`;
+				alert(msg);
+				return;
+			}
+			actionNotice = `Approval ready (ID: ${payload?.approvalId || 'created'}). Redirecting to Approvals…`;
+			window.location.href = '/dashboard/approvals';
+		} finally {
+			saving = null;
+		}
+	}
+
 	// ── Status display ────────────────────────────────────────────────────────
 	const STATUS_LABEL: Record<string,string> = {
-		draft: 'Draft', submitted: 'Pending Approvals', under_review: 'Under Review',
-		approved: 'Approved', approval_submittedto: 'Approved → QB', paid: 'Paid', rejected: 'Rejected'
+		draft: 'Draft', submitted: 'Pending', under_review: 'Approval In Progress',
+		approved: 'Pending Payment', paid: 'Paid', rejected: 'Rejected'
 	};
 	const STATUS_CLASS: Record<string,string> = {
 		draft:        'bg-slate-700 text-slate-300',
 		submitted:    'bg-blue-900/60 text-blue-300 border border-blue-700/50',
 		under_review: 'bg-yellow-900/60 text-yellow-300 border border-yellow-700/50',
-		approved:     'bg-violet-900/60 text-violet-300 border border-violet-700/50',
-		approval_submittedto: 'bg-amber-900/60 text-amber-300 border border-amber-700/50',
+		approved:     'bg-amber-900/60 text-amber-300 border border-amber-700/50',
 		paid:         'bg-emerald-900/60 text-emerald-300 border border-emerald-700/50',
 		rejected:     'bg-red-900/60 text-red-300 border border-red-700/50',
 	};
@@ -188,9 +263,9 @@
 
 	// ── Pipeline counts for header ────────────────────────────────────────────
 	const PIPELINE = [
-		{ key: 'under_review', label: 'Under Review', color: 'text-yellow-400',  bg: 'bg-yellow-950/40 border-yellow-800/50' },
-		{ key: 'submitted',    label: 'Pending Approvals', color: 'text-blue-400',    bg: 'bg-blue-950/40 border-blue-800/50' },
-		{ key: 'approved',     label: 'Approved',     color: 'text-violet-400',  bg: 'bg-violet-950/40 border-violet-800/50' },
+		{ key: 'under_review', label: 'Approval In Progress', color: 'text-yellow-400',  bg: 'bg-yellow-950/40 border-yellow-800/50' },
+		{ key: 'submitted',    label: 'Pending', color: 'text-blue-400',    bg: 'bg-blue-950/40 border-blue-800/50' },
+		{ key: 'approved',     label: 'Pending Payment',     color: 'text-amber-400',  bg: 'bg-amber-950/40 border-amber-800/50' },
 		{ key: 'paid',         label: 'Paid',         color: 'text-emerald-400', bg: 'bg-emerald-950/40 border-emerald-800/50' },
 	];
 </script>
@@ -241,10 +316,9 @@
 				class="h-9 rounded-md border border-slate-600 bg-slate-900 text-slate-200 text-sm px-3 focus:outline-none [color-scheme:dark]">
 				<option value="all">All Statuses</option>
 				<option value="draft">Draft</option>
-				<option value="submitted">Pending Approvals</option>
-				<option value="under_review">Under Review</option>
-				<option value="approved">Approved</option>
-						<option value="approval_submittedto">Approved → QB</option>
+				<option value="submitted">Pending</option>
+				<option value="under_review">Approval In Progress</option>
+				<option value="approved">Pending Payment</option>
 				<option value="paid">Paid</option>
 				<option value="rejected">Rejected</option>
 			</select>
@@ -266,6 +340,9 @@
 
 			<span class="ml-auto text-xs text-slate-500">{rows().length} claims</span>
 		</div>
+		{#if actionNotice}
+			<p class="mt-3 text-xs text-slate-300">{actionNotice}</p>
+		{/if}
 	</Card>
 
 	<!-- Table -->
@@ -298,6 +375,7 @@
 							{@const items  = itemsFor(claim.id)}
 							{@const f      = form(claim.id)}
 							{@const busy   = saving === claim.id}
+							{@const isLocked = claim.status === 'approved' || claim.status === 'paid'}
 
 							<!-- Main row -->
 							<tr class="hover:bg-slate-700/30 transition-colors {isOpen ? 'bg-slate-700/20' : ''}">
@@ -325,16 +403,16 @@
 										{#if claim.status === 'submitted'}
 											<button onclick={() => action(claim.id, 'under_review')} disabled={busy}
 												class="text-xs px-2 py-1 rounded bg-yellow-900/50 border border-yellow-700/50 text-yellow-300 hover:bg-yellow-800/60 transition-colors disabled:opacity-50 whitespace-nowrap">
-												{busy ? '…' : 'Start Review'}
+												{busy ? '…' : 'Create Approval'}
 											</button>
 											<button onclick={() => action(claim.id, 'rejected')} disabled={busy}
 												class="text-xs px-2 py-1 rounded bg-red-900/40 border border-red-700/40 text-red-400 hover:bg-red-900/60 transition-colors disabled:opacity-50">
 												{busy ? '…' : 'Reject'}
 											</button>
 										{:else if claim.status === 'under_review'}
-											<button onclick={() => action(claim.id, 'approved')} disabled={busy}
-												class="text-xs px-2 py-1 rounded bg-violet-900/50 border border-violet-700/50 text-violet-300 hover:bg-violet-800/60 transition-colors disabled:opacity-50">
-												{busy ? '…' : 'Approve'}
+											<button onclick={() => openApprovalsForClaim(claim.id)}
+												class="text-xs px-2 py-1 rounded bg-violet-900/50 border border-violet-700/50 text-violet-300 hover:bg-violet-800/60 transition-colors">
+												Open Approvals
 											</button>
 											<button onclick={() => action(claim.id, 'rejected')} disabled={busy}
 												class="text-xs px-2 py-1 rounded bg-red-900/40 border border-red-700/40 text-red-400 hover:bg-red-900/60 transition-colors disabled:opacity-50">
@@ -342,11 +420,7 @@
 											</button>
 										{:else if claim.status === 'approved'}
 											<span class="text-xs px-2 py-1 rounded bg-slate-700 border border-slate-600 text-slate-300 whitespace-nowrap">
-												Paid disabled - submit to QB first
-											</span>
-										{:else if claim.status === 'approval_submittedto'}
-											<span class="text-xs px-2 py-1 rounded bg-amber-900/50 border border-amber-700/50 text-amber-300 whitespace-nowrap">
-												Work order created
+												Pending - submit to QB on Work Orders
 											</span>
 										{:else if claim.status === 'draft'}
 											<span class="text-xs text-slate-600 italic">awaiting submission</span>
@@ -377,6 +451,7 @@
 															<th class="pb-1.5 pr-3">
 																<input
 																	type="checkbox"
+																	disabled={isLocked}
 																	checked={items.length > 0 && selectedCountForClaim(claim.id) === items.length}
 																	onchange={(e) => toggleSelectAllForClaim(claim.id, (e.currentTarget as HTMLInputElement).checked)}
 																	class="rounded border-slate-600 accent-red-500"
@@ -397,6 +472,7 @@
 																<td class="py-1.5 pr-3">
 																	<input
 																		type="checkbox"
+																		disabled={isLocked}
 																		checked={isItemSelected(item.id)}
 																		onchange={(e) => toggleItemSelected(item.id, (e.currentTarget as HTMLInputElement).checked)}
 																		class="rounded border-slate-600 accent-red-500"
@@ -409,13 +485,17 @@
 																<td class="py-1.5 pr-3 text-slate-400">{fmtDate(item.date)}</td>
 																<td class="py-1.5 text-right font-semibold text-emerald-400">{fmt(item.amount)}</td>
 																<td class="py-1.5 text-right">
-																	<button
-																		onclick={() => deleteLineItem(claim.id, item.id, item.description)}
-																		disabled={deletingItem === item.id}
-																		class="text-[11px] px-2 py-1 rounded border border-red-700/50 bg-red-950/40 text-red-300 hover:bg-red-900/50 disabled:opacity-50"
-																	>
-																		{deletingItem === item.id ? 'Removing…' : 'Remove'}
-																	</button>
+																	{#if isLocked}
+																		<span class="text-[11px] text-slate-500">Locked</span>
+																	{:else}
+																		<button
+																			onclick={() => deleteLineItem(claim.id, item.id, item.description)}
+																			disabled={deletingItem === item.id}
+																			class="text-[11px] px-2 py-1 rounded border border-red-700/50 bg-red-950/40 text-red-300 hover:bg-red-900/50 disabled:opacity-50"
+																		>
+																			{deletingItem === item.id ? 'Removing…' : 'Remove'}
+																		</button>
+																	{/if}
 																</td>
 															</tr>
 														{/each}
@@ -429,7 +509,7 @@
 																	</p>
 																	<button
 																		onclick={() => deleteSelectedForClaim(claim.id)}
-																		disabled={selectedCountForClaim(claim.id) === 0 || bulkDeletingClaim === claim.id}
+																		disabled={isLocked || selectedCountForClaim(claim.id) === 0 || bulkDeletingClaim === claim.id}
 																		class="text-[11px] px-2 py-1 rounded border border-red-700/50 bg-red-950/40 text-red-300 hover:bg-red-900/50 disabled:opacity-50"
 																	>
 																		{bulkDeletingClaim === claim.id ? 'Removing…' : `Remove Selected (${selectedCountForClaim(claim.id)})`}
@@ -472,7 +552,7 @@
 														class="{INPUT} resize-none" placeholder="Feedback or approval notes…"></textarea>
 												</div>
 
-												{#if claim.status === 'approved' || claim.status === 'approval_submittedto'}
+												{#if claim.status === 'approved'}
 													<div class="p-3 rounded-lg bg-slate-900/50 border border-slate-700 text-xs text-slate-300">
 														<p class="font-semibold text-slate-200">QuickBooks handoff required</p>
 														<p class="mt-1">This claim now creates a work order. Enter the QB check number on the Work Orders page after the work order is created.</p>
@@ -484,16 +564,16 @@
 													{#if claim.status === 'submitted'}
 														<button onclick={() => action(claim.id, 'under_review')} disabled={busy}
 															class="text-xs px-3 py-1.5 rounded bg-yellow-900/50 border border-yellow-700/50 text-yellow-300 hover:bg-yellow-800/60 disabled:opacity-50">
-															{busy ? 'Saving…' : 'Start Review'}
+															{busy ? 'Saving…' : 'Create Approval'}
 														</button>
 														<button onclick={() => action(claim.id, 'rejected')} disabled={busy}
 															class="text-xs px-3 py-1.5 rounded bg-red-900/40 border border-red-700/40 text-red-400 hover:bg-red-900/60 disabled:opacity-50">
 															{busy ? '…' : 'Reject'}
 														</button>
 													{:else if claim.status === 'under_review'}
-														<button onclick={() => action(claim.id, 'approved')} disabled={busy}
-															class="text-xs px-3 py-1.5 rounded bg-violet-900/50 border border-violet-700/50 text-violet-300 hover:bg-violet-800/60 disabled:opacity-50">
-															{busy ? 'Saving…' : 'Approve'}
+														<button onclick={() => openApprovalsForClaim(claim.id)}
+															class="text-xs px-3 py-1.5 rounded bg-violet-900/50 border border-violet-700/50 text-violet-300 hover:bg-violet-800/60">
+															Open Approvals Queue
 														</button>
 														<button onclick={() => action(claim.id, 'submitted')} disabled={busy}
 															class="text-xs px-3 py-1.5 rounded bg-slate-700 border border-slate-600 text-slate-300 hover:bg-slate-600 disabled:opacity-50">
@@ -506,17 +586,8 @@
 													{:else if claim.status === 'approved'}
 														<button disabled
 															class="text-xs px-3 py-1.5 rounded bg-slate-700 border border-slate-600 text-slate-400 cursor-not-allowed font-semibold">
-															Paid disabled - use QuickBooks handoff
+															Pending - complete in Work Orders
 														</button>
-														<button onclick={() => action(claim.id, 'approved')} disabled={busy}
-															class="text-xs px-3 py-1.5 rounded bg-amber-900/50 border border-amber-700/50 text-amber-300 hover:bg-amber-800/60 disabled:opacity-50">
-															{busy ? 'Saving…' : 'Create Work Order'}
-														</button>
-														<button onclick={() => action(claim.id, 'under_review')} disabled={busy}
-															class="text-xs px-3 py-1.5 rounded bg-slate-700 border border-slate-600 text-slate-300 hover:bg-slate-600 disabled:opacity-50">
-															{busy ? '…' : '← Back to Review'}
-														</button>
-													{:else if claim.status === 'approval_submittedto'}
 														<button onclick={() => window.location.href = '/dashboard/work-orders'}
 															class="text-xs px-3 py-1.5 rounded bg-amber-900/50 border border-amber-700/50 text-amber-300 hover:bg-amber-800/60">
 															Open Work Orders

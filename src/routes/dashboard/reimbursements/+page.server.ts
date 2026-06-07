@@ -58,7 +58,7 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 		}
 
 		const pendingCount  = allClaims.filter(c => c.status === 'submitted' || c.status === 'under_review').length;
-		const approvedTotal = allClaims.filter(c => c.status === 'approved' || c.status === 'approval_submittedto').reduce((s, c) => s + (c.totalAmount || 0), 0);
+		const approvedTotal = allClaims.filter(c => c.status === 'approved').reduce((s, c) => s + (c.totalAmount || 0), 0);
 		const paidTotal     = allClaims.filter(c => c.status === 'paid').reduce((s, c) => s + (c.totalAmount || 0), 0);
 
 		return {

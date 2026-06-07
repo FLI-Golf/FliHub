@@ -14,7 +14,7 @@ const CLAIMANTS = [
 	'j534vv0tvcc7q9c', // Gannon Buhr
 ];
 
-const STATUSES = ['draft','submitted','submitted','under_review','under_review','approved','approved','approval_submittedto','paid','paid','rejected'];
+const STATUSES = ['draft','submitted','submitted','under_review','under_review','approved','approved','paid','paid','rejected'];
 
 const CATEGORIES = ['travel','meals','equipment','software','marketing','legal','office','other'];
 
@@ -191,7 +191,7 @@ export const POST: RequestHandler = async ({ locals, url, request }) => {
 
 			// Claims that have been handed off to QuickBooks or already paid must
 			// have a matching work_orders record.
-			if (status === 'paid' || status === 'approval_submittedto') {
+			if (status === 'paid' || status === 'approved') {
 				await adminPb.collection('work_orders').create({
 					work_order_number: wo,
 					claimId:           claim.id,

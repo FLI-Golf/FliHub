@@ -27,11 +27,11 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 		draft:       claims.filter((c: any) => c.status === 'draft').length,
 		submitted:   claims.filter((c: any) => c.status === 'submitted').length,
 		under_review:claims.filter((c: any) => c.status === 'under_review').length,
-		approved:    claims.filter((c: any) => c.status === 'approved' || c.status === 'approval_submittedto').length,
+		approved:    claims.filter((c: any) => c.status === 'approved').length,
 		paid:        claims.filter((c: any) => c.status === 'paid').length,
 		rejected:    claims.filter((c: any) => c.status === 'rejected').length,
 		totalPaid:   claims.filter((c: any) => c.status === 'paid').reduce((s: number, c: any) => s + (c.totalAmount || 0), 0),
-		totalApproved: claims.filter((c: any) => c.status === 'approved' || c.status === 'approval_submittedto').reduce((s: number, c: any) => s + (c.totalAmount || 0), 0),
+		totalApproved: claims.filter((c: any) => c.status === 'approved').reduce((s: number, c: any) => s + (c.totalAmount || 0), 0),
 		totalPending:  claims.filter((c: any) => c.status === 'submitted' || c.status === 'under_review').reduce((s: number, c: any) => s + (c.totalAmount || 0), 0),
 	};
 

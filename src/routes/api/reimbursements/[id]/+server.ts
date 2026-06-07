@@ -21,7 +21,8 @@ async function getNextReimbursementWorkOrderNumber(adminPb: any): Promise<string
 
 // PATCH /api/reimbursements/:id — update status, reference number, review notes, payment info
 export const PATCH: RequestHandler = async ({ locals, url, params, request }) => {
-	const ctx  = await RequestContext.from(locals, url);
+	const ctx = await RequestContext.fromApi(locals, url);
+	if (!ctx) return json({ message: 'Unauthorized' }, { status: 401 });
 	const body = await request.json();
 
 	try {
@@ -39,9 +40,11 @@ export const PATCH: RequestHandler = async ({ locals, url, params, request }) =>
 			return json({ message: 'Reimbursement claims must be approved and handed off to QuickBooks through a work order before payment.' }, { status: 400 });
 		}
 
-		const isApprovalHandoff = body.status === 'approved' || body.status === 'approval_submittedto';
+		const requestedStatus = body.status === 'approval_submittedto' ? 'approved' : body.status;
+		const shouldCreateApproval = requestedStatus === 'under_review';
+		const isApprovalHandoff = requestedStatus === 'approved';
 		if (isApprovalHandoff) {
-			update.status = 'approval_submittedto';
+			update.status = 'approved';
 		}
 
 		const adminPb = await getAdminPocketBase();
@@ -54,6 +57,30 @@ export const PATCH: RequestHandler = async ({ locals, url, params, request }) =>
 		}
 
 		const record = await adminPb.collection('reimbursement_claims').update(params.id, update);
+
+		if (shouldCreateApproval) {
+			console.log(`[reimb] creating approval for claim ${record.id}`);
+			const existingPending = await adminPb.collection('approvals').getFullList({
+				filter: `entityType='expense' && entityId='${record.id}' && status='pending'`,
+				fields: 'id'
+			}).catch(() => []);
+
+			if (!existingPending.length) {
+				const approvalData = {
+					entityType: 'expense',
+					entityId: record.id,
+					status: 'pending',
+					requestedBy: ctx.profile?.id ?? record.claimant ?? null,
+					requestedDate: new Date().toISOString(),
+					amount: record.totalAmount || 0,
+					comments: '<p>Reimbursement claim submitted for approval.</p>'
+				};
+				const approval = await adminPb.collection('approvals').create(approvalData);
+				console.log(`[reimb] approval created: ${approval.id} for claim ${record.id}`);
+			} else {
+				console.log(`[reimb] pending approval already exists for claim ${record.id}`);
+			}
+		}
 
 		// When a claim is approved, create the reimbursement work order and
 		// hand it off to QuickBooks instead of paying it directly from the claim.
@@ -96,7 +123,7 @@ export const PATCH: RequestHandler = async ({ locals, url, params, request }) =>
 					await adminPb.collection('reimbursement_claims').update(record.id, {
 						work_order_number: woNumber,
 						referenceNumber: record.referenceNumber || woNumber,
-						status: 'approval_submittedto',
+						status: 'approved',
 					}).catch((e: any) => woErrors.push('stamp claim: ' + e?.message));
 
 					// 3. Stamp WO number on every line item
@@ -125,7 +152,16 @@ export const PATCH: RequestHandler = async ({ locals, url, params, request }) =>
 
 		return json(record);
 	} catch (err: any) {
-		return json({ message: err?.response?.message ?? err?.message ?? 'Failed' }, { status: 500 });
+		const status = err?.status ?? err?.response?.status ?? 500;
+		const message = err?.response?.message ?? err?.message ?? 'Failed';
+		console.error('[reimb] PATCH failed', {
+			claimId: params.id,
+			requestedStatus: body?.status,
+			message,
+			data: err?.response?.data ?? null,
+			status
+		});
+		return json({ message }, { status });
 	}
 };
 

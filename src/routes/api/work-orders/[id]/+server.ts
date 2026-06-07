@@ -39,6 +39,21 @@ export const PATCH: RequestHandler = async ({ locals, url, params, request }) =>
 
 		const record = await adminPb.collection('work_orders').update(params.id, update);
 
+		// Keep reimbursement claim lifecycle in sync with work order payment status.
+		if (record.source === 'reimbursement' && record.claimId && body.status === 'paid') {
+			const paidDate = body.paidDate || new Date().toISOString().slice(0, 10);
+			await adminPb.collection('reimbursement_claims').update(record.claimId, {
+				status: 'paid',
+				paidDate,
+				paidBy: profile?.id ?? null,
+				reviewNotes: body.qb_transaction_id
+					? `Paid in QuickBooks (Txn ${body.qb_transaction_id}).`
+					: 'Paid in QuickBooks.'
+			}).catch((e: any) => {
+				console.warn('[wo] reimbursement claim paid sync failed:', e?.message);
+			});
+		}
+
 		// When QB transaction ID is saved on a reimbursement-sourced WO, create an expense
 		// record in 'submitted' status so it enters the normal approval pipeline.
 		const isQBEntry = !!body.qb_transaction_id;

@@ -75,7 +75,65 @@ export const POST: RequestHandler = async ({ locals, request }) => {
 
 			// ── Side effects on quorum ────────────────────────────────────────
 			if (approval.entityType === 'expense') {
-				const expense = await pb.collection('expenses').getOne(approval.entityId) as any;
+				const expense = await pb.collection('expenses').getOne(approval.entityId).catch(() => null) as any;
+
+				// Reimbursements use approval.entityType='expense' with entityId = reimbursement_claims.id.
+				if (!expense) {
+					const claim = await pb.collection('reimbursement_claims').getOne(approval.entityId).catch(() => null) as any;
+					if (!claim) {
+						return json({ error: 'Linked expense or reimbursement claim not found' }, { status: 404 });
+					}
+
+					const existingWOs = await pb.collection('work_orders').getFullList({
+						filter: `claimId="${claim.id}"`,
+						fields: 'id,work_order_number',
+						sort: '-created'
+					}).catch(() => []) as any[];
+
+					workOrderNumber = claim.work_order_number || claim.referenceNumber || existingWOs[0]?.work_order_number || null;
+					if (!workOrderNumber) {
+						const allWOs = await pb.collection('work_orders').getFullList({
+							fields: 'work_order_number',
+							sort: '-created'
+						}).catch(() => []) as any[];
+						const seq = allWOs.length + 1;
+						workOrderNumber = `WO-${String(seq).padStart(3, '0')}`;
+					}
+
+					if (!existingWOs.length) {
+						await pb.collection('work_orders').create({
+							work_order_number: workOrderNumber,
+							claimId:           claim.id,
+							source:            'reimbursement',
+							status:            'open',
+							approver:          userProfile.id,
+							submittedBy:       claim.claimant || null,
+							description:       claim.title || '',
+							amount:            claim.totalAmount || 0,
+							approvedDate:      new Date().toISOString(),
+							notes:             'Reimbursement claim approved and submitted to QuickBooks for payment processing.',
+						}).catch((e: any) => console.error('❌ reimbursement work_order create failed:', e.message, JSON.stringify(e.data ?? {})));
+					}
+
+					await pb.collection('reimbursement_claims').update(claim.id, {
+						status:            'approved',
+						work_order_number: workOrderNumber,
+						referenceNumber:   claim.referenceNumber || workOrderNumber,
+						reviewNotes:       claim.reviewNotes || `Approved by quorum (${voteCount}/${quorum}).`,
+					}).catch((e: any) => console.warn('reimbursement claim update failed:', e.message));
+
+					const reimbItems = await pb.collection('reimbursement_items').getFullList({
+						filter: `claim="${claim.id}"`,
+						fields: 'id'
+					}).catch(() => []) as any[];
+					for (const item of reimbItems) {
+						await pb.collection('reimbursement_items').update(item.id, {
+							work_order_number: workOrderNumber,
+						}).catch(() => {});
+					}
+
+					updatePayload.comments = `<p>Quorum reached — approved by ${voteCount} ${voteCount === 1 ? 'approver' : 'approvers'}. Reimbursement Work Order: ${workOrderNumber}</p>`;
+				} else {
 
 				// 1. Resolve project via task
 				let project: any = null;
@@ -155,6 +213,7 @@ export const POST: RequestHandler = async ({ locals, request }) => {
 					await pb.collection('projects').update(project.id, {
 						project_actual_expenses: currentActual + (expense.amount || 0),
 					}).catch((e: any) => console.warn('project budget update failed:', e.message));
+				}
 				}
 
 			} else if (approval.entityType === 'project') {
