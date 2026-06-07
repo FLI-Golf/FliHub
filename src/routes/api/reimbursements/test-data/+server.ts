@@ -189,9 +189,9 @@ export const POST: RequestHandler = async ({ locals, url, request }) => {
 				totalAmount: finalTotal
 			});
 
-			// Paid claims must have a matching work_orders record — this is the
-			// electronic record Ina uses to enter the payment in QuickBooks.
-			if (status === 'paid') {
+			// Claims that have been handed off to QuickBooks or already paid must
+			// have a matching work_orders record.
+			if (status === 'paid' || status === 'approved') {
 				await adminPb.collection('work_orders').create({
 					work_order_number: wo,
 					claimId:           claim.id,
@@ -200,10 +200,12 @@ export const POST: RequestHandler = async ({ locals, url, request }) => {
 					description:       title,
 					amount:            finalTotal,
 					approvedDate:      new Date(Date.now() - randInt(1, 30) * 86400000).toISOString(),
-					paidDate,
-					paymentMethod:     payMethod,
-					status:            'paid',
-					notes:             `Reimbursement claim paid via ${payMethod.replace(/_/g, ' ')}`,
+					paidDate:          status === 'paid' ? paidDate : null,
+					paymentMethod:     status === 'paid' ? payMethod : '',
+					status:            status === 'paid' ? 'paid' : 'open',
+					notes:             status === 'paid'
+						? `Reimbursement claim paid via ${payMethod.replace(/_/g, ' ')}`
+						: 'Reimbursement claim approved and submitted to QuickBooks for payment processing.',
 				}).catch((e: any) => console.error('[seed] WO create failed for', wo, e?.response?.data ?? e?.message));
 			}
 

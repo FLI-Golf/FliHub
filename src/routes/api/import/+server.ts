@@ -123,7 +123,10 @@ export const POST: RequestHandler = async ({ locals, url, request }) => {
 				const isHistorical = row.isHistorical?.trim().toLowerCase() === 'true';
 				const itemAmount   = row.itemAmount ? Number(row.itemAmount.replace(/[^0-9.]/g, '')) : 0;
 				const claimTitle   = row.claimTitle?.trim() || '';
-				const claimStatus  = row.claimStatus?.trim() || 'draft';
+				const rawClaimStatus = row.claimStatus?.trim();
+				const claimStatus = !rawClaimStatus || rawClaimStatus === 'submitted'
+					? 'under_review'
+					: rawClaimStatus;
 
 				// Group multi-item rows: reuse an existing claim created in this import
 				// batch if claimTitle + claimantEmail match a previously created claim.

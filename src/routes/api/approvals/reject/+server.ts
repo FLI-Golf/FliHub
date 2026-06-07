@@ -43,11 +43,19 @@ export const POST: RequestHandler = async ({ locals, request }) => {
 		// Update the linked entity based on type
 		try {
 			if (approval.entityType === 'expense') {
-				// Update expense status to rejected (or back to draft)
-				await pb.collection('expenses').update(approval.entityId, {
+				// Update expense status to rejected, with reimbursement fallback.
+				const updatedExpense = await pb.collection('expenses').update(approval.entityId, {
 					status: 'rejected'
-				});
-				console.log(`✅ Updated expense ${approval.entityId} to rejected`);
+				}).catch(() => null);
+				if (updatedExpense) {
+					console.log(`✅ Updated expense ${approval.entityId} to rejected`);
+				} else {
+					await pb.collection('reimbursement_claims').update(approval.entityId, {
+						status: 'rejected',
+						reviewNotes: 'Rejected during approval workflow.'
+					}).catch(() => null);
+					console.log(`✅ Updated reimbursement claim ${approval.entityId} to rejected`);
+				}
 			} else if (approval.entityType === 'project') {
 				// Update project status back to draft or cancelled
 				await pb.collection('projects').update(approval.entityId, {
