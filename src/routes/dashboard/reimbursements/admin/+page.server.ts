@@ -12,13 +12,18 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 
 	const adminPb = await getAdminPocketBase();
 
-	const [claims, items] = await Promise.all([
+	const [claims, items, workOrders] = await Promise.all([
 		adminPb.collection('reimbursement_claims').getFullList({
 			sort:   '-id',
 			expand: 'claimant,paidBy,department'
 		}).catch(() => []),
 		adminPb.collection('reimbursement_items').getFullList({
 			sort: 'date'
+		}).catch(() => []),
+		adminPb.collection('work_orders').getFullList({
+			filter: 'source="reimbursement"',
+			sort: '-created',
+			fields: 'id,claimId,work_order_number,status,approvedDate,paidDate,paymentMethod,qb_transaction_id,qb_entered_date,qb_account,qb_notes'
 		}).catch(() => []),
 	]);
 
@@ -35,5 +40,5 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 		totalPending:  claims.filter((c: any) => c.status === 'submitted' || c.status === 'under_review').reduce((s: number, c: any) => s + (c.totalAmount || 0), 0),
 	};
 
-	return { claims, items, metrics, profile, isAdmin };
+	return { claims, items, workOrders, metrics, profile, isAdmin };
 };

@@ -54,8 +54,9 @@ export const PATCH: RequestHandler = async ({ locals, url, params, request }) =>
 			});
 		}
 
-		// When QB transaction ID is saved on a reimbursement-sourced WO, create an expense
-		// record in 'submitted' status so it enters the normal approval pipeline.
+		// When QB transaction ID is saved on a reimbursement-sourced WO, create a linked
+		// expense record for reporting, but do not create another approval record.
+		// The reimbursement claim itself already went through approvals.
 		const isQBEntry = !!body.qb_transaction_id;
 
 		if (isQBEntry && record.source === 'reimbursement' && record.claimId) {
@@ -72,29 +73,18 @@ export const PATCH: RequestHandler = async ({ locals, url, params, request }) =>
 						// Build a description from the claim title + WO number
 						const description = `Reimbursement — ${claim.title} (${record.work_order_number})`;
 
-						// Create the expense in submitted status — this auto-triggers an approval
+						// Create the expense as paid because QB entry indicates payment is complete.
 						const expense = await adminPb.collection('expenses').create({
 							description,
 							amount:          claim.totalAmount ?? record.amount ?? 0,
 							category:        'Reimbursement',
-							status:          'submitted',
+							status:          'paid',
 							date:            body.qb_entered_date || new Date().toISOString().slice(0, 10),
+							paidDate:        body.qb_entered_date || new Date().toISOString().slice(0, 10),
 							notes:           `QB Transaction: ${body.qb_transaction_id}${body.qb_account ? ` · Account: ${body.qb_account}` : ''}${body.qb_notes ? ` · ${body.qb_notes}` : ''}`,
 							submittedBy:     profile?.id || null,
 							work_order_number: record.work_order_number || '',
 							invoiceNumber:   record.work_order_number || '',
-						});
-
-						// Create the approval record manually (adminPb bypasses the auto-create
-						// in the expenses PATCH endpoint, so we do it explicitly here)
-						await adminPb.collection('approvals').create({
-							entityType:    'expense',
-							entityId:      expense.id,
-							status:        'pending',
-							requestedBy:   profile?.id || null,
-							requestedDate: new Date().toISOString(),
-							amount:        expense.amount,
-							comments:      `<p>Reimbursement expense created from QB entry on ${record.work_order_number}. Claim: ${claim.title}. QB Txn: ${body.qb_transaction_id}.</p>`,
 						});
 
 						// Stamp the expense ID back onto the work order so we don't create duplicates
@@ -102,7 +92,7 @@ export const PATCH: RequestHandler = async ({ locals, url, params, request }) =>
 							expense: expense.id,
 						}).catch(() => {});
 
-						console.log(`[wo] QB entry on ${record.work_order_number} → expense ${expense.id} submitted for approval`);
+						console.log(`[wo] QB entry on ${record.work_order_number} → expense ${expense.id} recorded as paid`);
 
 						return json({ ...record, _expenseCreated: true, _expenseId: expense.id });
 					}

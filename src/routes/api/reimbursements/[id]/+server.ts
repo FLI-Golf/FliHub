@@ -19,6 +19,36 @@ async function getNextReimbursementWorkOrderNumber(adminPb: any): Promise<string
 	return `WO-${String(max + 1).padStart(3, '0')}`;
 }
 
+function reimbursementWorkOrderFromClaimId(claimId: string): string {
+	return `WO-${String(claimId || '').slice(-4).toLowerCase()}`;
+}
+
+async function getUniqueReimbursementWorkOrderNumber(
+	adminPb: any,
+	claimId: string,
+	preferred?: string | null
+): Promise<string> {
+	const existingWOs = await adminPb.collection('work_orders')
+		.getFullList({ fields: 'id,claimId,work_order_number' })
+		.catch(() => []) as any[];
+
+	const candidates = [
+		reimbursementWorkOrderFromClaimId(claimId),
+		(preferred || '').trim()
+	].filter(Boolean);
+
+	for (const candidate of candidates) {
+		const existing = existingWOs.filter((wo: any) => String(wo.work_order_number || '').trim() === candidate);
+
+		// Safe to reuse if the number is unused or already belongs to this same claim.
+		if (!existing.length || existing.every((wo: any) => wo.claimId === claimId)) {
+			return candidate;
+		}
+	}
+
+	return getNextReimbursementWorkOrderNumber(adminPb);
+}
+
 // PATCH /api/reimbursements/:id — update status, reference number, review notes, payment info
 export const PATCH: RequestHandler = async ({ locals, url, params, request }) => {
 	const ctx = await RequestContext.fromApi(locals, url);
@@ -87,14 +117,18 @@ export const PATCH: RequestHandler = async ({ locals, url, params, request }) =>
 		if (isApprovalHandoff) {
 			const woErrors: string[] = [];
 			try {
-				const woNumber = record.work_order_number || record.referenceNumber || await getNextReimbursementWorkOrderNumber(adminPb);
+				const woNumber = await getUniqueReimbursementWorkOrderNumber(
+					adminPb,
+					record.id,
+					record.work_order_number || record.referenceNumber
+				);
 
 				if (!woNumber) {
 					woErrors.push('referenceNumber is blank — work order not created');
 				} else {
 					// 1. Create work_orders record if not already there
 					const existing = await adminPb.collection('work_orders')
-						.getFullList({ filter: `work_order_number="${woNumber}"`, fields: 'id' })
+						.getFullList({ filter: `work_order_number='${woNumber}'`, fields: 'id' })
 						.catch(() => []);
 
 					if (!existing.length) {

@@ -13,6 +13,10 @@ function deriveProjectCode(name: string): string {
 		.slice(0, 6) || 'WO';
 }
 
+function reimbursementWorkOrderFromClaimId(claimId: string): string {
+	return `WO-${String(claimId || '').slice(-4).toLowerCase()}`;
+}
+
 export const POST: RequestHandler = async ({ locals, request }) => {
 	const userPb = locals.pb;
 
@@ -85,19 +89,40 @@ export const POST: RequestHandler = async ({ locals, request }) => {
 					}
 
 					const existingWOs = await pb.collection('work_orders').getFullList({
-						filter: `claimId="${claim.id}"`,
+						filter: `claimId='${claim.id}'`,
 						fields: 'id,work_order_number',
 						sort: '-created'
 					}).catch(() => []) as any[];
 
-					workOrderNumber = claim.work_order_number || claim.referenceNumber || existingWOs[0]?.work_order_number || null;
+					const collisionPool = await pb.collection('work_orders').getFullList({
+						fields: 'id,claimId,work_order_number'
+					}).catch(() => []) as any[];
+
+					const canonical = reimbursementWorkOrderFromClaimId(claim.id);
+					const canonicalTakenByOther = collisionPool.some((wo: any) =>
+						String(wo.work_order_number || '').trim() === canonical && wo.claimId !== claim.id
+					);
+
+					workOrderNumber = !canonicalTakenByOther ? canonical : null;
+
+					if (!workOrderNumber && existingWOs.length) {
+						workOrderNumber = existingWOs[0]?.work_order_number || null;
+					}
+
 					if (!workOrderNumber) {
-						const allWOs = await pb.collection('work_orders').getFullList({
-							fields: 'work_order_number',
-							sort: '-created'
-						}).catch(() => []) as any[];
+						const allWOs = collisionPool;
 						const seq = allWOs.length + 1;
 						workOrderNumber = `WO-${String(seq).padStart(3, '0')}`;
+					}
+
+					if (existingWOs.length) {
+						for (const wo of existingWOs) {
+							if (wo.work_order_number !== workOrderNumber) {
+								await pb.collection('work_orders').update(wo.id, {
+									work_order_number: workOrderNumber,
+								}).catch(() => {});
+							}
+						}
 					}
 
 					if (!existingWOs.length) {
@@ -118,7 +143,7 @@ export const POST: RequestHandler = async ({ locals, request }) => {
 					await pb.collection('reimbursement_claims').update(claim.id, {
 						status:            'approved',
 						work_order_number: workOrderNumber,
-						referenceNumber:   claim.referenceNumber || workOrderNumber,
+						referenceNumber:   workOrderNumber,
 						reviewNotes:       claim.reviewNotes || `Approved by quorum (${voteCount}/${quorum}).`,
 					}).catch((e: any) => console.warn('reimbursement claim update failed:', e.message));
 

@@ -6,7 +6,7 @@
 	import {
 		Search, ChevronDown, ChevronUp, CheckCircle2, Clock,
 		AlertCircle, XCircle, DollarSign, FileText, ArrowRight,
-		ChevronsUpDown, ChevronRight, Receipt
+		ChevronsUpDown, ChevronRight, Receipt, Loader2
 	} from 'lucide-svelte';
 	import type { PageData } from './$types';
 
@@ -22,6 +22,13 @@
 	}
 	function itemsFor(claimId: string) {
 		return (data.items as any[]).filter(i => i.claim === claimId);
+	}
+	function workOrderForClaim(claim: any) {
+		const workOrders = (data.workOrders ?? []) as any[];
+		return workOrders.find((wo: any) =>
+			wo.claimId === claim.id ||
+			(wo.work_order_number && (wo.work_order_number === claim.work_order_number || wo.work_order_number === claim.referenceNumber))
+		) ?? null;
 	}
 
 	// ── Filters / search ──────────────────────────────────────────────────────
@@ -373,6 +380,7 @@
 						{#each rows() as claim (claim.id)}
 							{@const isOpen = expanded === claim.id}
 							{@const items  = itemsFor(claim.id)}
+							{@const wo     = workOrderForClaim(claim)}
 							{@const f      = form(claim.id)}
 							{@const busy   = saving === claim.id}
 							{@const isLocked = claim.status === 'approved' || claim.status === 'paid'}
@@ -410,9 +418,13 @@
 												{busy ? '…' : 'Reject'}
 											</button>
 										{:else if claim.status === 'under_review'}
-											<button onclick={() => openApprovalsForClaim(claim.id)}
+											<button onclick={() => openApprovalsForClaim(claim.id)} disabled={busy}
 												class="text-xs px-2 py-1 rounded bg-violet-900/50 border border-violet-700/50 text-violet-300 hover:bg-violet-800/60 transition-colors">
-												Open Approvals
+												{#if busy}
+													<span class="inline-flex items-center gap-1"><Loader2 class="size-3 animate-spin" /> Opening…</span>
+												{:else}
+													Open Approvals
+												{/if}
 											</button>
 											<button onclick={() => action(claim.id, 'rejected')} disabled={busy}
 												class="text-xs px-2 py-1 rounded bg-red-900/40 border border-red-700/40 text-red-400 hover:bg-red-900/60 transition-colors disabled:opacity-50">
@@ -425,7 +437,7 @@
 										{:else if claim.status === 'draft'}
 											<span class="text-xs text-slate-600 italic">awaiting submission</span>
 										{:else if claim.status === 'paid'}
-											<span class="text-xs text-emerald-600">✓ Complete</span>
+											<span class="text-xs text-emerald-600">✓ Complete{#if wo?.qb_transaction_id} · QB {wo.qb_transaction_id}{/if}</span>
 										{:else if claim.status === 'rejected'}
 											<span class="text-xs text-red-600">✗ Rejected</span>
 										{/if}
@@ -501,22 +513,30 @@
 														{/each}
 													</tbody>
 													<tfoot class="border-t border-slate-600">
-														<tr>
-															<td colspan="7" class="pt-2 pb-1">
-																<div class="flex items-center justify-between">
-																	<p class="text-[11px] text-slate-500">
-																		{selectedCountForClaim(claim.id)} selected
-																	</p>
-																	<button
-																		onclick={() => deleteSelectedForClaim(claim.id)}
-																		disabled={isLocked || selectedCountForClaim(claim.id) === 0 || bulkDeletingClaim === claim.id}
-																		class="text-[11px] px-2 py-1 rounded border border-red-700/50 bg-red-950/40 text-red-300 hover:bg-red-900/50 disabled:opacity-50"
-																	>
-																		{bulkDeletingClaim === claim.id ? 'Removing…' : `Remove Selected (${selectedCountForClaim(claim.id)})`}
-																	</button>
-																</div>
-															</td>
-														</tr>
+														{#if !isLocked}
+															<tr>
+																<td colspan="7" class="pt-2 pb-1">
+																	<div class="flex items-center justify-between">
+																		<p class="text-[11px] text-slate-500">
+																			{selectedCountForClaim(claim.id)} selected
+																		</p>
+																		<button
+																			onclick={() => deleteSelectedForClaim(claim.id)}
+																			disabled={selectedCountForClaim(claim.id) === 0 || bulkDeletingClaim === claim.id}
+																			class="text-[11px] px-2 py-1 rounded border border-red-700/50 bg-red-950/40 text-red-300 hover:bg-red-900/50 disabled:opacity-50"
+																		>
+																			{bulkDeletingClaim === claim.id ? 'Removing…' : `Remove Selected (${selectedCountForClaim(claim.id)})`}
+																		</button>
+																	</div>
+																</td>
+															</tr>
+														{:else}
+															<tr>
+																<td colspan="7" class="pt-2 pb-1 text-[11px] text-slate-500">
+																	Line items are locked after approval/payment.
+																</td>
+															</tr>
+														{/if}
 														<tr>
 															<td colspan="6" class="pt-2 text-slate-400 font-semibold">Total</td>
 															<td class="pt-2 text-right font-bold text-emerald-300">{fmt(claim.totalAmount || 0)}</td>
@@ -536,9 +556,15 @@
 											{#if claim.status === 'paid'}
 												<div class="p-3 rounded-lg bg-emerald-950/40 border border-emerald-800/40 text-xs text-emerald-300 space-y-1">
 													<p class="font-semibold">Payment complete</p>
-													<p>Ref: <span class="font-mono font-bold">{claim.referenceNumber}</span></p>
+													<p>Ref: <span class="font-mono font-bold">{claim.referenceNumber || wo?.work_order_number || '—'}</span></p>
 													{#if claim.paidDate}<p>Paid: {fmtDate(claim.paidDate)}</p>{/if}
+													{#if claim.expand?.paidBy}<p>Paid By: {claimantName({ expand: { claimant: claim.expand.paidBy } })}</p>{/if}
 													{#if claim.paymentMethod}<p>Method: {claim.paymentMethod.replace('_',' ')}</p>{/if}
+																										<p>QB Ref: <span class="font-mono">{wo?.qb_transaction_id || 'not entered'}</span></p>
+													{#if wo?.qb_account}<p>QB Account: {wo.qb_account}</p>{/if}
+													{#if wo?.qb_entered_date}<p>QB Entered: {fmtDate(wo.qb_entered_date)}</p>{/if}
+													{#if wo?.qb_notes}<p class="text-emerald-200/90">QB Notes: {wo.qb_notes}</p>{/if}
+													<p class="text-emerald-200/90">Items: {items.length} · Total: {fmt(claim.totalAmount || 0)}</p>
 												</div>
 											{:else if claim.status === 'rejected'}
 												<div class="p-3 rounded-lg bg-red-950/40 border border-red-800/40 text-xs text-red-300">
@@ -571,9 +597,13 @@
 															{busy ? '…' : 'Reject'}
 														</button>
 													{:else if claim.status === 'under_review'}
-														<button onclick={() => openApprovalsForClaim(claim.id)}
+														<button onclick={() => openApprovalsForClaim(claim.id)} disabled={busy}
 															class="text-xs px-3 py-1.5 rounded bg-violet-900/50 border border-violet-700/50 text-violet-300 hover:bg-violet-800/60">
-															Open Approvals Queue
+															{#if busy}
+																<span class="inline-flex items-center gap-1"><Loader2 class="size-3.5 animate-spin" /> Opening Approvals…</span>
+															{:else}
+																Open Approvals Queue
+															{/if}
 														</button>
 														<button onclick={() => action(claim.id, 'submitted')} disabled={busy}
 															class="text-xs px-3 py-1.5 rounded bg-slate-700 border border-slate-600 text-slate-300 hover:bg-slate-600 disabled:opacity-50">
