@@ -85,8 +85,15 @@
 		return forms[id] ?? { refNum: '', payMethod: 'bank_transfer', paidDate: new Date().toISOString().slice(0,10), reviewNotes: '' };
 	}
 
+	function claimTitle(claimId: string) {
+		return ((data.claims as any[]).find(c => c.id === claimId)?.title as string) || 'this claim';
+	}
+
 	// ── Saving state ──────────────────────────────────────────────────────────
 	let saving = $state<string|null>(null);
+	let deletingItem = $state<string|null>(null);
+	let bulkDeletingClaim = $state<string|null>(null);
+	let selectedItemIds = $state<Record<string, boolean>>({});
 
 	async function action(claimId: string, status: string) {
 		saving = claimId;
@@ -104,6 +111,79 @@
 		});
 		await invalidateAll();
 		saving = null;
+	}
+
+	async function deleteLineItem(claimId: string, itemId: string, description: string) {
+		const willDeleteClaim = itemsFor(claimId).length === 1;
+		const ok = confirm(
+			willDeleteClaim
+				? `Remove this line item?\n\n${description || 'Untitled item'}\n\nThis is the last line item. The claim "${claimTitle(claimId)}" will also be deleted.\n\nThis cannot be undone.`
+				: `Remove this line item?\n\n${description || 'Untitled item'}\n\nThis cannot be undone.`
+		);
+		if (!ok) return;
+
+		deletingItem = itemId;
+		try {
+			const res = await fetch(`/api/reimbursements/${claimId}/items/${itemId}`, { method: 'DELETE' });
+			if (!res.ok) {
+				const err = await res.json().catch(() => ({}));
+				alert(err?.message || 'Failed to remove line item');
+				return;
+			}
+			await invalidateAll();
+		} finally {
+			deletingItem = null;
+		}
+	}
+
+	function isItemSelected(itemId: string) {
+		return !!selectedItemIds[itemId];
+	}
+
+	function toggleItemSelected(itemId: string, checked: boolean) {
+		selectedItemIds = { ...selectedItemIds, [itemId]: checked };
+	}
+
+	function selectedCountForClaim(claimId: string) {
+		return itemsFor(claimId).filter((it: any) => !!selectedItemIds[it.id]).length;
+	}
+
+	function toggleSelectAllForClaim(claimId: string, checked: boolean) {
+		const next = { ...selectedItemIds };
+		for (const item of itemsFor(claimId)) next[item.id] = checked;
+		selectedItemIds = next;
+	}
+
+	async function deleteSelectedForClaim(claimId: string) {
+		const items = itemsFor(claimId);
+		const selected = items.filter((it: any) => !!selectedItemIds[it.id]);
+		if (!selected.length) return;
+		const willDeleteClaim = selected.length === items.length;
+
+		const ok = confirm(
+			willDeleteClaim
+				? `Remove ${selected.length} selected line item${selected.length === 1 ? '' : 's'}?\n\nAll line items are selected. The claim "${claimTitle(claimId)}" will also be deleted.\n\nThis cannot be undone.`
+				: `Remove ${selected.length} selected line item${selected.length === 1 ? '' : 's'}?\n\nThis cannot be undone.`
+		);
+		if (!ok) return;
+
+		bulkDeletingClaim = claimId;
+		let failed = 0;
+		try {
+			for (const item of selected) {
+				const res = await fetch(`/api/reimbursements/${claimId}/items/${item.id}`, { method: 'DELETE' });
+				if (!res.ok) failed++;
+			}
+
+			const next = { ...selectedItemIds };
+			for (const item of selected) delete next[item.id];
+			selectedItemIds = next;
+
+			await invalidateAll();
+			if (failed) alert(`Removed ${selected.length - failed} item(s), ${failed} failed.`);
+		} finally {
+			bulkDeletingClaim = null;
+		}
 	}
 
 	// ── Status display ────────────────────────────────────────────────────────
@@ -445,27 +525,71 @@
 												<table class="w-full text-xs">
 													<thead>
 														<tr class="text-left text-slate-500 border-b border-slate-700">
+															<th class="pb-1.5 pr-3">
+																<input
+																	type="checkbox"
+																	checked={items.length > 0 && selectedCountForClaim(claim.id) === items.length}
+																	onchange={(e) => toggleSelectAllForClaim(claim.id, (e.currentTarget as HTMLInputElement).checked)}
+																	class="rounded border-slate-600 accent-red-500"
+																	title="Select all line items"
+																/>
+															</th>
 															<th class="pb-1.5 pr-3">Description</th>
 															<th class="pb-1.5 pr-3">Category</th>
 															<th class="pb-1.5 pr-3">Vendor</th>
 															<th class="pb-1.5 pr-3">Date</th>
 															<th class="pb-1.5 text-right">Amount</th>
+															<th class="pb-1.5 text-right">Action</th>
 														</tr>
 													</thead>
 													<tbody class="divide-y divide-slate-700/30">
 														{#each items as item}
 															<tr>
+																<td class="py-1.5 pr-3">
+																	<input
+																		type="checkbox"
+																		checked={isItemSelected(item.id)}
+																		onchange={(e) => toggleItemSelected(item.id, (e.currentTarget as HTMLInputElement).checked)}
+																		class="rounded border-slate-600 accent-red-500"
+																		title="Select line item"
+																	/>
+																</td>
 																<td class="py-1.5 pr-3 text-slate-200">{item.description}</td>
 																<td class="py-1.5 pr-3 text-slate-400 capitalize">{item.category}</td>
 																<td class="py-1.5 pr-3 text-slate-400">{item.vendor || '—'}</td>
 																<td class="py-1.5 pr-3 text-slate-400">{fmtDate(item.date)}</td>
 																<td class="py-1.5 text-right font-semibold text-emerald-400">{fmt(item.amount)}</td>
+																<td class="py-1.5 text-right">
+																	<button
+																		onclick={() => deleteLineItem(claim.id, item.id, item.description)}
+																		disabled={deletingItem === item.id}
+																		class="text-[11px] px-2 py-1 rounded border border-red-700/50 bg-red-950/40 text-red-300 hover:bg-red-900/50 disabled:opacity-50"
+																	>
+																		{deletingItem === item.id ? 'Removing…' : 'Remove'}
+																	</button>
+																</td>
 															</tr>
 														{/each}
 													</tbody>
 													<tfoot class="border-t border-slate-600">
 														<tr>
-															<td colspan="4" class="pt-2 text-slate-400 font-semibold">Total</td>
+															<td colspan="7" class="pt-2 pb-1">
+																<div class="flex items-center justify-between">
+																	<p class="text-[11px] text-slate-500">
+																		{selectedCountForClaim(claim.id)} selected
+																	</p>
+																	<button
+																		onclick={() => deleteSelectedForClaim(claim.id)}
+																		disabled={selectedCountForClaim(claim.id) === 0 || bulkDeletingClaim === claim.id}
+																		class="text-[11px] px-2 py-1 rounded border border-red-700/50 bg-red-950/40 text-red-300 hover:bg-red-900/50 disabled:opacity-50"
+																	>
+																		{bulkDeletingClaim === claim.id ? 'Removing…' : `Remove Selected (${selectedCountForClaim(claim.id)})`}
+																	</button>
+																</div>
+															</td>
+														</tr>
+														<tr>
+															<td colspan="6" class="pt-2 text-slate-400 font-semibold">Total</td>
 															<td class="pt-2 text-right font-bold text-emerald-300">{fmt(claim.totalAmount || 0)}</td>
 														</tr>
 													</tfoot>

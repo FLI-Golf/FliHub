@@ -84,20 +84,20 @@ export const POST: RequestHandler = async ({ locals, url, request }) => {
 					notes:       row.notes?.trim() || ''
 				});
 			} else if (type === 'reimbursements') {
-				// Resolve claimant by email
+				// Resolve claimant profile by email (reimbursement_claims.claimant -> user_profiles)
 				const email = row.claimantEmail?.trim();
 				if (!email) throw new Error('claimantEmail is required');
 
 				let claimantId: string;
 				try {
-					const user = await pb.collection('users').getFirstListItem(`email="${email}"`);
-					claimantId = user.id;
+					const profile = await pb.collection('user_profiles').getFirstListItem(`email="${email}"`, { fields: 'id' });
+					claimantId = profile.id;
 				} catch {
-					throw new Error(`No user found with email: ${email}`);
+					throw new Error(`No user profile found with email: ${email}`);
 				}
 
 				// Resolve optional vendor by name
-				let vendorId: string | undefined;
+				let vendorId: string | null = null;
 				const vendorName = row.vendorName?.trim();
 				if (vendorName) {
 					try {
@@ -109,7 +109,7 @@ export const POST: RequestHandler = async ({ locals, url, request }) => {
 				}
 
 				// Resolve optional department by name
-				let departmentId: string | undefined;
+				let departmentId: string | null = null;
 				const deptName = row.departmentName?.trim();
 				if (deptName) {
 					try {
@@ -144,7 +144,7 @@ export const POST: RequestHandler = async ({ locals, url, request }) => {
 						status:       claimStatus,
 						totalAmount:  itemAmount,
 						notes:        row.claimNotes?.trim() || '',
-						department:   departmentId ?? '',
+						department:   departmentId,
 						is_historical: isHistorical,
 					});
 					claimId = claim.id;
@@ -156,9 +156,10 @@ export const POST: RequestHandler = async ({ locals, url, request }) => {
 					claim:       claimId,
 					description: row.itemDescription?.trim() || '',
 					amount:      itemAmount,
-					date:        row.itemDate?.trim() || '',
+					date:        row.itemDate?.trim() || null,
 					category:    row.itemCategory?.trim() || 'other',
-					vendorId:    vendorId ?? '',
+					vendor:      vendorName || '',
+					vendorId:    vendorId,
 					notes:       row.itemNotes?.trim() || ''
 				});
 			} else {
@@ -167,7 +168,10 @@ export const POST: RequestHandler = async ({ locals, url, request }) => {
 			created++;
 		} catch (err: any) {
 			failed++;
-			const msg = err?.response?.message ?? err?.message ?? 'Unknown error';
+			const detail = err?.response?.data
+				? ` ${JSON.stringify(err.response.data)}`
+				: '';
+			const msg = (err?.response?.message ?? err?.message ?? 'Unknown error') + detail;
 			errors.push(`Row ${i + 2}: ${msg}`);
 		}
 	}
