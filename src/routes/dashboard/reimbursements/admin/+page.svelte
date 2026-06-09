@@ -128,6 +128,76 @@
 	let deletingItem = $state<string|null>(null);
 	let bulkDeletingClaim = $state<string|null>(null);
 	let selectedItemIds = $state<Record<string, boolean>>({});
+	let selectedClaimIds = $state<Record<string, boolean>>({});
+	let rollingUpClaims = $state(false);
+
+	function canRollupClaim(claim: any) {
+		return claim?.status === 'draft' || claim?.status === 'submitted' || claim?.status === 'under_review';
+	}
+
+	function isClaimSelected(claimId: string) {
+		return !!selectedClaimIds[claimId];
+	}
+
+	function selectedRollupClaimIds() {
+		return rows()
+			.filter((c: any) => canRollupClaim(c) && isClaimSelected(c.id))
+			.map((c: any) => c.id);
+	}
+
+	function selectedRollupCount() {
+		return selectedRollupClaimIds().length;
+	}
+
+	function toggleClaimSelected(claimId: string, checked: boolean) {
+		selectedClaimIds = { ...selectedClaimIds, [claimId]: checked };
+	}
+
+	function toggleSelectAllVisibleClaims(checked: boolean) {
+		const next = { ...selectedClaimIds };
+		for (const claim of rows()) {
+			if (!canRollupClaim(claim)) continue;
+			next[claim.id] = checked;
+		}
+		selectedClaimIds = next;
+	}
+
+	function areAllVisibleRollupClaimsSelected() {
+		const eligible = rows().filter((c: any) => canRollupClaim(c));
+		if (!eligible.length) return false;
+		return eligible.every((c: any) => isClaimSelected(c.id));
+	}
+
+	async function rollupSelectedClaims() {
+		const claimIds = selectedRollupClaimIds();
+		if (claimIds.length < 2 || rollingUpClaims) return;
+
+		const ok = confirm(
+			`Roll up ${claimIds.length} selected reimbursement claim${claimIds.length === 1 ? '' : 's'} into grouped claims with up to 10 transactions each?\n\nOnly draft, pending, and approval-in-progress claims are supported. This cannot be undone.`
+		);
+		if (!ok) return;
+
+		rollingUpClaims = true;
+		actionNotice = '';
+		try {
+			const res = await fetch('/api/reimbursements/rollup', {
+				method: 'POST',
+				headers: { 'content-type': 'application/json' },
+				body: JSON.stringify({ claimIds, maxTransactionsPerClaim: 10 })
+			});
+			const payload = await res.json().catch(() => ({}));
+			if (!res.ok) {
+				alert(payload?.message || 'Failed to roll up selected claims');
+				return;
+			}
+
+			selectedClaimIds = {};
+			actionNotice = `Rolled up ${payload?.sourceClaims ?? claimIds.length} claims into ${payload?.createdClaims ?? 0} grouped claim${payload?.createdClaims === 1 ? '' : 's'} (${payload?.movedItems ?? 0} transactions moved).`;
+			await invalidateAll();
+		} finally {
+			rollingUpClaims = false;
+		}
+	}
 
 	async function deleteLineItem(claimId: string, itemId: string, description: string) {
 		const willDeleteClaim = itemsFor(claimId).length === 1;
@@ -373,6 +443,26 @@
 
 			<span class="ml-auto text-xs text-slate-500">{rows().length} claims</span>
 		</div>
+		<div class="mt-3 flex flex-wrap items-center gap-2">
+			<label class="inline-flex items-center gap-2 text-xs text-slate-400">
+				<input
+					type="checkbox"
+					disabled={!rows().some((c: any) => canRollupClaim(c))}
+					checked={areAllVisibleRollupClaimsSelected()}
+					onchange={(e) => toggleSelectAllVisibleClaims((e.currentTarget as HTMLInputElement).checked)}
+					class="rounded border-slate-600 accent-emerald-500"
+				>
+				Select visible draft/pending/under-review claims
+			</label>
+			<button
+				onclick={rollupSelectedClaims}
+				disabled={selectedRollupCount() < 2 || rollingUpClaims}
+				class="text-xs px-3 py-1.5 rounded border border-emerald-700/60 bg-emerald-950/40 text-emerald-300 hover:bg-emerald-900/50 disabled:opacity-50"
+			>
+				{rollingUpClaims ? 'Rolling up…' : `Roll Up Selected (${selectedRollupCount()})`}
+			</button>
+			<p class="text-[11px] text-slate-500">Creates grouped claims with at most 10 transactions each.</p>
+		</div>
 		{#if actionNotice}
 			<p class="mt-3 text-xs text-slate-300">{actionNotice}</p>
 		{/if}
@@ -384,7 +474,7 @@
 			<table class="w-full text-sm">
 				<thead>
 					<tr class="border-b border-slate-700 bg-slate-900/40">
-						<th class="w-8 px-3 py-3"></th>
+						<th class="w-14 px-3 py-3"></th>
 						{#each ([['status','Status'],['claimant','Claimant'],['title','Title'],['items','Items'],['amount','Amount']] as const) as [col, label]}
 							<th class="px-4 py-3 text-left font-medium text-slate-400">
 								<button onclick={() => toggleSort(col)} class="flex items-center gap-1.5 hover:text-slate-200 transition-colors group">
@@ -414,6 +504,14 @@
 							<!-- Main row -->
 							<tr class="hover:bg-slate-700/30 transition-colors {isOpen ? 'bg-slate-700/20' : ''}">
 								<td class="px-3 py-3">
+									<input
+										type="checkbox"
+										disabled={!canRollupClaim(claim)}
+										checked={isClaimSelected(claim.id)}
+										onchange={(e) => toggleClaimSelected(claim.id, (e.currentTarget as HTMLInputElement).checked)}
+										class="mr-2 rounded border-slate-600 accent-emerald-500"
+										title={canRollupClaim(claim) ? 'Select claim for roll-up' : 'Only draft, pending, or under-review claims can be rolled up'}
+									>
 									<button onclick={() => expanded = isOpen ? null : claim.id}
 										class="text-slate-500 hover:text-slate-300 transition-colors">
 										<ChevronRight class="size-4 transition-transform {isOpen ? 'rotate-90' : ''}" />
@@ -494,7 +592,7 @@
 																	onchange={(e) => toggleSelectAllForClaim(claim.id, (e.currentTarget as HTMLInputElement).checked)}
 																	class="rounded border-slate-600 accent-red-500"
 																	title="Select all line items"
-																/>
+																>
 															</th>
 															<th class="pb-1.5 pr-3">Description</th>
 															<th class="pb-1.5 pr-3">Category</th>
@@ -515,7 +613,7 @@
 																		onchange={(e) => toggleItemSelected(item.id, (e.currentTarget as HTMLInputElement).checked)}
 																		class="rounded border-slate-600 accent-red-500"
 																		title="Select line item"
-																	/>
+																	>
 																</td>
 																<td class="py-1.5 pr-3 text-slate-200">{item.description}</td>
 																<td class="py-1.5 pr-3 text-slate-400 capitalize">{item.category}</td>

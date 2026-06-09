@@ -133,7 +133,7 @@ Here are the records to convert:
 	};
 
 	// ── State ─────────────────────────────────────────────────────────────────
-	let selectedType = $state<ImportType>('vendors');
+	let selectedType = $state<ImportType>('reimbursements');
 	let csvText      = $state('');
 	let rows         = $state<Record<string, string>[]>([]);
 	let parseError   = $state('');
@@ -160,7 +160,7 @@ Here are the records to convert:
 			'travel',
 			firstVendorName,
 			'Round trip, economy',
-			'paid',
+			'under_review',
 			'Historical import — pre-FliHub',
 			reimbursementDeptName,
 			'true'
