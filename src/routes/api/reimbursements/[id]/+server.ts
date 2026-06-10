@@ -1,58 +1,23 @@
 import { json } from '@sveltejs/kit';
 import { RequestContext } from '$lib/infra/RequestContext';
 import { getAdminPocketBase } from '$lib/infra/pocketbase/pbClient';
+import {
+	DEFAULT_REIMBURSEMENT_MAX_CLAIM_TOTAL,
+	REIMBURSEMENT_MAX_TOTAL_SETTING_KEY
+} from '$lib/domain/schemas/reimbursement.schema';
 import type { RequestHandler } from './$types';
 
-async function getNextReimbursementWorkOrderNumber(adminPb: any): Promise<string> {
-	const workOrders = await adminPb.collection('work_orders')
-		.getFullList({ fields: 'work_order_number', sort: '-created' })
-		.catch(() => []) as any[];
-
-	let max = 0;
-	for (const workOrder of workOrders) {
-		const match = String(workOrder.work_order_number ?? '').match(/^WO-(\d+)$/);
-		if (match) {
-			max = Math.max(max, Number(match[1]));
-		}
-	}
-
-	return `WO-${String(max + 1).padStart(3, '0')}`;
-}
-
-function reimbursementWorkOrderFromClaimId(claimId: string): string {
-	return `WO-${String(claimId || '').slice(-4).toLowerCase()}`;
-}
-
-async function getUniqueReimbursementWorkOrderNumber(
-	adminPb: any,
-	claimId: string,
-	preferred?: string | null
-): Promise<string> {
-	const existingWOs = await adminPb.collection('work_orders')
-		.getFullList({ fields: 'id,claimId,work_order_number' })
-		.catch(() => []) as any[];
-
-	const candidates = [
-		reimbursementWorkOrderFromClaimId(claimId),
-		(preferred || '').trim()
-	].filter(Boolean);
-
-	for (const candidate of candidates) {
-		const existing = existingWOs.filter((wo: any) => String(wo.work_order_number || '').trim() === candidate);
-
-		// Safe to reuse if the number is unused or already belongs to this same claim.
-		if (!existing.length || existing.every((wo: any) => wo.claimId === claimId)) {
-			return candidate;
-		}
-	}
-
-	return getNextReimbursementWorkOrderNumber(adminPb);
+async function getMaxClaimTotal(pb: any): Promise<number> {
+	const setting = await pb.collection('settings')
+		.getFirstListItem(`key = "${REIMBURSEMENT_MAX_TOTAL_SETTING_KEY}"`, { fields: 'value' })
+		.catch(() => null);
+	const parsed = Number(setting?.value);
+	return Number.isFinite(parsed) && parsed > 0 ? parsed : DEFAULT_REIMBURSEMENT_MAX_CLAIM_TOTAL;
 }
 
 // PATCH /api/reimbursements/:id — update status, reference number, review notes, payment info
 export const PATCH: RequestHandler = async ({ locals, url, params, request }) => {
-	const ctx = await RequestContext.fromApi(locals, url);
-	if (!ctx) return json({ message: 'Unauthorized' }, { status: 401 });
+	const ctx  = await RequestContext.from(locals, url);
 	const body = await request.json();
 
 	try {
@@ -66,69 +31,52 @@ export const PATCH: RequestHandler = async ({ locals, url, params, request }) =>
 		if (body.paidDate        !== undefined) update.paidDate        = body.paidDate || null;
 		if (body.paidBy          !== undefined) update.paidBy          = body.paidBy  || null;
 
-		if (body.status === 'paid') {
-			return json({ message: 'Reimbursement claims must be approved and handed off to QuickBooks through a work order before payment.' }, { status: 400 });
-		}
-
-		const requestedStatus = body.status === 'approval_submittedto' ? 'approved' : body.status;
-		const shouldCreateApproval = requestedStatus === 'under_review';
-		const isApprovalHandoff = requestedStatus === 'approved';
-		if (isApprovalHandoff) {
-			update.status = 'approved';
-		}
-
 		const adminPb = await getAdminPocketBase();
+		const maxClaimTotal = await getMaxClaimTotal(adminPb);
+
+		if (body.status === 'submitted') {
+			const items = await adminPb.collection('reimbursement_items')
+				.getFullList({ filter: `claim="${params.id}"`, fields: 'amount' });
+			const total = items.reduce((s, i) => s + (i.amount || 0), 0);
+			if (total > maxClaimTotal) {
+				return json({
+					message: `Claim total cannot exceed $${maxClaimTotal.toFixed(2)}`,
+					maxClaimTotal,
+					total
+				}, { status: 400 });
+			}
+			update.totalAmount = total;
+		}
 
 		// Recalculate total from items if requested
 		if (body.recalcTotal) {
 			const items = await adminPb.collection('reimbursement_items')
 				.getFullList({ filter: `claim="${params.id}"`, fields: 'amount' });
-			update.totalAmount = items.reduce((s, i) => s + (i.amount || 0), 0);
+			const total = items.reduce((s, i) => s + (i.amount || 0), 0);
+			if (total > maxClaimTotal) {
+				return json({
+					message: `Claim total cannot exceed $${maxClaimTotal.toFixed(2)}`,
+					maxClaimTotal,
+					total
+				}, { status: 400 });
+			}
+			update.totalAmount = total;
 		}
 
 		const record = await adminPb.collection('reimbursement_claims').update(params.id, update);
 
-		if (shouldCreateApproval) {
-			console.log(`[reimb] creating approval for claim ${record.id}`);
-			const existingPending = await adminPb.collection('approvals').getFullList({
-				filter: `entityType='expense' && entityId='${record.id}' && status='pending'`,
-				fields: 'id'
-			}).catch(() => []);
-
-			if (!existingPending.length) {
-				const approvalData = {
-					entityType: 'expense',
-					entityId: record.id,
-					status: 'pending',
-					requestedBy: ctx.profile?.id ?? record.claimant ?? null,
-					requestedDate: new Date().toISOString(),
-					amount: record.totalAmount || 0,
-					comments: '<p>Reimbursement claim submitted for approval.</p>'
-				};
-				const approval = await adminPb.collection('approvals').create(approvalData);
-				console.log(`[reimb] approval created: ${approval.id} for claim ${record.id}`);
-			} else {
-				console.log(`[reimb] pending approval already exists for claim ${record.id}`);
-			}
-		}
-
-		// When a claim is approved, create the reimbursement work order and
-		// hand it off to QuickBooks instead of paying it directly from the claim.
-		if (isApprovalHandoff) {
+		// When marking paid: create work order, stamp WO number everywhere, debit dept budget
+		if (body.status === 'paid') {
 			const woErrors: string[] = [];
 			try {
-				const woNumber = await getUniqueReimbursementWorkOrderNumber(
-					adminPb,
-					record.id,
-					record.work_order_number || record.referenceNumber
-				);
+				const woNumber = record.referenceNumber;
 
 				if (!woNumber) {
 					woErrors.push('referenceNumber is blank — work order not created');
 				} else {
 					// 1. Create work_orders record if not already there
 					const existing = await adminPb.collection('work_orders')
-						.getFullList({ filter: `work_order_number='${woNumber}'`, fields: 'id' })
+						.getFullList({ filter: `work_order_number="${woNumber}"`, fields: 'id' })
 						.catch(() => []);
 
 					if (!existing.length) {
@@ -143,10 +91,10 @@ export const PATCH: RequestHandler = async ({ locals, url, params, request }) =>
 							description:   record.title || '',
 							amount:        record.totalAmount || 0,
 							approvedDate:  new Date().toISOString(),
-							paidDate:      null,
-							paymentMethod: '',
-							status:        'open',
-							notes:         'Reimbursement claim approved and submitted to QuickBooks for payment processing.',
+							paidDate:      body.paidDate || new Date().toISOString(),
+							paymentMethod: body.paymentMethod || '',
+							status:        'paid',
+							notes:         `Reimbursement claim paid via ${(body.paymentMethod || 'bank_transfer').replace(/_/g, ' ')}`,
 						});
 						console.log(`[reimb] work order created: ${woNumber} (${wo.id})`);
 					} else {
@@ -155,9 +103,7 @@ export const PATCH: RequestHandler = async ({ locals, url, params, request }) =>
 
 					// 2. Stamp WO number on the claim itself
 					await adminPb.collection('reimbursement_claims').update(record.id, {
-						work_order_number: woNumber,
-						referenceNumber: record.referenceNumber || woNumber,
-						status: 'approved',
+						work_order_number: woNumber
 					}).catch((e: any) => woErrors.push('stamp claim: ' + e?.message));
 
 					// 3. Stamp WO number on every line item
@@ -170,6 +116,26 @@ export const PATCH: RequestHandler = async ({ locals, url, params, request }) =>
 						}).catch(() => {});
 					}
 					console.log(`[reimb] stamped WO ${woNumber} on claim + ${items.length} items`);
+				}
+
+				// 4. Debit department actual spend
+				const claimFull = await adminPb.collection('reimbursement_claims')
+					.getOne(record.id, { fields: 'id,department,totalAmount' })
+					.catch(() => null);
+
+				if (claimFull?.department) {
+					const dept = await adminPb.collection('departments')
+						.getOne(claimFull.department, { fields: 'id,department_actual_expenses' })
+						.catch(() => null);
+
+					if (dept) {
+						const current = dept.department_actual_expenses ?? 0;
+						const claimTotal = claimFull.totalAmount ?? record.totalAmount ?? 0;
+						await adminPb.collection('departments').update(dept.id, {
+							department_actual_expenses: current + claimTotal
+						});
+						console.log(`[reimb] dept ${dept.id} actuals +${claimTotal} → ${current + claimTotal}`);
+					}
 				}
 
 			} catch (e: any) {
@@ -186,16 +152,7 @@ export const PATCH: RequestHandler = async ({ locals, url, params, request }) =>
 
 		return json(record);
 	} catch (err: any) {
-		const status = err?.status ?? err?.response?.status ?? 500;
-		const message = err?.response?.message ?? err?.message ?? 'Failed';
-		console.error('[reimb] PATCH failed', {
-			claimId: params.id,
-			requestedStatus: body?.status,
-			message,
-			data: err?.response?.data ?? null,
-			status
-		});
-		return json({ message }, { status });
+		return json({ message: err?.response?.message ?? err?.message ?? 'Failed' }, { status: 500 });
 	}
 };
 

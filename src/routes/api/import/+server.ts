@@ -1,6 +1,18 @@
 import { json } from '@sveltejs/kit';
 import { RequestContext } from '$lib/infra/RequestContext';
+import {
+	DEFAULT_REIMBURSEMENT_MAX_CLAIM_TOTAL,
+	REIMBURSEMENT_MAX_TOTAL_SETTING_KEY
+} from '$lib/domain/schemas/reimbursement.schema';
 import type { RequestHandler } from './$types';
+
+async function getMaxClaimTotal(pb: any): Promise<number> {
+	const setting = await pb.collection('settings')
+		.getFirstListItem(`key = "${REIMBURSEMENT_MAX_TOTAL_SETTING_KEY}"`, { fields: 'value' })
+		.catch(() => null);
+	const parsed = Number(setting?.value);
+	return Number.isFinite(parsed) && parsed > 0 ? parsed : DEFAULT_REIMBURSEMENT_MAX_CLAIM_TOTAL;
+}
 
 // POST /api/import
 // Body: { type: 'vendors' | 'sponsors' | 'pros', rows: Record<string, string>[] }
@@ -19,6 +31,10 @@ export const POST: RequestHandler = async ({ locals, url, request }) => {
 	let created = 0;
 	let failed = 0;
 	const errors: string[] = [];
+	const allowedClaimStatuses = new Set(['draft', 'submitted', 'under_review', 'approved', 'paid', 'rejected']);
+	const maxClaimTotal = type === 'reimbursements'
+		? await getMaxClaimTotal(pb)
+		: DEFAULT_REIMBURSEMENT_MAX_CLAIM_TOTAL;
 
 	// Cache for grouping multi-item reimbursement rows into one claim per title+claimant
 	const claimCache = new Map<string, string>();
@@ -84,20 +100,20 @@ export const POST: RequestHandler = async ({ locals, url, request }) => {
 					notes:       row.notes?.trim() || ''
 				});
 			} else if (type === 'reimbursements') {
-				// Resolve claimant profile by email (reimbursement_claims.claimant -> user_profiles)
+				// Resolve claimant by email
 				const email = row.claimantEmail?.trim();
 				if (!email) throw new Error('claimantEmail is required');
 
 				let claimantId: string;
 				try {
-					const profile = await pb.collection('user_profiles').getFirstListItem(`email="${email}"`, { fields: 'id' });
-					claimantId = profile.id;
+					const user = await pb.collection('users').getFirstListItem(`email="${email}"`);
+					claimantId = user.id;
 				} catch {
-					throw new Error(`No user profile found with email: ${email}`);
+					throw new Error(`No user found with email: ${email}`);
 				}
 
 				// Resolve optional vendor by name
-				let vendorId: string | null = null;
+				let vendorId: string | undefined;
 				const vendorName = row.vendorName?.trim();
 				if (vendorName) {
 					try {
@@ -109,7 +125,7 @@ export const POST: RequestHandler = async ({ locals, url, request }) => {
 				}
 
 				// Resolve optional department by name
-				let departmentId: string | null = null;
+				let departmentId: string | undefined;
 				const deptName = row.departmentName?.trim();
 				if (deptName) {
 					try {
@@ -123,10 +139,9 @@ export const POST: RequestHandler = async ({ locals, url, request }) => {
 				const isHistorical = row.isHistorical?.trim().toLowerCase() === 'true';
 				const itemAmount   = row.itemAmount ? Number(row.itemAmount.replace(/[^0-9.]/g, '')) : 0;
 				const claimTitle   = row.claimTitle?.trim() || '';
-				const rawClaimStatus = row.claimStatus?.trim();
-				const claimStatus = !rawClaimStatus || rawClaimStatus === 'submitted'
-					? 'under_review'
-					: rawClaimStatus;
+				const rawStatus = (row.claimStatus?.trim().toLowerCase() || 'draft');
+				const normalizedStatus = allowedClaimStatuses.has(rawStatus) ? rawStatus : 'draft';
+				const claimStatus = normalizedStatus === 'paid' ? 'under_review' : normalizedStatus;
 
 				// Group multi-item rows: reuse an existing claim created in this import
 				// batch if claimTitle + claimantEmail match a previously created claim.
@@ -137,17 +152,24 @@ export const POST: RequestHandler = async ({ locals, url, request }) => {
 					claimId = claimCache.get(cacheKey)!;
 					// Update totalAmount on the existing claim
 					const existing = await pb.collection('reimbursement_claims').getOne(claimId, { fields: 'id,totalAmount' });
+					const nextTotal = (existing.totalAmount || 0) + itemAmount;
+					if (nextTotal > maxClaimTotal) {
+						throw new Error(`Claim total cannot exceed $${maxClaimTotal.toFixed(2)} (claim: ${claimTitle})`);
+					}
 					await pb.collection('reimbursement_claims').update(claimId, {
-						totalAmount: (existing.totalAmount || 0) + itemAmount
+						totalAmount: nextTotal
 					});
 				} else {
+					if (itemAmount > maxClaimTotal) {
+						throw new Error(`Claim total cannot exceed $${maxClaimTotal.toFixed(2)} (claim: ${claimTitle})`);
+					}
 					const claim = await pb.collection('reimbursement_claims').create({
 						title:        claimTitle,
 						claimant:     claimantId,
 						status:       claimStatus,
 						totalAmount:  itemAmount,
 						notes:        row.claimNotes?.trim() || '',
-						department:   departmentId,
+						department:   departmentId ?? '',
 						is_historical: isHistorical,
 					});
 					claimId = claim.id;
@@ -159,10 +181,9 @@ export const POST: RequestHandler = async ({ locals, url, request }) => {
 					claim:       claimId,
 					description: row.itemDescription?.trim() || '',
 					amount:      itemAmount,
-					date:        row.itemDate?.trim() || null,
+					date:        row.itemDate?.trim() || '',
 					category:    row.itemCategory?.trim() || 'other',
-					vendor:      vendorName || '',
-					vendorId:    vendorId,
+					vendorId:    vendorId ?? '',
 					notes:       row.itemNotes?.trim() || ''
 				});
 			} else {
@@ -171,10 +192,7 @@ export const POST: RequestHandler = async ({ locals, url, request }) => {
 			created++;
 		} catch (err: any) {
 			failed++;
-			const detail = err?.response?.data
-				? ` ${JSON.stringify(err.response.data)}`
-				: '';
-			const msg = (err?.response?.message ?? err?.message ?? 'Unknown error') + detail;
+			const msg = err?.response?.message ?? err?.message ?? 'Unknown error';
 			errors.push(`Row ${i + 2}: ${msg}`);
 		}
 	}

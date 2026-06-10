@@ -1,6 +1,10 @@
 import { json } from '@sveltejs/kit';
 import { RequestContext } from '$lib/infra/RequestContext';
 import { getAdminPocketBase } from '$lib/infra/pocketbase/pbClient';
+import {
+	DEFAULT_REIMBURSEMENT_MAX_CLAIM_TOTAL,
+	REIMBURSEMENT_MAX_TOTAL_SETTING_KEY
+} from '$lib/domain/schemas/reimbursement.schema';
 import type { RequestHandler } from './$types';
 
 // Generate next WO-NNN reference number
@@ -20,6 +24,14 @@ async function nextWorkOrderNumber(pb: any): Promise<string> {
 	return `WO-${String(max + 1).padStart(3, '0')}`;
 }
 
+async function getMaxClaimTotal(pb: any): Promise<number> {
+	const setting = await pb.collection('settings')
+		.getFirstListItem(`key = "${REIMBURSEMENT_MAX_TOTAL_SETTING_KEY}"`, { fields: 'value' })
+		.catch(() => null);
+	const parsed = Number(setting?.value);
+	return Number.isFinite(parsed) && parsed > 0 ? parsed : DEFAULT_REIMBURSEMENT_MAX_CLAIM_TOTAL;
+}
+
 // POST /api/reimbursements — create a new claim (always starts as draft)
 export const POST: RequestHandler = async ({ locals, url, request }) => {
 	const ctx  = await RequestContext.from(locals, url);
@@ -29,7 +41,18 @@ export const POST: RequestHandler = async ({ locals, url, request }) => {
 
 	try {
 		const adminPb = await getAdminPocketBase();
+		const maxClaimTotal = await getMaxClaimTotal(adminPb);
 		const workOrder = await nextWorkOrderNumber(adminPb);
+		const items = body.items ?? [];
+		const total = (items as any[]).reduce((s: number, i: any) => s + (Number(i.amount) || 0), 0);
+
+		if (total > maxClaimTotal) {
+			return json({
+				message: `Claim total cannot exceed $${maxClaimTotal.toFixed(2)}`,
+				maxClaimTotal,
+				total
+			}, { status: 400 });
+		}
 
 		// Always link new claims to the Tax-Exempt Reimbursements department
 		let reimbDeptId: string | null = body.department ?? null;
@@ -50,7 +73,6 @@ export const POST: RequestHandler = async ({ locals, url, request }) => {
 		});
 
 		// Create any initial items passed along with the claim
-		const items = body.items ?? [];
 		for (const item of items) {
 			if (!item.description?.trim() || !item.amount) continue;
 			await adminPb.collection('reimbursement_items').create({
@@ -68,7 +90,6 @@ export const POST: RequestHandler = async ({ locals, url, request }) => {
 
 		// Recalculate total
 		if (items.length) {
-			const total = items.reduce((s: number, i: any) => s + (Number(i.amount) || 0), 0);
 			await adminPb.collection('reimbursement_claims').update(claim.id, { totalAmount: total });
 		}
 
