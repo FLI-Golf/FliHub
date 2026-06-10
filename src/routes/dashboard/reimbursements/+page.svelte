@@ -29,6 +29,10 @@
 	let lineItems  = $state<{ description: string; amount: string; date: string; category: string; vendor: string; vendorId: string; notes: string; receipts: FileList | null }[]>([
 		{ description: '', amount: '', date: '', category: 'other', vendor: '', vendorId: '', notes: '', receipts: null }
 	]);
+	let editingMaxClaimTotal = $state(false);
+	let maxClaimTotalInput = $state(String(data.maxClaimTotal ?? 1500));
+	let maxClaimTotalError = $state('');
+	let savingMaxClaimTotal = $state(false);
 
 	function addLine() {
 		lineItems = [...lineItems, { description: '', amount: '', date: '', category: 'other', vendor: '', vendorId: '', notes: '', receipts: null }];
@@ -39,12 +43,16 @@
 	}
 
 	const lineTotal = $derived(lineItems.reduce((s, l) => s + (Number(l.amount) || 0), 0));
+	const maxClaimTotal = $derived(Number(data.maxClaimTotal ?? 1500));
+	const remainingClaimLimit = $derived(Math.max(0, maxClaimTotal - lineTotal));
+	const isOverClaimLimit = $derived(lineTotal > maxClaimTotal);
 
 	async function submitNewClaim(e: SubmitEvent) {
 		e.preventDefault();
 		if (!claimTitle.trim()) { err = 'Title is required'; return; }
 		const validLines = lineItems.filter(l => l.description.trim() && Number(l.amount) > 0);
 		if (!validLines.length) { err = 'Add at least one line item with a description and amount'; return; }
+		if (lineTotal > maxClaimTotal) { err = `Claim total cannot exceed ${fmt(maxClaimTotal)}`; return; }
 		saving = true; err = '';
 		try {
 			const res = await fetch('/api/reimbursements', {
@@ -74,6 +82,7 @@
 		if (!claimTitle.trim()) { err = 'Title is required'; return; }
 		const validLines = lineItems.filter(l => l.description.trim() && Number(l.amount) > 0);
 		if (!validLines.length) { err = 'Add at least one line item with a description and amount'; return; }
+		if (lineTotal > maxClaimTotal) { err = `Claim total cannot exceed ${fmt(maxClaimTotal)}`; return; }
 		saving = true; err = '';
 		try {
 			const res = await fetch('/api/reimbursements', {
@@ -98,11 +107,49 @@
 
 	// ── Submit a draft claim for review ──────────────────────────────────────
 	async function submitForReview(claimId: string) {
-		await fetch(`/api/reimbursements/${claimId}`, {
+		const res = await fetch(`/api/reimbursements/${claimId}`, {
 			method: 'PATCH', headers: { 'Content-Type': 'application/json' },
 			body: JSON.stringify({ status: 'submitted' })
 		});
+		if (!res.ok) {
+			const body = await res.json().catch(() => ({}));
+			alert(body.message ?? 'Unable to submit claim');
+			return;
+		}
 		await invalidateAll();
+	}
+
+	async function saveMaxClaimTotal() {
+		const val = Number(maxClaimTotalInput);
+		if (!Number.isFinite(val) || val <= 0) {
+			maxClaimTotalError = 'Enter a number greater than 0';
+			return;
+		}
+
+		savingMaxClaimTotal = true;
+		maxClaimTotalError = '';
+		try {
+			const res = await fetch('/api/settings', {
+				method: 'PATCH',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({
+					id: data.maxClaimTotalSettingId,
+					key: 'reimbursement_claim_max_total',
+					label: 'Reimbursement Max Claim Total',
+					value: String(val)
+				})
+			});
+			if (!res.ok) {
+				const body = await res.json().catch(() => ({}));
+				throw new Error(body.message ?? 'Failed to save setting');
+			}
+			editingMaxClaimTotal = false;
+			await invalidateAll();
+		} catch (e: any) {
+			maxClaimTotalError = e?.message ?? 'Failed to save setting';
+		} finally {
+			savingMaxClaimTotal = false;
+		}
 	}
 
 	// ── Delete a draft claim ─────────────────────────────────────────────────
@@ -176,6 +223,58 @@
 				<Plus class="size-4" /> New Claim
 			</Button>
 		</div>
+	</div>
+
+	<div class="rounded-xl border border-emerald-800/40 bg-emerald-950/20 px-5 py-4 flex items-center gap-4 flex-wrap">
+		<div class="flex-1">
+			<p class="text-sm font-semibold text-emerald-200">Claim total cap</p>
+			<p class="text-xs text-emerald-300/75">Each reimbursement claim can include unlimited line items, but the claim total is capped.</p>
+		</div>
+		{#if data.isAdmin && editingMaxClaimTotal}
+			<div class="flex items-center gap-2">
+				<input
+					type="number"
+					min="1"
+					step="0.01"
+					bind:value={maxClaimTotalInput}
+					class="w-32 rounded-md border border-emerald-700 bg-slate-900 text-slate-100 text-sm px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+				/>
+				<button
+					type="button"
+					onclick={saveMaxClaimTotal}
+					disabled={savingMaxClaimTotal}
+					class="text-xs font-semibold px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white transition-colors disabled:opacity-50"
+				>
+					{savingMaxClaimTotal ? 'Saving…' : 'Save'}
+				</button>
+				<button
+					type="button"
+					onclick={() => { editingMaxClaimTotal = false; maxClaimTotalInput = String(data.maxClaimTotal ?? 1500); maxClaimTotalError = ''; }}
+					class="text-xs text-slate-400 hover:text-slate-200"
+				>
+					Cancel
+				</button>
+			</div>
+		{:else}
+			<div class="flex items-center gap-3">
+				<div class="text-right">
+					<p class="text-xs text-emerald-400/70 uppercase tracking-wide">Max per claim</p>
+					<p class="text-lg font-bold text-emerald-300">{fmt(maxClaimTotal)}</p>
+				</div>
+				{#if data.isAdmin}
+					<button
+						type="button"
+						onclick={() => { editingMaxClaimTotal = true; maxClaimTotalInput = String(data.maxClaimTotal ?? 1500); }}
+						class="text-xs px-3 py-1.5 rounded-lg border border-emerald-700/60 text-emerald-300 hover:bg-emerald-900/40"
+					>
+						Edit
+					</button>
+				{/if}
+			</div>
+		{/if}
+		{#if maxClaimTotalError}
+			<p class="w-full text-xs text-red-400">{maxClaimTotalError}</p>
+		{/if}
 	</div>
 
 	<!-- About this page -->
@@ -658,7 +757,7 @@
 						<span class="size-5 rounded-full bg-blue-900/60 border border-blue-700 text-blue-300 flex items-center justify-center font-bold shrink-0 text-[10px]">2</span>
 						<div>
 							<p class="font-semibold text-slate-200 mb-0.5">Group multiple transactions into one claim</p>
-							<p class="text-slate-400">Add as many line items as you need — 10 receipts from a business trip, a month of software subscriptions, founder out-of-pocket expenses. One claim, one reference number when paid.</p>
+							<p class="text-slate-400">Add as many line items as you need — receipts from a business trip, a month of software subscriptions, founder out-of-pocket expenses. One claim, one reference number when paid.</p>
 						</div>
 					</div>
 					<div class="flex gap-3">
@@ -778,17 +877,23 @@
 
 			<!-- Total summary -->
 			<div class="flex items-center justify-between p-3 rounded-xl bg-emerald-950/30 border border-emerald-800/40">
-				<span class="text-sm text-slate-300">{lineItems.filter(l => l.description && Number(l.amount) > 0).length} valid item{lineItems.filter(l => l.description && Number(l.amount) > 0).length !== 1 ? 's' : ''}</span>
-				<span class="text-lg font-bold text-emerald-300">{fmt(lineTotal)}</span>
+				<div>
+					<span class="text-sm text-slate-300">{lineItems.filter(l => l.description && Number(l.amount) > 0).length} valid item{lineItems.filter(l => l.description && Number(l.amount) > 0).length !== 1 ? 's' : ''}</span>
+					<p class="text-[11px] text-slate-400 mt-0.5">Max allowed: {fmt(maxClaimTotal)} · Remaining: {fmt(remainingClaimLimit)}</p>
+				</div>
+				<span class="text-lg font-bold {isOverClaimLimit ? 'text-red-300' : 'text-emerald-300'}">{fmt(lineTotal)}</span>
 			</div>
+			{#if isOverClaimLimit}
+				<p class="text-xs text-red-400">Claim total exceeds {fmt(maxClaimTotal)}. Reduce line-item amounts before saving.</p>
+			{/if}
 		</form>
 
 		<div class="flex justify-end gap-3 px-6 py-4 border-t border-slate-700 shrink-0">
 			<Button type="button" variant="outline" onclick={() => showNewClaim = false} class="border-slate-600 text-slate-300">Cancel</Button>
-			<Button onclick={submitNewClaim} disabled={saving} class="gap-2 bg-slate-700 hover:bg-slate-600 text-white">
+			<Button onclick={submitNewClaim} disabled={saving || isOverClaimLimit} class="gap-2 bg-slate-700 hover:bg-slate-600 text-white">
 				<Receipt class="size-4" />{saving ? 'Saving…' : 'Save as Draft'}
 			</Button>
-			<Button onclick={submitAndSend} disabled={saving} class="gap-2 bg-emerald-600 hover:bg-emerald-700 text-white">
+			<Button onclick={submitAndSend} disabled={saving || isOverClaimLimit} class="gap-2 bg-emerald-600 hover:bg-emerald-700 text-white">
 				<Send class="size-4" />{saving ? 'Saving…' : 'Save & Submit'}
 			</Button>
 		</div>

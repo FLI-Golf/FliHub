@@ -55,6 +55,9 @@ export const ITEM_CATEGORY_LABELS: Record<string, string> = {
 	other:     'Other'
 };
 
+export const REIMBURSEMENT_MAX_TOTAL_SETTING_KEY = 'reimbursement_claim_max_total';
+export const DEFAULT_REIMBURSEMENT_MAX_CLAIM_TOTAL = 1500;
+
 export const ReimbursementItemSchema = z.object({
 	id:          z.string().optional(),
 	claim:       z.string().optional(),

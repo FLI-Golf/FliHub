@@ -1,6 +1,18 @@
 import { json } from '@sveltejs/kit';
 import { RequestContext } from '$lib/infra/RequestContext';
+import {
+	DEFAULT_REIMBURSEMENT_MAX_CLAIM_TOTAL,
+	REIMBURSEMENT_MAX_TOTAL_SETTING_KEY
+} from '$lib/domain/schemas/reimbursement.schema';
 import type { RequestHandler } from './$types';
+
+async function getMaxClaimTotal(pb: any): Promise<number> {
+	const setting = await pb.collection('settings')
+		.getFirstListItem(`key = "${REIMBURSEMENT_MAX_TOTAL_SETTING_KEY}"`, { fields: 'value' })
+		.catch(() => null);
+	const parsed = Number(setting?.value);
+	return Number.isFinite(parsed) && parsed > 0 ? parsed : DEFAULT_REIMBURSEMENT_MAX_CLAIM_TOTAL;
+}
 
 // POST /api/import
 // Body: { type: 'vendors' | 'sponsors' | 'pros', rows: Record<string, string>[] }
@@ -19,6 +31,10 @@ export const POST: RequestHandler = async ({ locals, url, request }) => {
 	let created = 0;
 	let failed = 0;
 	const errors: string[] = [];
+	const allowedClaimStatuses = new Set(['draft', 'submitted', 'under_review', 'approved', 'paid', 'rejected']);
+	const maxClaimTotal = type === 'reimbursements'
+		? await getMaxClaimTotal(pb)
+		: DEFAULT_REIMBURSEMENT_MAX_CLAIM_TOTAL;
 
 	// Cache for grouping multi-item reimbursement rows into one claim per title+claimant
 	const claimCache = new Map<string, string>();
@@ -123,7 +139,9 @@ export const POST: RequestHandler = async ({ locals, url, request }) => {
 				const isHistorical = row.isHistorical?.trim().toLowerCase() === 'true';
 				const itemAmount   = row.itemAmount ? Number(row.itemAmount.replace(/[^0-9.]/g, '')) : 0;
 				const claimTitle   = row.claimTitle?.trim() || '';
-				const claimStatus  = row.claimStatus?.trim() || 'draft';
+				const rawStatus = (row.claimStatus?.trim().toLowerCase() || 'draft');
+				const normalizedStatus = allowedClaimStatuses.has(rawStatus) ? rawStatus : 'draft';
+				const claimStatus = normalizedStatus === 'paid' ? 'under_review' : normalizedStatus;
 
 				// Group multi-item rows: reuse an existing claim created in this import
 				// batch if claimTitle + claimantEmail match a previously created claim.
@@ -134,10 +152,17 @@ export const POST: RequestHandler = async ({ locals, url, request }) => {
 					claimId = claimCache.get(cacheKey)!;
 					// Update totalAmount on the existing claim
 					const existing = await pb.collection('reimbursement_claims').getOne(claimId, { fields: 'id,totalAmount' });
+					const nextTotal = (existing.totalAmount || 0) + itemAmount;
+					if (nextTotal > maxClaimTotal) {
+						throw new Error(`Claim total cannot exceed $${maxClaimTotal.toFixed(2)} (claim: ${claimTitle})`);
+					}
 					await pb.collection('reimbursement_claims').update(claimId, {
-						totalAmount: (existing.totalAmount || 0) + itemAmount
+						totalAmount: nextTotal
 					});
 				} else {
+					if (itemAmount > maxClaimTotal) {
+						throw new Error(`Claim total cannot exceed $${maxClaimTotal.toFixed(2)} (claim: ${claimTitle})`);
+					}
 					const claim = await pb.collection('reimbursement_claims').create({
 						title:        claimTitle,
 						claimant:     claimantId,

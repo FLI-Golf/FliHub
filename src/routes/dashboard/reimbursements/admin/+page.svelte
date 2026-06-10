@@ -72,6 +72,73 @@
 
 	// ── Expanded row ──────────────────────────────────────────────────────────
 	let expanded = $state<string|null>(null);
+	let selectedClaimIds = $state<string[]>([]);
+	let rollupBusy = $state(false);
+	let rollupToast = $state<{ type: 'success' | 'error'; message: string } | null>(null);
+
+	const selectableRows = $derived(() => rows().filter((c: any) => c.status !== 'paid' && c.status !== 'rejected'));
+	const allSelectableSelected = $derived(() =>
+		selectableRows().length > 0 && selectableRows().every((c: any) => selectedClaimIds.includes(c.id))
+	);
+
+	function toggleClaimSelected(claimId: string) {
+		if (selectedClaimIds.includes(claimId)) {
+			selectedClaimIds = selectedClaimIds.filter((id) => id !== claimId);
+		} else {
+			selectedClaimIds = [...selectedClaimIds, claimId];
+		}
+	}
+
+	function toggleSelectAllVisible() {
+		if (allSelectableSelected()) {
+			const visibleIds = new Set(selectableRows().map((c: any) => c.id));
+			selectedClaimIds = selectedClaimIds.filter((id) => !visibleIds.has(id));
+			return;
+		}
+
+		const merged = new Set([...selectedClaimIds, ...selectableRows().map((c: any) => c.id)]);
+		selectedClaimIds = [...merged];
+	}
+
+	async function rollupSelectedClaims() {
+		if (selectedClaimIds.length < 2) {
+			alert('Select at least 2 claims to roll up');
+			return;
+		}
+
+		if (!confirm(`Roll up ${selectedClaimIds.length} selected claims? This will re-bucket line items under the max claim limit.`)) {
+			return;
+		}
+
+		rollupBusy = true;
+		try {
+			const sourceCount = selectedClaimIds.length;
+			const res = await fetch('/api/reimbursements/rollup', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ claimIds: selectedClaimIds })
+			});
+			const body = await res.json().catch(() => ({}));
+			if (!res.ok) {
+				const details = body?.details ? ` (${JSON.stringify(body.details)})` : '';
+				throw new Error((body.message ?? 'Rollup failed') + details);
+			}
+			const createdCount = Array.isArray(body.rolledClaimIds) ? body.rolledClaimIds.length : 0;
+			rollupToast = {
+				type: 'success',
+				message: `Rolled up ${sourceCount} claim${sourceCount !== 1 ? 's' : ''} into ${createdCount} new claim${createdCount !== 1 ? 's' : ''}.`
+			};
+			setTimeout(() => { rollupToast = null; }, 3500);
+			selectedClaimIds = [];
+			await invalidateAll();
+		} catch (e: any) {
+			const msg = e?.message ?? 'Rollup failed';
+			rollupToast = { type: 'error', message: msg };
+			setTimeout(() => { rollupToast = null; }, 4500);
+		} finally {
+			rollupBusy = false;
+		}
+	}
 
 	// ── Per-claim admin form ──────────────────────────────────────────────────
 	let forms = $state<Record<string,{ refNum:string; payMethod:string; paidDate:string; reviewNotes:string }>>({});
@@ -338,6 +405,20 @@
 				</button>
 			{/if}
 
+			<Button
+				onclick={rollupSelectedClaims}
+				disabled={rollupBusy || selectedClaimIds.length < 2}
+				class="h-9 bg-emerald-700 hover:bg-emerald-600 text-white disabled:opacity-50"
+			>
+				{#if rollupBusy}
+					Rolling up…
+				{:else}
+					Roll Up Selected ({selectedClaimIds.length})
+				{/if}
+			</Button>
+
+			<span class="text-[11px] text-slate-500 whitespace-nowrap">max per rolled claim: {fmt(data.maxClaimTotal ?? 1500)}</span>
+
 			<span class="ml-auto text-xs text-slate-500">{rows().length} claims</span>
 		</div>
 	</Card>
@@ -348,6 +429,15 @@
 			<table class="w-full text-sm">
 				<thead>
 					<tr class="border-b border-slate-700 bg-slate-900/40">
+						<th class="w-8 px-3 py-3">
+							<input
+								type="checkbox"
+								checked={allSelectableSelected()}
+								onchange={toggleSelectAllVisible}
+								class="rounded border-slate-600 accent-emerald-500"
+								title="Select all visible eligible claims"
+							/>
+						</th>
 						<th class="w-8 px-3 py-3"></th>
 						{#each ([['status','Status'],['claimant','Claimant'],['title','Title'],['items','Items'],['amount','Amount']] as const) as [col, label]}
 							<th class="px-4 py-3 text-left font-medium text-slate-400">
@@ -365,16 +455,27 @@
 				</thead>
 				<tbody class="divide-y divide-slate-700/50">
 					{#if rows().length === 0}
-						<tr><td colspan="8" class="px-4 py-12 text-center text-slate-500">No claims match the current filters.</td></tr>
+						<tr><td colspan="9" class="px-4 py-12 text-center text-slate-500">No claims match the current filters.</td></tr>
 					{:else}
 						{#each rows() as claim (claim.id)}
 							{@const isOpen = expanded === claim.id}
 							{@const items  = itemsFor(claim.id)}
 							{@const f      = form(claim.id)}
 							{@const busy   = saving === claim.id}
+							{@const selectable = claim.status !== 'paid' && claim.status !== 'rejected'}
 
 							<!-- Main row -->
 							<tr class="hover:bg-slate-700/30 transition-colors {isOpen ? 'bg-slate-700/20' : ''}">
+								<td class="px-3 py-3">
+									{#if selectable}
+										<input
+											type="checkbox"
+											checked={selectedClaimIds.includes(claim.id)}
+											onchange={() => toggleClaimSelected(claim.id)}
+											class="rounded border-slate-600 accent-emerald-500"
+										/>
+									{/if}
+								</td>
 								<td class="px-3 py-3">
 									<button onclick={() => expanded = isOpen ? null : claim.id}
 										class="text-slate-500 hover:text-slate-300 transition-colors">
@@ -433,7 +534,7 @@
 							<!-- Expanded detail row -->
 							{#if isOpen}
 							<tr class="bg-slate-900/40">
-								<td colspan="8" class="px-6 py-4">
+								<td colspan="9" class="px-6 py-4">
 									<div class="grid grid-cols-1 lg:grid-cols-2 gap-5">
 
 										<!-- Line items -->
@@ -579,3 +680,12 @@
 		</div>
 	</Card>
 </div>
+
+{#if rollupToast}
+	<div class="fixed bottom-4 right-4 z-50 max-w-sm rounded-lg border px-3 py-2 text-xs shadow-lg backdrop-blur-sm
+		{rollupToast.type === 'success'
+			? 'border-emerald-700 bg-emerald-950/90 text-emerald-200'
+			: 'border-red-700 bg-red-950/90 text-red-200'}">
+		{rollupToast.message}
+	</div>
+{/if}

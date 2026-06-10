@@ -1,6 +1,10 @@
 import type { PageServerLoad } from './$types';
 import { RequestContext } from '$lib/infra/RequestContext';
 import { getAdminPocketBase } from '$lib/infra/pocketbase/pbClient';
+import {
+	DEFAULT_REIMBURSEMENT_MAX_CLAIM_TOTAL,
+	REIMBURSEMENT_MAX_TOTAL_SETTING_KEY
+} from '$lib/domain/schemas/reimbursement.schema';
 
 export const load: PageServerLoad = async ({ locals, url }) => {
 	const ctx     = await RequestContext.from(locals, url);
@@ -41,6 +45,12 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 		// All claims (admin/leader only)
 		let allClaims: any[] = [];
 		let allItems:  any[] = [];
+		const settings = await adminPb.collection('settings').getFullList({ fields: 'id,key,value,label' }).catch(() => []);
+		const maxClaimTotalSetting = (settings as any[]).find((s: any) => s.key === REIMBURSEMENT_MAX_TOTAL_SETTING_KEY);
+		const maxClaimTotalParsed = Number(maxClaimTotalSetting?.value);
+		const maxClaimTotal = Number.isFinite(maxClaimTotalParsed) && maxClaimTotalParsed > 0
+			? maxClaimTotalParsed
+			: DEFAULT_REIMBURSEMENT_MAX_CLAIM_TOTAL;
 		if (isAdmin) {
 			allClaims = await adminPb.collection('reimbursement_claims').getFullList({
 				sort: '-id',
@@ -72,9 +82,24 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 			metrics: { pendingCount, approvedTotal, paidTotal, totalClaims: allClaims.length },
 			reimbDept,
 			cpa,
+			maxClaimTotal,
+			maxClaimTotalSettingId: maxClaimTotalSetting?.id ?? null,
 		};
 	} catch (e: any) {
 		console.error('[reimb] load error:', e?.message);
-		return { profile, isAdmin, vendors: [], myClaims: [], myItems: [], allClaims: [], allItems: [], metrics: null, reimbDept: null, cpa: null };
+		return {
+			profile,
+			isAdmin,
+			vendors: [],
+			myClaims: [],
+			myItems: [],
+			allClaims: [],
+			allItems: [],
+			metrics: null,
+			reimbDept: null,
+			cpa: null,
+			maxClaimTotal: DEFAULT_REIMBURSEMENT_MAX_CLAIM_TOTAL,
+			maxClaimTotalSettingId: null
+		};
 	}
 };

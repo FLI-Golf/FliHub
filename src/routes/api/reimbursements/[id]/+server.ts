@@ -1,7 +1,19 @@
 import { json } from '@sveltejs/kit';
 import { RequestContext } from '$lib/infra/RequestContext';
 import { getAdminPocketBase } from '$lib/infra/pocketbase/pbClient';
+import {
+	DEFAULT_REIMBURSEMENT_MAX_CLAIM_TOTAL,
+	REIMBURSEMENT_MAX_TOTAL_SETTING_KEY
+} from '$lib/domain/schemas/reimbursement.schema';
 import type { RequestHandler } from './$types';
+
+async function getMaxClaimTotal(pb: any): Promise<number> {
+	const setting = await pb.collection('settings')
+		.getFirstListItem(`key = "${REIMBURSEMENT_MAX_TOTAL_SETTING_KEY}"`, { fields: 'value' })
+		.catch(() => null);
+	const parsed = Number(setting?.value);
+	return Number.isFinite(parsed) && parsed > 0 ? parsed : DEFAULT_REIMBURSEMENT_MAX_CLAIM_TOTAL;
+}
 
 // PATCH /api/reimbursements/:id — update status, reference number, review notes, payment info
 export const PATCH: RequestHandler = async ({ locals, url, params, request }) => {
@@ -20,12 +32,35 @@ export const PATCH: RequestHandler = async ({ locals, url, params, request }) =>
 		if (body.paidBy          !== undefined) update.paidBy          = body.paidBy  || null;
 
 		const adminPb = await getAdminPocketBase();
+		const maxClaimTotal = await getMaxClaimTotal(adminPb);
+
+		if (body.status === 'submitted') {
+			const items = await adminPb.collection('reimbursement_items')
+				.getFullList({ filter: `claim="${params.id}"`, fields: 'amount' });
+			const total = items.reduce((s, i) => s + (i.amount || 0), 0);
+			if (total > maxClaimTotal) {
+				return json({
+					message: `Claim total cannot exceed $${maxClaimTotal.toFixed(2)}`,
+					maxClaimTotal,
+					total
+				}, { status: 400 });
+			}
+			update.totalAmount = total;
+		}
 
 		// Recalculate total from items if requested
 		if (body.recalcTotal) {
 			const items = await adminPb.collection('reimbursement_items')
 				.getFullList({ filter: `claim="${params.id}"`, fields: 'amount' });
-			update.totalAmount = items.reduce((s, i) => s + (i.amount || 0), 0);
+			const total = items.reduce((s, i) => s + (i.amount || 0), 0);
+			if (total > maxClaimTotal) {
+				return json({
+					message: `Claim total cannot exceed $${maxClaimTotal.toFixed(2)}`,
+					maxClaimTotal,
+					total
+				}, { status: 400 });
+			}
+			update.totalAmount = total;
 		}
 
 		const record = await adminPb.collection('reimbursement_claims').update(params.id, update);

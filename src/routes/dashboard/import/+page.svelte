@@ -37,7 +37,8 @@ RULES:
 - itemDate: YYYY-MM-DD format
 - itemCategory: one of → travel · meals · equipment · software · marketing · legal · office · other
 - vendorName: optional, match exactly to one of → ${vendorNames || 'vendor name as written'}
-- claimStatus: use "paid" for already-reimbursed items, "submitted" for pending
+- claimStatus: use "under_review" for imported historical reimbursement claims, "submitted" for pending
+- if claimStatus is "paid", importer will automatically convert it to "under_review"
 - departmentName: one of → ${deptNames || 'department name'}
 - isHistorical: true for all records that existed before FliHub was set up, false for new claims
 - claimNotes: add "Historical import — pre-FliHub" for historical records
@@ -63,7 +64,7 @@ Here are the records to convert:
 			{ col: 'itemCategory',     required: false, example: 'travel',                     note: 'travel · meals · equipment · software · marketing · legal · office · other' },
 			{ col: 'vendorName',       required: false, example: 'Delta Airlines',             note: 'Matched by name in vendors collection' },
 			{ col: 'itemNotes',        required: false, example: 'Round trip, economy' },
-			{ col: 'claimStatus',      required: false, example: 'paid',                       note: 'draft · submitted · under_review · approved · paid · rejected' },
+			{ col: 'claimStatus',      required: false, example: 'under_review',               note: 'draft · submitted · under_review · approved · paid · rejected (paid is auto-mapped to under_review on import)' },
 			{ col: 'claimNotes',       required: false, example: 'Historical import — pre-FliHub' },
 			{ col: 'departmentName',   required: false, example: 'Tax-Exempt Reimbursements',  note: 'Matched by name — debits dept budget when paid' },
 			{ col: 'isHistorical',     required: false, example: 'true',                       note: 'true for pre-FliHub records, false for new claims' },
