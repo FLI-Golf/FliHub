@@ -29,9 +29,30 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 
 			// Reimbursement: load line items
 			if (wo.source === 'reimbursement' && claim?.id) {
-				claimItems = await adminPb.collection('reimbursement_items')
+				const claimItemsRaw = await adminPb.collection('reimbursement_items')
 					.getFullList({ filter: `claim="${claim.id}"`, sort: 'date' })
 					.catch(() => []);
+
+				claimItems = (claimItemsRaw as any[]).map((item: any) => {
+					const receiptFiles = Array.isArray(item.receipts) ? item.receipts.filter(Boolean) : [];
+					const receiptAssets = receiptFiles.map((filename: string) => {
+						const lower = String(filename).toLowerCase();
+						const isPdf = lower.endsWith('.pdf');
+						const isImage = /\.(png|jpe?g|webp|gif|bmp|svg)$/.test(lower);
+						return {
+							filename,
+							isPdf,
+							isImage,
+							url: adminPb.files.getURL(item, filename),
+							thumbUrl: isImage ? adminPb.files.getURL(item, filename, { thumb: '320x0' }) : null,
+						};
+					});
+
+					return {
+						...item,
+						_receiptAssets: receiptAssets,
+					};
+				});
 			}
 
 			// Expense: load linked approval + resolve task/project if missing

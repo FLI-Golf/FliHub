@@ -2,7 +2,7 @@
 	import { invalidateAll } from '$app/navigation';
 	import Card from '$lib/components/ui/card.svelte';
 	import { Button } from '$lib/components/ui/button/index.js';
-	import { Plus, X, Receipt, CheckCircle2, Clock, AlertCircle, ChevronDown, ChevronRight, Pencil, Trash2, Send, DollarSign, Hash, UserCircle, Building2, ShieldCheck, Info, FileText, ArrowRight } from 'lucide-svelte';
+	import { Plus, X, Receipt, CheckCircle2, Clock, AlertCircle, ChevronDown, ChevronRight, Pencil, Trash2, Send, DollarSign, Hash, UserCircle, Building2, ShieldCheck, Info, FileText, ArrowRight, Upload, Loader2 } from 'lucide-svelte';
 	import type { PageData } from './$types';
 	import {
 		CLAIM_STATUS_LABELS, CLAIM_STATUS_COLORS, CLAIMANT_PIPELINE,
@@ -18,10 +18,20 @@
 	let showNewClaim    = $state(false);
 	let showInstructions = $state(false);
 	let showAbout       = $state(false);
+	let showMyClaims    = $state(false);
+	let showItemFinder  = $state(false);
 	let expandedClaim   = $state<string | null>(null);
 	let adminExpanded   = $state<string | null>(null);
 	let saving        = $state(false);
 	let err           = $state('');
+	let itemFilter    = $state('');
+	let attachingReceiptItemId = $state<string | null>(null);
+	let removingReceiptItemId = $state<string | null>(null);
+	let attachReceiptErr = $state('');
+	let selectedItemIds = $state<Record<string, boolean>>({});
+	let bankStatementFile = $state<File | null>(null);
+	let bankStatementUploading = $state(false);
+	let bankStatementErr = $state('');
 
 	// ── New claim form ────────────────────────────────────────────────────────
 	let claimTitle = $state('');
@@ -74,7 +84,114 @@
 		if (!files?.length) return;
 		const fd = new FormData();
 		for (const f of Array.from(files)) fd.append('receipts', f);
-		await fetch(`/api/reimbursements/${claimId}/items/${itemId}/receipts`, { method: 'POST', body: fd }).catch(() => {});
+		const res = await fetch(`/api/reimbursements/${claimId}/items/${itemId}/receipts`, { method: 'POST', body: fd });
+		if (!res.ok) {
+			const body = await res.json().catch(() => ({}));
+			throw new Error(body.message ?? 'Upload failed');
+		}
+	}
+
+	async function attachReceiptToItem(claimId: string, itemId: string, files: FileList | null) {
+		if (!files?.length) return;
+		attachingReceiptItemId = itemId;
+		attachReceiptErr = '';
+		try {
+			await uploadReceipts(claimId, itemId, files);
+			await invalidateAll();
+		} catch (e: any) {
+			attachReceiptErr = e?.message ?? 'Failed to attach receipt';
+		} finally {
+			attachingReceiptItemId = null;
+		}
+	}
+
+	async function removeReceiptsFromItem(claimId: string, itemId: string, receipts: string[] | undefined) {
+		if (!receipts?.length) {
+			attachReceiptErr = 'This item has no receipts to remove yet.';
+			return;
+		}
+		if (!confirm(`Remove ${receipts.length} receipt${receipts.length === 1 ? '' : 's'} from this item?`)) return;
+
+		removingReceiptItemId = itemId;
+		attachReceiptErr = '';
+		try {
+			const res = await fetch(`/api/reimbursements/${claimId}/items/${itemId}/receipts`, {
+				method: 'DELETE',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ receipts })
+			});
+
+			if (!res.ok) {
+				const body = await res.json().catch(() => ({}));
+				throw new Error(body.message ?? 'Remove failed');
+			}
+
+			await invalidateAll();
+		} catch (e: any) {
+			attachReceiptErr = e?.message ?? 'Failed to remove receipt';
+		} finally {
+			removingReceiptItemId = null;
+		}
+	}
+
+	function toggleSelectItem(itemId: string, checked: boolean) {
+		selectedItemIds = { ...selectedItemIds, [itemId]: checked };
+	}
+
+	function toggleSelectAllFiltered(checked: boolean) {
+		const next = { ...selectedItemIds };
+		for (const item of filteredMyItems as any[]) {
+			next[item.id] = checked;
+		}
+		selectedItemIds = next;
+	}
+
+	const selectedFilteredItems = $derived.by(() => {
+		const source = (filteredMyItems as any[]) ?? [];
+		return source.filter((item: any) => !!selectedItemIds[item.id]);
+	});
+
+	const selectedFilteredWithReceipts = $derived.by(() => {
+		const source = (selectedFilteredItems as any[]) ?? [];
+		return source.filter((item: any) => Array.isArray(item.receipts) && item.receipts.length > 0);
+	});
+
+	const allFilteredSelected = $derived.by(() => {
+		const source = (filteredMyItems as any[]) ?? [];
+		if (!source.length) return false;
+		return source.every((item: any) => !!selectedItemIds[item.id]);
+	});
+
+	async function removeReceiptsFromSelectedItems() {
+		const selected = (selectedFilteredWithReceipts as any[]) ?? [];
+		if (!selected.length) {
+			attachReceiptErr = 'Select at least one item that has receipts.';
+			return;
+		}
+
+		const totalReceipts = selected.reduce((sum: number, item: any) => sum + ((item.receipts?.length ?? 0)), 0);
+		if (!confirm(`Remove ${totalReceipts} receipt${totalReceipts === 1 ? '' : 's'} from ${selected.length} selected item${selected.length === 1 ? '' : 's'}?`)) return;
+
+		attachReceiptErr = '';
+		for (const item of selected) {
+			removingReceiptItemId = item.id;
+			const res = await fetch(`/api/reimbursements/${item.claim}/items/${item.id}/receipts`, {
+				method: 'DELETE',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ receipts: item.receipts })
+			});
+
+			if (!res.ok) {
+				const body = await res.json().catch(() => ({}));
+				attachReceiptErr = body.message ?? `Failed to remove receipts for item ${item.description || item.id}`;
+				removingReceiptItemId = null;
+				return;
+			}
+		}
+
+		removingReceiptItemId = null;
+		selectedItemIds = {};
+		await invalidateAll();
 	}
 
 	// ── Save draft then immediately submit for review ─────────────────────────
@@ -152,6 +269,38 @@
 		}
 	}
 
+	async function uploadBankStatement() {
+		if (!bankStatementFile) {
+			bankStatementErr = 'Please choose a PDF file first';
+			return;
+		}
+
+		bankStatementUploading = true;
+		bankStatementErr = '';
+		try {
+			const formData = new FormData();
+			formData.append('pdf_file', bankStatementFile);
+
+			const res = await fetch('/api/bank-statements', {
+				method: 'POST',
+				body: formData
+			});
+
+			if (!res.ok) {
+				const body = await res.json().catch(() => ({}));
+				throw new Error(body.message ?? 'Upload failed');
+			}
+
+			bankStatementFile = null;
+			const input = document.getElementById('bank-statement-upload-input') as HTMLInputElement | null;
+			if (input) input.value = '';
+			await invalidateAll();
+		} catch (e: any) {
+			bankStatementErr = e?.message ?? 'Upload failed';
+		} finally {
+			bankStatementUploading = false;
+		}
+	}
 	// ── Delete a draft claim ─────────────────────────────────────────────────
 	async function deleteClaim(claimId: string) {
 		if (!confirm('Delete this draft claim?')) return;
@@ -197,6 +346,33 @@
 	function itemsForClaim(claimId: string, source: any[]) {
 		return source.filter((i: any) => i.claim === claimId);
 	}
+
+	function claimTitleFor(item: any): string {
+		const claim = (data.myClaims as any[]).find((c) => c.id === item.claim);
+		return claim?.title ?? 'Unknown claim';
+	}
+
+	const filteredMyItems = $derived.by(() => {
+		const source = (data.myItems as any[]) ?? [];
+		const q = itemFilter.trim().toLowerCase();
+		if (!q) return source;
+
+		return source.filter((item: any) => {
+			const claimTitle = claimTitleFor(item).toLowerCase();
+			const haystack = [
+				item.description,
+				item.category,
+				item.notes,
+				item.workOrderReference,
+				claimTitle
+			]
+				.filter(Boolean)
+				.join(' ')
+				.toLowerCase();
+
+			return haystack.includes(q);
+		});
+	});
 
 	const INPUT = 'w-full rounded-lg border border-slate-600 bg-slate-800 text-slate-100 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 placeholder:text-slate-500';
 	const LABEL = 'block text-xs font-medium text-slate-400 mb-1';
@@ -277,6 +453,81 @@
 		{/if}
 	</div>
 
+	<!-- Bank statement vault -->
+	<Card class="p-5 bg-slate-800/40 border-slate-700 space-y-4">
+		<div class="flex items-center justify-between gap-3 flex-wrap">
+			<div>
+				<h2 class="text-lg font-semibold text-slate-100">Bank Statement Vault</h2>
+				<p class="text-sm text-slate-400">Upload one bank statement PDF at a time for historical backup.</p>
+			</div>
+			<span class="text-xs px-2.5 py-1 rounded-md border border-slate-600 text-slate-300">
+				{data.myBankStatements?.length ?? 0} file{(data.myBankStatements?.length ?? 0) === 1 ? '' : 's'}
+			</span>
+		</div>
+
+		<div class="flex items-center gap-3 flex-wrap">
+			<input
+				id="bank-statement-upload-input"
+				type="file"
+				accept="application/pdf,.pdf"
+				onchange={(e) => {
+					bankStatementErr = '';
+					bankStatementFile = ((e.currentTarget as HTMLInputElement).files?.[0] ?? null);
+				}}
+				class="block w-full max-w-md text-xs text-slate-400 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border file:border-slate-600 file:bg-slate-700 file:text-slate-300 file:text-xs hover:file:bg-slate-600 file:transition-colors cursor-pointer"
+			/>
+			<Button onclick={uploadBankStatement} disabled={bankStatementUploading || !bankStatementFile} class="gap-2 bg-blue-600 hover:bg-blue-700 text-white">
+				{#if bankStatementUploading}
+					<Loader2 class="size-4 animate-spin" /> Uploading...
+				{:else}
+					<Upload class="size-4" /> Upload PDF
+				{/if}
+			</Button>
+		</div>
+
+		{#if bankStatementErr}
+			<p class="text-xs text-red-400 bg-red-900/30 border border-red-700 rounded-lg px-3 py-2">{bankStatementErr}</p>
+		{/if}
+
+		{#if !data.myBankStatements?.length}
+			<p class="text-xs text-slate-400">No bank statements uploaded yet.</p>
+		{:else}
+			<div class="rounded-lg border border-slate-700 overflow-hidden">
+				<table class="w-full text-xs">
+					<thead class="bg-slate-900/40 border-b border-slate-700">
+						<tr class="text-left text-slate-400 uppercase tracking-wide">
+							<th class="px-3 py-2">File</th>
+							<th class="px-3 py-2">Uploaded</th>
+							<th class="px-3 py-2 text-right">Action</th>
+						</tr>
+					</thead>
+					<tbody class="divide-y divide-slate-700/40">
+						{#each data.myBankStatements as statement}
+							{@const fileName = Array.isArray(statement.pdf_file) ? statement.pdf_file[0] : statement.pdf_file}
+							<tr>
+								<td class="px-3 py-2 text-slate-200">{fileName || 'PDF file'}</td>
+								<td class="px-3 py-2 text-slate-400">{fmtDate(statement.created)}</td>
+								<td class="px-3 py-2 text-right">
+									{#if fileName}
+										<a
+											href="/api/pb-file/{statement.collectionId}/{statement.id}/{fileName}"
+											target="_blank"
+											rel="noopener noreferrer"
+											class="text-blue-400 hover:text-blue-300 hover:underline"
+										>
+											View PDF
+										</a>
+									{:else}
+										<span class="text-slate-500">Unavailable</span>
+									{/if}
+								</td>
+							</tr>
+						{/each}
+					</tbody>
+				</table>
+			</div>
+		{/if}
+	</Card>
 	<!-- About this page -->
 	<div class="rounded-xl border border-slate-700 bg-slate-800/40 overflow-hidden">
 		<button
@@ -432,287 +683,290 @@
 	</div>
 	{/if}
 
-	<!-- My Claims -->
-	<div>
-		<h2 class="text-lg font-semibold text-slate-200 mb-3">My Claims</h2>
-		{#if data.myClaims.length === 0}
-			<Card class="p-8 text-center bg-slate-800/40 border-slate-700">
-				<Receipt class="size-10 text-slate-600 mx-auto mb-3" />
-				<p class="text-slate-400 text-sm">No claims yet. Click <strong class="text-slate-200">New Claim</strong> to submit your first reimbursement request.</p>
-			</Card>
-		{:else}
-			<div class="space-y-3">
-				{#each data.myClaims as claim}
-					{@const items = itemsForClaim(claim.id, data.myItems)}
-					{@const isOpen = expandedClaim === claim.id}
-					<Card class="overflow-hidden bg-slate-800/50 border-slate-700">
-						<!-- Claim header row -->
-						<button
-							onclick={() => expandedClaim = isOpen ? null : claim.id}
-							class="w-full flex items-center justify-between px-5 py-4 hover:bg-slate-700/40 transition-colors text-left"
-						>
-							<div class="flex items-center gap-3 min-w-0">
-								<ChevronRight class="size-4 text-slate-500 shrink-0 transition-transform {isOpen ? 'rotate-90' : ''}" />
-								<div class="min-w-0">
-									<p class="font-semibold text-slate-100 truncate">{claim.title}</p>
-									<p class="text-xs text-slate-400 mt-0.5">{items.length} item{items.length !== 1 ? 's' : ''} · submitted {fmtDate(claim.created)}</p>
-								</div>
-							</div>
-							<div class="flex items-center gap-3 shrink-0 ml-4">
-								{#if claim.referenceNumber}
-									<span class="text-sm font-black font-mono text-emerald-400 bg-emerald-500/10 border border-emerald-500/30 px-2 py-0.5 rounded">{claim.referenceNumber}</span>
-								{/if}
-								<span class="font-bold text-emerald-400">{fmt(claim.totalAmount || 0)}</span>
-								<span class="text-[10px] px-2 py-0.5 rounded border font-medium {CLAIM_STATUS_COLORS[claim.status]}">{CLAIM_STATUS_LABELS[claim.status]}</span>
-							</div>
-						</button>
-
-						<!-- Expanded detail -->
-						{#if isOpen}
-						<div class="border-t border-slate-700 px-5 py-4 space-y-4">
-							<!-- Pipeline progress -->
-							{#if claim.status !== 'rejected'}
-							<div class="flex items-center gap-0">
-								{#each CLAIMANT_PIPELINE as stage, i}
-									{@const done   = CLAIMANT_PIPELINE.indexOf(claim.status) > i}
-									{@const active = claim.status === stage}
-									<div class="flex items-center flex-1">
-										<div class="flex flex-col items-center gap-1 flex-1">
-											<div class="size-2.5 rounded-full {active ? 'bg-emerald-400 ring-2 ring-emerald-400/40' : done ? 'bg-emerald-600' : 'bg-slate-700'}"></div>
-											<span class="text-[9px] {active ? 'text-emerald-400 font-semibold' : done ? 'text-slate-400' : 'text-slate-600'}">{CLAIM_STATUS_LABELS[stage]}</span>
-										</div>
-										{#if i < CLAIMANT_PIPELINE.length - 1}
-											<div class="h-px flex-1 mb-3 {done ? 'bg-emerald-600' : 'bg-slate-700'} mx-0.5"></div>
-										{/if}
-									</div>
-								{/each}
-							</div>
-							{/if}
-
-							<!-- Line items table -->
-							<table class="w-full text-xs">
-								<thead>
-									<tr class="text-left text-slate-400 uppercase tracking-wide border-b border-slate-700">
-										<th class="pb-1.5 pr-3">Description</th>
-										<th class="pb-1.5 pr-3">Category</th>
-										<th class="pb-1.5 pr-3">Vendor</th>
-										<th class="pb-1.5 pr-3">Date</th>
-										<th class="pb-1.5 text-right">Amount</th>
-									</tr>
-								</thead>
-								<tbody class="divide-y divide-slate-700/40">
-									{#each items as item}
-										<tr class="hover:bg-slate-700/20 align-top">
-											<td class="py-1.5 pr-3 text-slate-200">
-												{item.description}
-												{#if item.receipts?.length}
-													<span class="ml-1.5 text-[9px] px-1.5 py-0.5 rounded bg-blue-900/50 text-blue-300 border border-blue-700/50 font-medium">
-														{item.receipts.length} receipt{item.receipts.length !== 1 ? 's' : ''}
-													</span>
-												{/if}
-											</td>
-											<td class="py-1.5 pr-3 text-slate-400 capitalize">{ITEM_CATEGORY_LABELS[item.category] ?? item.category}</td>
-											<td class="py-1.5 pr-3 text-slate-400">{item.expand?.vendorId?.name || item.vendor || '—'}</td>
-											<td class="py-1.5 pr-3 text-slate-400">{fmtDate(item.date)}</td>
-											<td class="py-1.5 text-right font-semibold text-emerald-400">{fmt(item.amount)}</td>
-										</tr>
-									{/each}
-								</tbody>
-								<tfoot class="border-t border-slate-600">
-									<tr>
-										<td colspan="4" class="pt-2 text-slate-400 font-semibold text-xs">Total</td>
-										<td class="pt-2 text-right font-bold text-emerald-300">{fmt(claim.totalAmount || 0)}</td>
-									</tr>
-								</tfoot>
-							</table>
-
-							{#if claim.notes}
-								<p class="text-xs text-slate-400 italic">"{claim.notes}"</p>
-							{/if}
-							{#if claim.reviewNotes}
-								<div class="p-3 rounded-lg bg-yellow-950/30 border border-yellow-800/40 text-xs text-yellow-300">
-									<span class="font-semibold">Admin note:</span> {claim.reviewNotes}
-								</div>
-							{/if}
-							{#if claim.referenceNumber}
-								<div class="p-3 rounded-lg bg-emerald-950/30 border border-emerald-800/40 flex items-center gap-3">
-									<span class="text-lg font-black font-mono text-emerald-400">{claim.referenceNumber}</span>
-									<div class="text-xs text-emerald-300/70">
-										<p>QuickBooks reference — use this number when entering the payment in QB.</p>
-										{#if claim.paidDate}<p class="mt-0.5 text-slate-400">Paid {fmtDate(claim.paidDate)}</p>{/if}
-									</div>
-								</div>
-							{/if}
-
-							<!-- Actions for draft -->
-							{#if claim.status === 'draft'}
-							<div class="flex gap-2 pt-1">
-								<Button onclick={() => submitForReview(claim.id)} class="gap-2 bg-blue-600 hover:bg-blue-700 text-white h-8 text-xs px-3">
-									<Send class="size-3.5" /> Submit for Review
-								</Button>
-								<Button onclick={() => deleteClaim(claim.id)} variant="outline" class="gap-2 border-red-800 text-red-400 hover:bg-red-900/30 h-8 text-xs px-3">
-									<Trash2 class="size-3.5" /> Delete Draft
-								</Button>
-							</div>
-							{/if}
-						</div>
-						{/if}
-					</Card>
-				{/each}
+	<!-- Find items + attach receipts -->
+	<Card class="overflow-hidden bg-slate-900/40 border-slate-700">
+		<button
+			onclick={() => showItemFinder = !showItemFinder}
+			class="w-full flex items-center justify-between px-4 py-3 hover:bg-slate-700/30 transition-colors text-left"
+		>
+			<div class="flex items-center gap-2">
+				<ChevronRight class="size-4 text-slate-500 shrink-0 transition-transform {showItemFinder ? 'rotate-90' : ''}" />
+				<div>
+					<p class="text-sm font-semibold text-slate-200">Find My Reimbursement Items</p>
+					<p class="text-[11px] text-slate-400">Filter your line items and attach receipts or a photo from your phone camera.</p>
+				</div>
 			</div>
-		{/if}
-	</div>
+			<span class="text-xs text-slate-400">{filteredMyItems.length} items</span>
+		</button>
 
-	<!-- Admin: All Claims -->
-	{#if data.isAdmin && data.allClaims.length > 0}
-	<div>
-		<h2 class="text-lg font-semibold text-slate-200 mb-3">All Claims — Admin View</h2>
-		<div class="space-y-3">
-			{#each data.allClaims as claim}
-				{@const items  = itemsForClaim(claim.id, data.allItems)}
-				{@const isOpen = adminExpanded === claim.id}
-				{@const af     = getAdminForm(claim.id)}
-				<Card class="overflow-hidden bg-slate-800/50 border-slate-700">
-					<button
-						onclick={() => adminExpanded = isOpen ? null : claim.id}
-						class="w-full flex items-center justify-between px-5 py-4 hover:bg-slate-700/40 transition-colors text-left"
-					>
-						<div class="flex items-center gap-3 min-w-0">
-							<ChevronRight class="size-4 text-slate-500 shrink-0 transition-transform {isOpen ? 'rotate-90' : ''}" />
-							<div class="min-w-0">
-								<p class="font-semibold text-slate-100 truncate">{claim.title}</p>
-								<p class="text-xs text-slate-400 mt-0.5">
-									{claim.expand?.claimant?.firstName ?? ''} {claim.expand?.claimant?.lastName ?? claim.claimant}
-									· {items.length} item{items.length !== 1 ? 's' : ''}
-									· {fmtDate(claim.created)}
-								</p>
-							</div>
-						</div>
-						<div class="flex items-center gap-3 shrink-0 ml-4">
-							{#if claim.referenceNumber}
-								<span class="text-sm font-black font-mono text-emerald-400 bg-emerald-500/10 border border-emerald-500/30 px-2 py-0.5 rounded">{claim.referenceNumber}</span>
-							{/if}
-							<span class="font-bold text-emerald-400">{fmt(claim.totalAmount || 0)}</span>
-							<span class="text-[10px] px-2 py-0.5 rounded border font-medium {CLAIM_STATUS_COLORS[claim.status]}">{CLAIM_STATUS_LABELS[claim.status]}</span>
-						</div>
-					</button>
+		{#if showItemFinder}
+		<div class="border-t border-slate-700 px-4 py-4 space-y-3">
+			<div class="flex flex-wrap items-center gap-2">
+				<input
+					type="text"
+					bind:value={itemFilter}
+					placeholder="Filter by description, claim title, category, notes, WO#..."
+					class={`${INPUT} flex-1 min-w-[240px]`}
+				/>
+				<Button
+					type="button"
+					variant="outline"
+					class="h-9 text-[11px] border-red-800 text-red-400 hover:bg-red-900/30"
+					disabled={removingReceiptItemId !== null || attachingReceiptItemId !== null}
+					onclick={removeReceiptsFromSelectedItems}
+				>
+					<Trash2 class="size-3.5 mr-1" /> Remove Selected Receipts ({selectedFilteredWithReceipts.length})
+				</Button>
+			</div>
 
-					{#if isOpen}
-					<div class="border-t border-slate-700 px-5 py-4 space-y-4">
-						<!-- Line items -->
-						<table class="w-full text-xs">
-							<thead>
-								<tr class="text-left text-slate-400 uppercase tracking-wide border-b border-slate-700">
-									<th class="pb-1.5 pr-3">Description</th>
-									<th class="pb-1.5 pr-3">Category</th>
-									<th class="pb-1.5 pr-3">Vendor</th>
-									<th class="pb-1.5 pr-3">Date</th>
-									<th class="pb-1.5 text-right">Amount</th>
-								</tr>
-							</thead>
-							<tbody class="divide-y divide-slate-700/40">
-								{#each items as item}
-									<tr class="hover:bg-slate-700/20 align-top">
-										<td class="py-1.5 pr-3 text-slate-200">
-											{item.description}
-											{#if item.receipts?.length}
-												<span class="ml-1.5 text-[9px] px-1.5 py-0.5 rounded bg-blue-900/50 text-blue-300 border border-blue-700/50 font-medium">
-													{item.receipts.length} receipt{item.receipts.length !== 1 ? 's' : ''}
-												</span>
-											{/if}
-										</td>
-										<td class="py-1.5 pr-3 text-slate-400 capitalize">{ITEM_CATEGORY_LABELS[item.category] ?? item.category}</td>
-										<td class="py-1.5 pr-3 text-slate-400">{item.expand?.vendorId?.name || item.vendor || '—'}</td>
-										<td class="py-1.5 pr-3 text-slate-400">{fmtDate(item.date)}</td>
-										<td class="py-1.5 text-right font-semibold text-emerald-400">{fmt(item.amount)}</td>
-									</tr>
-								{/each}
-							</tbody>
-							<tfoot class="border-t border-slate-600">
+			{#if attachReceiptErr}
+				<p class="text-xs text-red-400 bg-red-900/30 border border-red-700 rounded-lg px-3 py-2">{attachReceiptErr}</p>
+			{/if}
+
+			<div class="rounded-lg border border-slate-700 overflow-hidden">
+				<table class="w-full text-xs">
+					<thead class="bg-slate-900/30">
+						<tr class="text-left text-slate-400 uppercase tracking-wide border-b border-slate-700">
+							<th class="px-3 py-2 w-8">
+								<input
+									type="checkbox"
+									class="rounded border-slate-500 bg-slate-800"
+									checked={allFilteredSelected}
+									onchange={(e) => toggleSelectAllFiltered((e.currentTarget as HTMLInputElement).checked)}
+									title="Select all filtered items"
+								/>
+							</th>
+							<th class="px-3 py-2">Description</th>
+							<th class="px-3 py-2">Category</th>
+							<th class="px-3 py-2">Notes</th>
+							<th class="px-3 py-2">WO#</th>
+							<th class="px-3 py-2">Receipts</th>
+							<th class="px-3 py-2 text-right">Amount</th>
+							<th class="px-3 py-2 text-right">Actions</th>
+						</tr>
+					</thead>
+					<tbody class="divide-y divide-slate-700/40">
+						{#if filteredMyItems.length === 0}
+							<tr>
+								<td colspan="8" class="px-3 py-4 text-slate-400 text-center">No items match your filter.</td>
+							</tr>
+						{:else}
+							{#each filteredMyItems as item}
 								<tr>
-									<td colspan="4" class="pt-2 text-slate-400 font-semibold">Total</td>
-									<td class="pt-2 text-right font-bold text-emerald-300">{fmt(claim.totalAmount || 0)}</td>
+									<td class="px-3 py-2 align-top">
+										<input
+											type="checkbox"
+											class="rounded border-slate-500 bg-slate-800"
+											checked={!!selectedItemIds[item.id]}
+											onchange={(e) => toggleSelectItem(item.id, (e.currentTarget as HTMLInputElement).checked)}
+											title="Select item for bulk receipt removal"
+										/>
+									</td>
+									<td class="px-3 py-2 text-slate-200">
+										<div>{item.description}</div>
+										<div class="text-[10px] text-slate-500 mt-0.5">{claimTitleFor(item)}</div>
+									</td>
+									<td class="px-3 py-2 text-slate-400 capitalize">{ITEM_CATEGORY_LABELS[item.category] ?? item.category}</td>
+									<td class="px-3 py-2 text-slate-400">{item.notes || '—'}</td>
+									<td class="px-3 py-2 text-slate-300 font-mono">{item.workOrderReference || '—'}</td>
+									<td class="px-3 py-2 text-slate-400">{item.receipts?.length ?? 0}</td>
+									<td class="px-3 py-2 text-right font-semibold text-emerald-400">{fmt(item.amount)}</td>
+									<td class="px-3 py-2 text-right">
+										<input
+											type="file"
+											id="attach-receipt-{item.id}"
+											class="hidden"
+											accept="image/*,application/pdf"
+											capture="environment"
+											onchange={(e) => attachReceiptToItem(item.claim, item.id, (e.currentTarget as HTMLInputElement).files)}
+										/>
+										<div class="flex items-center justify-end gap-2">
+											<Button
+												type="button"
+												variant="outline"
+												class="h-7 text-[11px] border-slate-600 text-slate-300"
+												disabled={attachingReceiptItemId === item.id || removingReceiptItemId === item.id}
+												onclick={() => (document.getElementById(`attach-receipt-${item.id}`) as HTMLInputElement | null)?.click()}
+											>
+												{#if attachingReceiptItemId === item.id}
+													<Loader2 class="size-3 mr-1 animate-spin" /> Uploading
+												{:else}
+													<Upload class="size-3 mr-1" /> Attach
+												{/if}
+											</Button>
+											<Button
+												type="button"
+												variant="outline"
+												class="h-7 text-[11px] border-red-800 text-red-400 hover:bg-red-900/30"
+												disabled={removingReceiptItemId === item.id || attachingReceiptItemId === item.id}
+												onclick={() => removeReceiptsFromItem(item.claim, item.id, item.receipts)}
+											>
+												{#if removingReceiptItemId === item.id}
+													<Loader2 class="size-3 mr-1 animate-spin" /> Removing
+												{:else}
+													<Trash2 class="size-3 mr-1" /> Remove
+												{/if}
+											</Button>
+										</div>
+									</td>
 								</tr>
-							</tfoot>
-						</table>
+							{/each}
+						{/if}
+					</tbody>
+				</table>
+			</div>
+		</div>
+		{/if}
+	</Card>
 
-						{#if claim.notes}<p class="text-xs text-slate-400 italic">Claimant note: "{claim.notes}"</p>{/if}
+	<!-- My Claims -->
+	<Card class="overflow-hidden bg-slate-800/50 border-slate-700">
+		<button
+			onclick={() => showMyClaims = !showMyClaims}
+			class="w-full flex items-center justify-between px-5 py-4 hover:bg-slate-700/40 transition-colors text-left"
+		>
+			<div class="flex items-center gap-3 min-w-0">
+				<ChevronRight class="size-4 text-slate-500 shrink-0 transition-transform {showMyClaims ? 'rotate-90' : ''}" />
+				<div class="min-w-0">
+					<h2 class="text-lg font-semibold text-slate-200">My Claims</h2>
+					<p class="text-xs text-slate-400 mt-0.5">{data.myClaims.length} claim{data.myClaims.length !== 1 ? 's' : ''}</p>
+				</div>
+			</div>
+		</button>
 
-						<!-- Admin action panel -->
-						{#if claim.status !== 'paid' && claim.status !== 'rejected'}
-						<div class="p-4 bg-slate-900/60 border border-slate-600 rounded-xl space-y-3">
-							<p class="text-xs font-semibold text-slate-300 uppercase tracking-wide">Admin Actions</p>
-
-							<div>
-								<label class={LABEL}>Review Notes (visible to claimant)</label>
-								<textarea bind:value={af.reviewNotes} rows="2" class="{INPUT} resize-none" placeholder="Feedback, questions, or approval notes…"></textarea>
-							</div>
-
-							{#if claim.status === 'approved'}
-							<div class="grid grid-cols-3 gap-3">
-								<div>
-									<label class={LABEL}>Reference Number *</label>
-									<input bind:value={af.refNum} class={INPUT} placeholder="REF-2026-001" />
+		{#if showMyClaims}
+		<div class="border-t border-slate-700 px-4 py-4">
+			{#if data.myClaims.length === 0}
+				<div class="p-8 text-center bg-slate-800/40 border border-slate-700 rounded-xl">
+					<Receipt class="size-10 text-slate-600 mx-auto mb-3" />
+					<p class="text-slate-400 text-sm">No claims yet. Click <strong class="text-slate-200">New Claim</strong> to submit your first reimbursement request.</p>
+				</div>
+			{:else}
+				<div class="space-y-3">
+					{#each data.myClaims as claim}
+						{@const items = itemsForClaim(claim.id, data.myItems)}
+						{@const isOpen = expandedClaim === claim.id}
+						<Card class="overflow-hidden bg-slate-800/50 border-slate-700">
+							<!-- Claim header row -->
+							<button
+								onclick={() => expandedClaim = isOpen ? null : claim.id}
+								class="w-full flex items-center justify-between px-5 py-4 hover:bg-slate-700/40 transition-colors text-left"
+							>
+								<div class="flex items-center gap-3 min-w-0">
+									<ChevronRight class="size-4 text-slate-500 shrink-0 transition-transform {isOpen ? 'rotate-90' : ''}" />
+									<div class="min-w-0">
+										<p class="font-semibold text-slate-100 truncate">{claim.title}</p>
+										<p class="text-xs text-slate-400 mt-0.5">{items.length} item{items.length !== 1 ? 's' : ''} · submitted {fmtDate(claim.created)}</p>
+									</div>
 								</div>
-								<div>
-									<label class={LABEL}>Payment Method</label>
-									<select bind:value={af.payMethod} class={INPUT}>
-										{#each Object.entries(PAYMENT_METHOD_LABELS) as [val, label]}
-											<option value={val}>{label}</option>
+								<div class="flex items-center gap-3 shrink-0 ml-4">
+									{#if claim.referenceNumber}
+										<span class="text-sm font-black font-mono text-emerald-400 bg-emerald-500/10 border border-emerald-500/30 px-2 py-0.5 rounded">{claim.referenceNumber}</span>
+									{/if}
+									<span class="font-bold text-emerald-400">{fmt(claim.totalAmount || 0)}</span>
+									<span class="text-[10px] px-2 py-0.5 rounded border font-medium {CLAIM_STATUS_COLORS[claim.status]}">{CLAIM_STATUS_LABELS[claim.status]}</span>
+								</div>
+							</button>
+
+							<!-- Expanded detail -->
+							{#if isOpen}
+							<div class="border-t border-slate-700 px-5 py-4 space-y-4">
+								<!-- Pipeline progress -->
+								{#if claim.status !== 'rejected'}
+								<div class="flex items-center gap-0">
+									{#each CLAIMANT_PIPELINE as stage, i}
+										{@const done   = CLAIMANT_PIPELINE.indexOf(claim.status) > i}
+										{@const active = claim.status === stage}
+										<div class="flex items-center flex-1">
+											<div class="flex flex-col items-center gap-1 flex-1">
+												<div class="size-2.5 rounded-full {active ? 'bg-emerald-400 ring-2 ring-emerald-400/40' : done ? 'bg-emerald-600' : 'bg-slate-700'}"></div>
+												<span class="text-[9px] {active ? 'text-emerald-400 font-semibold' : done ? 'text-slate-400' : 'text-slate-600'}">{CLAIM_STATUS_LABELS[stage]}</span>
+											</div>
+											{#if i < CLAIMANT_PIPELINE.length - 1}
+												<div class="h-px flex-1 mb-3 {done ? 'bg-emerald-600' : 'bg-slate-700'} mx-0.5"></div>
+											{/if}
+										</div>
+									{/each}
+								</div>
+								{/if}
+
+								<!-- Line items table -->
+								<table class="w-full text-xs">
+									<thead>
+										<tr class="text-left text-slate-400 uppercase tracking-wide border-b border-slate-700">
+											<th class="pb-1.5 pr-3">Description</th>
+											<th class="pb-1.5 pr-3">Category</th>
+											<th class="pb-1.5 pr-3">Notes</th>
+											<th class="pb-1.5 pr-3">WO#</th>
+											<th class="pb-1.5 text-right">Amount</th>
+										</tr>
+									</thead>
+									<tbody class="divide-y divide-slate-700/40">
+										{#each items as item}
+											<tr class="hover:bg-slate-700/20 align-top">
+												<td class="py-1.5 pr-3 text-slate-200">
+													{item.description}
+													{#if item.receipts?.length}
+														<span class="ml-1.5 text-[9px] px-1.5 py-0.5 rounded bg-blue-900/50 text-blue-300 border border-blue-700/50 font-medium">
+															{item.receipts.length} receipt{item.receipts.length !== 1 ? 's' : ''}
+														</span>
+													{/if}
+												</td>
+												<td class="py-1.5 pr-3 text-slate-400 capitalize">{ITEM_CATEGORY_LABELS[item.category] ?? item.category}</td>
+												<td class="py-1.5 pr-3 text-slate-400">{item.notes || '—'}</td>
+												<td class="py-1.5 pr-3 text-slate-300 font-mono">{item.workOrderReference || claim.referenceNumber || '—'}</td>
+												<td class="py-1.5 text-right font-semibold text-emerald-400">{fmt(item.amount)}</td>
+											</tr>
 										{/each}
-									</select>
+									</tbody>
+									<tfoot class="border-t border-slate-600">
+										<tr>
+											<td colspan="4" class="pt-2 text-slate-400 font-semibold text-xs">Total</td>
+											<td class="pt-2 text-right font-bold text-emerald-300">{fmt(claim.totalAmount || 0)}</td>
+										</tr>
+									</tfoot>
+								</table>
+
+								{#if claim.notes}
+									<p class="text-xs text-slate-400 italic">"{claim.notes}"</p>
+								{/if}
+								{#if claim.reviewNotes}
+									<div class="p-3 rounded-lg bg-yellow-950/30 border border-yellow-800/40 text-xs text-yellow-300">
+										<span class="font-semibold">Admin note:</span> {claim.reviewNotes}
+									</div>
+								{/if}
+								{#if claim.referenceNumber}
+									<div class="p-3 rounded-lg bg-emerald-950/30 border border-emerald-800/40 flex items-center gap-3">
+										<span class="text-lg font-black font-mono text-emerald-400">{claim.referenceNumber}</span>
+										<div class="text-xs text-emerald-300/70">
+											<p>QuickBooks reference — use this number when entering the payment in QB.</p>
+											{#if claim.paidDate}<p class="mt-0.5 text-slate-400">Paid {fmtDate(claim.paidDate)}</p>{/if}
+										</div>
+									</div>
+								{/if}
+
+								<!-- Actions for draft -->
+								{#if claim.status === 'draft'}
+								<div class="flex gap-2 pt-1">
+									<Button onclick={() => submitForReview(claim.id)} class="gap-2 bg-blue-600 hover:bg-blue-700 text-white h-8 text-xs px-3">
+										<Send class="size-3.5" /> Submit for Review
+									</Button>
+									<Button onclick={() => deleteClaim(claim.id)} variant="outline" class="gap-2 border-red-800 text-red-400 hover:bg-red-900/30 h-8 text-xs px-3">
+										<Trash2 class="size-3.5" /> Delete Draft
+									</Button>
 								</div>
-								<div>
-									<label class={LABEL}>Paid Date</label>
-									<input bind:value={af.paidDate} type="date" class={INPUT} />
-								</div>
+								{/if}
 							</div>
 							{/if}
-
-							<div class="flex flex-wrap gap-2">
-								{#if claim.status === 'submitted'}
-									<Button onclick={() => adminAction(claim.id, 'review')} variant="outline" class="gap-1.5 h-8 text-xs border-yellow-700 text-yellow-300 hover:bg-yellow-900/30">
-										<Clock class="size-3.5" /> Mark Under Review
-									</Button>
-									<Button onclick={() => adminAction(claim.id, 'approve')} class="gap-1.5 h-8 text-xs bg-emerald-700 hover:bg-emerald-600 text-white">
-										<CheckCircle2 class="size-3.5" /> Approve
-									</Button>
-								{/if}
-								{#if claim.status === 'under_review'}
-									<Button onclick={() => adminAction(claim.id, 'approve')} class="gap-1.5 h-8 text-xs bg-emerald-700 hover:bg-emerald-600 text-white">
-										<CheckCircle2 class="size-3.5" /> Approve
-									</Button>
-								{/if}
-								{#if claim.status === 'approved'}
-									<Button onclick={() => adminAction(claim.id, 'pay')} class="gap-1.5 h-8 text-xs bg-blue-600 hover:bg-blue-700 text-white">
-										<DollarSign class="size-3.5" /> Mark as Paid
-									</Button>
-								{/if}
-								<Button onclick={() => adminAction(claim.id, 'reject')} variant="outline" class="gap-1.5 h-8 text-xs border-red-800 text-red-400 hover:bg-red-900/30">
-									<X class="size-3.5" /> Reject
-								</Button>
-							</div>
-						</div>
-						{:else if claim.status === 'paid'}
-						<div class="p-3 rounded-lg bg-emerald-950/30 border border-emerald-800/40 text-xs text-emerald-300 flex flex-wrap items-center gap-3">
-							<CheckCircle2 class="size-4 shrink-0" />
-							<span>Paid via <strong>{PAYMENT_METHOD_LABELS[claim.paymentMethod] ?? claim.paymentMethod}</strong></span>
-							<span class="font-mono flex items-center gap-1"><Hash class="size-3" />{claim.referenceNumber}</span>
-							{#if claim.paidDate}<span class="text-slate-400">on {fmtDate(claim.paidDate)}</span>{/if}
-							{#if claim.expand?.paidBy}<span class="text-slate-400">by {claim.expand.paidBy.firstName} {claim.expand.paidBy.lastName}</span>{/if}
-						</div>
-						{:else if claim.status === 'rejected'}
-						<div class="p-3 rounded-lg bg-red-950/30 border border-red-800/40 text-xs text-red-300">
-							<span class="font-semibold">Rejected</span>{#if claim.reviewNotes} — {claim.reviewNotes}{/if}
-						</div>
-						{/if}
-					</div>
-					{/if}
-				</Card>
-			{/each}
+						</Card>
+					{/each}
+				</div>
+			{/if}
 		</div>
-	</div>
-	{/if}
+		{/if}
+	</Card>
+
+
 
 </div>
 

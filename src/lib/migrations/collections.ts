@@ -2096,5 +2096,21 @@ export const collections = [
 		createRule: '@request.auth.id != ""',
 		updateRule: '@request.auth.id != ""',
 		deleteRule: '@request.auth.id != ""'
+	},
+
+	// ─── Bank statement archive ───────────────────────────────────────────────
+	{
+		name: 'bank_statements',
+		type: 'base',
+		schema: [
+			{ name: 'user', type: 'relation', required: true, options: { collectionId: 'users', maxSelect: 1 } },
+			{ name: 'pdf_file', type: 'file', required: true, options: { maxSelect: 1, maxSize: 10485760, mimeTypes: ['application/pdf'] } }
+		],
+		indexes: [],
+		listRule: '@request.auth.id != ""',
+		viewRule: '@request.auth.id != ""',
+		createRule: '@request.auth.id != ""',
+		updateRule: '@request.auth.id != ""',
+		deleteRule: '@request.auth.id != ""'
 	}
 ];

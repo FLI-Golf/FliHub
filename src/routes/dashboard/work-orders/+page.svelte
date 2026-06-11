@@ -99,6 +99,15 @@
 
 	function generatePDF(wo: any) {
 		const fmt2 = (n: number) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(n ?? 0);
+		const escHtml = (v: any) => String(v ?? '')
+			.replace(/&/g, '&amp;')
+			.replace(/</g, '&lt;')
+			.replace(/>/g, '&gt;')
+			.replace(/"/g, '&quot;')
+			.replace(/'/g, '&#39;');
+		const escAttr = (v: any) => String(v ?? '')
+			.replace(/&/g, '&amp;')
+			.replace(/"/g, '&quot;');
 		const d = (s: string) => {
 			if (!s) return '—';
 			try {
@@ -128,6 +137,48 @@
 				<td style="padding:6px 8px;border-bottom:1px solid #e2e8f0">${d(item.date)}</td>
 				<td style="padding:6px 8px;border-bottom:1px solid #e2e8f0;text-align:right;font-weight:600">${fmt2(item.amount)}</td>
 			</tr>`).join('');
+
+		const claimReceiptBlocks = (wo._claimItems ?? []).map((item: any, idx: number) => {
+			const receipts = Array.isArray(item._receiptAssets) ? item._receiptAssets : [];
+			if (receipts.length === 0) return '';
+
+			const cards = receipts.map((asset: any, assetIdx: number) => {
+				const fileName = escHtml(asset.filename || `receipt-${assetIdx + 1}`);
+				const fileUrl = escAttr(asset.url || '#');
+				if (asset.isImage) {
+					const thumbUrl = escAttr(asset.thumbUrl || asset.url || '#');
+					return `
+					<div style="width:180px;border:1px solid #e2e8f0;border-radius:8px;overflow:hidden;background:#fff">
+						<a href="${fileUrl}" target="_blank" rel="noopener noreferrer" style="display:block;text-decoration:none;color:inherit">
+							<img src="${thumbUrl}" alt="${fileName}" style="display:block;width:100%;height:120px;object-fit:cover;background:#edf2f7" />
+							<div style="padding:8px 10px;font-size:11px;color:#4a5568;word-break:break-word">${fileName}</div>
+						</a>
+					</div>`;
+				}
+
+				if (asset.isPdf) {
+					return `
+					<div style="width:220px;border:1px solid #e2e8f0;border-radius:8px;background:#fff;padding:10px 12px;display:flex;flex-direction:column;gap:6px">
+						<div style="font-size:11px;font-weight:700;color:#2d3748">PDF Receipt</div>
+						<div style="font-size:11px;color:#4a5568;word-break:break-word">${fileName}</div>
+						<a href="${fileUrl}" target="_blank" rel="noopener noreferrer" style="font-size:11px;color:#2b6cb0;text-decoration:underline">Open PDF</a>
+					</div>`;
+				}
+
+				return `
+				<div style="width:220px;border:1px solid #e2e8f0;border-radius:8px;background:#fff;padding:10px 12px;display:flex;flex-direction:column;gap:6px">
+					<div style="font-size:11px;font-weight:700;color:#2d3748">Attachment</div>
+					<div style="font-size:11px;color:#4a5568;word-break:break-word">${fileName}</div>
+					<a href="${fileUrl}" target="_blank" rel="noopener noreferrer" style="font-size:11px;color:#2b6cb0;text-decoration:underline">Open file</a>
+				</div>`;
+			}).join('');
+
+			return `
+			<div style="margin-bottom:14px">
+				<div style="font-size:12px;font-weight:700;color:#2d3748;margin-bottom:8px">Item ${idx + 1}: ${escHtml(item.description || 'Untitled item')}</div>
+				<div style="display:flex;flex-wrap:wrap;gap:10px">${cards}</div>
+			</div>`;
+		}).join('');
 
 		const html = `<!DOCTYPE html>
 <html>
@@ -310,6 +361,12 @@ ${isReimb && wo._claim ? `
   ${wo._claim?.notes ? `<div class="note" style="margin-top:12px">Notes: ${wo._claim.notes}</div>` : ''}
 </div>` : ''}
 
+${isReimb && claimReceiptBlocks ? `
+<div class="section">
+	<div class="section-title">Receipts &amp; Supporting Files</div>
+	${claimReceiptBlocks}
+</div>` : ''}
+
 ${isExpense && wo._expense ? `
 <div class="section">
   <div class="section-title">Expense Detail</div>
@@ -377,7 +434,7 @@ ${wo.notes ? `
 		win.document.write(html);
 		win.document.close();
 		win.focus();
-		setTimeout(() => win.print(), 400);
+		setTimeout(() => win.print(), 900);
 	}
 
 	async function markPaid(woId: string, expenseId: string) {
