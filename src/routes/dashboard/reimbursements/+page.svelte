@@ -27,6 +27,8 @@
 	let itemFilter    = $state('');
 	let attachingReceiptItemId = $state<string | null>(null);
 	let removingReceiptItemId = $state<string | null>(null);
+	let deletingItemId = $state<string | null>(null);
+	let deletingSelectedItems = $state(false);
 	let attachReceiptErr = $state('');
 	let selectedItemIds = $state<Record<string, boolean>>({});
 	let bankStatementFile = $state<File | null>(null);
@@ -134,6 +136,30 @@
 		}
 	}
 
+	async function deleteItemFromClaim(claimId: string, itemId: string, description: string) {
+		if (!confirm(`Delete item \"${description}\" from this claim?`)) return;
+
+		deletingItemId = itemId;
+		attachReceiptErr = '';
+		try {
+			const res = await fetch(`/api/reimbursements/${claimId}/items/${itemId}`, {
+				method: 'DELETE'
+			});
+
+			if (!res.ok) {
+				const body = await res.json().catch(() => ({}));
+				throw new Error(body.message ?? 'Delete failed');
+			}
+
+			selectedItemIds = { ...selectedItemIds, [itemId]: false };
+			await invalidateAll();
+		} catch (e: any) {
+			attachReceiptErr = e?.message ?? 'Failed to delete item';
+		} finally {
+			deletingItemId = null;
+		}
+	}
+
 	function toggleSelectItem(itemId: string, checked: boolean) {
 		selectedItemIds = { ...selectedItemIds, [itemId]: checked };
 	}
@@ -192,6 +218,40 @@
 		removingReceiptItemId = null;
 		selectedItemIds = {};
 		await invalidateAll();
+	}
+
+	async function deleteSelectedItems() {
+		const selected = (selectedFilteredItems as any[]) ?? [];
+		if (!selected.length) {
+			attachReceiptErr = 'Select at least one item to delete.';
+			return;
+		}
+
+		if (!confirm(`Delete ${selected.length} selected item${selected.length === 1 ? '' : 's'}? This cannot be undone.`)) return;
+
+		deletingSelectedItems = true;
+		attachReceiptErr = '';
+		try {
+			for (const item of selected) {
+				deletingItemId = item.id;
+				const res = await fetch(`/api/reimbursements/${item.claim}/items/${item.id}`, {
+					method: 'DELETE'
+				});
+
+				if (!res.ok) {
+					const body = await res.json().catch(() => ({}));
+					throw new Error(body.message ?? `Failed to delete item ${item.description || item.id}`);
+				}
+			}
+
+			selectedItemIds = {};
+			await invalidateAll();
+		} catch (e: any) {
+			attachReceiptErr = e?.message ?? 'Failed to delete selected items';
+		} finally {
+			deletingItemId = null;
+			deletingSelectedItems = false;
+		}
 	}
 
 	// ── Save draft then immediately submit for review ─────────────────────────
@@ -712,7 +772,20 @@
 					type="button"
 					variant="outline"
 					class="h-9 text-[11px] border-red-800 text-red-400 hover:bg-red-900/30"
-					disabled={removingReceiptItemId !== null || attachingReceiptItemId !== null}
+					disabled={deletingSelectedItems || removingReceiptItemId !== null || attachingReceiptItemId !== null || deletingItemId !== null}
+					onclick={deleteSelectedItems}
+				>
+					{#if deletingSelectedItems}
+						<Loader2 class="size-3.5 mr-1 animate-spin" /> Deleting Selected...
+					{:else}
+						<Trash2 class="size-3.5 mr-1" /> Delete Selected Items ({selectedFilteredItems.length})
+					{/if}
+				</Button>
+				<Button
+					type="button"
+					variant="outline"
+					class="h-9 text-[11px] border-red-800 text-red-400 hover:bg-red-900/30"
+					disabled={deletingSelectedItems || deletingItemId !== null || removingReceiptItemId !== null || attachingReceiptItemId !== null}
 					onclick={removeReceiptsFromSelectedItems}
 				>
 					<Trash2 class="size-3.5 mr-1" /> Remove Selected Receipts ({selectedFilteredWithReceipts.length})
@@ -785,7 +858,7 @@
 												type="button"
 												variant="outline"
 												class="h-7 text-[11px] border-slate-600 text-slate-300"
-												disabled={attachingReceiptItemId === item.id || removingReceiptItemId === item.id}
+												disabled={attachingReceiptItemId === item.id || removingReceiptItemId === item.id || deletingItemId === item.id}
 												onclick={() => (document.getElementById(`attach-receipt-${item.id}`) as HTMLInputElement | null)?.click()}
 											>
 												{#if attachingReceiptItemId === item.id}
@@ -798,13 +871,13 @@
 												type="button"
 												variant="outline"
 												class="h-7 text-[11px] border-red-800 text-red-400 hover:bg-red-900/30"
-												disabled={removingReceiptItemId === item.id || attachingReceiptItemId === item.id}
-												onclick={() => removeReceiptsFromItem(item.claim, item.id, item.receipts)}
+												disabled={deletingItemId === item.id || attachingReceiptItemId === item.id || removingReceiptItemId === item.id}
+												onclick={() => deleteItemFromClaim(item.claim, item.id, item.description)}
 											>
-												{#if removingReceiptItemId === item.id}
-													<Loader2 class="size-3 mr-1 animate-spin" /> Removing
+												{#if deletingItemId === item.id}
+													<Loader2 class="size-3 mr-1 animate-spin" /> Deleting
 												{:else}
-													<Trash2 class="size-3 mr-1" /> Remove
+													<Trash2 class="size-3 mr-1" /> Delete
 												{/if}
 											</Button>
 										</div>
