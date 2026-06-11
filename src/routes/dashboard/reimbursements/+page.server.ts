@@ -42,6 +42,13 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 			}).catch(() => [])
 			: [];
 
+		const myBankStatements = profile?.id
+			? await adminPb.collection('bank_statements').getFullList({
+				filter: `user="${ctx.userId}"`,
+				sort: '-created'
+			}).catch(() => [])
+			: [];
+
 		// All claims (admin/leader only)
 		let allClaims: any[] = [];
 		let allItems:  any[] = [];
@@ -77,6 +84,7 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 			vendors,
 			myClaims,
 			myItems,
+			myBankStatements,
 			allClaims,
 			allItems,
 			metrics: { pendingCount, approvedTotal, paidTotal, totalClaims: allClaims.length },
@@ -93,6 +101,7 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 			vendors: [],
 			myClaims: [],
 			myItems: [],
+			myBankStatements: [],
 			allClaims: [],
 			allItems: [],
 			metrics: null,

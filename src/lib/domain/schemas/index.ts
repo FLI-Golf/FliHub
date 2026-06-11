@@ -5,6 +5,7 @@ export * from './department.schema';
 export * from './project.schema';
 export * from './task.schema';
 export * from './expense.schema';
+export * from './bank-statement.schema';
 export * from './broadcast-partner.schema';
 export * from './budget-period.schema';
 export * from './approval.schema';
