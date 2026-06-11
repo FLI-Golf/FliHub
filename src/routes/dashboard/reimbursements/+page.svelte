@@ -301,7 +301,6 @@
 			bankStatementUploading = false;
 		}
 	}
-
 	// ── Delete a draft claim ─────────────────────────────────────────────────
 	async function deleteClaim(claimId: string) {
 		if (!confirm('Delete this draft claim?')) return;
@@ -529,7 +528,6 @@
 			</div>
 		{/if}
 	</Card>
-
 	<!-- About this page -->
 	<div class="rounded-xl border border-slate-700 bg-slate-800/40 overflow-hidden">
 		<button
@@ -603,7 +601,7 @@
 						'Click New Claim and give it a descriptive title (e.g. "March Travel — Phoenix Conference").',
 						'Add one line item per expense — description, amount, date, category, and vendor.',
 						'Click Submit for Review to send it to the admin queue. Or save as a draft to finish later.',
-						'Once paid, your claim will show a Work Order number (WO-NNN). This is the reference Ina uses to enter the payment in QuickBooks — keep it for your records.',
+						'Once approved, the claim is handed off to a Work Order. Ina uses the Work Orders screen to enter the QuickBooks check number and complete payment processing.',
 					] as step, i}
 						<li class="flex items-start gap-2.5">
 							<span class="size-5 rounded-full bg-slate-700 text-slate-300 text-[10px] font-bold flex items-center justify-center shrink-0 mt-0.5">{i + 1}</span>
@@ -619,8 +617,8 @@
 				<p class="text-xs font-bold uppercase tracking-wide text-slate-400">Admin actions</p>
 				<div class="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs text-slate-400">
 					<div class="flex items-start gap-2"><ArrowRight class="size-3.5 text-blue-400 mt-0.5 shrink-0" /><span><strong class="text-slate-200">Mark Under Review</strong> — signals to the claimant that you're actively reviewing their claim.</span></div>
-					<div class="flex items-start gap-2"><ArrowRight class="size-3.5 text-violet-400 mt-0.5 shrink-0" /><span><strong class="text-slate-200">Approve</strong> — confirms the claim is valid and queued for payment.</span></div>
-					<div class="flex items-start gap-2"><ArrowRight class="size-3.5 text-emerald-400 mt-0.5 shrink-0" /><span><strong class="text-slate-200">Mark Paid</strong> — requires a reference number (WO-NNN) and payment method. Automatically creates a <strong class="text-slate-200">Work Order</strong> record — the electronic payment record Ina enters in QuickBooks. Also stamps the WO number on the claim and every line item, and debits the department budget.</span></div>
+					<div class="flex items-start gap-2"><ArrowRight class="size-3.5 text-violet-400 mt-0.5 shrink-0" /><span><strong class="text-slate-200">Approve</strong> — confirms the claim is valid and creates the Work Order handoff to QuickBooks.</span></div>
+					<div class="flex items-start gap-2"><ArrowRight class="size-3.5 text-emerald-400 mt-0.5 shrink-0" /><span><strong class="text-slate-200">QuickBooks payment</strong> — the QB check number is entered on the Work Orders screen. That step creates the reimbursement expense and keeps the claim out of a direct-paid flow.</span></div>
 					<div class="flex items-start gap-2"><ArrowRight class="size-3.5 text-red-400 mt-0.5 shrink-0" /><span><strong class="text-slate-200">Reject</strong> — closes the claim. Add a review note so the claimant knows why.</span></div>
 				</div>
 			</div>

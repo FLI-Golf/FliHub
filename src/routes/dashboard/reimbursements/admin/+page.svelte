@@ -6,7 +6,7 @@
 	import {
 		Search, ChevronDown, ChevronUp, CheckCircle2, Clock,
 		AlertCircle, XCircle, DollarSign, FileText, ArrowRight,
-		ChevronsUpDown, ChevronRight, Receipt, FlaskConical, Trash2, RefreshCw, Plus
+		ChevronsUpDown, ChevronRight, Receipt, Trash2
 	} from 'lucide-svelte';
 	import type { PageData } from './$types';
 
@@ -73,8 +73,18 @@
 	// ── Expanded row ──────────────────────────────────────────────────────────
 	let expanded = $state<string|null>(null);
 	let selectedClaimIds = $state<string[]>([]);
+	let selectedItemIdsByClaim = $state<Record<string, string[]>>({});
 	let rollupBusy = $state(false);
+	let itemDeleteBusyByClaim = $state<Record<string, boolean>>({});
 	let rollupToast = $state<{ type: 'success' | 'error'; message: string } | null>(null);
+	let itemToast = $state<{ type: 'success' | 'error'; message: string } | null>(null);
+
+	function showItemToast(type: 'success' | 'error', message: string, timeoutMs = 3200) {
+		itemToast = { type, message };
+		setTimeout(() => {
+			itemToast = null;
+		}, timeoutMs);
+	}
 
 	const selectableRows = $derived(() => rows().filter((c: any) => c.status !== 'paid' && c.status !== 'rejected'));
 	const allSelectableSelected = $derived(() =>
@@ -140,6 +150,80 @@
 		}
 	}
 
+	function selectedItemsForClaim(claimId: string) {
+		return selectedItemIdsByClaim[claimId] ?? [];
+	}
+
+	function isItemSelected(claimId: string, itemId: string) {
+		return selectedItemsForClaim(claimId).includes(itemId);
+	}
+
+	function toggleItemSelected(claimId: string, itemId: string) {
+		const selected = selectedItemsForClaim(claimId);
+		selectedItemIdsByClaim = {
+			...selectedItemIdsByClaim,
+			[claimId]: selected.includes(itemId)
+				? selected.filter((id) => id !== itemId)
+				: [...selected, itemId]
+		};
+	}
+
+	function toggleAllItemsSelected(claimId: string, items: any[]) {
+		if (!items.length) return;
+		const selected = selectedItemsForClaim(claimId);
+		const allSelected = items.every((item) => selected.includes(item.id));
+		selectedItemIdsByClaim = {
+			...selectedItemIdsByClaim,
+			[claimId]: allSelected ? [] : items.map((item) => item.id)
+		};
+	}
+
+	async function removeSingleItem(claimId: string, itemId: string) {
+		if (!confirm('Remove this reimbursement line item?')) return;
+		itemDeleteBusyByClaim = { ...itemDeleteBusyByClaim, [claimId]: true };
+		try {
+			const res = await fetch(`/api/reimbursements/${claimId}/items/${itemId}`, { method: 'DELETE' });
+			const body = await res.json().catch(() => ({}));
+			if (!res.ok) throw new Error(body?.message ?? 'Failed to remove line item');
+			selectedItemIdsByClaim = {
+				...selectedItemIdsByClaim,
+				[claimId]: selectedItemsForClaim(claimId).filter((id) => id !== itemId)
+			};
+			await invalidateAll();
+			showItemToast('success', 'Line item removed.');
+		} catch (err: any) {
+			showItemToast('error', err?.message ?? 'Failed to remove line item', 4200);
+		} finally {
+			itemDeleteBusyByClaim = { ...itemDeleteBusyByClaim, [claimId]: false };
+		}
+	}
+
+	async function removeSelectedItems(claimId: string) {
+		const selected = selectedItemsForClaim(claimId);
+		if (!selected.length) {
+			showItemToast('error', 'Select at least one line item to remove.', 3600);
+			return;
+		}
+		if (!confirm(`Remove ${selected.length} selected line item${selected.length !== 1 ? 's' : ''}?`)) return;
+
+		itemDeleteBusyByClaim = { ...itemDeleteBusyByClaim, [claimId]: true };
+		try {
+			const selectedCount = selected.length;
+			for (const itemId of selected) {
+				const res = await fetch(`/api/reimbursements/${claimId}/items/${itemId}`, { method: 'DELETE' });
+				const body = await res.json().catch(() => ({}));
+				if (!res.ok) throw new Error(body?.message ?? 'Failed to remove selected line items');
+			}
+			selectedItemIdsByClaim = { ...selectedItemIdsByClaim, [claimId]: [] };
+			await invalidateAll();
+			showItemToast('success', `Removed ${selectedCount} line item${selectedCount !== 1 ? 's' : ''}.`);
+		} catch (err: any) {
+			showItemToast('error', err?.message ?? 'Failed to remove selected line items', 4200);
+		} finally {
+			itemDeleteBusyByClaim = { ...itemDeleteBusyByClaim, [claimId]: false };
+		}
+	}
+
 	// ── Per-claim admin form ──────────────────────────────────────────────────
 	let forms = $state<Record<string,{ refNum:string; payMethod:string; paidDate:string; reviewNotes:string }>>({});
 	$effect(() => {
@@ -190,53 +274,6 @@
 	const INPUT = 'w-full rounded-md border border-slate-600 bg-slate-800 text-slate-100 px-3 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-emerald-500 placeholder:text-slate-500';
 	const LABEL = 'block text-[10px] font-medium text-slate-400 mb-1 uppercase tracking-wide';
 
-	// ── Test data panel ───────────────────────────────────────────────────────
-	let showTestPanel  = $state(false);
-	let seedCount      = $state(20);
-	let seedStatuses   = $state({ draft: true, submitted: true, under_review: true, approved: true, paid: true, rejected: true });
-	let testBusy       = $state<'seed'|'reset'|'reset-seed'|null>(null);
-	let testMsg        = $state('');
-
-	async function seedData() {
-		testBusy = 'seed'; testMsg = '';
-		const statuses = Object.entries(seedStatuses).filter(([,v]) => v).map(([k]) => k);
-		if (!statuses.length) { testMsg = 'Select at least one status.'; testBusy = null; return; }
-		const r = await fetch('/api/reimbursements/test-data', {
-			method: 'POST', headers: { 'Content-Type': 'application/json' },
-			body: JSON.stringify({ count: seedCount, statuses })
-		});
-		const d = await r.json();
-		testMsg = r.ok ? `✅ Created ${d.created} claims.` : `❌ ${d.message}`;
-		testBusy = null;
-		await invalidateAll();
-	}
-
-	async function resetData() {
-		if (!confirm(`Delete ALL ${(data.claims as any[]).length} claims and their items? This cannot be undone.`)) return;
-		testBusy = 'reset'; testMsg = '';
-		const r = await fetch('/api/reimbursements/test-data', { method: 'DELETE' });
-		const d = await r.json();
-		testMsg = r.ok ? `✅ Deleted ${d.deleted} claims.` : `❌ ${d.message}`;
-		testBusy = null;
-		await invalidateAll();
-	}
-
-	async function resetAndSeed() {
-		if (!confirm(`Delete ALL ${(data.claims as any[]).length} claims then seed ${seedCount} fresh ones?`)) return;
-		testBusy = 'reset-seed'; testMsg = '';
-		const del = await fetch('/api/reimbursements/test-data', { method: 'DELETE' });
-		if (!del.ok) { testMsg = '❌ Reset failed.'; testBusy = null; return; }
-		const statuses = Object.entries(seedStatuses).filter(([,v]) => v).map(([k]) => k);
-		const seed = await fetch('/api/reimbursements/test-data', {
-			method: 'POST', headers: { 'Content-Type': 'application/json' },
-			body: JSON.stringify({ count: seedCount, statuses })
-		});
-		const d = await seed.json();
-		testMsg = seed.ok ? `✅ Reset & seeded ${d.created} claims.` : `❌ ${d.message}`;
-		testBusy = null;
-		await invalidateAll();
-	}
-
 	// ── Pipeline counts for header ────────────────────────────────────────────
 	const PIPELINE = [
 		{ key: 'submitted',    label: 'Submitted',    color: 'text-blue-400',    bg: 'bg-blue-950/40 border-blue-800/50' },
@@ -257,97 +294,6 @@
 			<p class="text-sm text-slate-400 mt-0.5">Review, approve, and process reimbursement claims</p>
 		</div>
 		<a href="/dashboard/reimbursements" class="text-xs text-slate-400 hover:text-slate-200 underline underline-offset-2">← Claimant view</a>
-	</div>
-
-	<!-- Test data panel -->
-	<div class="rounded-xl border border-amber-700/40 bg-amber-950/20 overflow-hidden">
-		<button onclick={() => showTestPanel = !showTestPanel}
-			class="w-full flex items-center justify-between px-5 py-3 hover:bg-amber-900/20 transition-colors text-left">
-			<div class="flex items-center gap-2.5">
-				<FlaskConical class="size-4 text-amber-400 shrink-0" />
-				<span class="text-sm font-medium text-amber-300">Test Data Tools</span>
-				<span class="text-xs text-amber-600 bg-amber-900/40 border border-amber-700/40 px-2 py-0.5 rounded">dev only</span>
-			</div>
-			<ChevronDown class="size-4 text-amber-600 transition-transform {showTestPanel ? 'rotate-180' : ''}" />
-		</button>
-
-		{#if showTestPanel}
-		<div class="border-t border-amber-700/30 px-5 py-4 space-y-4">
-			<div class="grid grid-cols-1 sm:grid-cols-2 gap-5">
-
-				<!-- Seed controls -->
-				<div class="space-y-3">
-					<p class="text-xs font-semibold text-amber-400 uppercase tracking-wide">Seed Claims</p>
-
-					<div class="flex items-center gap-3">
-						<label class="text-xs text-slate-400 whitespace-nowrap">Count</label>
-						<input type="number" bind:value={seedCount} min="1" max="200"
-							class="w-24 rounded-md border border-slate-600 bg-slate-900 text-slate-100 px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-amber-500 [color-scheme:dark]" />
-					</div>
-
-					<div>
-						<p class="text-xs text-slate-400 mb-2">Include statuses</p>
-						<div class="flex flex-wrap gap-2">
-							{#each [
-								['draft','Draft','bg-slate-700 text-slate-300'],
-								['submitted','Submitted','bg-blue-900/60 text-blue-300'],
-								['under_review','Under Review','bg-yellow-900/60 text-yellow-300'],
-								['approved','Approved','bg-violet-900/60 text-violet-300'],
-								['paid','Paid','bg-emerald-900/60 text-emerald-300'],
-								['rejected','Rejected','bg-red-900/60 text-red-300'],
-							] as [key, label, cls]}
-								<label class="flex items-center gap-1.5 cursor-pointer">
-									<input type="checkbox" bind:checked={seedStatuses[key as keyof typeof seedStatuses]}
-										class="rounded border-slate-600 accent-amber-500" />
-									<span class="text-xs px-2 py-0.5 rounded {cls}">{label}</span>
-								</label>
-							{/each}
-						</div>
-					</div>
-
-					<button onclick={seedData} disabled={!!testBusy}
-						class="flex items-center gap-2 text-sm px-4 py-2 rounded-lg bg-amber-700/50 border border-amber-600/50 text-amber-200 hover:bg-amber-700/70 transition-colors disabled:opacity-50">
-						{#if testBusy === 'seed'}
-							<RefreshCw class="size-4 animate-spin" /> Seeding…
-						{:else}
-							<Plus class="size-4" /> Seed {seedCount} Claims
-						{/if}
-					</button>
-				</div>
-
-				<!-- Reset controls -->
-				<div class="space-y-3">
-					<p class="text-xs font-semibold text-red-400 uppercase tracking-wide">Danger Zone</p>
-					<p class="text-xs text-slate-400">Currently <strong class="text-slate-200">{(data.claims as any[]).length}</strong> claims in the database.</p>
-
-
-					<div class="flex flex-col gap-2">
-						<button onclick={resetAndSeed} disabled={!!testBusy}
-							class="flex items-center gap-2 text-sm px-4 py-2 rounded-lg bg-amber-900/40 border border-amber-700/40 text-amber-300 hover:bg-amber-900/60 transition-colors disabled:opacity-50">
-							{#if testBusy === 'reset-seed'}
-								<RefreshCw class="size-4 animate-spin" /> Working…
-							{:else}
-								<RefreshCw class="size-4" /> Reset & Seed {seedCount} Fresh
-							{/if}
-						</button>
-
-						<button onclick={resetData} disabled={!!testBusy}
-							class="flex items-center gap-2 text-sm px-4 py-2 rounded-lg bg-red-950/40 border border-red-800/40 text-red-400 hover:bg-red-900/40 transition-colors disabled:opacity-50">
-							{#if testBusy === 'reset'}
-								<RefreshCw class="size-4 animate-spin" /> Deleting…
-							{:else}
-								<Trash2 class="size-4" /> Delete All Claims
-							{/if}
-						</button>
-					</div>
-				</div>
-			</div>
-
-			{#if testMsg}
-				<p class="text-sm {testMsg.startsWith('✅') ? 'text-emerald-400' : 'text-red-400'}">{testMsg}</p>
-			{/if}
-		</div>
-		{/if}
 	</div>
 
 	<!-- Pipeline metrics -->
@@ -429,6 +375,7 @@
 			<table class="w-full text-sm">
 				<thead>
 					<tr class="border-b border-slate-700 bg-slate-900/40">
+						<th class="w-10 px-2 py-3 text-center text-xs font-medium text-slate-400">#</th>
 						<th class="w-8 px-3 py-3">
 							<input
 								type="checkbox"
@@ -455,9 +402,9 @@
 				</thead>
 				<tbody class="divide-y divide-slate-700/50">
 					{#if rows().length === 0}
-						<tr><td colspan="9" class="px-4 py-12 text-center text-slate-500">No claims match the current filters.</td></tr>
+						<tr><td colspan="10" class="px-4 py-12 text-center text-slate-500">No claims match the current filters.</td></tr>
 					{:else}
-						{#each rows() as claim (claim.id)}
+						{#each rows() as claim, rowIndex (claim.id)}
 							{@const isOpen = expanded === claim.id}
 							{@const items  = itemsFor(claim.id)}
 							{@const f      = form(claim.id)}
@@ -466,6 +413,17 @@
 
 							<!-- Main row -->
 							<tr class="hover:bg-slate-700/30 transition-colors {isOpen ? 'bg-slate-700/20' : ''}">
+								<td class="px-2 py-3 text-center text-xs text-slate-500">{rowIndex + 1}</td>
+								<td class="px-3 py-3">
+									{#if selectable}
+										<input
+											type="checkbox"
+											checked={selectedClaimIds.includes(claim.id)}
+											onchange={() => toggleClaimSelected(claim.id)}
+											class="rounded border-slate-600 accent-emerald-500"
+										/>
+									{/if}
+								</td>
 								<td class="px-3 py-3">
 									{#if selectable}
 										<input
@@ -534,40 +492,91 @@
 							<!-- Expanded detail row -->
 							{#if isOpen}
 							<tr class="bg-slate-900/40">
-								<td colspan="9" class="px-6 py-4">
+								<td colspan="10" class="px-6 py-4">
 									<div class="grid grid-cols-1 lg:grid-cols-2 gap-5">
 
 										<!-- Line items -->
 										<div>
-											<p class="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-2">Line Items</p>
+											<div class="mb-2 flex items-center justify-between gap-2">
+												<p class="text-xs font-semibold text-slate-400 uppercase tracking-wide">Line Items</p>
+												<div class="flex items-center gap-2">
+													{#if selectedItemsForClaim(claim.id).length > 0}
+														<span class="text-[11px] text-slate-500">{selectedItemsForClaim(claim.id).length} selected</span>
+													{/if}
+													<button
+														onclick={() => removeSelectedItems(claim.id)}
+														disabled={(itemDeleteBusyByClaim[claim.id] ?? false) || selectedItemsForClaim(claim.id).length === 0}
+														class="text-[11px] px-2 py-1 rounded bg-red-900/40 border border-red-700/40 text-red-300 hover:bg-red-900/60 disabled:opacity-50 disabled:cursor-not-allowed"
+													>
+														{#if itemDeleteBusyByClaim[claim.id] ?? false}
+															Removing...
+														{:else}
+															Remove Selected
+														{/if}
+													</button>
+												</div>
+											</div>
 											{#if items.length === 0}
 												<p class="text-xs text-slate-600">No items.</p>
 											{:else}
 												<table class="w-full text-xs">
 													<thead>
 														<tr class="text-left text-slate-500 border-b border-slate-700">
+															<th class="pb-1.5 pr-2 w-8 text-center">#</th>
+															<th class="pb-1.5 pr-2 w-8">
+																<input
+																	type="checkbox"
+																	checked={items.length > 0 && items.every((item) => isItemSelected(claim.id, item.id))}
+																	onchange={() => toggleAllItemsSelected(claim.id, items)}
+																	class="rounded border-slate-600 accent-red-500"
+																	title="Select all line items"
+																/>
+															</th>
 															<th class="pb-1.5 pr-3">Description</th>
 															<th class="pb-1.5 pr-3">Category</th>
 															<th class="pb-1.5 pr-3">Vendor</th>
 															<th class="pb-1.5 pr-3">Date</th>
 															<th class="pb-1.5 text-right">Amount</th>
+															<th class="pb-1.5 pl-3 text-right">Actions</th>
 														</tr>
 													</thead>
 													<tbody class="divide-y divide-slate-700/30">
-														{#each items as item}
+														{#each items as item, index}
 															<tr>
+																<td class="py-1.5 pr-2 text-center text-[11px] text-slate-500">{index + 1}</td>
+																<td class="py-1.5 pr-2">
+																	<input
+																		type="checkbox"
+																		checked={isItemSelected(claim.id, item.id)}
+																		onchange={() => toggleItemSelected(claim.id, item.id)}
+																		class="rounded border-slate-600 accent-red-500"
+																		disabled={itemDeleteBusyByClaim[claim.id] ?? false}
+																	/>
+																</td>
 																<td class="py-1.5 pr-3 text-slate-200">{item.description}</td>
 																<td class="py-1.5 pr-3 text-slate-400 capitalize">{item.category}</td>
 																<td class="py-1.5 pr-3 text-slate-400">{item.vendor || '—'}</td>
 																<td class="py-1.5 pr-3 text-slate-400">{fmtDate(item.date)}</td>
 																<td class="py-1.5 text-right font-semibold text-emerald-400">{fmt(item.amount)}</td>
+																<td class="py-1.5 pl-3 text-right">
+																	<button
+																		onclick={() => removeSingleItem(claim.id, item.id)}
+																		disabled={itemDeleteBusyByClaim[claim.id] ?? false}
+																		class="inline-flex items-center gap-1 rounded border border-red-700/40 bg-red-900/30 px-2 py-1 text-[11px] text-red-300 hover:bg-red-900/60 disabled:opacity-50 disabled:cursor-not-allowed"
+																		title="Remove line item"
+																	>
+																		<Trash2 class="size-3" />
+																		Remove
+																	</button>
+																</td>
 															</tr>
 														{/each}
 													</tbody>
 													<tfoot class="border-t border-slate-600">
 														<tr>
-															<td colspan="4" class="pt-2 text-slate-400 font-semibold">Total</td>
+															<td colspan="6" class="pt-2 text-slate-400 font-semibold">Total</td>
 															<td class="pt-2 text-right font-bold text-emerald-300">{fmt(claim.totalAmount || 0)}</td>
+															<td></td>
 														</tr>
 													</tfoot>
 												</table>
@@ -687,5 +696,14 @@
 			? 'border-emerald-700 bg-emerald-950/90 text-emerald-200'
 			: 'border-red-700 bg-red-950/90 text-red-200'}">
 		{rollupToast.message}
+	</div>
+{/if}
+
+{#if itemToast}
+	<div class="fixed bottom-20 right-4 z-50 max-w-sm rounded-lg border px-3 py-2 text-xs shadow-lg backdrop-blur-sm
+		{itemToast.type === 'success'
+			? 'border-emerald-700 bg-emerald-950/90 text-emerald-200'
+			: 'border-red-700 bg-red-950/90 text-red-200'}">
+		{itemToast.message}
 	</div>
 {/if}

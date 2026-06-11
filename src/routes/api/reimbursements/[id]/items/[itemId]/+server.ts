@@ -66,13 +66,64 @@ export const DELETE: RequestHandler = async ({ locals, url, params }) => {
 	const ctx = await RequestContext.fromApi(locals, url);
 	if (!ctx) return json({ message: 'Unauthorized' }, { status: 401 });
 	try {
+		const claim = await ctx.pb.collection('reimbursement_claims')
+			.getOne(params.id, { fields: 'id,status,department,totalAmount' });
+		const item = await ctx.pb.collection('reimbursement_items')
+			.getOne(params.itemId, { fields: 'id,amount' });
+		const removedAmount = Number(item.amount || 0);
+
 		await ctx.pb.collection('reimbursement_items').delete(params.itemId);
 
 		// Recalculate claim total
 		const allItems = await ctx.pb.collection('reimbursement_items')
 			.getFullList({ filter: `claim = "${params.id}"`, fields: 'amount' });
 		const total = allItems.reduce((s, i) => s + (i.amount || 0), 0);
+
+		// Keep paid-claim accounting in sync when admin removes non-business items.
+		if (claim.status === 'paid' && removedAmount > 0) {
+			if (claim.department) {
+				const dept = await ctx.pb.collection('departments')
+					.getOne(claim.department, { fields: 'id,department_actual_expenses' })
+					.catch(() => null);
+				if (dept) {
+					const current = Number(dept.department_actual_expenses || 0);
+					const next = Math.max(0, current - removedAmount);
+					await ctx.pb.collection('departments').update(dept.id, {
+						department_actual_expenses: next
+					});
+				}
+			}
+		}
+
+		// If this was the final line item, remove the empty claim entirely.
+		if (allItems.length === 0) {
+			const workOrders = await ctx.pb.collection('work_orders').getFullList({
+				filter: `claimId = "${params.id}"`,
+				fields: 'id'
+			}).catch(() => []);
+
+			for (const wo of workOrders) {
+				await ctx.pb.collection('work_orders').delete(wo.id).catch(() => {});
+			}
+
+			await ctx.pb.collection('reimbursement_claims').delete(params.id);
+			return json({ ok: true, claimDeleted: true });
+		}
+
 		await ctx.pb.collection('reimbursement_claims').update(params.id, { totalAmount: total });
+
+		if (claim.status === 'paid') {
+			const workOrders = await ctx.pb.collection('work_orders').getFullList({
+				filter: `claimId = "${params.id}"`,
+				fields: 'id,amount'
+			}).catch(() => []);
+
+			for (const wo of workOrders) {
+				await ctx.pb.collection('work_orders').update(wo.id, {
+					amount: total
+				}).catch(() => {});
+			}
+		}
 
 		return json({ ok: true });
 	} catch (err: any) {
