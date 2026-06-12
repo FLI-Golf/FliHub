@@ -7,6 +7,10 @@
  *   - One work_order per tournament covers all pro + manager payments for that event.
  *   - Each pro_payment record is linked to the work_order via the proPayment multi-relation.
  *   - payment_audit_log is append-only (no update/delete rules in PocketBase).
+ *
+ * Exception by design:
+ *   - pro_payments use a dedicated payout pipeline and are intentionally outside
+ *     the standard expense -> approval -> work_order chain.
  */
 
 import type PocketBase from 'pocketbase';

@@ -2,6 +2,9 @@ import { json } from '@sveltejs/kit';
 import { RequestContext } from '$lib/infra/RequestContext';
 import type { RequestHandler } from './$types';
 
+// Exception by design: sponsor_payments are inbound revenue records.
+// They intentionally do not use the expense -> approval -> work_order chain.
+
 // POST /api/sponsor-payments — log a new payment against a sponsor
 export const POST: RequestHandler = async ({ locals, url, request }) => {
 	const ctx = await RequestContext.fromApi(locals, url);

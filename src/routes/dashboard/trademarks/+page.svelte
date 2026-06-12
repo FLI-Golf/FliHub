@@ -1,7 +1,10 @@
 <script lang="ts">
+	import { onMount } from 'svelte';
 	import { invalidateAll } from '$app/navigation';
 	import Card from '$lib/components/ui/card.svelte';
 	import { Button } from '$lib/components/ui/button/index.js';
+	import { PipelineBoard } from '$lib/pipeline';
+	import type { PipelineBoardConfig, PipelineCardItem, PipelineMoveEvent } from '$lib/pipeline/types';
 	import { Plus, X, ChevronDown, Pencil, Shield, FileText, AlertCircle, CheckCircle2, Clock, Download, Loader, Trash2, DollarSign, Receipt, Users, Upload } from 'lucide-svelte';
 	import UploadPdfsModal from '$lib/components/trademarks/UploadPdfsModal.svelte';
 	import type { PageData } from './$types';
@@ -46,14 +49,177 @@
 	// ── Filter state ──────────────────────────────────────────────────────────
 	let filterStatus     = $state('all');
 	let filterFranchise  = $state('all');
+	let classSearch      = $state('');
+	const allTrademarkClasses = Object.keys(TRADEMARK_CLASS_LABELS);
+	let selectedClasses  = $state<string[]>([...allTrademarkClasses]);
+	let presetName       = $state('');
+	let savedPresets     = $state<Array<{
+		id: string;
+		name: string;
+		status: string;
+		franchise: string;
+		classes: string[];
+	}>>([]);
 	let expandedFranchise = $state<string | null>(null);
+
+	const PRESET_STORAGE_KEY = 'trademark-filter-presets-v1';
+
+	const classCounts = $derived(
+		data.filings.reduce((acc: Record<string, number>, filing: any) => {
+			const key = filing.trademarkClass || 'other';
+			acc[key] = (acc[key] ?? 0) + 1;
+			return acc;
+		}, {})
+	);
+
+	const visibleClassOptions = $derived(
+		Object.entries(TRADEMARK_CLASS_LABELS).filter(([, label]) =>
+			label.toLowerCase().includes(classSearch.trim().toLowerCase())
+		)
+	);
+
+	function isClassSelected(classKey: string) {
+		return selectedClasses.includes(classKey);
+	}
+
+	function toggleClass(classKey: string) {
+		selectedClasses = isClassSelected(classKey)
+			? selectedClasses.filter((v) => v !== classKey)
+			: [...selectedClasses, classKey];
+	}
+
+	function selectAllClasses() {
+		selectedClasses = [...allTrademarkClasses];
+	}
+
+	function clearAllClasses() {
+		selectedClasses = [];
+	}
+
+	function selectCoreClasses() {
+		selectedClasses = ['ic_028', 'ic_041', 'ic_025', 'ic_035', 'ic_038', 'ic_009'];
+	}
+
+	function hasActiveClassFilter() {
+		return selectedClasses.length !== allTrademarkClasses.length;
+	}
+
+	function hasActiveFilters() {
+		return filterStatus !== 'all' || filterFranchise !== 'all' || hasActiveClassFilter();
+	}
+
+	function resetAllFilters() {
+		filterStatus = 'all';
+		filterFranchise = 'all';
+		selectAllClasses();
+		classSearch = '';
+	}
+
+	function savePresets() {
+		if (typeof window === 'undefined') return;
+		window.localStorage.setItem(PRESET_STORAGE_KEY, JSON.stringify(savedPresets));
+	}
+
+	function loadPresets() {
+		if (typeof window === 'undefined') return;
+		const raw = window.localStorage.getItem(PRESET_STORAGE_KEY);
+		if (!raw) return;
+		try {
+			const parsed = JSON.parse(raw) as Array<{ id: string; name: string; status: string; franchise: string; classes: string[] }>;
+			savedPresets = Array.isArray(parsed)
+				? parsed.filter((p) => p && p.id && p.name)
+				: [];
+		} catch {
+			savedPresets = [];
+		}
+	}
+
+	function createPreset() {
+		const name = presetName.trim();
+		if (!name) return;
+		const id = typeof crypto !== 'undefined' && 'randomUUID' in crypto
+			? crypto.randomUUID()
+			: `preset-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+		const preset = {
+			id,
+			name,
+			status: filterStatus,
+			franchise: filterFranchise,
+			classes: [...selectedClasses],
+		};
+		savedPresets = [preset, ...savedPresets];
+		presetName = '';
+		savePresets();
+	}
+
+	function applyPreset(presetId: string) {
+		const preset = savedPresets.find((p) => p.id === presetId);
+		if (!preset) return;
+		filterStatus = preset.status;
+		filterFranchise = preset.franchise;
+		selectedClasses = [...preset.classes];
+		classSearch = '';
+	}
+
+	function deletePreset(presetId: string) {
+		savedPresets = savedPresets.filter((p) => p.id !== presetId);
+		savePresets();
+	}
+
+	onMount(() => {
+		loadPresets();
+	});
+
+	function isClassMatch(filing: any) {
+		return selectedClasses.length === 0 || selectedClasses.includes(filing.trademarkClass);
+	}
 
 	const filteredFilings = $derived(
 		data.filings.filter((f: any) => {
 			if (filterStatus !== 'all' && f.status !== filterStatus) return false;
 			if (filterFranchise !== 'all' && f.franchiseId !== filterFranchise) return false;
+			if (!isClassMatch(f)) return false;
 			return true;
 		})
+	);
+
+	const franchiseNameById = $derived(
+		Object.fromEntries(data.franchises.map((f: any) => [f.id, f.name])) as Record<string, string>
+	);
+
+	const trademarkStages = [
+		{ key: 'not_filed', label: 'Not Filed', colorClass: TRADEMARK_STATUS_COLORS.not_filed },
+		{ key: 'attorney_review', label: 'Attorney Review', colorClass: TRADEMARK_STATUS_COLORS.attorney_review },
+		{ key: 'filed', label: 'Filed', colorClass: TRADEMARK_STATUS_COLORS.filed },
+		{ key: 'published', label: 'Published', colorClass: TRADEMARK_STATUS_COLORS.published },
+		{ key: 'approved', label: 'Approved', colorClass: TRADEMARK_STATUS_COLORS.approved, isSuccess: true },
+	];
+
+	const trademarkTerminalStages = [
+		{ key: 'opposition', label: 'Opposition', colorClass: TRADEMARK_STATUS_COLORS.opposition },
+		{ key: 'rejected', label: 'Rejected', colorClass: TRADEMARK_STATUS_COLORS.rejected },
+		{ key: 'abandoned', label: 'Abandoned', colorClass: TRADEMARK_STATUS_COLORS.abandoned },
+	];
+
+	const trademarkBoardConfig: PipelineBoardConfig = {
+		columnWidth: 'w-64',
+		stages: trademarkStages,
+		terminalStages: trademarkTerminalStages,
+	};
+
+	const trademarkBoardItems = $derived<PipelineCardItem[]>(
+		filteredFilings.map((f: any) => ({
+			id: f.id,
+			status: f.status,
+			title: `${MARK_TYPE_LABELS[f.markType] ?? f.markType}`,
+			subtitle: franchiseNameById[f.franchiseId] ?? 'Unknown Franchise',
+			tags: [
+				{ label: LOGO_VARIANT_LABELS[f.logoVariant] ?? f.logoVariant, colorClass: 'bg-slate-700 text-slate-300 border-slate-600' },
+				{ label: TRADEMARK_CLASS_LABELS[f.trademarkClass] ?? f.trademarkClass, colorClass: 'bg-slate-700 text-slate-300 border-slate-600' },
+			],
+			meta: [f.usptoAppNumber || 'No USPTO #', f.filedDate ? `Filed ${fmtDate(f.filedDate)}` : 'Unfiled'].join(' · '),
+			raw: f,
+		}))
 	);
 
 	// ── New filing modal ──────────────────────────────────────────────────────
@@ -160,6 +326,18 @@
 			next.delete(filing.id);
 			inlineUpdating = next;
 		}
+	}
+
+	async function handleTrademarkMove(e: PipelineMoveEvent) {
+		const filing = data.filings.find((f: any) => f.id === e.item.id);
+		if (!filing || e.to === filing.status) return;
+		await updateStatusInline(filing, String(e.to));
+	}
+
+	function handleTrademarkSelect(item: PipelineCardItem) {
+		if (!data.isAdmin) return;
+		const filing = data.filings.find((f: any) => f.id === item.id);
+		if (filing) openEdit(filing);
 	}
 
 	async function confirmInlineReview() {
@@ -375,7 +553,7 @@
 
 <svelte:head><title>Trademark Pipeline — FliHub</title></svelte:head>
 
-<div class="space-y-6 max-w-7xl">
+<div class="space-y-6 w-full max-w-none">
 
 	<!-- Header -->
 	<div class="flex items-start justify-between gap-4">
@@ -454,25 +632,137 @@
 	</div>
 
 	{#if activeTab === 'franchises'}
-	<!-- Filters -->
-	<div class="flex flex-wrap gap-3 items-center">
-		<select bind:value={filterStatus} class="text-sm rounded-lg border border-slate-600 bg-slate-800 text-slate-200 px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-violet-500">
-			<option value="all">All Statuses</option>
-			{#each Object.entries(TRADEMARK_STATUS_LABELS) as [val, label]}
-				<option value={val}>{label}</option>
-			{/each}
-		</select>
-		<select bind:value={filterFranchise} class="text-sm rounded-lg border border-slate-600 bg-slate-800 text-slate-200 px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-violet-500">
-			<option value="all">All Franchises</option>
-			{#each data.franchises as f}
-				<option value={f.id}>{f.name}</option>
-			{/each}
-		</select>
-		{#if filterStatus !== 'all' || filterFranchise !== 'all'}
-			<button onclick={() => { filterStatus = 'all'; filterFranchise = 'all'; }} class="text-xs text-slate-400 hover:text-slate-200 flex items-center gap-1">
-				<X class="size-3.5" /> Clear filters
-			</button>
-			<span class="text-xs text-slate-500">{filteredFilings.length} result{filteredFilings.length !== 1 ? 's' : ''}</span>
+	<!-- Advanced Filters + Presets -->
+	<Card class="p-4 bg-slate-900/40 border-slate-700 space-y-4">
+		<div class="flex flex-wrap items-center justify-between gap-3">
+			<div>
+				<p class="text-sm font-semibold text-slate-100">Advanced Filters</p>
+				<p class="text-xs text-slate-400">Status, franchise, and trademark class filters with reusable presets.</p>
+			</div>
+			<div class="flex items-center gap-2">
+				{#if hasActiveFilters()}
+					<button onclick={resetAllFilters} class="text-xs rounded-md border border-slate-600 px-2 py-1 text-slate-300 hover:text-slate-100 hover:border-slate-500 transition-colors">Clear filters</button>
+				{/if}
+				<span class="text-xs text-slate-500">{filteredFilings.length} result{filteredFilings.length !== 1 ? 's' : ''}</span>
+			</div>
+		</div>
+
+		<div class="flex flex-wrap gap-3 items-center">
+			<select bind:value={filterStatus} class="text-sm rounded-lg border border-slate-600 bg-slate-800 text-slate-200 px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-violet-500">
+				<option value="all">All Statuses</option>
+				{#each Object.entries(TRADEMARK_STATUS_LABELS) as [val, label]}
+					<option value={val}>{label}</option>
+				{/each}
+			</select>
+			<select bind:value={filterFranchise} class="text-sm rounded-lg border border-slate-600 bg-slate-800 text-slate-200 px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-violet-500">
+				<option value="all">All Franchises</option>
+				{#each data.franchises as f}
+					<option value={f.id}>{f.name}</option>
+				{/each}
+			</select>
+		</div>
+
+		<div class="rounded-lg border border-slate-700 bg-slate-900/40 p-3 space-y-3">
+			<div class="flex flex-wrap items-center gap-2 justify-between">
+				<div class="flex items-center gap-2">
+					<p class="text-xs uppercase tracking-wide text-slate-300">Trademark Class Filter</p>
+					<span class="text-[11px] text-slate-500">{selectedClasses.length}/{allTrademarkClasses.length} selected</span>
+				</div>
+				<div class="flex items-center gap-2">
+					<button type="button" onclick={selectAllClasses} class="text-[11px] px-2 py-1 rounded border border-slate-600 text-slate-300 hover:border-slate-500 hover:text-slate-100 transition-colors">All</button>
+					<button type="button" onclick={selectCoreClasses} class="text-[11px] px-2 py-1 rounded border border-slate-600 text-slate-300 hover:border-slate-500 hover:text-slate-100 transition-colors">Core</button>
+					<button type="button" onclick={clearAllClasses} class="text-[11px] px-2 py-1 rounded border border-slate-600 text-slate-300 hover:border-slate-500 hover:text-slate-100 transition-colors">None</button>
+				</div>
+			</div>
+			<div>
+				<input
+					bind:value={classSearch}
+					placeholder="Search class labels..."
+					class="w-full md:w-80 text-sm rounded-lg border border-slate-600 bg-slate-800 text-slate-200 px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-violet-500 placeholder:text-slate-500"
+				/>
+			</div>
+			<div class="flex flex-wrap gap-2">
+				{#if visibleClassOptions.length === 0}
+					<span class="text-xs text-slate-500">No class labels match this search.</span>
+				{:else}
+					{#each visibleClassOptions as [classKey, classLabel]}
+						<button
+							type="button"
+							onclick={() => toggleClass(classKey)}
+							class={`text-xs px-2.5 py-1 rounded-full border transition-colors ${isClassSelected(classKey)
+								? 'bg-violet-900/40 text-violet-300 border-violet-700/50'
+								: 'bg-slate-800 text-slate-400 border-slate-700 hover:border-slate-500 hover:text-slate-200'}`}
+						>
+							{classLabel}
+							<span class="ml-1 text-[10px] text-slate-500">({classCounts[classKey] ?? 0})</span>
+						</button>
+					{/each}
+				{/if}
+			</div>
+		</div>
+
+		<div class="rounded-lg border border-slate-700 bg-slate-900/40 p-3 space-y-3">
+			<p class="text-xs uppercase tracking-wide text-slate-300">Saved Presets</p>
+			<div class="flex flex-wrap gap-2">
+				<input
+					bind:value={presetName}
+					placeholder="Preset name (e.g. Attorney Queue)"
+					class="w-full md:w-80 text-sm rounded-lg border border-slate-600 bg-slate-800 text-slate-200 px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-violet-500 placeholder:text-slate-500"
+				/>
+				<button
+					type="button"
+					onclick={createPreset}
+					disabled={!presetName.trim()}
+					class="text-xs rounded-md border border-violet-700/60 bg-violet-900/40 px-3 py-1.5 text-violet-300 hover:text-violet-200 hover:border-violet-600 transition-colors disabled:opacity-40"
+				>
+					Save Current Filter
+				</button>
+			</div>
+			{#if savedPresets.length === 0}
+				<p class="text-xs text-slate-500">No saved presets yet.</p>
+			{:else}
+				<div class="flex flex-wrap gap-2">
+					{#each savedPresets as preset}
+						<div class="flex items-center gap-1 rounded-full border border-slate-600 bg-slate-800 px-2 py-1">
+							<button
+								type="button"
+								onclick={() => applyPreset(preset.id)}
+								class="text-xs text-slate-200 hover:text-white transition-colors"
+							>
+								{preset.name}
+							</button>
+							<button
+								type="button"
+								onclick={() => deletePreset(preset.id)}
+								class="text-[10px] text-slate-500 hover:text-red-400 transition-colors"
+								title="Delete preset"
+							>
+								✕
+							</button>
+						</div>
+					{/each}
+				</div>
+			{/if}
+		</div>
+	</Card>
+
+	<!-- Pipeline board -->
+	<div>
+		<div class="flex items-center justify-between mb-2">
+			<p class="text-xs text-slate-500">Drag cards to move filing stage. Click a card to open details.</p>
+			<p class="text-xs text-slate-600">{trademarkBoardItems.length} filing{trademarkBoardItems.length !== 1 ? 's' : ''} in view</p>
+		</div>
+		{#if trademarkBoardItems.length > 0}
+			<PipelineBoard
+				config={trademarkBoardConfig}
+				items={trademarkBoardItems}
+				onmove={handleTrademarkMove}
+				onselect={handleTrademarkSelect}
+			/>
+		{:else}
+			<Card class="p-6 bg-slate-800/30 border-slate-700 border-dashed">
+				<p class="text-sm text-slate-500 text-center">No filings match the current filters.</p>
+			</Card>
 		{/if}
 	</div>
 
@@ -481,7 +771,8 @@
 		{#each filingsByFranchise as { franchise, filings: fFilings }}
 			{@const visible = filterFranchise === 'all' || filterFranchise === franchise.id}
 			{@const statusFiltered = filterStatus === 'all' ? fFilings : fFilings.filter((f: any) => f.status === filterStatus)}
-			{#if visible && (filterStatus === 'all' || statusFiltered.length > 0)}
+			{@const classFiltered = statusFiltered.filter((f: any) => isClassMatch(f))}
+			{#if visible && classFiltered.length > 0}
 				{@const approved  = fFilings.filter((f: any) => f.status === 'approved').length}
 				{@const total     = fFilings.length}
 				{@const hasIssue  = fFilings.some((f: any) => ['opposition','rejected','abandoned'].includes(f.status))}
@@ -543,7 +834,7 @@
 					<!-- Expanded filings table -->
 					{#if isOpen}
 						<div class="border-t border-slate-700">
-							{#if statusFiltered.length === 0}
+							{#if classFiltered.length === 0}
 								<p class="text-sm text-slate-500 px-4 py-3">No filings match the current filter.</p>
 							{:else}
 								<div class="overflow-x-auto">
@@ -563,7 +854,7 @@
 											</tr>
 										</thead>
 										<tbody class="divide-y divide-slate-700/40">
-											{#each statusFiltered as filing}
+											{#each classFiltered as filing}
 												<tr class="hover:bg-slate-700/20 group">
 													<td class="px-4 py-2.5 text-slate-200 font-medium whitespace-nowrap">
 														{MARK_TYPE_LABELS[filing.markType] ?? filing.markType}

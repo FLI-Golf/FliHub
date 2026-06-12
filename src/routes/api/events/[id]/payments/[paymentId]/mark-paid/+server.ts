@@ -2,6 +2,16 @@ import { json } from '@sveltejs/kit';
 import { getAdminPocketBase } from '$lib/infra/pocketbase/pbClient';
 import type { RequestHandler } from './$types';
 
+function deriveCode(name: string): string {
+	return String(name || 'EVENT')
+		.replace(/[^a-zA-Z\s]/g, '')
+		.split(/\s+/)
+		.filter(Boolean)
+		.map((w) => w[0].toUpperCase())
+		.join('')
+		.slice(0, 6) || 'EVENT';
+}
+
 export const POST: RequestHandler = async ({ params, locals }) => {
 	try {
 		const pb = await getAdminPocketBase();
@@ -13,6 +23,40 @@ export const POST: RequestHandler = async ({ params, locals }) => {
 		}
 		if (payment.status === 'paid') {
 			return json({ message: 'Payment already marked as paid' }, { status: 409 });
+		}
+		if (payment.status === 'approval_required') {
+			return json({ message: 'Payment requires approval before payout' }, { status: 409 });
+		}
+
+		if (payment.status === 'approved') {
+			const marker = `[EP:${payment.id}]`;
+			const existingWO = await pb.collection('work_orders').getFirstListItem(
+				`source = 'event_payment' && notes ~ '${marker}'`
+			).catch(() => null) as any;
+
+			if (!existingWO) {
+				const allWOs = await pb.collection('work_orders').getFullList({
+					fields: 'work_order_number', sort: '-created'
+				}).catch(() => []) as any[];
+				const seq = allWOs.length + 1;
+				const eventRecord = payment.event
+					? await pb.collection('special_events').getOne(payment.event, { fields: 'id,name' }).catch(() => null)
+					: null;
+				const eventCode = deriveCode(eventRecord?.name || 'Event Payment');
+				const woNumber = `WO-${eventCode}-${String(seq).padStart(4, '0')}`;
+
+				await pb.collection('work_orders').create({
+					work_order_number: woNumber,
+					source:            'event_payment',
+					status:            'open',
+					approver:          null,
+					submittedBy:       null,
+					description:       `${eventRecord?.name || 'Event'} — ${payment.paymentType || 'payment'}`.slice(0, 500),
+					amount:            payment.amount || 0,
+					approvedDate:      new Date().toISOString(),
+					notes:             `${marker} Auto-created before paid transition.`
+				}).catch(() => null);
+			}
 		}
 
 		const updated = await pb.collection('event_payments').update(params.paymentId, {

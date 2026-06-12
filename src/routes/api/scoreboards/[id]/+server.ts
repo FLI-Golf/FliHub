@@ -3,8 +3,8 @@
  * DELETE /api/scoreboards/[id] — delete (admin only)
  *
  * Stage transition side-effects:
- *   → approval     : creates an approvals record
- *   → procurement  : resolves approval; creates expense + work order
+ *   → approval     : creates/submits a linked expense and approval request
+ *   → procurement  : ensures linked expense remains on approval pipeline (no direct WO)
  *   → cancelled    : marks any open approval as rejected
  */
 import { json } from '@sveltejs/kit';
@@ -32,57 +32,72 @@ export const PATCH: RequestHandler = async ({ params, request, locals, url }) =>
 		const current = await ctx.pb.collection('scoreboards').getOne(params.id);
 		const newStage: string | undefined = patch.stage;
 
-		// ── approval: auto-create approval record ─────────────────────────────
-		if (newStage === 'approval' && current.stage !== 'approval') {
-			const approval = await ctx.pb.collection('approvals').create({
-				entityType:    'expense',
-				entityId:      params.id,
-				status:        'pending',
-				requestedBy:   ctx.userId,
-				requestedDate: new Date().toISOString(),
-				amount:        current.quotedCost ?? patch.quotedCost ?? 0,
-				comments:      `Scoreboard procurement: ${current.name}`
-			}).catch(() => null);
-			if (approval) patch.approvalId = approval.id;
-		}
+		const amount = Number(current.approvedBudget ?? patch.approvedBudget ?? current.quotedCost ?? patch.quotedCost ?? 0) || 0;
+		const ensureSubmittedExpense = async () => {
+			const existingById = current.expenseId
+				? await ctx.pb.collection('expenses').getOne(current.expenseId).catch(() => null)
+				: null;
+			const existingBySource = existingById
+				? existingById
+				: await ctx.pb.collection('expenses').getFirstListItem(
+					`sourceType = \"scoreboard\" && sourceId = \"${params.id}\"`
+				).catch(() => null);
 
-		// ── procurement: resolve approval + create expense + work order ───────
-		if (newStage === 'procurement' && current.stage !== 'procurement') {
-			// Resolve approval
-			if (current.approvalId) {
-				await ctx.pb.collection('approvals').update(current.approvalId, {
-					status:       'approved',
-					approver:     ctx.userId,
-					reviewedDate: new Date().toISOString()
-				}).catch(() => {});
-			}
-
-			// Create expense
-			const expense = await ctx.pb.collection('expenses').create({
+			const expensePayload = {
 				title:       `Scoreboard: ${current.name}`,
 				description: current.description ?? '',
-				amount:      current.approvedBudget ?? current.quotedCost ?? 0,
-				status:      'draft',
+				amount,
+				status:      'submitted',
 				category:    'capital_equipment',
 				notes:       `Scoreboard procurement. Location: ${current.location ?? '—'}`,
 				sourceType:  'scoreboard',
 				sourceId:    params.id
-			}).catch(() => null);
-			if (expense) patch.expenseId = expense.id;
+			};
 
-			// Create work order
-			const wo = await ctx.pb.collection('work_orders').create({
-				title:         `Install Scoreboard: ${current.name}`,
-				description:   current.description ?? '',
+			if (existingBySource) {
+				const updatedExpense = await ctx.pb.collection('expenses').update(existingBySource.id, expensePayload);
+				patch.expenseId = updatedExpense.id;
+				return updatedExpense;
+			}
+
+			const createdExpense = await ctx.pb.collection('expenses').create(expensePayload);
+			patch.expenseId = createdExpense.id;
+			return createdExpense;
+		};
+
+		const ensurePendingApproval = async (expenseId: string) => {
+			const existingApproval = await ctx.pb.collection('approvals').getFirstListItem(
+				`entityType = \"expense\" && entityId = \"${expenseId}\" && status = \"pending\"`
+			).catch(() => null);
+			if (existingApproval) {
+				patch.approvalId = existingApproval.id;
+				return existingApproval;
+			}
+
+			const createdApproval = await ctx.pb.collection('approvals').create({
+				entityType:    'expense',
+				entityId:      expenseId,
 				status:        'pending',
-				priority:      'high',
-				estimatedCost: current.approvedBudget ?? current.quotedCost ?? 0,
-				sourceType:    'scoreboard',
-				sourceId:      params.id,
-				expenseId:     expense?.id ?? null,
-				notes:         `Location: ${current.location ?? '—'}. Vendor: ${current.vendorName ?? '—'}`
+				requestedBy:   ctx.userId,
+				requestedDate: new Date().toISOString(),
+				amount,
+				comments:      `Scoreboard procurement: ${current.name}`
 			}).catch(() => null);
-			if (wo) patch.workOrderId = wo.id;
+			if (createdApproval) patch.approvalId = createdApproval.id;
+			return createdApproval;
+		};
+
+		// ── approval: create/submit expense and pending approval ───────────────
+		if (newStage === 'approval' && current.stage !== 'approval') {
+			const expense = await ensureSubmittedExpense();
+			await ensurePendingApproval(expense.id);
+		}
+
+		// ── procurement: keep pipeline on expense approval path ─────────────────
+		if (newStage === 'procurement' && current.stage !== 'procurement') {
+			const expense = await ensureSubmittedExpense();
+			await ensurePendingApproval(expense.id);
+			if ('workOrderId' in patch) delete patch.workOrderId;
 		}
 
 		// ── cancelled: reject any open approval ───────────────────────────────

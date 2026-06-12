@@ -393,6 +393,54 @@ export const POST: RequestHandler = async ({ locals, request }) => {
 					}).catch((e: any) => console.warn('goal_task update failed:', e.message));
 				}
 
+			} else if (approval.entityType === 'event_payment') {
+				const payment = await pb.collection('event_payments').getOne(approval.entityId, {
+					expand: 'event,talent,talentGroup,eventTalent'
+				}).catch(() => null) as any;
+
+				if (!payment) {
+					return json({ error: 'Linked event payment not found' }, { status: 404 });
+				}
+
+				const eventName = payment.expand?.event?.name || 'Event Payment';
+				const payeeName = payment.recipient === 'manager'
+					? (payment.expand?.talent?.name || 'Manager')
+					: (payment.expand?.talentGroup?.name || payment.expand?.talent?.name || 'Talent');
+				const marker = `[EP:${payment.id}]`;
+
+				const existingWO = await pb.collection('work_orders').getFirstListItem(
+					`source = 'event_payment' && notes ~ '${marker}'`
+				).catch(() => null) as any;
+
+				if (existingWO?.work_order_number) {
+					workOrderNumber = existingWO.work_order_number;
+				} else {
+					const allWOs = await pb.collection('work_orders').getFullList({
+						fields: 'work_order_number', sort: '-created'
+					}).catch(() => []) as any[];
+					const seq = allWOs.length + 1;
+					const eventCode = deriveProjectCode(eventName || 'EVENT');
+					workOrderNumber = `WO-${eventCode}-${String(seq).padStart(4, '0')}`;
+
+					await pb.collection('work_orders').create({
+						work_order_number: workOrderNumber,
+						source:            'event_payment',
+						status:            'open',
+						approver:          userProfile.id,
+						submittedBy:       userProfile.id,
+						description:       `${eventName} — ${payment.paymentType || 'payment'} to ${payeeName}`.slice(0, 500),
+						amount:            payment.amount || 0,
+						approvedDate:      new Date().toISOString(),
+						notes:             `${marker} Approved via quorum (${voteCount}/${quorum}).`,
+					}).catch((e: any) => console.error('❌ work_order create failed (event_payment):', e.message));
+				}
+
+				await pb.collection('event_payments').update(payment.id, {
+					status: 'approved'
+				}).catch((e: any) => console.warn('event_payment update failed:', e.message));
+
+				updatePayload.comments = `<p>Quorum reached — approved by ${voteCount} ${voteCount === 1 ? 'approver' : 'approvers'}. Event Payment Work Order: ${workOrderNumber}</p>`;
+
 			} else {
 				updatePayload.comments = `<p>Quorum reached — approved by ${voteCount} ${voteCount === 1 ? 'approver' : 'approvers'}.</p>`;
 			}
