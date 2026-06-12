@@ -26,6 +26,9 @@
 	let saving        = $state(false);
 	let err           = $state('');
 	let itemFilter    = $state('');
+	type ItemSortKey = 'description' | 'date' | 'category' | 'notes' | 'workOrderReference' | 'receipts' | 'amount';
+	let itemSortKey = $state<ItemSortKey>('date');
+	let itemSortDir = $state<'asc' | 'desc'>('desc');
 	let attachingReceiptItemId = $state<string | null>(null);
 	let removingReceiptItemId = $state<string | null>(null);
 	let deletingItemId = $state<string | null>(null);
@@ -499,6 +502,15 @@
 		return claim?.title ?? 'Unknown claim';
 	}
 
+	function toggleItemSort(key: ItemSortKey) {
+		if (itemSortKey === key) {
+			itemSortDir = itemSortDir === 'asc' ? 'desc' : 'asc';
+			return;
+		}
+		itemSortKey = key;
+		itemSortDir = 'asc';
+	}
+
 	const filteredMyItems = $derived.by(() => {
 		const source = (data.myItems as any[]) ?? [];
 		const q = itemFilter.trim().toLowerCase();
@@ -519,6 +531,46 @@
 
 			return haystack.includes(q);
 		});
+	});
+
+	const sortedFilteredMyItems = $derived.by(() => {
+		const source = [...((filteredMyItems as any[]) ?? [])];
+		source.sort((a: any, b: any) => {
+			let cmp = 0;
+			switch (itemSortKey) {
+				case 'description':
+					cmp = (a.description ?? '').localeCompare(b.description ?? '', undefined, { sensitivity: 'base' });
+					break;
+				case 'date': {
+					const aTime = a.date ? new Date(a.date).getTime() : 0;
+					const bTime = b.date ? new Date(b.date).getTime() : 0;
+					cmp = aTime - bTime;
+					break;
+				}
+				case 'category':
+					cmp = (ITEM_CATEGORY_LABELS[a.category] ?? a.category ?? '').localeCompare((ITEM_CATEGORY_LABELS[b.category] ?? b.category ?? ''), undefined, { sensitivity: 'base' });
+					break;
+				case 'notes':
+					cmp = (a.notes ?? '').localeCompare(b.notes ?? '', undefined, { sensitivity: 'base' });
+					break;
+				case 'workOrderReference':
+					cmp = (a.workOrderReference ?? '').localeCompare(b.workOrderReference ?? '', undefined, { sensitivity: 'base' });
+					break;
+				case 'receipts':
+					cmp = (a.receipts?.length ?? 0) - (b.receipts?.length ?? 0);
+					break;
+				case 'amount':
+					cmp = (Number(a.amount) || 0) - (Number(b.amount) || 0);
+					break;
+			}
+
+			if (cmp === 0) {
+				cmp = (a.description ?? '').localeCompare(b.description ?? '', undefined, { sensitivity: 'base' });
+			}
+
+			return itemSortDir === 'asc' ? cmp : -cmp;
+		});
+		return source;
 	});
 
 	const INPUT = 'w-full rounded-lg border border-slate-600 bg-slate-800 text-slate-100 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 placeholder:text-slate-500';
@@ -952,22 +1004,58 @@
 									title="Select all filtered items"
 								/>
 							</th>
-							<th class="px-3 py-2">Description</th>
-							<th class="px-3 py-2">Category</th>
-							<th class="px-3 py-2">Notes</th>
-							<th class="px-3 py-2">WO#</th>
-							<th class="px-3 py-2">Receipts</th>
-							<th class="px-3 py-2 text-right">Amount</th>
+							<th class="px-3 py-2">
+								<button type="button" class="inline-flex items-center gap-1 hover:text-slate-200" onclick={() => toggleItemSort('description')}>
+									Description
+									{#if itemSortKey === 'description'}<span class="text-slate-500">{itemSortDir === 'asc' ? '↑' : '↓'}</span>{/if}
+								</button>
+							</th>
+							<th class="px-3 py-2">
+								<button type="button" class="inline-flex items-center gap-1 hover:text-slate-200" onclick={() => toggleItemSort('date')}>
+									Date
+									{#if itemSortKey === 'date'}<span class="text-slate-500">{itemSortDir === 'asc' ? '↑' : '↓'}</span>{/if}
+								</button>
+							</th>
+							<th class="px-3 py-2">
+								<button type="button" class="inline-flex items-center gap-1 hover:text-slate-200" onclick={() => toggleItemSort('category')}>
+									Category
+									{#if itemSortKey === 'category'}<span class="text-slate-500">{itemSortDir === 'asc' ? '↑' : '↓'}</span>{/if}
+								</button>
+							</th>
+							<th class="px-3 py-2">
+								<button type="button" class="inline-flex items-center gap-1 hover:text-slate-200" onclick={() => toggleItemSort('notes')}>
+									Notes
+									{#if itemSortKey === 'notes'}<span class="text-slate-500">{itemSortDir === 'asc' ? '↑' : '↓'}</span>{/if}
+								</button>
+							</th>
+							<th class="px-3 py-2">
+								<button type="button" class="inline-flex items-center gap-1 hover:text-slate-200" onclick={() => toggleItemSort('workOrderReference')}>
+									WO#
+									{#if itemSortKey === 'workOrderReference'}<span class="text-slate-500">{itemSortDir === 'asc' ? '↑' : '↓'}</span>{/if}
+								</button>
+							</th>
+							<th class="px-3 py-2">
+								<button type="button" class="inline-flex items-center gap-1 hover:text-slate-200" onclick={() => toggleItemSort('receipts')}>
+									Receipts
+									{#if itemSortKey === 'receipts'}<span class="text-slate-500">{itemSortDir === 'asc' ? '↑' : '↓'}</span>{/if}
+								</button>
+							</th>
+							<th class="px-3 py-2 text-right">
+								<button type="button" class="inline-flex items-center gap-1 hover:text-slate-200" onclick={() => toggleItemSort('amount')}>
+									Amount
+									{#if itemSortKey === 'amount'}<span class="text-slate-500">{itemSortDir === 'asc' ? '↑' : '↓'}</span>{/if}
+								</button>
+							</th>
 							<th class="px-3 py-2 text-right">Actions</th>
 						</tr>
 					</thead>
 					<tbody class="divide-y divide-slate-700/40">
-						{#if filteredMyItems.length === 0}
+						{#if sortedFilteredMyItems.length === 0}
 							<tr>
-								<td colspan="8" class="px-3 py-4 text-slate-400 text-center">No items match your filter.</td>
+								<td colspan="9" class="px-3 py-4 text-slate-400 text-center">No items match your filter.</td>
 							</tr>
 						{:else}
-							{#each filteredMyItems as item}
+							{#each sortedFilteredMyItems as item}
 								<tr>
 									<td class="px-3 py-2 align-top">
 										<input
@@ -982,6 +1070,7 @@
 										<div>{item.description}</div>
 										<div class="text-[10px] text-slate-500 mt-0.5">{claimTitleFor(item)}</div>
 									</td>
+									<td class="px-3 py-2 text-slate-400 whitespace-nowrap">{fmtDate(item.date)}</td>
 									<td class="px-3 py-2 text-slate-400 capitalize">{ITEM_CATEGORY_LABELS[item.category] ?? item.category}</td>
 									<td class="px-3 py-2 text-slate-400">{item.notes || '—'}</td>
 									<td class="px-3 py-2 text-slate-300 font-mono">{item.workOrderReference || '—'}</td>

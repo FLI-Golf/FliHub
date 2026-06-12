@@ -525,10 +525,10 @@
 									<label class="text-xs text-muted-foreground">Role</label>
 									<select 
 										bind:value={editData[person.id].role}
-										class="w-full h-8 text-sm rounded-md border border-input bg-background px-3"
+										class="w-full h-8 text-sm rounded-md border border-slate-700 bg-slate-800 text-slate-100 px-3 [color-scheme:dark]"
 									>
 										{#each roleOptions as option}
-											<option value={option.value}>{option.label}</option>
+											<option value={option.value} class="bg-slate-800 text-slate-100">{option.label}</option>
 										{/each}
 									</select>
 								</div>
@@ -537,10 +537,10 @@
 									<label class="text-xs text-muted-foreground">Status</label>
 									<select 
 										bind:value={editData[person.id].status}
-										class="w-full h-8 text-sm rounded-md border border-input bg-background px-3"
+										class="w-full h-8 text-sm rounded-md border border-slate-700 bg-slate-800 text-slate-100 px-3 [color-scheme:dark]"
 									>
 										{#each statusOptions as option}
-											<option value={option.value}>{option.label}</option>
+											<option value={option.value} class="bg-slate-800 text-slate-100">{option.label}</option>
 										{/each}
 									</select>
 								</div>
