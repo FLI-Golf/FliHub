@@ -12,8 +12,18 @@
 
 	let { data }: { data: PageData } = $props();
 
-	let statusFilter   = $state<string>('all');
-	let typeFilter     = $state<string>('all');
+	const APPROVAL_STATUS_ORDER = ['pending', 'approved', 'rejected', 'revision_requested'];
+	const APPROVAL_TYPE_ORDER = ['expense', 'project', 'budget', 'bid'];
+
+	let searchTerm = $state('');
+	let selectedStatuses = $state<string[]>([]);
+	let selectedTypes = $state<string[]>([]);
+	let minAmountFilter = $state('');
+	let maxAmountFilter = $state('');
+	let requestedFrom = $state('');
+	let requestedTo = $state('');
+	let sortBy = $state('requested_desc');
+
 	let actionMessages = $state<Record<string, string>>({});
 	let processingId   = $state<string | null>(null);
 
@@ -106,11 +116,119 @@
 		}
 	}
 
+	const statusOptions = $derived.by(() => {
+		const fromData = Array.from(new Set((data.approvals as any[]).map(a => String(a.status ?? '')))).filter(Boolean);
+		const ordered = APPROVAL_STATUS_ORDER.filter(s => fromData.includes(s));
+		const remainder = fromData.filter(s => !APPROVAL_STATUS_ORDER.includes(s)).sort();
+		return [...ordered, ...remainder];
+	});
+
+	const typeOptions = $derived.by(() => {
+		const fromData = Array.from(new Set((data.approvals as any[]).map(a => String(a.entityType ?? '')))).filter(Boolean);
+		const ordered = APPROVAL_TYPE_ORDER.filter(t => fromData.includes(t));
+		const remainder = fromData.filter(t => !APPROVAL_TYPE_ORDER.includes(t)).sort();
+		return [...ordered, ...remainder];
+	});
+
+	if (selectedStatuses.length === 0 && statusOptions.length > 0) {
+		selectedStatuses = [...statusOptions];
+	}
+	if (selectedTypes.length === 0 && typeOptions.length > 0) {
+		selectedTypes = [...typeOptions];
+	}
+
+	function toggleStatus(status: string) {
+		selectedStatuses = selectedStatuses.includes(status)
+			? selectedStatuses.filter(s => s !== status)
+			: [...selectedStatuses, status];
+	}
+
+	function toggleType(type: string) {
+		selectedTypes = selectedTypes.includes(type)
+			? selectedTypes.filter(t => t !== type)
+			: [...selectedTypes, type];
+	}
+
+	function clearFilters() {
+		searchTerm = '';
+		selectedStatuses = [...statusOptions];
+		selectedTypes = [...typeOptions];
+		minAmountFilter = '';
+		maxAmountFilter = '';
+		requestedFrom = '';
+		requestedTo = '';
+		sortBy = 'requested_desc';
+	}
+
 	let filtered = $derived.by(() => {
-		let list = data.approvals as any[];
-		if (statusFilter !== 'all') list = list.filter(a => a.status === statusFilter);
-		if (typeFilter  !== 'all') list = list.filter(a => a.entityType === typeFilter);
+		const q = searchTerm.trim().toLowerCase();
+		const minAmount = minAmountFilter ? Number(minAmountFilter) : null;
+		const maxAmount = maxAmountFilter ? Number(maxAmountFilter) : null;
+		const fromTs = requestedFrom ? new Date(`${requestedFrom}T00:00:00`).getTime() : null;
+		const toTs = requestedTo ? new Date(`${requestedTo}T23:59:59`).getTime() : null;
+
+		let list = (data.approvals as any[]).filter((a: any) => {
+			if (selectedStatuses.length > 0 && !selectedStatuses.includes(a.status)) return false;
+			if (selectedTypes.length > 0 && !selectedTypes.includes(a.entityType)) return false;
+
+			const amount = Number(a.amount ?? 0);
+			if (minAmount !== null && !Number.isNaN(minAmount) && amount < minAmount) return false;
+			if (maxAmount !== null && !Number.isNaN(maxAmount) && amount > maxAmount) return false;
+
+			if (fromTs !== null || toTs !== null) {
+				const ts = a.requestedDate ? new Date(a.requestedDate).getTime() : 0;
+				if (fromTs !== null && ts < fromTs) return false;
+				if (toTs !== null && ts > toTs) return false;
+			}
+
+			if (q) {
+				const expense = a.expand?.expenseId;
+				const bid = a.expand?.bidId;
+				const requestedBy = `${a.expand?.requestedBy?.firstName ?? ''} ${a.expand?.requestedBy?.lastName ?? ''}`.trim();
+				const haystack = [
+					String(a.id ?? ''),
+					String(a.entityType ?? ''),
+					String(a.status ?? ''),
+					String(a.comments ?? ''),
+					String(expense?.description ?? ''),
+					String(expense?.work_order_number ?? ''),
+					String(expense?.category ?? ''),
+					String(bid?.expand?.vendorId?.name ?? ''),
+					requestedBy
+				].join(' ').toLowerCase();
+				if (!haystack.includes(q)) return false;
+			}
+
+			return true;
+		});
+
+		list = [...list].sort((a: any, b: any) => {
+			switch (sortBy) {
+				case 'requested_asc':
+					return new Date(a.requestedDate ?? 0).getTime() - new Date(b.requestedDate ?? 0).getTime();
+				case 'amount_desc':
+					return Number(b.amount ?? 0) - Number(a.amount ?? 0);
+				case 'amount_asc':
+					return Number(a.amount ?? 0) - Number(b.amount ?? 0);
+				case 'status_az':
+					return String(a.status ?? '').localeCompare(String(b.status ?? ''));
+				case 'type_az':
+					return String(a.entityType ?? '').localeCompare(String(b.entityType ?? ''));
+				case 'requested_desc':
+				default:
+					return new Date(b.requestedDate ?? 0).getTime() - new Date(a.requestedDate ?? 0).getTime();
+			}
+		});
+
 		return list;
+	});
+
+	const filteredStats = $derived({
+		pending: filtered.filter((a: any) => a.status === 'pending').length,
+		approved: filtered.filter((a: any) => a.status === 'approved').length,
+		rejected: filtered.filter((a: any) => a.status === 'rejected').length,
+		totalAmount: filtered.reduce((s: number, a: any) => s + (a.amount || 0), 0),
+		pendingAmount: filtered.filter((a: any) => a.status === 'pending').reduce((s: number, a: any) => s + (a.amount || 0), 0),
 	});
 
 	// Group filtered approvals by work order number (from linked expense)
@@ -354,8 +472,8 @@
 			<div class="flex items-center justify-between">
 				<div>
 					<p class="text-xs text-muted-foreground mb-1 uppercase tracking-wide">Pending</p>
-					<p class="text-2xl font-bold">{data.stats.pending}</p>
-					<p class="text-xs text-muted-foreground mt-1">{fmt(data.stats.pendingAmount)}</p>
+					<p class="text-2xl font-bold">{filteredStats.pending}</p>
+					<p class="text-xs text-muted-foreground mt-1">{fmt(filteredStats.pendingAmount)}</p>
 				</div>
 				<Clock class="size-8 text-amber-500 opacity-40" />
 			</div>
@@ -364,7 +482,7 @@
 			<div class="flex items-center justify-between">
 				<div>
 					<p class="text-xs text-muted-foreground mb-1 uppercase tracking-wide">Approved</p>
-					<p class="text-2xl font-bold">{data.stats.approved}</p>
+					<p class="text-2xl font-bold">{filteredStats.approved}</p>
 				</div>
 				<CheckCircle2 class="size-8 text-emerald-500 opacity-40" />
 			</div>
@@ -373,7 +491,7 @@
 			<div class="flex items-center justify-between">
 				<div>
 					<p class="text-xs text-muted-foreground mb-1 uppercase tracking-wide">Rejected</p>
-					<p class="text-2xl font-bold">{data.stats.rejected}</p>
+					<p class="text-2xl font-bold">{filteredStats.rejected}</p>
 				</div>
 				<XCircle class="size-8 text-red-500 opacity-40" />
 			</div>
@@ -382,7 +500,8 @@
 			<div class="flex items-center justify-between">
 				<div>
 					<p class="text-xs text-muted-foreground mb-1 uppercase tracking-wide">Total Amount</p>
-					<p class="text-2xl font-bold">{fmt(data.stats.totalAmount)}</p>
+					<p class="text-2xl font-bold">{fmt(filteredStats.totalAmount)}</p>
+					<p class="text-xs text-muted-foreground mt-1">{filtered.length} of {data.approvals.length}</p>
 				</div>
 				<DollarSign class="size-8 text-blue-500 opacity-40" />
 			</div>
@@ -391,28 +510,83 @@
 
 	<!-- Filters -->
 	<Card class="p-4">
-		<div class="flex flex-wrap items-end gap-4">
-			<div>
-				<label class="text-xs font-medium text-slate-400 mb-1.5 block uppercase tracking-wide">Status</label>
-				<select bind:value={statusFilter} class="appearance-none px-3 py-2 rounded-lg bg-slate-800 border border-slate-600 text-slate-100 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 cursor-pointer">
-					<option value="all" class="bg-slate-800">All Statuses</option>
-					<option value="pending" class="bg-slate-800">Pending</option>
-					<option value="approved" class="bg-slate-800">Approved</option>
-					<option value="rejected" class="bg-slate-800">Rejected</option>
-					<option value="revision_requested" class="bg-slate-800">Revision Requested</option>
-				</select>
+		<div class="space-y-4">
+			<div class="flex flex-wrap items-end gap-3">
+				<div class="min-w-[220px] flex-1">
+					<label class="text-xs font-medium text-slate-400 mb-1.5 block uppercase tracking-wide">Search</label>
+					<input
+						bind:value={searchTerm}
+						placeholder="Work order, vendor, requester, comments"
+						class="w-full px-3 py-2 rounded-lg bg-slate-800 border border-slate-600 text-slate-100 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 placeholder:text-slate-500"
+					/>
+				</div>
+				<div class="w-36">
+					<label class="text-xs font-medium text-slate-400 mb-1.5 block uppercase tracking-wide">Min Amount</label>
+					<input bind:value={minAmountFilter} type="number" min="0" placeholder="0" class="w-full px-3 py-2 rounded-lg bg-slate-800 border border-slate-600 text-slate-100 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 placeholder:text-slate-500" />
+				</div>
+				<div class="w-36">
+					<label class="text-xs font-medium text-slate-400 mb-1.5 block uppercase tracking-wide">Max Amount</label>
+					<input bind:value={maxAmountFilter} type="number" min="0" placeholder="No max" class="w-full px-3 py-2 rounded-lg bg-slate-800 border border-slate-600 text-slate-100 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 placeholder:text-slate-500" />
+				</div>
+				<div class="w-44">
+					<label class="text-xs font-medium text-slate-400 mb-1.5 block uppercase tracking-wide">Requested From</label>
+					<input bind:value={requestedFrom} type="date" class="w-full px-3 py-2 rounded-lg bg-slate-800 border border-slate-600 text-slate-100 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 [color-scheme:dark]" />
+				</div>
+				<div class="w-44">
+					<label class="text-xs font-medium text-slate-400 mb-1.5 block uppercase tracking-wide">Requested To</label>
+					<input bind:value={requestedTo} type="date" class="w-full px-3 py-2 rounded-lg bg-slate-800 border border-slate-600 text-slate-100 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 [color-scheme:dark]" />
+				</div>
+				<div class="w-48">
+					<label class="text-xs font-medium text-slate-400 mb-1.5 block uppercase tracking-wide">Sort</label>
+					<select bind:value={sortBy} class="w-full px-3 py-2 rounded-lg bg-slate-800 border border-slate-600 text-slate-100 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 cursor-pointer">
+						<option value="requested_desc">Newest requested</option>
+						<option value="requested_asc">Oldest requested</option>
+						<option value="amount_desc">Amount high → low</option>
+						<option value="amount_asc">Amount low → high</option>
+						<option value="status_az">Status A → Z</option>
+						<option value="type_az">Type A → Z</option>
+					</select>
+				</div>
+				<button
+					type="button"
+					onclick={clearFilters}
+					class="px-3 py-2 rounded-lg border border-slate-600 text-slate-300 text-sm hover:border-slate-400 hover:text-slate-100 transition-colors"
+				>
+					Clear Filters
+				</button>
 			</div>
-			<div>
-				<label class="text-xs font-medium text-slate-400 mb-1.5 block uppercase tracking-wide">Type</label>
-				<select bind:value={typeFilter} class="appearance-none px-3 py-2 rounded-lg bg-slate-800 border border-slate-600 text-slate-100 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 cursor-pointer">
-					<option value="all" class="bg-slate-800">All Types</option>
-					<option value="expense" class="bg-slate-800">Expenses</option>
-					<option value="project" class="bg-slate-800">Projects</option>
-					<option value="budget" class="bg-slate-800">Budgets</option>
-					<option value="bid" class="bg-slate-800">Bids</option>
-				</select>
+
+			<div class="flex flex-wrap items-center gap-2">
+				<span class="text-xs text-slate-400 uppercase tracking-wide mr-1">Status</span>
+				{#each statusOptions as status}
+					<button
+						type="button"
+						onclick={() => toggleStatus(status)}
+						class={`text-xs px-2.5 py-1 rounded-full border transition-colors ${selectedStatuses.includes(status)
+							? statusColor(status)
+							: 'bg-slate-900 text-slate-500 border-slate-700 hover:border-slate-500 hover:text-slate-300'}`}
+					>
+						{status.replace('_', ' ')}
+					</button>
+				{/each}
 			</div>
-			<p class="text-sm text-slate-500 pb-2">Showing {filtered.length} of {data.approvals.length}</p>
+
+			<div class="flex flex-wrap items-center gap-2">
+				<span class="text-xs text-slate-400 uppercase tracking-wide mr-1">Type</span>
+				{#each typeOptions as type}
+					<button
+						type="button"
+						onclick={() => toggleType(type)}
+						class={`text-xs px-2.5 py-1 rounded-full border transition-colors ${selectedTypes.includes(type)
+							? 'bg-blue-900/40 text-blue-300 border-blue-700/50'
+							: 'bg-slate-900 text-slate-500 border-slate-700 hover:border-slate-500 hover:text-slate-300'}`}
+					>
+						{type}
+					</button>
+				{/each}
+			</div>
+
+			<p class="text-sm text-slate-500">Showing {filtered.length} of {data.approvals.length}</p>
 		</div>
 	</Card>
 

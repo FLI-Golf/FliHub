@@ -6,8 +6,19 @@
 
 	let { data }: { data: PageData } = $props();
 
-	let statusFilter  = $state('all');
-	let projectFilter = $state('all');
+	const STATUS_OPTIONS = ['open', 'paid', 'cancelled'];
+	const SOURCE_OPTIONS = ['expense', 'reimbursement', 'bid'];
+
+	let searchTerm = $state('');
+	let selectedStatuses = $state<string[]>([...STATUS_OPTIONS]);
+	let selectedSources = $state<string[]>([]);
+	let selectedProjects = $state<string[]>([]);
+	let minAmountFilter = $state('');
+	let maxAmountFilter = $state('');
+	let approvedFrom = $state('');
+	let approvedTo = $state('');
+	let qbFilter = $state<'all' | 'recorded' | 'missing'>('all');
+	let sortBy = $state('approved_desc');
 	let copied        = $state<string | null>(null);
 	let markingPaid   = $state<string | null>(null);
 	let showAbout     = $state(false);
@@ -70,11 +81,119 @@
 
 	const projects = $derived([...new Set((data.workOrders as any[]).map((w: any) => w.projectName).filter(Boolean))].sort());
 
+	$effect(() => {
+		if (selectedSources.length === 0) {
+			const present = [...new Set((data.workOrders as any[]).map((w: any) => String(w.source ?? '')).filter(Boolean))];
+			selectedSources = SOURCE_OPTIONS.filter((s) => present.includes(s));
+		}
+		if (selectedProjects.length === 0 && projects.length > 0) {
+			selectedProjects = [...projects];
+		}
+	});
+
+	function toggleStatus(status: string) {
+		selectedStatuses = selectedStatuses.includes(status)
+			? selectedStatuses.filter((s) => s !== status)
+			: [...selectedStatuses, status];
+	}
+
+	function toggleSource(source: string) {
+		selectedSources = selectedSources.includes(source)
+			? selectedSources.filter((s) => s !== source)
+			: [...selectedSources, source];
+	}
+
+	function toggleProject(project: string) {
+		selectedProjects = selectedProjects.includes(project)
+			? selectedProjects.filter((p) => p !== project)
+			: [...selectedProjects, project];
+	}
+
+	function clearFilters() {
+		searchTerm = '';
+		selectedStatuses = [...STATUS_OPTIONS];
+		selectedSources = [...new Set((data.workOrders as any[]).map((w: any) => String(w.source ?? '')).filter(Boolean))];
+		selectedProjects = [...projects];
+		minAmountFilter = '';
+		maxAmountFilter = '';
+		approvedFrom = '';
+		approvedTo = '';
+		qbFilter = 'all';
+		sortBy = 'approved_desc';
+	}
+
 	const filtered = $derived.by(() => {
-		let list = data.workOrders as any[];
-		if (statusFilter  !== 'all') list = list.filter((w: any) => w.status === statusFilter);
-		if (projectFilter !== 'all') list = list.filter((w: any) => w.projectName === projectFilter);
+		const q = searchTerm.trim().toLowerCase();
+		const minAmount = minAmountFilter ? Number(minAmountFilter) : null;
+		const maxAmount = maxAmountFilter ? Number(maxAmountFilter) : null;
+		const fromTs = approvedFrom ? new Date(`${approvedFrom}T00:00:00`).getTime() : null;
+		const toTs = approvedTo ? new Date(`${approvedTo}T23:59:59`).getTime() : null;
+
+		let list = (data.workOrders as any[]).filter((w: any) => {
+			if (selectedStatuses.length > 0 && !selectedStatuses.includes(w.status)) return false;
+			if (selectedSources.length > 0 && !selectedSources.includes(w.source)) return false;
+			if (selectedProjects.length > 0 && projects.length > 0 && !selectedProjects.includes(w.projectName)) return false;
+
+			const amount = Number(w.amount ?? 0);
+			if (minAmount !== null && !Number.isNaN(minAmount) && amount < minAmount) return false;
+			if (maxAmount !== null && !Number.isNaN(maxAmount) && amount > maxAmount) return false;
+
+			if (qbFilter === 'recorded' && !w.qb_transaction_id) return false;
+			if (qbFilter === 'missing' && w.qb_transaction_id) return false;
+
+			if (fromTs !== null || toTs !== null) {
+				const ts = w.approvedDate ? new Date(w.approvedDate).getTime() : 0;
+				if (fromTs !== null && ts < fromTs) return false;
+				if (toTs !== null && ts > toTs) return false;
+			}
+
+			if (q) {
+				const haystack = [
+					String(w.work_order_number ?? ''),
+					String(w.projectName ?? ''),
+					String(w.projectCode ?? ''),
+					String(w.description ?? ''),
+					String(w.status ?? ''),
+					String(w.source ?? ''),
+					String(w.qb_transaction_id ?? ''),
+					String(w._vendor?.name ?? ''),
+					String(w._claim?.referenceNumber ?? '')
+				].join(' ').toLowerCase();
+				if (!haystack.includes(q)) return false;
+			}
+
+			return true;
+		});
+
+		list = [...list].sort((a: any, b: any) => {
+			switch (sortBy) {
+				case 'approved_asc':
+					return new Date(a.approvedDate ?? 0).getTime() - new Date(b.approvedDate ?? 0).getTime();
+				case 'amount_desc':
+					return Number(b.amount ?? 0) - Number(a.amount ?? 0);
+				case 'amount_asc':
+					return Number(a.amount ?? 0) - Number(b.amount ?? 0);
+				case 'wo_az':
+					return String(a.work_order_number ?? '').localeCompare(String(b.work_order_number ?? ''));
+				case 'project_az':
+					return String(a.projectName ?? '').localeCompare(String(b.projectName ?? ''));
+				case 'status_az':
+					return String(a.status ?? '').localeCompare(String(b.status ?? ''));
+				case 'approved_desc':
+				default:
+					return new Date(b.approvedDate ?? 0).getTime() - new Date(a.approvedDate ?? 0).getTime();
+			}
+		});
+
 		return list;
+	});
+
+	const filteredStats = $derived({
+		open: filtered.filter((w: any) => w.status === 'open').length,
+		paid: filtered.filter((w: any) => w.status === 'paid').length,
+		cancelled: filtered.filter((w: any) => w.status === 'cancelled').length,
+		totalAmount: filtered.reduce((s: number, w: any) => s + (w.amount || 0), 0),
+		openAmount: filtered.filter((w: any) => w.status === 'open').reduce((s: number, w: any) => s + (w.amount || 0), 0),
 	});
 
 	function statusColor(s: string) {
@@ -556,8 +675,8 @@ ${wo.notes ? `
 			<div class="flex items-center justify-between">
 				<div>
 					<p class="text-xs text-muted-foreground mb-1 uppercase tracking-wide">Open</p>
-					<p class="text-2xl font-bold">{data.stats.open}</p>
-					<p class="text-xs text-amber-400 mt-1">{fmt(data.stats.openAmount)}</p>
+					<p class="text-2xl font-bold">{filteredStats.open}</p>
+					<p class="text-xs text-amber-400 mt-1">{fmt(filteredStats.openAmount)}</p>
 				</div>
 				<Clock class="size-8 text-amber-500 opacity-40" />
 			</div>
@@ -566,7 +685,7 @@ ${wo.notes ? `
 			<div class="flex items-center justify-between">
 				<div>
 					<p class="text-xs text-muted-foreground mb-1 uppercase tracking-wide">Paid</p>
-					<p class="text-2xl font-bold">{data.stats.paid}</p>
+					<p class="text-2xl font-bold">{filteredStats.paid}</p>
 				</div>
 				<CheckCircle2 class="size-8 text-emerald-500 opacity-40" />
 			</div>
@@ -575,7 +694,7 @@ ${wo.notes ? `
 			<div class="flex items-center justify-between">
 				<div>
 					<p class="text-xs text-muted-foreground mb-1 uppercase tracking-wide">Cancelled</p>
-					<p class="text-2xl font-bold">{data.stats.cancelled}</p>
+					<p class="text-2xl font-bold">{filteredStats.cancelled}</p>
 				</div>
 				<XCircle class="size-8 text-slate-500 opacity-40" />
 			</div>
@@ -584,7 +703,8 @@ ${wo.notes ? `
 			<div class="flex items-center justify-between">
 				<div>
 					<p class="text-xs text-muted-foreground mb-1 uppercase tracking-wide">Total Amount</p>
-					<p class="text-2xl font-bold">{fmt(data.stats.totalAmount)}</p>
+					<p class="text-2xl font-bold">{fmt(filteredStats.totalAmount)}</p>
+					<p class="text-xs text-muted-foreground mt-1">{filtered.length} of {data.workOrders.length}</p>
 				</div>
 				<DollarSign class="size-8 text-blue-500 opacity-40" />
 			</div>
@@ -593,26 +713,103 @@ ${wo.notes ? `
 
 	<!-- Filters -->
 	<Card class="p-4">
-		<div class="flex flex-wrap items-end gap-4">
-			<div>
-				<label class="text-xs font-medium text-muted-foreground mb-1.5 block uppercase tracking-wide">Status</label>
-				<select bind:value={statusFilter} class="px-3 py-2 border rounded-lg bg-background text-sm">
-					<option value="all">All</option>
-					<option value="open">Open</option>
-					<option value="paid">Paid</option>
-					<option value="cancelled">Cancelled</option>
-				</select>
+		<div class="space-y-4">
+			<div class="flex flex-wrap items-end gap-3">
+				<div class="min-w-[240px] flex-1">
+					<label class="text-xs font-medium text-muted-foreground mb-1.5 block uppercase tracking-wide">Search</label>
+					<input
+						bind:value={searchTerm}
+						placeholder="WO #, project, description, QB ID, vendor"
+						class="w-full px-3 py-2 border rounded-lg bg-background text-sm"
+					/>
+				</div>
+				<div class="w-36">
+					<label class="text-xs font-medium text-muted-foreground mb-1.5 block uppercase tracking-wide">Min Amount</label>
+					<input bind:value={minAmountFilter} type="number" min="0" placeholder="0" class="w-full px-3 py-2 border rounded-lg bg-background text-sm" />
+				</div>
+				<div class="w-36">
+					<label class="text-xs font-medium text-muted-foreground mb-1.5 block uppercase tracking-wide">Max Amount</label>
+					<input bind:value={maxAmountFilter} type="number" min="0" placeholder="No max" class="w-full px-3 py-2 border rounded-lg bg-background text-sm" />
+				</div>
+				<div class="w-44">
+					<label class="text-xs font-medium text-muted-foreground mb-1.5 block uppercase tracking-wide">Approved From</label>
+					<input bind:value={approvedFrom} type="date" class="w-full px-3 py-2 border rounded-lg bg-background text-sm [color-scheme:dark]" />
+				</div>
+				<div class="w-44">
+					<label class="text-xs font-medium text-muted-foreground mb-1.5 block uppercase tracking-wide">Approved To</label>
+					<input bind:value={approvedTo} type="date" class="w-full px-3 py-2 border rounded-lg bg-background text-sm [color-scheme:dark]" />
+				</div>
+				<div class="w-44">
+					<label class="text-xs font-medium text-muted-foreground mb-1.5 block uppercase tracking-wide">QB Entry</label>
+					<select bind:value={qbFilter} class="w-full px-3 py-2 border rounded-lg bg-background text-sm">
+						<option value="all">All</option>
+						<option value="recorded">Recorded in QB</option>
+						<option value="missing">Missing QB entry</option>
+					</select>
+				</div>
+				<div class="w-48">
+					<label class="text-xs font-medium text-muted-foreground mb-1.5 block uppercase tracking-wide">Sort</label>
+					<select bind:value={sortBy} class="w-full px-3 py-2 border rounded-lg bg-background text-sm">
+						<option value="approved_desc">Newest approved</option>
+						<option value="approved_asc">Oldest approved</option>
+						<option value="amount_desc">Amount high → low</option>
+						<option value="amount_asc">Amount low → high</option>
+						<option value="wo_az">WO number A → Z</option>
+						<option value="project_az">Project A → Z</option>
+						<option value="status_az">Status A → Z</option>
+					</select>
+				</div>
+				<button type="button" onclick={clearFilters} class="px-3 py-2 rounded-lg border border-slate-600 text-slate-300 text-sm hover:border-slate-400 hover:text-slate-100 transition-colors">Clear Filters</button>
 			</div>
-			<div>
-				<label class="text-xs font-medium text-muted-foreground mb-1.5 block uppercase tracking-wide">Project</label>
-				<select bind:value={projectFilter} class="px-3 py-2 border rounded-lg bg-background text-sm">
-					<option value="all">All Projects</option>
-					{#each projects as p}
-						<option value={p}>{p}</option>
-					{/each}
-				</select>
+
+			<div class="flex flex-wrap items-center gap-2">
+				<span class="text-xs text-slate-400 uppercase tracking-wide mr-1">Status</span>
+				{#each STATUS_OPTIONS as status}
+					<button
+						type="button"
+						onclick={() => toggleStatus(status)}
+						class={`text-xs px-2.5 py-1 rounded-full border transition-colors ${selectedStatuses.includes(status)
+							? statusColor(status)
+							: 'bg-slate-900 text-slate-500 border-slate-700 hover:border-slate-500 hover:text-slate-300'}`}
+					>
+						{status}
+					</button>
+				{/each}
 			</div>
-			<p class="text-sm text-muted-foreground pb-2">Showing {filtered.length} of {data.workOrders.length}</p>
+
+			<div class="flex flex-wrap items-center gap-2">
+				<span class="text-xs text-slate-400 uppercase tracking-wide mr-1">Source</span>
+				{#each SOURCE_OPTIONS as source}
+					<button
+						type="button"
+						onclick={() => toggleSource(source)}
+						class={`text-xs px-2.5 py-1 rounded-full border transition-colors ${selectedSources.includes(source)
+							? 'bg-violet-900/40 text-violet-300 border-violet-700/50'
+							: 'bg-slate-900 text-slate-500 border-slate-700 hover:border-slate-500 hover:text-slate-300'}`}
+					>
+						{source}
+					</button>
+				{/each}
+			</div>
+
+			{#if projects.length > 0}
+			<div class="flex flex-wrap items-center gap-2">
+				<span class="text-xs text-slate-400 uppercase tracking-wide mr-1">Projects</span>
+				{#each projects as p}
+					<button
+						type="button"
+						onclick={() => toggleProject(p)}
+						class={`text-xs px-2.5 py-1 rounded-full border transition-colors ${selectedProjects.includes(p)
+							? 'bg-blue-900/40 text-blue-300 border-blue-700/50'
+							: 'bg-slate-900 text-slate-500 border-slate-700 hover:border-slate-500 hover:text-slate-300'}`}
+					>
+						{p}
+					</button>
+				{/each}
+			</div>
+			{/if}
+
+			<p class="text-sm text-muted-foreground">Showing {filtered.length} of {data.workOrders.length}</p>
 		</div>
 	</Card>
 
@@ -620,7 +817,20 @@ ${wo.notes ? `
 	{#if filtered.length === 0}
 		<Card class="p-10 text-center">
 			<ClipboardList class="size-10 text-slate-600 mx-auto mb-3" />
-			<p class="text-muted-foreground">No work orders yet. They are created automatically when an expense is approved.</p>
+			{#if data.workOrders.length === 0}
+				<p class="text-muted-foreground">No work orders yet. They are created automatically when an expense is approved.</p>
+			{:else}
+				<p class="text-muted-foreground">No work orders match these filters.</p>
+				<div class="mt-3">
+					<button
+						type="button"
+						onclick={clearFilters}
+						class="px-3 py-1.5 rounded-lg border border-slate-600 text-slate-300 text-sm hover:border-slate-400 hover:text-slate-100 transition-colors"
+					>
+						Clear Filters
+					</button>
+				</div>
+			{/if}
 		</Card>
 	{:else}
 		<Card class="overflow-hidden p-0">

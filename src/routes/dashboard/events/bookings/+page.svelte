@@ -38,6 +38,14 @@
 		d ? new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'No date';
 
 	let moveError = $state('');
+	let confirmFinanceModal = $state<{ id: string; name: string; eventName: string; rate: number; from: string; to: string } | null>(null);
+	let financeBusy = $state(false);
+	let financeForm = $state({
+		downPaymentAmount: '',
+		travelAmount: '',
+		lodgingAmount: '',
+		notes: ''
+	});
 	let showNew = $state(false);
 	let bookingError = $state('');
 	let bookingBusy = $state(false);
@@ -106,9 +114,63 @@
 	async function handleMove(e: PipelineMoveEvent) {
 		const booking = e.item.raw;
 		moveError = '';
+
+		if (e.to === 'confirmed' && booking.status !== 'confirmed') {
+			const rate = Number(booking.confirmedRate ?? 0);
+			financeForm = {
+				downPaymentAmount: String(Math.round((rate * 0.3) * 100) / 100),
+				travelAmount: '',
+				lodgingAmount: '',
+				notes: ''
+			};
+			confirmFinanceModal = {
+				id: booking.id,
+				name: booking.expand?.talentGroup?.name ?? booking.expand?.talent?.name ?? 'Talent Booking',
+				eventName: booking.expand?.event?.name ?? 'Event',
+				rate,
+				from: booking.status,
+				to: e.to as string
+			};
+			return;
+		}
+
 		const result = await pipelineMove(`/api/events/${booking.event}/talent/${booking.id}`, e.to);
 		if (!result.ok) moveError = result.error?.message ?? 'Move failed';
 		else await invalidateAll();
+	}
+
+	async function confirmBookedWithFinance() {
+		if (!confirmFinanceModal || financeBusy) return;
+		financeBusy = true;
+		moveError = '';
+		try {
+			const booking = (data.eventTalent ?? []).find((b: any) => b.id === confirmFinanceModal!.id);
+			if (!booking) throw new Error('Booking not found');
+
+			const res = await fetch(`/api/events/${booking.event}/talent/${booking.id}`, {
+				method: 'PATCH',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({
+					status: 'confirmed',
+					finance: {
+						downPaymentAmount: financeForm.downPaymentAmount ? Number(financeForm.downPaymentAmount) : undefined,
+						travelAmount: financeForm.travelAmount ? Number(financeForm.travelAmount) : 0,
+						lodgingAmount: financeForm.lodgingAmount ? Number(financeForm.lodgingAmount) : 0,
+						notes: financeForm.notes || undefined
+					}
+				})
+			});
+			if (!res.ok) {
+				const body = await res.json().catch(() => ({}));
+				throw new Error(body.message ?? 'Move failed');
+			}
+			confirmFinanceModal = null;
+			await invalidateAll();
+		} catch (err: any) {
+			moveError = err?.message ?? 'Move failed';
+		} finally {
+			financeBusy = false;
+		}
 	}
 
 	async function createBooking(e: SubmitEvent) {
@@ -286,8 +348,76 @@
 		</div>
 	{/if}
 
+	<div class="rounded-xl border border-slate-700 bg-slate-900/30 px-4 py-3 space-y-3">
+		<div class="flex flex-wrap items-center gap-2">
+			<span class="text-[11px] uppercase tracking-wide text-slate-400 font-semibold">Pipeline Stage</span>
+			<span class="inline-flex items-center gap-1.5 text-[11px] px-2 py-0.5 rounded-full border border-slate-600 text-slate-300 bg-slate-800/70"><span class="size-2 rounded-full bg-slate-400"></span>Outreach</span>
+			<span class="inline-flex items-center gap-1.5 text-[11px] px-2 py-0.5 rounded-full border border-emerald-700/50 text-emerald-300 bg-emerald-900/30"><span class="size-2 rounded-full bg-emerald-400"></span>Booked</span>
+			<span class="inline-flex items-center gap-1.5 text-[11px] px-2 py-0.5 rounded-full border border-blue-700/50 text-blue-300 bg-blue-900/30"><span class="size-2 rounded-full bg-blue-400"></span>Completed</span>
+			<span class="inline-flex items-center gap-1.5 text-[11px] px-2 py-0.5 rounded-full border border-red-700/50 text-red-300 bg-red-900/30"><span class="size-2 rounded-full bg-red-400"></span>Declined</span>
+			<span class="inline-flex items-center gap-1.5 text-[11px] px-2 py-0.5 rounded-full border border-orange-700/50 text-orange-300 bg-orange-900/30"><span class="size-2 rounded-full bg-orange-400"></span>No Show</span>
+		</div>
+		<div class="flex flex-wrap items-center gap-2">
+			<span class="text-[11px] uppercase tracking-wide text-slate-400 font-semibold">Card Tags</span>
+			<span class="inline-flex items-center gap-1.5 text-[11px] px-2 py-0.5 rounded-full border border-amber-700/50 text-amber-300 bg-amber-900/30"><span class="size-2 rounded-full bg-amber-400"></span>Celebrity</span>
+			<span class="inline-flex items-center gap-1.5 text-[11px] px-2 py-0.5 rounded-full border border-violet-700/50 text-violet-300 bg-violet-900/30"><span class="size-2 rounded-full bg-violet-400"></span>Music Act</span>
+			<span class="inline-flex items-center gap-1.5 text-[11px] px-2 py-0.5 rounded-full border border-yellow-700/50 text-yellow-300 bg-yellow-900/30"><span class="size-2 rounded-full bg-yellow-400"></span>Payment Pending</span>
+			<span class="inline-flex items-center gap-1.5 text-[11px] px-2 py-0.5 rounded-full border border-emerald-700/50 text-emerald-300 bg-emerald-900/30"><span class="size-2 rounded-full bg-emerald-400"></span>Payment Paid</span>
+		</div>
+	</div>
+
 	<PipelineBoard config={BOARD_CONFIG} {items} onmove={handleMove} />
 </div>
+
+{#if confirmFinanceModal}
+	<div class="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4" role="dialog" aria-modal="true">
+		<div class="bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl w-full max-w-lg">
+			<div class="flex items-center justify-between p-5 border-b border-slate-700">
+				<div>
+					<h2 class="text-base font-semibold text-slate-100">Move to Booked: Finance Setup</h2>
+					<p class="text-xs text-slate-400 mt-1">{confirmFinanceModal.name} · {confirmFinanceModal.eventName}</p>
+				</div>
+				<button onclick={() => confirmFinanceModal = null} class="text-slate-400 hover:text-slate-100">
+					<X class="size-5" />
+				</button>
+			</div>
+			<div class="p-5 space-y-4">
+				<div class="rounded-lg border border-emerald-700/40 bg-emerald-950/20 px-3 py-2 text-xs text-emerald-300">
+					This creates submitted expenses that enter Approvals automatically and then flow into Work Orders after approval.
+				</div>
+				<div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+					<div>
+						<label class={LABEL}>Down Payment ($)</label>
+						<input bind:value={financeForm.downPaymentAmount} type="number" min="0" step="0.01" class={INPUT} placeholder="Required for booking" />
+					</div>
+					<div>
+						<label class={LABEL}>Travel Reimb. ($)</label>
+						<input bind:value={financeForm.travelAmount} type="number" min="0" step="0.01" class={INPUT} placeholder="Optional" />
+					</div>
+					<div>
+						<label class={LABEL}>Lodging Reimb. ($)</label>
+						<input bind:value={financeForm.lodgingAmount} type="number" min="0" step="0.01" class={INPUT} placeholder="Optional" />
+					</div>
+				</div>
+				<div>
+					<label class={LABEL}>Finance Notes (optional)</label>
+					<input bind:value={financeForm.notes} class={INPUT} placeholder="Booking terms, reimbursement constraints, or approvals context" />
+				</div>
+			</div>
+			<div class="flex justify-end gap-2 px-5 pb-5">
+				<Button type="button" variant="outline" onclick={() => confirmFinanceModal = null}>Cancel</Button>
+				<Button
+					type="button"
+					onclick={confirmBookedWithFinance}
+					disabled={financeBusy || !financeForm.downPaymentAmount || Number(financeForm.downPaymentAmount) <= 0}
+					class="bg-emerald-600 hover:bg-emerald-700 text-white disabled:opacity-50"
+				>
+					{financeBusy ? 'Saving...' : 'Confirm Booked + Create Expenses'}
+				</Button>
+			</div>
+		</div>
+	</div>
+{/if}
 
 {#if showNew}
 	<div class="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4" role="dialog" aria-modal="true">
