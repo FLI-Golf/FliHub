@@ -18,6 +18,7 @@
 	let showNewClaim    = $state(false);
 	let showInstructions = $state(false);
 	let showAbout       = $state(false);
+	let showBankStatementVault = $state(false);
 	let showMyClaims    = $state(false);
 	let showItemFinder  = $state(false);
 	let expandedClaim   = $state<string | null>(null);
@@ -31,8 +32,11 @@
 	let deletingSelectedItems = $state(false);
 	let attachReceiptErr = $state('');
 	let selectedItemIds = $state<Record<string, boolean>>({});
+	let selectedBankStatementIds = $state<Record<string, boolean>>({});
 	let bankStatementFile = $state<File | null>(null);
 	let bankStatementUploading = $state(false);
+	let deletingBankStatementId = $state<string | null>(null);
+	let deletingSelectedBankStatements = $state(false);
 	let bankStatementErr = $state('');
 
 	// ── New claim form ────────────────────────────────────────────────────────
@@ -182,11 +186,94 @@
 		return source.filter((item: any) => Array.isArray(item.receipts) && item.receipts.length > 0);
 	});
 
+	const selectedBankStatements = $derived.by(() => {
+		const source = (data.myBankStatements as any[]) ?? [];
+		return source.filter((statement: any) => !!selectedBankStatementIds[statement.id]);
+	});
+
 	const allFilteredSelected = $derived.by(() => {
 		const source = (filteredMyItems as any[]) ?? [];
 		if (!source.length) return false;
 		return source.every((item: any) => !!selectedItemIds[item.id]);
 	});
+
+	const allBankStatementsSelected = $derived.by(() => {
+		const source = (data.myBankStatements as any[]) ?? [];
+		if (!source.length) return false;
+		return source.every((statement: any) => !!selectedBankStatementIds[statement.id]);
+	});
+
+	function toggleSelectBankStatement(statementId: string, checked: boolean) {
+		selectedBankStatementIds = { ...selectedBankStatementIds, [statementId]: checked };
+	}
+
+	function toggleSelectAllBankStatements(checked: boolean) {
+		const next = { ...selectedBankStatementIds };
+		for (const statement of (data.myBankStatements as any[]) ?? []) {
+			next[statement.id] = checked;
+		}
+		selectedBankStatementIds = next;
+	}
+
+	async function requestDeleteBankStatements(statementIds: string[]) {
+		const res = await fetch('/api/bank-statements', {
+			method: 'DELETE',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({ ids: statementIds })
+		});
+
+		if (!res.ok) {
+			const body = await res.json().catch(() => ({}));
+			throw new Error(body.message ?? 'Delete failed');
+		}
+	}
+
+	function clearSelectedBankStatements(statementIds: string[]) {
+		const next = { ...selectedBankStatementIds };
+		for (const statementId of statementIds) {
+			delete next[statementId];
+		}
+		selectedBankStatementIds = next;
+	}
+
+	async function deleteBankStatement(statementId: string, fileName: string) {
+		if (!confirm(`Delete ${fileName || 'this bank statement'}? This cannot be undone.`)) return;
+
+		deletingBankStatementId = statementId;
+		bankStatementErr = '';
+		try {
+			await requestDeleteBankStatements([statementId]);
+			clearSelectedBankStatements([statementId]);
+			await invalidateAll();
+		} catch (e: any) {
+			bankStatementErr = e?.message ?? 'Failed to delete bank statement';
+		} finally {
+			deletingBankStatementId = null;
+		}
+	}
+
+	async function deleteSelectedBankStatements() {
+		const selected = (selectedBankStatements as any[]) ?? [];
+		if (!selected.length) {
+			bankStatementErr = 'Select at least one bank statement to delete.';
+			return;
+		}
+
+		if (!confirm(`Delete ${selected.length} selected bank statement${selected.length === 1 ? '' : 's'}? This cannot be undone.`)) return;
+
+		deletingSelectedBankStatements = true;
+		bankStatementErr = '';
+		const statementIds = selected.map((statement: any) => statement.id);
+		try {
+			await requestDeleteBankStatements(statementIds);
+			clearSelectedBankStatements(statementIds);
+			await invalidateAll();
+		} catch (e: any) {
+			bankStatementErr = e?.message ?? 'Failed to delete selected bank statements';
+		} finally {
+			deletingSelectedBankStatements = false;
+		}
+	}
 
 	async function removeReceiptsFromSelectedItems() {
 		const selected = (selectedFilteredWithReceipts as any[]) ?? [];
@@ -514,77 +601,135 @@
 	</div>
 
 	<!-- Bank statement vault -->
-	<Card class="p-5 bg-slate-800/40 border-slate-700 space-y-4">
-		<div class="flex items-center justify-between gap-3 flex-wrap">
+	<Card class="bg-slate-800/40 border-slate-700 overflow-hidden">
+		<button
+			type="button"
+			onclick={() => showBankStatementVault = !showBankStatementVault}
+			class="w-full flex items-center justify-between gap-3 flex-wrap px-5 py-4 hover:bg-slate-700/30 transition-colors text-left"
+			aria-expanded={showBankStatementVault}
+		>
 			<div>
 				<h2 class="text-lg font-semibold text-slate-100">Bank Statement Vault</h2>
 				<p class="text-sm text-slate-400">Upload one bank statement PDF at a time for historical backup.</p>
 			</div>
-			<span class="text-xs px-2.5 py-1 rounded-md border border-slate-600 text-slate-300">
-				{data.myBankStatements?.length ?? 0} file{(data.myBankStatements?.length ?? 0) === 1 ? '' : 's'}
-			</span>
-		</div>
+			<div class="flex items-center gap-3">
+				<span class="text-xs px-2.5 py-1 rounded-md border border-slate-600 text-slate-300">
+					{data.myBankStatements?.length ?? 0} file{(data.myBankStatements?.length ?? 0) === 1 ? '' : 's'}
+				</span>
+				<ChevronDown class="size-4 text-slate-500 transition-transform {showBankStatementVault ? 'rotate-180' : ''}" />
+			</div>
+		</button>
 
-		<div class="flex items-center gap-3 flex-wrap">
-			<input
-				id="bank-statement-upload-input"
-				type="file"
-				accept="application/pdf,.pdf"
-				onchange={(e) => {
-					bankStatementErr = '';
-					bankStatementFile = ((e.currentTarget as HTMLInputElement).files?.[0] ?? null);
-				}}
-				class="block w-full max-w-md text-xs text-slate-400 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border file:border-slate-600 file:bg-slate-700 file:text-slate-300 file:text-xs hover:file:bg-slate-600 file:transition-colors cursor-pointer"
-			/>
-			<Button onclick={uploadBankStatement} disabled={bankStatementUploading || !bankStatementFile} class="gap-2 bg-blue-600 hover:bg-blue-700 text-white">
-				{#if bankStatementUploading}
-					<Loader2 class="size-4 animate-spin" /> Uploading...
-				{:else}
-					<Upload class="size-4" /> Upload PDF
+		{#if showBankStatementVault}
+			<div class="border-t border-slate-700 p-5 space-y-4">
+				<div class="flex items-center gap-3 flex-wrap">
+					<input
+						id="bank-statement-upload-input"
+						type="file"
+						accept="application/pdf,.pdf"
+						onchange={(e) => {
+							bankStatementErr = '';
+							bankStatementFile = ((e.currentTarget as HTMLInputElement).files?.[0] ?? null);
+						}}
+						class="block w-full max-w-md text-xs text-slate-400 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border file:border-slate-600 file:bg-slate-700 file:text-slate-300 file:text-xs hover:file:bg-slate-600 file:transition-colors cursor-pointer"
+					/>
+					<Button onclick={uploadBankStatement} disabled={bankStatementUploading || !bankStatementFile} class="gap-2 bg-blue-600 hover:bg-blue-700 text-white">
+						{#if bankStatementUploading}
+							<Loader2 class="size-4 animate-spin" /> Uploading...
+						{:else}
+							<Upload class="size-4" /> Upload PDF
+						{/if}
+					</Button>
+					<Button
+						type="button"
+						variant="outline"
+						onclick={deleteSelectedBankStatements}
+						disabled={bankStatementUploading || deletingSelectedBankStatements || deletingBankStatementId !== null || !(selectedBankStatements as any[])?.length}
+						class="gap-2 border-red-800 text-red-400 hover:bg-red-900/30"
+					>
+						{#if deletingSelectedBankStatements}
+							<Loader2 class="size-4 animate-spin" /> Deleting Selected...
+						{:else}
+							<Trash2 class="size-4" /> Delete Selected ({(selectedBankStatements as any[])?.length ?? 0})
+						{/if}
+					</Button>
+				</div>
+
+				{#if bankStatementErr}
+					<p class="text-xs text-red-400 bg-red-900/30 border border-red-700 rounded-lg px-3 py-2">{bankStatementErr}</p>
 				{/if}
-			</Button>
-		</div>
 
-		{#if bankStatementErr}
-			<p class="text-xs text-red-400 bg-red-900/30 border border-red-700 rounded-lg px-3 py-2">{bankStatementErr}</p>
-		{/if}
-
-		{#if !data.myBankStatements?.length}
-			<p class="text-xs text-slate-400">No bank statements uploaded yet.</p>
-		{:else}
-			<div class="rounded-lg border border-slate-700 overflow-hidden">
-				<table class="w-full text-xs">
-					<thead class="bg-slate-900/40 border-b border-slate-700">
-						<tr class="text-left text-slate-400 uppercase tracking-wide">
-							<th class="px-3 py-2">File</th>
-							<th class="px-3 py-2">Uploaded</th>
-							<th class="px-3 py-2 text-right">Action</th>
-						</tr>
-					</thead>
-					<tbody class="divide-y divide-slate-700/40">
-						{#each data.myBankStatements as statement}
-							{@const fileName = Array.isArray(statement.pdf_file) ? statement.pdf_file[0] : statement.pdf_file}
-							<tr>
-								<td class="px-3 py-2 text-slate-200">{fileName || 'PDF file'}</td>
-								<td class="px-3 py-2 text-slate-400">{fmtDate(statement.created)}</td>
-								<td class="px-3 py-2 text-right">
-									{#if fileName}
-										<a
-											href="/api/pb-file/{statement.collectionId}/{statement.id}/{fileName}"
-											target="_blank"
-											rel="noopener noreferrer"
-											class="text-blue-400 hover:text-blue-300 hover:underline"
-										>
-											View PDF
-										</a>
-									{:else}
-										<span class="text-slate-500">Unavailable</span>
-									{/if}
-								</td>
-							</tr>
-						{/each}
-					</tbody>
-				</table>
+				{#if !data.myBankStatements?.length}
+					<p class="text-xs text-slate-400">No bank statements uploaded yet.</p>
+				{:else}
+					<div class="rounded-lg border border-slate-700 overflow-hidden">
+						<table class="w-full text-xs">
+							<thead class="bg-slate-900/40 border-b border-slate-700">
+								<tr class="text-left text-slate-400 uppercase tracking-wide">
+									<th class="px-3 py-2 w-8">
+										<input
+											type="checkbox"
+											class="rounded border-slate-500 bg-slate-800"
+											checked={allBankStatementsSelected}
+											onchange={(e) => toggleSelectAllBankStatements((e.currentTarget as HTMLInputElement).checked)}
+											title="Select all bank statements"
+										/>
+									</th>
+									<th class="px-3 py-2">File</th>
+									<th class="px-3 py-2">Uploaded</th>
+									<th class="px-3 py-2 text-right">Action</th>
+								</tr>
+							</thead>
+							<tbody class="divide-y divide-slate-700/40">
+								{#each data.myBankStatements as statement}
+									{@const fileName = Array.isArray(statement.pdf_file) ? statement.pdf_file[0] : statement.pdf_file}
+									<tr>
+										<td class="px-3 py-2 align-top">
+											<input
+												type="checkbox"
+												class="rounded border-slate-500 bg-slate-800"
+												checked={!!selectedBankStatementIds[statement.id]}
+												onchange={(e) => toggleSelectBankStatement(statement.id, (e.currentTarget as HTMLInputElement).checked)}
+												disabled={deletingSelectedBankStatements || deletingBankStatementId !== null}
+												title={`Select ${fileName || 'bank statement'}`}
+											/>
+										</td>
+										<td class="px-3 py-2 text-slate-200">{fileName || 'PDF file'}</td>
+										<td class="px-3 py-2 text-slate-400">{fmtDate(statement.created)}</td>
+										<td class="px-3 py-2 text-right">
+											<div class="flex items-center justify-end gap-3">
+												{#if fileName}
+													<a
+														href="/api/pb-file/{statement.collectionId}/{statement.id}/{fileName}"
+														target="_blank"
+														rel="noopener noreferrer"
+														class="text-blue-400 hover:text-blue-300 hover:underline"
+													>
+														View PDF
+													</a>
+												{:else}
+													<span class="text-slate-500">Unavailable</span>
+												{/if}
+												<button
+													type="button"
+													onclick={() => deleteBankStatement(statement.id, fileName || 'this bank statement')}
+													disabled={deletingSelectedBankStatements || deletingBankStatementId !== null}
+													class="inline-flex items-center gap-1 text-red-400 hover:text-red-300 disabled:opacity-50"
+												>
+													{#if deletingBankStatementId === statement.id}
+														<Loader2 class="size-3.5 animate-spin" /> Deleting...
+													{:else}
+														<Trash2 class="size-3.5" /> Delete
+													{/if}
+												</button>
+											</div>
+										</td>
+									</tr>
+								{/each}
+							</tbody>
+						</table>
+					</div>
+				{/if}
 			</div>
 		{/if}
 	</Card>
@@ -607,17 +752,15 @@
 			<!-- What is this -->
 			<div class="space-y-1.5">
 				<p class="text-xs font-bold uppercase tracking-wide text-slate-400">What is this?</p>
-				<p>The Reimbursements module lets FLI Golf team members submit out-of-pocket business expenses for reimbursement. Expenses are grouped into <strong class="text-slate-100">claims</strong> — each claim can contain multiple line items (receipts, transactions, etc.). Every claim is reviewed by Ina Masten (CPA, Masten Solutions) to verify tax treatment and IRS compliance before payment is authorized.</p>
+				<p>The Reimbursements module lets FLI Golf team members submit out-of-pocket business expenses for reimbursement. Expenses are grouped into <strong class="text-slate-100">claims</strong> — each claim can contain multiple line items (receipts, transactions, etc.). Once submitted, each claim enters the workflow at <strong class="text-slate-100">Under Review</strong>, where Ina Masten (CPA, Masten Solutions) verifies tax treatment and IRS compliance before payment is authorized.</p>
 			</div>
 
 			<!-- Pipeline -->
 			<div class="space-y-3">
 				<p class="text-xs font-bold uppercase tracking-wide text-slate-400">The Pipeline</p>
-				<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-2">
+				<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
 					{#each [
-						{ status: 'Draft',        color: 'border-slate-600 bg-slate-800/60',       dot: 'bg-slate-500',   who: 'Claimant',  desc: 'Claim created but not yet submitted. You can edit or delete it.' },
-						{ status: 'Submitted',    color: 'border-blue-700/50 bg-blue-950/30',      dot: 'bg-blue-400',    who: 'Claimant',  desc: 'Sent for admin review. No further edits allowed.' },
-						{ status: 'Under Review', color: 'border-yellow-700/50 bg-yellow-950/30',  dot: 'bg-yellow-400',  who: 'Admin',     desc: 'Admin is actively reviewing the claim and line items.' },
+						{ status: 'Under Review', color: 'border-yellow-700/50 bg-yellow-950/30',  dot: 'bg-yellow-400',  who: 'Admin',     desc: 'This is the starting point. Admin is actively reviewing the claim and line items.' },
 						{ status: 'Approved',     color: 'border-violet-700/50 bg-violet-950/30',  dot: 'bg-violet-400',  who: 'Admin',     desc: 'Claim approved. Admin will assign a reference number and process payment.' },
 						{ status: 'Paid',         color: 'border-emerald-700/50 bg-emerald-950/30',dot: 'bg-emerald-400', who: 'Admin',     desc: 'Payment issued. A Work Order (WO-NNN) is created automatically — Ina uses this to enter the payment in QuickBooks. Once the QB transaction ID is recorded on the Work Order, an Expense record is automatically submitted to the approval pipeline to fully settle the payment.' },
 					] as stage}
@@ -660,7 +803,7 @@
 					{#each [
 						'Click New Claim and give it a descriptive title (e.g. "March Travel — Phoenix Conference").',
 						'Add one line item per expense — description, amount, date, category, and vendor.',
-						'Click Submit for Review to send it to the admin queue. Or save as a draft to finish later.',
+						'Click Submit for Review to send it directly into the Under Review queue.',
 						'Once approved, the claim is handed off to a Work Order. Ina uses the Work Orders screen to enter the QuickBooks check number and complete payment processing.',
 					] as step, i}
 						<li class="flex items-start gap-2.5">
