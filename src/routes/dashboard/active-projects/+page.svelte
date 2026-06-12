@@ -99,6 +99,31 @@
 		cancelled:   { label: 'Cancelled',   color: 'text-slate-600' }
 	};
 
+	function taskStatusPriority(status: string | null | undefined): number {
+		// Keep active work at the top, then order everything else by date.
+		return status === 'in_progress' ? 0 : 1;
+	}
+
+	function taskDateValue(task: any): number {
+		if (!task?.dueDate) return Number.POSITIVE_INFINITY;
+		const time = new Date(task.dueDate).getTime();
+		return Number.isFinite(time) ? time : Number.POSITIVE_INFINITY;
+	}
+
+	function sortedProjectTasks(project: any): any[] {
+		const items = [...(project?.tasks?.items ?? [])];
+		items.sort((a: any, b: any) => {
+			const statusCmp = taskStatusPriority(a.status) - taskStatusPriority(b.status);
+			if (statusCmp !== 0) return statusCmp;
+
+			const dateCmp = taskDateValue(a) - taskDateValue(b);
+			if (dateCmp !== 0) return dateCmp;
+
+			return (a.title ?? '').localeCompare(b.title ?? '');
+		});
+		return items;
+	}
+
 	function fmt(n: number) {
 		return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(n);
 	}
@@ -742,7 +767,7 @@
 								{#if project.tasks.items.length === 0}
 									<p class="text-[11px] text-slate-600 italic px-2 py-1">No tasks have been added to this project.</p>
 								{:else}
-									{#each project.tasks.items as task}
+									{#each sortedProjectTasks(project) as task}
 										{@const s = STATUS_ICON[task.status] ?? STATUS_ICON.todo}
 										<div
 											role="button"

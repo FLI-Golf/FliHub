@@ -425,16 +425,6 @@
 									{/if}
 								</td>
 								<td class="px-3 py-3">
-									{#if selectable}
-										<input
-											type="checkbox"
-											checked={selectedClaimIds.includes(claim.id)}
-											onchange={() => toggleClaimSelected(claim.id)}
-											class="rounded border-slate-600 accent-emerald-500"
-										/>
-									{/if}
-								</td>
-								<td class="px-3 py-3">
 									<button onclick={() => expanded = isOpen ? null : claim.id}
 										class="text-slate-500 hover:text-slate-300 transition-colors">
 										<ChevronRight class="size-4 transition-transform {isOpen ? 'rotate-90' : ''}" />
