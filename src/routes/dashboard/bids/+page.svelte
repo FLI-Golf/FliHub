@@ -16,16 +16,90 @@
 	let filterProject = $state('');
 	let filterVendor  = $state('');
 	let search        = $state('');
+	let minAmount     = $state('');
+	let maxAmount     = $state('');
+	let sortBy        = $state('created_desc');
 
-	const filtered = $derived(bids.filter((b: any) => {
-		const q = search.toLowerCase();
-		const matchSearch = !q ||
-			(b.expand?.vendorId?.name  ?? '').toLowerCase().includes(q) ||
-			(b.expand?.projectId?.name ?? '').toLowerCase().includes(q);
-		const matchProject = !filterProject || b.projectId === filterProject;
-		const matchVendor  = !filterVendor  || b.vendorId  === filterVendor;
-		return matchSearch && matchProject && matchVendor;
-	}));
+	const STAGE_OPTIONS = ['submitted', 'under_review', 'shortlisted', 'awarded', 'not_selected', 'closed'];
+	let selectedStages = $state<string[]>([...STAGE_OPTIONS]);
+
+	const APPROVAL_OPTIONS = ['pending', 'approved', 'rejected'];
+	let selectedApprovalStatuses = $state<string[]>([...APPROVAL_OPTIONS]);
+
+	function toggleStage(stage: string) {
+		selectedStages = selectedStages.includes(stage)
+			? selectedStages.filter((s) => s !== stage)
+			: [...selectedStages, stage];
+	}
+
+	function toggleApprovalStatus(status: string) {
+		selectedApprovalStatuses = selectedApprovalStatuses.includes(status)
+			? selectedApprovalStatuses.filter((s) => s !== status)
+			: [...selectedApprovalStatuses, status];
+	}
+
+	function resetFilters() {
+		filterProject = '';
+		filterVendor = '';
+		search = '';
+		minAmount = '';
+		maxAmount = '';
+		sortBy = 'created_desc';
+		selectedStages = [...STAGE_OPTIONS];
+		selectedApprovalStatuses = [...APPROVAL_OPTIONS];
+	}
+
+	const filtered = $derived.by(() => {
+		const q = search.trim().toLowerCase();
+		const min = minAmount ? Number(minAmount) : null;
+		const max = maxAmount ? Number(maxAmount) : null;
+
+		let list = bids.filter((b: any) => {
+			const approvalStatus = (data.approvalByBid as Record<string, string>)?.[b.id] ?? '';
+			const hasApproval = Boolean(approvalStatus);
+
+			const matchSearch = !q ||
+				(b.expand?.vendorId?.name  ?? '').toLowerCase().includes(q) ||
+				(b.expand?.projectId?.name ?? '').toLowerCase().includes(q) ||
+				String(b.scope ?? '').toLowerCase().includes(q) ||
+				String(b.notes ?? '').toLowerCase().includes(q);
+
+			if (!matchSearch) return false;
+			if (filterProject && b.projectId !== filterProject) return false;
+			if (filterVendor && b.vendorId !== filterVendor) return false;
+			if (selectedStages.length > 0 && !selectedStages.includes(b.status)) return false;
+
+			if (hasApproval) {
+				if (selectedApprovalStatuses.length > 0 && !selectedApprovalStatuses.includes(approvalStatus)) return false;
+			}
+
+			const amount = Number(b.amount ?? 0);
+			if (min !== null && !Number.isNaN(min) && amount < min) return false;
+			if (max !== null && !Number.isNaN(max) && amount > max) return false;
+
+			return true;
+		});
+
+		list = [...list].sort((a: any, b: any) => {
+			switch (sortBy) {
+				case 'amount_desc':
+					return Number(b.amount ?? 0) - Number(a.amount ?? 0);
+				case 'amount_asc':
+					return Number(a.amount ?? 0) - Number(b.amount ?? 0);
+				case 'vendor_az':
+					return String(a.expand?.vendorId?.name ?? '').localeCompare(String(b.expand?.vendorId?.name ?? ''));
+				case 'project_az':
+					return String(a.expand?.projectId?.name ?? '').localeCompare(String(b.expand?.projectId?.name ?? ''));
+				case 'created_asc':
+					return new Date(a.created ?? 0).getTime() - new Date(b.created ?? 0).getTime();
+				case 'created_desc':
+				default:
+					return new Date(b.created ?? 0).getTime() - new Date(a.created ?? 0).getTime();
+			}
+		});
+
+		return list;
+	});
 
 	// ── Formatting ────────────────────────────────────────────────────────────
 	function fmt(n: number) {
@@ -81,6 +155,21 @@
 			};
 		})
 	);
+
+	const filteredStageCounts = $derived.by(() => {
+		const counts: Record<string, number> = {
+			submitted: 0,
+			under_review: 0,
+			shortlisted: 0,
+			awarded: 0,
+			not_selected: 0,
+			closed: 0,
+		};
+		for (const bid of filtered) {
+			counts[bid.status] = (counts[bid.status] ?? 0) + 1;
+		}
+		return counts;
+	});
 
 	// ── Stage advance ─────────────────────────────────────────────────────────
 	let moving     = $state(false);
@@ -161,42 +250,103 @@
 	<!-- KPI strip -->
 	<div class="grid grid-cols-2 lg:grid-cols-5 gap-3">
 		{#each [
-			{ label: 'Total Bids',    value: bids.length,                                                    color: 'border-l-slate-500' },
-			{ label: 'Submitted',     value: (data as any).stageCounts?.submitted    ?? 0,                   color: 'border-l-blue-500' },
-			{ label: 'Under Review',  value: (data as any).stageCounts?.under_review ?? 0,                   color: 'border-l-yellow-500' },
-			{ label: 'Shortlisted',   value: (data as any).stageCounts?.shortlisted  ?? 0,                   color: 'border-l-violet-500' },
-			{ label: 'Awarded',       value: (data as any).stageCounts?.awarded       ?? 0,                   color: 'border-l-emerald-500' },
+			{ label: 'Total Bids',    value: filtered.length,                      sub: `${filtered.length} of ${bids.length}`, color: 'border-l-slate-500' },
+			{ label: 'Submitted',     value: filteredStageCounts.submitted ?? 0,   sub: null,                                    color: 'border-l-blue-500' },
+			{ label: 'Under Review',  value: filteredStageCounts.under_review ?? 0,sub: null,                                    color: 'border-l-yellow-500' },
+			{ label: 'Shortlisted',   value: filteredStageCounts.shortlisted ?? 0, sub: null,                                    color: 'border-l-violet-500' },
+			{ label: 'Awarded',       value: filteredStageCounts.awarded ?? 0,     sub: null,                                    color: 'border-l-emerald-500' },
 		] as kpi}
 			<Card class="p-4 border-l-4 {kpi.color} bg-slate-800/40">
 				<p class="text-xs text-slate-400 uppercase tracking-wide mb-1">{kpi.label}</p>
 				<p class="text-2xl font-bold text-white">{kpi.value}</p>
+				{#if kpi.sub}
+					<p class="text-[10px] text-slate-500 mt-1">{kpi.sub}</p>
+				{/if}
 			</Card>
 		{/each}
 	</div>
 
 	<!-- Filters -->
-	<div class="flex flex-wrap gap-3">
-		<div class="relative flex-1 min-w-48 max-w-xs">
+	<div class="rounded-xl border border-slate-700 bg-slate-900/40 p-4 space-y-4">
+		<div class="flex flex-wrap gap-3 items-end">
+			<div class="relative flex-1 min-w-48 max-w-xs">
 			<Search class="absolute left-3 top-1/2 -translate-y-1/2 size-3.5 text-slate-500" />
 			<input bind:value={search} placeholder="Search vendor or project…"
 				class="w-full rounded-lg bg-slate-800 border border-slate-700 pl-9 pr-3 py-2 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-orange-500" />
 		</div>
-		<select bind:value={filterProject}
-			class="rounded-lg bg-slate-800 border border-slate-700 px-3 py-2 text-sm text-white focus:outline-none focus:border-orange-500">
-			<option value="">All projects</option>
-			{#each projects as p}<option value={p.id}>{p.name}</option>{/each}
-		</select>
-		<select bind:value={filterVendor}
-			class="rounded-lg bg-slate-800 border border-slate-700 px-3 py-2 text-sm text-white focus:outline-none focus:border-orange-500">
-			<option value="">All vendors</option>
-			{#each vendors as v}<option value={v.id}>{v.name}</option>{/each}
-		</select>
+			<select bind:value={filterProject}
+				class="rounded-lg bg-slate-800 border border-slate-700 px-3 py-2 text-sm text-white focus:outline-none focus:border-orange-500">
+				<option value="">All projects</option>
+				{#each projects as p}<option value={p.id}>{p.name}</option>{/each}
+			</select>
+			<select bind:value={filterVendor}
+				class="rounded-lg bg-slate-800 border border-slate-700 px-3 py-2 text-sm text-white focus:outline-none focus:border-orange-500">
+				<option value="">All vendors</option>
+				{#each vendors as v}<option value={v.id}>{v.name}</option>{/each}
+			</select>
+			<input bind:value={minAmount} type="number" min="0" placeholder="Min amount"
+				class="w-36 rounded-lg bg-slate-800 border border-slate-700 px-3 py-2 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-orange-500" />
+			<input bind:value={maxAmount} type="number" min="0" placeholder="Max amount"
+				class="w-36 rounded-lg bg-slate-800 border border-slate-700 px-3 py-2 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-orange-500" />
+			<select bind:value={sortBy}
+				class="rounded-lg bg-slate-800 border border-slate-700 px-3 py-2 text-sm text-white focus:outline-none focus:border-orange-500">
+				<option value="created_desc">Newest first</option>
+				<option value="created_asc">Oldest first</option>
+				<option value="amount_desc">Amount high → low</option>
+				<option value="amount_asc">Amount low → high</option>
+				<option value="vendor_az">Vendor A → Z</option>
+				<option value="project_az">Project A → Z</option>
+			</select>
+			<button type="button" onclick={resetFilters}
+				class="rounded-lg border border-slate-600 px-3 py-2 text-sm text-slate-300 hover:border-slate-400 hover:text-slate-100 transition-colors">Reset</button>
+		</div>
+
+		<div class="flex flex-wrap items-center gap-2">
+			<span class="text-xs text-slate-400 uppercase tracking-wide mr-1">Stage</span>
+			{#each STAGE_OPTIONS as stage}
+				<button
+					type="button"
+					onclick={() => toggleStage(stage)}
+					class={`text-xs px-2.5 py-1 rounded-full border transition-colors ${selectedStages.includes(stage)
+						? 'bg-blue-900/30 text-blue-300 border-blue-700/50'
+						: 'bg-slate-900 text-slate-500 border-slate-700 hover:border-slate-500 hover:text-slate-300'}`}
+				>
+					{stage.replace('_', ' ')}
+				</button>
+			{/each}
+		</div>
+
+		<div class="flex flex-wrap items-center gap-2">
+			<span class="text-xs text-slate-400 uppercase tracking-wide mr-1">Approval</span>
+			{#each APPROVAL_OPTIONS as s}
+				<button
+					type="button"
+					onclick={() => toggleApprovalStatus(s)}
+					class={`text-xs px-2.5 py-1 rounded-full border transition-colors ${selectedApprovalStatuses.includes(s)
+						? 'bg-emerald-900/30 text-emerald-300 border-emerald-700/50'
+						: 'bg-slate-900 text-slate-500 border-slate-700 hover:border-slate-500 hover:text-slate-300'}`}
+				>
+					{s}
+				</button>
+			{/each}
+		</div>
+
+		<p class="text-xs text-slate-500">Showing {filtered.length} of {bids.length} bids</p>
 	</div>
 
 	<!-- Board -->
 	<div>
 		<p class="text-xs text-slate-500 mb-3">Drag to advance · awarding a bid links the vendor to the project</p>
-		<PipelineBoard config={boardConfig} items={boardItems} onmove={handleMove} />
+		{#if boardItems.length === 0}
+			<Card class="p-8 text-center border-slate-700 bg-slate-900/30">
+				<p class="text-slate-300 font-medium">No bids match these filters</p>
+				<p class="text-xs text-slate-500 mt-1">Try broadening search criteria or reset filters.</p>
+				<button type="button" onclick={resetFilters}
+					class="mt-3 rounded-lg border border-slate-600 px-3 py-1.5 text-sm text-slate-300 hover:border-slate-400 hover:text-slate-100 transition-colors">Reset Filters</button>
+			</Card>
+		{:else}
+			<PipelineBoard config={boardConfig} items={boardItems} onmove={handleMove} />
+		{/if}
 	</div>
 
 </div>

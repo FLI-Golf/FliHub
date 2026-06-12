@@ -64,6 +64,11 @@
 	// Calculate filtered totals
 	let filteredBudget = $derived(filteredProjects.reduce((sum, p) => sum + (p.project_budget || 0), 0));
 	let filteredActual = $derived(filteredProjects.reduce((sum, p) => sum + (p.project_actual_expenses || 0), 0));
+	let filteredOverBudget = $derived(filteredProjects.filter((p) => getBudgetPercentage(p) >= 100).length);
+	let filteredNearingBudget = $derived(filteredProjects.filter((p) => {
+		const pct = getBudgetPercentage(p);
+		return pct >= 80 && pct < 100;
+	}).length);
 	
 	// Build status tabs
 	let statusTabs = $derived([
@@ -118,6 +123,35 @@
 		// Simple regex-based HTML stripping (works on both server and client)
 		return html.replace(/<[^>]*>/g, '').replace(/&nbsp;/g, ' ').trim();
 	}
+
+	function clearFilters() {
+		statusFilter = 'all';
+		typeFilter = 'all';
+		searchQuery = '';
+	}
+
+	function statusToneClass(status: string): string {
+		switch (status) {
+			case 'draft': return 'border-l-slate-500';
+			case 'planned': return 'border-l-blue-500';
+			case 'in_progress': return 'border-l-amber-500';
+			case 'completed': return 'border-l-emerald-500';
+			case 'cancelled': return 'border-l-rose-500';
+			default: return 'border-l-slate-600';
+		}
+	}
+
+	function nextAction(project: any): string {
+		const pct = getBudgetPercentage(project);
+		if (project.status === 'draft') return 'Define budget, owner, and kickoff date';
+		if (project.status === 'planned') return 'Confirm scope and move to in progress';
+		if (project.status === 'in_progress' && pct >= 100) return 'Freeze spend and approve budget correction';
+		if (project.status === 'in_progress' && pct >= 80) return 'Review remaining spend and reprioritize tasks';
+		if (project.status === 'in_progress') return 'Track execution milestones this week';
+		if (project.status === 'completed') return 'Closeout financials and capture outcomes';
+		if (project.status === 'cancelled') return 'Archive notes and release remaining budget';
+		return 'Review current status and ownership';
+	}
 </script>
 
 <svelte:head>
@@ -125,16 +159,19 @@
 </svelte:head>
 
 <div class="flex flex-col gap-6">
-	<div class="flex justify-between items-center">
-		<div>
-			<h1 class="text-3xl font-bold mb-2">Projects</h1>
-			<p class="text-muted-foreground">Manage tournaments, events, activations, and campaigns</p>
+	<Card class="p-6 bg-gradient-to-r from-blue-950/40 via-slate-900/40 to-emerald-950/30 border-slate-700">
+		<div class="flex flex-wrap justify-between items-center gap-4">
+			<div>
+				<h1 class="text-3xl font-bold mb-2 text-slate-100">Projects</h1>
+				<p class="text-slate-300">Manage tournaments, events, activations, and campaigns</p>
+				<p class="text-xs text-slate-400 mt-1">Use filters below to focus on projects needing action this week.</p>
+			</div>
+			<Button class="gap-2 bg-emerald-600 hover:bg-emerald-700 text-white" onclick={() => showAddModal = true}>
+				<Plus class="size-4" />
+				Add Project
+			</Button>
 		</div>
-		<Button class="gap-2" onclick={() => showAddModal = true}>
-			<Plus class="size-4" />
-			Add Project
-		</Button>
-	</div>
+	</Card>
 
 	<!-- Add Project Modal -->
 	<AddProjectModal bind:open={showAddModal} departments={data.departments || []} />
@@ -206,6 +243,27 @@
 		</div>
 	</div>
 
+	<!-- Action Center -->
+	<Card class="p-5 border-slate-700 bg-slate-900/40">
+		<div class="flex flex-wrap items-center justify-between gap-4">
+			<div>
+				<h2 class="text-sm font-semibold uppercase tracking-wide text-slate-300">Action Center</h2>
+				<p class="text-xs text-slate-400 mt-1">Color-coded priorities based on budget pressure and delivery stage.</p>
+			</div>
+			<div class="flex flex-wrap gap-2 text-xs">
+				<span class="px-2.5 py-1 rounded-full border border-red-700/50 bg-red-900/30 text-red-300">
+					{filteredOverBudget} over budget
+				</span>
+				<span class="px-2.5 py-1 rounded-full border border-amber-700/50 bg-amber-900/30 text-amber-300">
+					{filteredNearingBudget} near limit
+				</span>
+				<span class="px-2.5 py-1 rounded-full border border-blue-700/50 bg-blue-900/30 text-blue-300">
+					{stats.byStatus.in_progress} in progress
+				</span>
+			</div>
+		</div>
+	</Card>
+
 	<!-- Budget Overview -->
 	<div>
 		<h2 class="text-xl font-semibold mb-4">Budget Utilization</h2>
@@ -245,25 +303,28 @@
 	<div>
 		<div class="flex items-center justify-between mb-4">
 			<h2 class="text-xl font-semibold">All Projects</h2>
-			{#if statusFilter !== 'all' || typeFilter !== 'all' || searchQuery}
-				<div class="text-sm text-muted-foreground">
-					Showing {filteredProjects.length} {filteredProjects.length === 1 ? 'project' : 'projects'} • 
-					Budget: <span class="font-semibold">{formatCurrency(filteredBudget)}</span> • 
-					Spent: <span class="font-semibold">{formatCurrency(filteredActual)}</span>
-				</div>
-			{/if}
+			<div class="text-sm text-muted-foreground">
+				Showing {filteredProjects.length} {filteredProjects.length === 1 ? 'project' : 'projects'} • 
+				Budget: <span class="font-semibold text-slate-200">{formatCurrency(filteredBudget)}</span> • 
+				Spent: <span class="font-semibold text-slate-200">{formatCurrency(filteredActual)}</span>
+			</div>
 		</div>
 		
 		<!-- Search Bar -->
-		<div class="mb-4">
-			<div class="relative max-w-md">
-				<Search class="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
-				<Input
-					type="text"
-					placeholder="Search projects by name or description..."
-					bind:value={searchQuery}
-					class="pl-10 text-white placeholder:text-slate-400"
-				/>
+		<div class="mb-4 rounded-xl border border-slate-700 bg-slate-900/30 p-4">
+			<div class="flex flex-wrap gap-3 items-center justify-between">
+				<div class="relative max-w-md w-full">
+					<Search class="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
+					<Input
+						type="text"
+						placeholder="Search projects by name or description..."
+						bind:value={searchQuery}
+						class="pl-10 text-white placeholder:text-slate-400"
+					/>
+				</div>
+				{#if statusFilter !== 'all' || typeFilter !== 'all' || searchQuery}
+					<Button variant="outline" class="border-slate-600 text-slate-300" onclick={clearFilters}>Clear Filters</Button>
+				{/if}
 			</div>
 		</div>
 		
@@ -289,30 +350,48 @@
 			/>
 		</div>
 
+		<!-- Legends -->
+		<div class="mb-4 flex flex-wrap items-center gap-4 rounded-xl border border-slate-700 bg-slate-900/30 px-4 py-3">
+			<div class="flex flex-wrap items-center gap-2">
+				<span class="text-[11px] uppercase tracking-wide text-slate-400 font-semibold">Status</span>
+				<span class="inline-flex items-center gap-1.5 text-[11px] px-2 py-0.5 rounded-full border border-slate-600 text-slate-300 bg-slate-800/70"><span class="size-2 rounded-full bg-slate-400"></span>Draft</span>
+				<span class="inline-flex items-center gap-1.5 text-[11px] px-2 py-0.5 rounded-full border border-blue-700/50 text-blue-300 bg-blue-900/30"><span class="size-2 rounded-full bg-blue-400"></span>Planned</span>
+				<span class="inline-flex items-center gap-1.5 text-[11px] px-2 py-0.5 rounded-full border border-amber-700/50 text-amber-300 bg-amber-900/30"><span class="size-2 rounded-full bg-amber-400"></span>In Progress</span>
+				<span class="inline-flex items-center gap-1.5 text-[11px] px-2 py-0.5 rounded-full border border-emerald-700/50 text-emerald-300 bg-emerald-900/30"><span class="size-2 rounded-full bg-emerald-400"></span>Completed</span>
+				<span class="inline-flex items-center gap-1.5 text-[11px] px-2 py-0.5 rounded-full border border-rose-700/50 text-rose-300 bg-rose-900/30"><span class="size-2 rounded-full bg-rose-400"></span>Cancelled</span>
+			</div>
+			<div class="flex flex-wrap items-center gap-2">
+				<span class="text-[11px] uppercase tracking-wide text-slate-400 font-semibold">Budget Risk</span>
+				<span class="inline-flex items-center gap-1.5 text-[11px] px-2 py-0.5 rounded-full border border-emerald-700/50 text-emerald-300 bg-emerald-900/30"><span class="size-2 rounded-full bg-emerald-400"></span>Healthy (&lt;80%)</span>
+				<span class="inline-flex items-center gap-1.5 text-[11px] px-2 py-0.5 rounded-full border border-amber-700/50 text-amber-300 bg-amber-900/30"><span class="size-2 rounded-full bg-amber-400"></span>Nearing Limit (80-99%)</span>
+				<span class="inline-flex items-center gap-1.5 text-[11px] px-2 py-0.5 rounded-full border border-red-700/50 text-red-300 bg-red-900/30"><span class="size-2 rounded-full bg-red-400"></span>Over Budget (100%+)</span>
+			</div>
+		</div>
+
 		<Card class="overflow-hidden">
 			<div class="overflow-x-auto">
 				<table class="w-full">
-					<thead class="bg-slate-50 dark:bg-slate-900 border-b">
+					<thead class="bg-slate-900 border-b border-slate-700">
 						<tr>
-							<th class="px-6 py-3 text-left text-xs font-semibold text-slate-900 dark:text-slate-100 uppercase tracking-wider">
+							<th class="px-6 py-3 text-left text-xs font-semibold text-slate-200 uppercase tracking-wider">
 								Project Name
 							</th>
-							<th class="px-6 py-3 text-left text-xs font-semibold text-slate-900 dark:text-slate-100 uppercase tracking-wider">
+							<th class="px-6 py-3 text-left text-xs font-semibold text-slate-200 uppercase tracking-wider">
 								Type
 							</th>
-							<th class="px-6 py-3 text-left text-xs font-semibold text-slate-900 dark:text-slate-100 uppercase tracking-wider">
+							<th class="px-6 py-3 text-left text-xs font-semibold text-slate-200 uppercase tracking-wider">
 								Status
 							</th>
-							<th class="px-6 py-3 text-left text-xs font-semibold text-slate-900 dark:text-slate-100 uppercase tracking-wider">
+							<th class="px-6 py-3 text-left text-xs font-semibold text-slate-200 uppercase tracking-wider">
 								Budget
 							</th>
-							<th class="px-6 py-3 text-left text-xs font-semibold text-slate-900 dark:text-slate-100 uppercase tracking-wider">
+							<th class="px-6 py-3 text-left text-xs font-semibold text-slate-200 uppercase tracking-wider">
 								Spent
 							</th>
-							<th class="px-6 py-3 text-left text-xs font-semibold text-slate-900 dark:text-slate-100 uppercase tracking-wider">
+							<th class="px-6 py-3 text-left text-xs font-semibold text-slate-200 uppercase tracking-wider">
 								Progress
 							</th>
-							<th class="px-6 py-3 text-left text-xs font-semibold text-slate-900 dark:text-slate-100 uppercase tracking-wider">
+							<th class="px-6 py-3 text-left text-xs font-semibold text-slate-200 uppercase tracking-wider">
 								Dates
 							</th>
 						</tr>
@@ -330,8 +409,9 @@
 							</tr>
 						{:else}
 							{#each filteredProjects as project, i}
+								{@const pct = getBudgetPercentage(project)}
 								<tr 
-									class="hover:bg-green-800 dark:hover:bg-green-800/50 transition-colors cursor-pointer {i % 2 === 1 ? 'bg-blue-800 dark:bg-blue-800/30' : ''}"
+									class="border-l-4 {statusToneClass(project.status)} hover:bg-slate-800/60 transition-colors cursor-pointer {i % 2 === 1 ? 'bg-slate-900/40' : ''}"
 									onclick={() => window.location.href = `/dashboard/projects/${project.id}`}
 								>
 									<td class="px-6 py-4">
@@ -341,6 +421,9 @@
 												{stripHtml(project.description)}
 											</div>
 										{/if}
+										<p class="text-[11px] mt-1 {pct >= 100 ? 'text-red-400' : pct >= 80 ? 'text-amber-400' : 'text-emerald-400'}">
+											Next: {nextAction(project)}
+										</p>
 									</td>
 									<td class="px-6 py-4 text-sm capitalize">
 										{project.type.replace('_', ' ')}
@@ -361,11 +444,11 @@
 													value={project.project_actual_expenses}
 													max={project.project_budget}
 													showPercentage={false}
-													variant={getBudgetVariant(getBudgetPercentage(project))}
+													variant={getBudgetVariant(pct)}
 													size="sm"
 												/>
-												<p class="text-xs text-muted-foreground mt-1">
-													{getBudgetPercentage(project).toFixed(0)}%
+												<p class="text-xs mt-1 {pct >= 100 ? 'text-red-400' : pct >= 80 ? 'text-amber-400' : 'text-emerald-400'}">
+													{pct.toFixed(0)}%
 												</p>
 											</div>
 										{:else}

@@ -9,6 +9,16 @@ import type { RequestHandler } from './$types';
 import { getAdminPocketBase } from '$lib/infra/pocketbase/pbClient';
 import { RequestContext } from '$lib/infra/RequestContext';
 
+function toIsoDate(d: Date): string {
+	return d.toISOString().slice(0, 10);
+}
+
+function addMonths(date: Date, months: number): Date {
+	const d = new Date(date);
+	d.setUTCMonth(d.getUTCMonth() + months);
+	return d;
+}
+
 function sponsorCode(name: string): string {
 	return name
 		.replace(/[^a-zA-Z\s]/g, '')
@@ -38,6 +48,13 @@ export const POST: RequestHandler = async ({ locals, url, params, request }) => 
 		return json({ message: 'amount is required and must be > 0' }, { status: 400 });
 	}
 
+	const paymentParts = Number(body.paymentParts ?? 1);
+	if (!Number.isInteger(paymentParts) || paymentParts < 1 || paymentParts > 6) {
+		return json({ message: 'paymentParts must be an integer between 1 and 6' }, { status: 400 });
+	}
+
+	const poYear = body.year ? Number(body.year) : new Date().getFullYear();
+
 	// Generate PO number: PO-SP{CODE}-{NNNN}
 	const code = sponsorCode(sponsor.companyName);
 	const existing = await adminPb.collection('sponsor_purchase_orders').getList(1, 1, {
@@ -50,24 +67,53 @@ export const POST: RequestHandler = async ({ locals, url, params, request }) => 
 	const poNumber = `PO-SP${code}-${String(seq).padStart(4, '0')}`;
 
 	try {
+		const sentDate = toIsoDate(new Date());
 		const po = await adminPb.collection('sponsor_purchase_orders').create({
 			po_number:    poNumber,
 			sponsorId:    sponsor.id,
 			amount,
-			year:         body.year         ? Number(body.year) : new Date().getFullYear(),
+			year:         poYear,
 			period_start: body.period_start ?? null,
 			period_end:   body.period_end   ?? null,
-			description:  body.description  || `Sponsorship agreement — ${sponsor.companyName} (${body.year ?? new Date().getFullYear()})`,
+			description:  body.description  || `Sponsorship agreement — ${sponsor.companyName} (${poYear})`,
 			terms:        body.terms        ?? '',
 			deliverables: body.deliverables ?? '',
 			dueDate:      body.dueDate      ?? null,
-			status:       'draft',
+			status:       'sent',
+			sentDate,
 			notes:        body.notes        ?? '',
 			createdBy:    ctx.profile?.id   ?? null,
 			assignedTo:   sponsor.assignedTo ?? null,
 		});
 
-		return json({ po, poNumber }, { status: 201 });
+		const totalCents = Math.round(amount * 100);
+		const baseCents = Math.floor(totalCents / paymentParts);
+		const remainder = totalCents - baseCents * paymentParts;
+		const scheduleStart = new Date(Date.UTC(poYear, 0, 15));
+
+		for (let i = 0; i < paymentParts; i++) {
+			const partCents = baseCents + (i < remainder ? 1 : 0);
+			const partAmount = partCents / 100;
+			const monthOffset = Math.round((i * 12) / paymentParts);
+			const dueDate = paymentParts === 1
+				? (body.dueDate ?? null)
+				: toIsoDate(addMonths(scheduleStart, monthOffset));
+
+			await adminPb.collection('sponsor_payments').create({
+				sponsor:       sponsor.id,
+				poId:          po.id,
+				amount:        partAmount,
+				paymentType:   paymentParts === 1 ? 'annual_fee' : 'installment',
+				status:        'invoiced',
+				dueDate,
+				year:          poYear,
+				invoiceNumber: paymentParts === 1 ? po.po_number : `${po.po_number}-${String(i + 1).padStart(2, '0')}`,
+				notes:         paymentParts === 1 ? (body.notes ?? '') : `Installment ${i + 1} of ${paymentParts}`,
+				recordedBy:    ctx.profile?.id ?? null,
+			});
+		}
+
+		return json({ po, poNumber, paymentParts }, { status: 201 });
 	} catch (err: any) {
 		const msg = err?.response?.message ?? err?.message ?? 'Failed to create PO';
 		return json({ message: msg }, { status: 500 });

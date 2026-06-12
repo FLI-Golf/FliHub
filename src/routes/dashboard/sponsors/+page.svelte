@@ -5,7 +5,7 @@
 	import { Plus, MapPin, Clock, ChevronRight, FileText, CheckCircle2 } from 'lucide-svelte';
 	import { PipelineBoard } from '$lib/pipeline';
 	import type { PipelineBoardConfig, PipelineCardItem, PipelineMoveEvent } from '$lib/pipeline/types';
-	import { invalidateAll } from '$app/navigation';
+	import { goto, invalidateAll } from '$app/navigation';
 	import {
 		PIPELINE_STAGES, CLOSED_STAGES,
 		SPONSOR_STATUS_LABELS, SPONSOR_STATUS_COLORS,
@@ -78,8 +78,21 @@
 		}))
 	});
 
+	const tierKeys = $derived(Object.keys(SPONSOR_TIER_LABELS) as Array<keyof typeof SPONSOR_TIER_LABELS>);
+	let selectedTiers = $state<Array<keyof typeof SPONSOR_TIER_LABELS>>([...tierKeys]);
+
+	function toggleTier(tier: keyof typeof SPONSOR_TIER_LABELS) {
+		selectedTiers = selectedTiers.includes(tier)
+			? selectedTiers.filter(t => t !== tier)
+			: [...selectedTiers, tier];
+	}
+
+	function resetTierFilter() {
+		selectedTiers = [...tierKeys];
+	}
+
 	const boardItems = $derived<PipelineCardItem[]>(
-		(data.sponsors ?? []).map((s: any) => {
+		(data.sponsors ?? []).filter((s: any) => selectedTiers.includes(s.tier as keyof typeof SPONSOR_TIER_LABELS)).map((s: any) => {
 			const rep = s.expand?.assignedTo;
 			const repLabel = rep ? ([rep.firstName, rep.lastName].filter(Boolean).join(' ') || rep.email) : null;
 			return {
@@ -107,6 +120,12 @@
 	let poAmount = $state('');
 	let poYear = $state(String(new Date().getFullYear()));
 	let poDescription = $state('');
+	let poPaymentParts = $state('1');
+	const poPaymentPartsNum = $derived(Math.max(1, Math.min(6, Number(poPaymentParts) || 1)));
+	const poAmountNum = $derived(Number(poAmount) || 0);
+	const perPaymentPreview = $derived(
+		poAmountNum > 0 ? fmt(poAmountNum / poPaymentPartsNum) : null
+	);
 
 	const pendingSponsor = $derived(
 		pendingMove ? (data.sponsors ?? []).find((s: any) => s.id === pendingMove!.item.id) ?? null : null
@@ -118,6 +137,7 @@
 		poAmount = '';
 		poYear = String(new Date().getFullYear());
 		poDescription = '';
+		poPaymentParts = '1';
 	}
 
 	async function confirmContractMove() {
@@ -133,7 +153,7 @@
 			});
 			if (!moveRes.ok) throw new Error('Failed to update stage');
 
-			// 2. Kick off collections — create a draft PO
+			// 2. Kick off collections — create a sent PO + payment schedule
 			const amount = poAmount ? Number(poAmount) : (pendingSponsor?.annualCommitment ?? 0);
 			if (amount > 0) {
 				const poRes = await fetch(`/api/sponsors/${pendingMove.item.id}/purchase-order`, {
@@ -142,6 +162,7 @@
 					body: JSON.stringify({
 						amount,
 						year: Number(poYear),
+						paymentParts: Number(poPaymentParts),
 						description: poDescription || undefined
 					})
 				});
@@ -152,7 +173,7 @@
 			}
 
 			cancelContractMove();
-			await invalidateAll();
+			await goto('/dashboard/purchase-orders');
 		} catch (err: any) {
 			contractErr = err.message ?? 'Something went wrong';
 		} finally {
@@ -169,6 +190,7 @@
 			poAmount = sponsor?.annualCommitment ? String(sponsor.annualCommitment) : '';
 			poYear = String(new Date().getFullYear());
 			poDescription = '';
+			poPaymentParts = '1';
 			pendingMove = e;
 			return;
 		}
@@ -289,12 +311,35 @@
 
 	<!-- Pipeline board -->
 	<div>
-		<div class="flex items-center gap-3 mb-3">
+		<div class="flex flex-wrap items-center gap-3 mb-3">
 			<h2 class="text-lg font-semibold text-slate-200">Sales Pipeline</h2>
+			<div class="flex flex-wrap items-center gap-2">
+				<span class="text-xs text-slate-400">Tier(s):</span>
+				{#each tierKeys as tier}
+					<button
+						type="button"
+						onclick={() => toggleTier(tier)}
+						class={`text-xs px-2 py-1 rounded-md border transition-colors ${selectedTiers.includes(tier)
+							? SPONSOR_TIER_COLORS[tier]
+							: 'border-slate-600 text-slate-500 bg-slate-900/50 hover:text-slate-300 hover:border-slate-500'}`}
+					>
+						{SPONSOR_TIER_LABELS[tier]}
+					</button>
+				{/each}
+				{#if selectedTiers.length !== tierKeys.length}
+					<button
+						type="button"
+						onclick={resetTierFilter}
+						class="text-xs px-2 py-1 rounded-md border border-slate-500 text-slate-300 hover:border-slate-300"
+					>
+						Reset
+					</button>
+				{/if}
+			</div>
 			{#if moving}
 				<span class="text-xs text-slate-400 animate-pulse">Saving…</span>
 			{/if}
-			<span class="text-xs text-slate-500">Drag cards between columns or use the ⋮ menu to move stages</span>
+			<span class="text-xs text-slate-500">Drag cards between columns or use the ⋮ menu to move stages for the Tier(s)</span>
 		</div>
 		<PipelineBoard
 			config={boardConfig}
@@ -397,7 +442,7 @@
 			<div>
 				<h2 class="text-lg font-semibold text-slate-100">Mark as Contracted</h2>
 				<p class="text-xs text-slate-400 mt-0.5">
-					{pendingSponsor?.companyName ?? 'This sponsor'} will move to <span class="text-orange-300 font-mono">contracted</span> and a draft Purchase Order will be created.
+					{pendingSponsor?.companyName ?? 'This sponsor'} will move to <span class="text-orange-300 font-mono">contracted</span> and a sent Purchase Order will be created.
 				</p>
 			</div>
 			<button onclick={cancelContractMove} class="ml-auto text-slate-400 hover:text-slate-100 transition-colors" aria-label="Close">
@@ -429,7 +474,7 @@
 			<!-- PO details -->
 			<div class="rounded-xl border border-slate-700 bg-slate-800/50 p-4 space-y-3">
 				<p class="text-xs font-semibold text-slate-400 uppercase tracking-wide flex items-center gap-1.5">
-					<FileText class="size-3.5" /> Draft Purchase Order
+					<FileText class="size-3.5" /> Purchase Order & Payment Schedule
 				</p>
 				<div class="grid grid-cols-2 gap-3">
 					<div>
@@ -449,6 +494,18 @@
 					</div>
 				</div>
 				<div>
+					<label class={LABEL}>Payment Parts</label>
+					<select bind:value={poPaymentParts} class={INPUT}>
+						{#each [1, 2, 3, 4, 5, 6] as n}
+							<option value={String(n)}>{n} payment{n > 1 ? 's' : ''}</option>
+						{/each}
+					</select>
+					{#if perPaymentPreview}
+						<p class="text-[10px] text-emerald-300 mt-1">Preview: {poPaymentPartsNum} payment{poPaymentPartsNum > 1 ? 's' : ''} of about {perPaymentPreview} each.</p>
+					{/if}
+					<p class="text-[10px] text-slate-500 mt-1">Split the PO into up to 6 installment records automatically.</p>
+				</div>
+				<div>
 					<label class={LABEL}>Description (optional)</label>
 					<input
 						bind:value={poDescription}
@@ -456,7 +513,7 @@
 						placeholder="Sponsorship agreement — {pendingSponsor?.companyName ?? ''} ({poYear})"
 					/>
 				</div>
-				<p class="text-[10px] text-slate-500">A draft PO will be created. You can review and send it from the sponsor's detail page.</p>
+				<p class="text-[10px] text-slate-500">A sent PO and payment schedule will be created. You can review and advance status in Purchase Orders.</p>
 			</div>
 		</div>
 
