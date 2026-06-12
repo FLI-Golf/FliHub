@@ -3,10 +3,10 @@
  * DELETE /api/marketing-goals/[id]/tasks/[taskId] — delete task
  *
  * Stage transitions handled here:
- *   → needs_approval  : creates an approval record
+ *   → needs_approval  : creates/submits expense + approval record
  *   → approved        : marks approval resolved, sets approvedBy/approvedAt
- *   → expense_created : creates an expense record linked to the goal
- *   → work_order      : creates a work order linked to the expense
+ *   → expense_created : creates/submits an expense record linked to the goal
+ *   → work_order      : legacy stage now routed to expense approval path
  */
 import { json } from '@sveltejs/kit';
 import { RequestContext } from '$lib/infra/RequestContext';
@@ -33,19 +33,55 @@ export const PATCH: RequestHandler = async ({ params, request, locals, url }) =>
 		const current = await ctx.pb.collection('goal_tasks').getOne(params.taskId);
 		const newStatus: string | undefined = patch.status;
 
-		// ── needs_approval: auto-create approval record ───────────────────────
-		if (newStatus === 'needs_approval' && current.status !== 'needs_approval') {
+		const ensureSubmittedExpenseAndApproval = async () => {
 			const goal = await ctx.pb.collection('marketing_goals').getOne(params.id).catch(() => null);
+			const expensePayload = {
+				title:       current.title,
+				description: current.description ?? '',
+				amount:      current.actualCost ?? current.estimatedCost ?? 0,
+				status:      'submitted',
+				category:    'marketing',
+				notes:       `Created from goal task. Goal: ${goal?.name ?? params.id}`,
+				sourceType:  'goal_task',
+				sourceId:    params.taskId
+			};
+
+			const existingExpense = current.expenseId
+				? await ctx.pb.collection('expenses').getOne(current.expenseId).catch(() => null)
+				: await ctx.pb.collection('expenses').getFirstListItem(
+					`sourceType = \"goal_task\" && sourceId = \"${params.taskId}\"`
+				).catch(() => null);
+
+			const expense = existingExpense
+				? await ctx.pb.collection('expenses').update(existingExpense.id, expensePayload)
+				: await ctx.pb.collection('expenses').create(expensePayload);
+
+			patch.expenseId = expense.id;
+
+			const existingApproval = await ctx.pb.collection('approvals').getFirstListItem(
+				`entityType = \"expense\" && entityId = \"${expense.id}\" && status = \"pending\"`
+			).catch(() => null);
+
+			if (existingApproval) {
+				patch.approvalId = existingApproval.id;
+				return;
+			}
+
 			const approval = await ctx.pb.collection('approvals').create({
-				entityType:    'goal_task',
-				entityId:      params.taskId,
+				entityType:    'expense',
+				entityId:      expense.id,
 				status:        'pending',
 				requestedBy:   ctx.userId,
 				requestedDate: new Date().toISOString(),
-				amount:        current.estimatedCost ?? patch.estimatedCost ?? 0,
+				amount:        expense.amount ?? 0,
 				comments:      `Goal task: ${current.title}${goal ? ` (${goal.name})` : ''}`
 			}).catch(() => null);
 			if (approval) patch.approvalId = approval.id;
+		};
+
+		// ── needs_approval: route through submitted expense approval ───────────
+		if (newStatus === 'needs_approval' && current.status !== 'needs_approval') {
+			await ensureSubmittedExpenseAndApproval();
 		}
 
 		// ── approved: resolve approval record ────────────────────────────────
@@ -61,39 +97,14 @@ export const PATCH: RequestHandler = async ({ params, request, locals, url }) =>
 			}
 		}
 
-		// ── expense_created: create an expense record ─────────────────────────
+		// ── expense_created: create/submit expense + approval ─────────────────
 		if (newStatus === 'expense_created' && current.status !== 'expense_created') {
-			const goal = await ctx.pb.collection('marketing_goals').getOne(params.id).catch(() => null);
-			const expense = await ctx.pb.collection('expenses').create({
-				title:       current.title,
-				description: current.description ?? '',
-				amount:      current.actualCost ?? current.estimatedCost ?? 0,
-				status:      'draft',
-				category:    'marketing',
-				notes:       `Created from goal task. Goal: ${goal?.name ?? params.id}`,
-				sourceType:  'goal_task',
-				sourceId:    params.taskId
-			}).catch(() => null);
-			if (expense) patch.expenseId = expense.id;
+			await ensureSubmittedExpenseAndApproval();
 		}
 
-		// ── work_order: create a work order linked to the expense ─────────────
+		// ── work_order: legacy stage, no direct work order creation ────────────
 		if (newStatus === 'work_order' && current.status !== 'work_order') {
-			const expenseId = current.expenseId ?? patch.expenseId;
-			const goal = await ctx.pb.collection('marketing_goals').getOne(params.id).catch(() => null);
-			const wo = await ctx.pb.collection('work_orders').create({
-				title:       current.title,
-				description: current.description ?? '',
-				status:      'pending',
-				priority:    current.priority ?? 'medium',
-				dueDate:     current.dueDate ?? null,
-				estimatedCost: current.estimatedCost ?? 0,
-				sourceType:  'goal_task',
-				sourceId:    params.taskId,
-				expenseId:   expenseId ?? null,
-				notes:       `Created from goal task. Goal: ${goal?.name ?? params.id}`
-			}).catch(() => null);
-			if (wo) patch.workOrderId = wo.id;
+			await ensureSubmittedExpenseAndApproval();
 		}
 
 		const updated = await ctx.pb.collection('goal_tasks').update(params.taskId, patch);

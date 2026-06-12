@@ -4,6 +4,9 @@ import { getAdminPocketBase } from '$lib/infra/pocketbase/pbClient';
 import { writeAuditLog } from '$lib/server/auditLog';
 import type { RequestHandler } from './$types';
 
+// Exception by design: sponsor_payments are inbound cash collection records,
+// so they remain outside the expense approval/work-order pipeline.
+
 // PATCH /api/sponsor-payments/:id
 export const PATCH: RequestHandler = async ({ locals, url, params, request }) => {
 	const ctx = await RequestContext.fromApi(locals, url);

@@ -18,6 +18,24 @@ import { json } from '@sveltejs/kit';
 import { getAdminPocketBase } from '$lib/infra/pocketbase/pbClient';
 import type { RequestHandler } from './$types';
 
+async function ensureEventPaymentApproval(pb: any, payment: any) {
+	if (!payment?.id || payment.status !== 'approval_required') return;
+	const existing = await pb.collection('approvals').getFirstListItem(
+		`entityType = \"event_payment\" && entityId = \"${payment.id}\" && status = \"pending\"`
+	).catch(() => null);
+	if (existing) return;
+
+	await pb.collection('approvals').create({
+		entityType: 'event_payment',
+		entityId: payment.id,
+		status: 'pending',
+		requestedBy: null,
+		requestedDate: new Date().toISOString(),
+		amount: Number(payment.amount) || 0,
+		comments: '<p>Event payment requires approval before payout.</p>'
+	}).catch(() => null);
+}
+
 export const POST: RequestHandler = async ({ params }) => {
 	try {
 		const pb = await getAdminPocketBase();
@@ -94,7 +112,7 @@ export const POST: RequestHandler = async ({ params }) => {
 			}
 
 			// Create talent payment
-			await pb.collection('event_payments').create({
+			const talentPayment = await pb.collection('event_payments').create({
 				event: params.id,
 				eventTalent: et.id,
 				talent: isGroupBooking ? null : talentId,
@@ -109,11 +127,12 @@ export const POST: RequestHandler = async ({ params }) => {
 				description: isGroupBooking ? `Group booking fee for ${talentGroup?.name ?? talentGroupId}` : undefined,
 				isBonus: false
 			});
+			await ensureEventPaymentApproval(pb, talentPayment);
 
 			// Create manager split payment if applicable
 			if (managerAmount > 0 && talent?.managerEmail) {
 				const mgNeedsApproval = event.requiresApproval || managerAmount > approvalThreshold;
-				await pb.collection('event_payments').create({
+				const managerPayment = await pb.collection('event_payments').create({
 					event: params.id,
 					eventTalent: et.id,
 					talent: talentId,
@@ -125,6 +144,7 @@ export const POST: RequestHandler = async ({ params }) => {
 					description: `Manager cut for ${talent?.name ?? talentId}`,
 					isBonus: false
 				});
+				await ensureEventPaymentApproval(pb, managerPayment);
 			}
 
 			// Create bonus payment if eligible and not yet earned.
@@ -135,7 +155,7 @@ export const POST: RequestHandler = async ({ params }) => {
 				}).catch(() => ({ totalItems: 0 }));
 
 				if (existingBonus.totalItems === 0) {
-					await pb.collection('event_payments').create({
+					const bonusPayment = await pb.collection('event_payments').create({
 						event: params.id,
 						eventTalent: et.id,
 						talent: talentId,
@@ -147,6 +167,7 @@ export const POST: RequestHandler = async ({ params }) => {
 						description: `Attendance bonus — completed ${event.bonusThreshold} events`,
 						isBonus: true
 					});
+					await ensureEventPaymentApproval(pb, bonusPayment);
 				}
 			}
 
