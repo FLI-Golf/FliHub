@@ -1,13 +1,14 @@
 <script lang="ts">
-	import type { PageData } from './$types';
+	import type { PageData, ActionData } from './$types';
 	import { enhance } from '$app/forms';
+	import { invalidateAll } from '$app/navigation';
 	import {
 		DollarSign, CheckCircle, Clock, TrendingUp, Users, FileText,
 		ChevronDown, ChevronUp, History, AlertTriangle, Trophy, Wallet,
 		Play, RotateCcw, ArrowRight, Loader2
 	} from 'lucide-svelte';
 
-	let { data }: { data: PageData } = $props();
+	let { data, form }: { data: PageData; form: ActionData } = $props();
 
 	const fmt = (n: number) =>
 		new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(n ?? 0);
@@ -60,6 +61,48 @@
 			<p class="text-muted-foreground mt-1">Seed results → pay pros → pay managers → verify math</p>
 		</div>
 		<div class="flex items-center gap-2 flex-wrap">
+			<form method="POST" action="?/seedSeason" use:enhance={() => {
+				setLoading('__season__', 'seed-season');
+				return async ({ update }) => {
+					try {
+						await update();
+					} finally {
+						clearLoading('__season__');
+						await invalidateAll();
+					}
+				};
+			}}>
+				<button type="submit" disabled={!!loading['__season__']}
+					class="text-xs px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white transition-colors flex items-center gap-1.5 font-semibold">
+					{#if loading['__season__'] === 'seed-season'}
+						<Loader2 class="size-3.5 animate-spin" />
+					{:else}
+						<Play class="size-3.5" />
+					{/if}
+					Seed Entire Season
+				</button>
+			</form>
+			<form method="POST" action="?/resetSeason" use:enhance={() => {
+				setLoading('__season_reset__', 'reset-season');
+				return async ({ update }) => {
+					try {
+						await update();
+					} finally {
+						clearLoading('__season_reset__');
+						await invalidateAll();
+					}
+				};
+			}}>
+				<button type="submit" disabled={!!loading['__season_reset__']}
+					class="text-xs px-3 py-1.5 rounded-lg bg-red-900/60 hover:bg-red-800 disabled:opacity-50 text-red-100 border border-red-700 transition-colors flex items-center gap-1.5 font-semibold">
+					{#if loading['__season_reset__'] === 'reset-season'}
+						<Loader2 class="size-3.5 animate-spin" />
+					{:else}
+						<RotateCcw class="size-3.5" />
+					{/if}
+					Reset Entire Season
+				</button>
+			</form>
 			<a href="/dashboard/talent/payments" class="text-xs px-3 py-1.5 rounded-lg bg-slate-800 border border-slate-700 hover:bg-slate-700 text-slate-300 transition-colors">Payments</a>
 			<a href="/dashboard/talent/tournaments" class="text-xs px-3 py-1.5 rounded-lg bg-slate-800 border border-slate-700 hover:bg-slate-700 text-slate-300 transition-colors">Tournaments</a>
 			<a href="/dashboard/work-orders" class="text-xs px-3 py-1.5 rounded-lg bg-slate-800 border border-slate-700 hover:bg-slate-700 text-slate-300 transition-colors flex items-center gap-1">
@@ -67,6 +110,12 @@
 			</a>
 		</div>
 	</div>
+
+	{#if form?.error}
+		<div class="rounded-xl border border-red-800 bg-red-950/30 px-4 py-3 text-sm text-red-200">
+			<span class="font-semibold">Action failed:</span> {form.error}
+		</div>
+	{/if}
 
 	<!-- Season summary strip -->
 	<div class="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2">
@@ -155,7 +204,14 @@
 					{#if step === 'seed'}
 						<form method="POST" action="?/seedTournament" use:enhance={() => {
 							setLoading(tid, 'seed');
-							return async ({ update }) => { await update(); clearLoading(tid); };
+							return async ({ update }) => {
+								try {
+									await update();
+								} finally {
+									clearLoading(tid);
+									await invalidateAll();
+								}
+							};
 						}}>
 							<input type="hidden" name="tournamentId" value={tid} />
 							<button type="submit" disabled={!!busy}
@@ -167,7 +223,14 @@
 					{:else if step === 'pay-pros'}
 						<form method="POST" action="?/markProsPaid" use:enhance={() => {
 							setLoading(tid, 'pros');
-							return async ({ update }) => { await update(); clearLoading(tid); };
+							return async ({ update }) => {
+								try {
+									await update();
+								} finally {
+									clearLoading(tid);
+									await invalidateAll();
+								}
+							};
 						}}>
 							<input type="hidden" name="tournamentId" value={tid} />
 							<button type="submit" disabled={!!busy}
@@ -179,7 +242,14 @@
 					{:else if step === 'pay-managers'}
 						<form method="POST" action="?/markManagersPaid" use:enhance={() => {
 							setLoading(tid, 'mgrs');
-							return async ({ update }) => { await update(); clearLoading(tid); };
+							return async ({ update }) => {
+								try {
+									await update();
+								} finally {
+									clearLoading(tid);
+									await invalidateAll();
+								}
+							};
 						}}>
 							<input type="hidden" name="tournamentId" value={tid} />
 							<button type="submit" disabled={!!busy}
@@ -193,7 +263,14 @@
 					{#if t.resultCount > 0}
 						<form method="POST" action="?/resetTournament" use:enhance={() => {
 							setLoading(tid, 'reset');
-							return async ({ update }) => { await update(); clearLoading(tid); };
+							return async ({ update }) => {
+								try {
+									await update();
+								} finally {
+									clearLoading(tid);
+									await invalidateAll();
+								}
+							};
 						}}>
 							<input type="hidden" name="tournamentId" value={tid} />
 							<button type="submit" disabled={!!busy}

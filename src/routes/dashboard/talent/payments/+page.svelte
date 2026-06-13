@@ -95,46 +95,123 @@
 	{/if}
 
 	<!-- Filters -->
-	<div class="flex flex-wrap gap-3 items-end">
-		{#each [
-			{ label: 'Status',    param: 'status',    current: data.filterStatus,    options: [['','All'],['pending','Pending'],['paid','Paid'],['overdue','Overdue']] },
-			{ label: 'Recipient', param: 'recipient', current: data.filterRecipient, options: [['','All'],['pro','Pro'],['manager','Manager']] },
-		] as f}
+	<form method="GET" class="rounded-xl border border-slate-700/80 bg-slate-900/40 p-4">
+		<div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3">
+			<div class="xl:col-span-2">
+				<p class="text-xs text-slate-400 mb-1">Search</p>
+				<input
+					type="text"
+					name="q"
+					value={data.filterQuery}
+					placeholder="Pro name, notes, transaction ID, method..."
+					class="w-full rounded-lg bg-slate-800 border border-slate-600 px-3 py-1.5 text-sm text-white placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-orange-500"
+				/>
+			</div>
+
 			<div>
-				<p class="text-xs text-slate-400 mb-1">{f.label}</p>
-				<select
-					class="rounded-lg bg-slate-800 border border-slate-600 px-3 py-1.5 text-sm text-white focus:outline-none focus:ring-2 focus:ring-orange-500"
-					onchange={(e) => {
-						const u = new URL(window.location.href);
-						if (e.currentTarget.value) u.searchParams.set(f.param, e.currentTarget.value);
-						else u.searchParams.delete(f.param);
-						window.location.href = u.toString();
-					}}
-				>
-					{#each f.options as [val, label]}
-						<option value={val} selected={f.current === val}>{label}</option>
+				<p class="text-xs text-slate-400 mb-1">Status</p>
+				<select name="status" class="w-full rounded-lg bg-slate-800 border border-slate-600 px-3 py-1.5 text-sm text-white focus:outline-none focus:ring-2 focus:ring-orange-500">
+					<option value="">All</option>
+					<option value="pending" selected={data.filterStatus === 'pending'}>Pending</option>
+					<option value="paid" selected={data.filterStatus === 'paid'}>Paid</option>
+					<option value="overdue" selected={data.filterStatus === 'overdue'}>Overdue</option>
+				</select>
+			</div>
+
+			<div>
+				<p class="text-xs text-slate-400 mb-1">Recipient</p>
+				<select name="recipient" class="w-full rounded-lg bg-slate-800 border border-slate-600 px-3 py-1.5 text-sm text-white focus:outline-none focus:ring-2 focus:ring-orange-500">
+					<option value="">All</option>
+					<option value="pro" selected={data.filterRecipient === 'pro'}>Pro</option>
+					<option value="manager" selected={data.filterRecipient === 'manager'}>Manager</option>
+				</select>
+			</div>
+
+			<div>
+				<p class="text-xs text-slate-400 mb-1">Season</p>
+				<select name="season" class="w-full rounded-lg bg-slate-800 border border-slate-600 px-3 py-1.5 text-sm text-white focus:outline-none focus:ring-2 focus:ring-orange-500">
+					<option value="">All Seasons</option>
+					{#each data.seasons as s}
+						<option value={s.id} selected={data.filterSeason === s.id}>{s.name}</option>
 					{/each}
 				</select>
 			</div>
-		{/each}
-		<div>
-			<p class="text-xs text-slate-400 mb-1">Season</p>
-			<select
-				class="rounded-lg bg-slate-800 border border-slate-600 px-3 py-1.5 text-sm text-white focus:outline-none focus:ring-2 focus:ring-orange-500"
-				onchange={(e) => {
-					const u = new URL(window.location.href);
-					if (e.currentTarget.value) u.searchParams.set('season', e.currentTarget.value);
-					else u.searchParams.delete('season');
-					window.location.href = u.toString();
-				}}
-			>
-				<option value="">All Seasons</option>
-				{#each data.seasons as s}
-					<option value={s.id} selected={data.filterSeason === s.id}>{s.name}</option>
-				{/each}
-			</select>
+
+			<div>
+				<p class="text-xs text-slate-400 mb-1">Min Amount</p>
+				<input
+					type="number"
+					name="minAmount"
+					min="0"
+					step="1"
+					value={data.minAmount}
+					class="w-full rounded-lg bg-slate-800 border border-slate-600 px-3 py-1.5 text-sm text-white placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-orange-500"
+				/>
+			</div>
+
+			<div>
+				<p class="text-xs text-slate-400 mb-1">Max Amount</p>
+				<input
+					type="number"
+					name="maxAmount"
+					min="0"
+					step="1"
+					value={data.maxAmount}
+					class="w-full rounded-lg bg-slate-800 border border-slate-600 px-3 py-1.5 text-sm text-white placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-orange-500"
+				/>
+			</div>
+
+			<div>
+				<p class="text-xs text-slate-400 mb-1">From Date</p>
+				<input
+					type="date"
+					name="fromDate"
+					value={data.fromDate}
+					class="w-full rounded-lg bg-slate-800 border border-slate-600 px-3 py-1.5 text-sm text-white focus:outline-none focus:ring-2 focus:ring-orange-500"
+				/>
+			</div>
+
+			<div>
+				<p class="text-xs text-slate-400 mb-1">To Date</p>
+				<input
+					type="date"
+					name="toDate"
+					value={data.toDate}
+					class="w-full rounded-lg bg-slate-800 border border-slate-600 px-3 py-1.5 text-sm text-white focus:outline-none focus:ring-2 focus:ring-orange-500"
+				/>
+			</div>
+
+			<div>
+				<p class="text-xs text-slate-400 mb-1">Sort By</p>
+				<select name="sortBy" class="w-full rounded-lg bg-slate-800 border border-slate-600 px-3 py-1.5 text-sm text-white focus:outline-none focus:ring-2 focus:ring-orange-500">
+					<option value="created" selected={data.sortBy === 'created'}>Created</option>
+					<option value="dueDate" selected={data.sortBy === 'dueDate'}>Due Date</option>
+					<option value="paymentDate" selected={data.sortBy === 'paymentDate'}>Payment Date</option>
+					<option value="amount" selected={data.sortBy === 'amount'}>Amount</option>
+					<option value="status" selected={data.sortBy === 'status'}>Status</option>
+					<option value="recipient" selected={data.sortBy === 'recipient'}>Recipient</option>
+					<option value="proName" selected={data.sortBy === 'proName'}>Pro Name</option>
+				</select>
+			</div>
+
+			<div>
+				<p class="text-xs text-slate-400 mb-1">Direction</p>
+				<select name="sortDir" class="w-full rounded-lg bg-slate-800 border border-slate-600 px-3 py-1.5 text-sm text-white focus:outline-none focus:ring-2 focus:ring-orange-500">
+					<option value="desc" selected={data.sortDir === 'desc'}>Descending</option>
+					<option value="asc" selected={data.sortDir === 'asc'}>Ascending</option>
+				</select>
+			</div>
 		</div>
-	</div>
+
+		<div class="flex items-center gap-2 mt-4">
+			<button type="submit" class="text-xs px-3 py-1.5 rounded-lg bg-orange-900/50 hover:bg-orange-800 text-orange-300 border border-orange-700 transition-colors font-semibold">
+				Apply Filters
+			</button>
+			<a href="/dashboard/talent/payments" class="text-xs px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-600 transition-colors font-semibold">
+				Reset
+			</a>
+		</div>
+	</form>
 
 	<!-- Per-pro groups -->
 	{#if data.groups.length === 0}
