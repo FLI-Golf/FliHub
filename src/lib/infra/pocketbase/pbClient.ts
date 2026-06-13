@@ -3,6 +3,14 @@ import { env } from '$env/dynamic/private';
 
 let pbInstance: PocketBase | null = null;
 
+function requireEnv(name: 'POCKETBASE_URL' | 'POCKETBASE_ADMIN_EMAIL' | 'POCKETBASE_ADMIN_PASSWORD'): string {
+	const value = env[name];
+	if (!value || !String(value).trim()) {
+		throw new Error(`${name} is required in environment configuration`);
+	}
+	return String(value).trim();
+}
+
 export function getPocketBase(): PocketBase {
 	if (!pbInstance) {
 		const url = env.POCKETBASE_URL || 'http://127.0.0.1:8090';
@@ -29,11 +37,13 @@ async function getAdminToken(): Promise<string> {
 	// Reuse token for up to 10 minutes
 	if (_adminToken && Date.now() < _adminTokenExpiry) return _adminToken;
 
-	const baseUrl = (env.POCKETBASE_URL || 'https://pocketbase-production-6ab5.up.railway.app').replace(/\/$/, '');
+	const baseUrl = requireEnv('POCKETBASE_URL').replace(/\/$/, '');
+	const identity = requireEnv('POCKETBASE_ADMIN_EMAIL');
+	const password = requireEnv('POCKETBASE_ADMIN_PASSWORD');
 	const res = await fetch(`${baseUrl}/api/collections/_superusers/auth-with-password`, {
 		method:  'POST',
 		headers: { 'Content-Type': 'application/json' },
-		body:    JSON.stringify({ identity: env.POCKETBASE_ADMIN_EMAIL, password: env.POCKETBASE_ADMIN_PASSWORD }),
+		body:    JSON.stringify({ identity, password }),
 	});
 	const data = await res.json();
 	_adminToken = data.token;
@@ -42,7 +52,7 @@ async function getAdminToken(): Promise<string> {
 }
 
 export async function getAdminPocketBase(): Promise<PocketBase> {
-	const baseUrl = (env.POCKETBASE_URL || 'https://pocketbase-production-6ab5.up.railway.app').replace(/\/$/, '');
+	const baseUrl = requireEnv('POCKETBASE_URL').replace(/\/$/, '');
 	const pb = new PocketBase(baseUrl);
 	pb.autoCancellation(false);
 
@@ -68,7 +78,7 @@ export async function adminFetch(
 	collection: string,
 	params: Record<string, string | number> = {}
 ): Promise<any[]> {
-	const baseUrl = (env.POCKETBASE_URL || 'https://pocketbase-production-6ab5.up.railway.app').replace(/\/$/, '');
+	const baseUrl = requireEnv('POCKETBASE_URL').replace(/\/$/, '');
 	const token   = await getAdminToken();
 
 	// Build query string — omit sort (applied client-side) and filter (appended raw)

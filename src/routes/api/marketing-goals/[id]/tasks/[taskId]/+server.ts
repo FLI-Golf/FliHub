@@ -2,11 +2,15 @@
  * PATCH  /api/marketing-goals/[id]/tasks/[taskId] — update task (status, fields)
  * DELETE /api/marketing-goals/[id]/tasks/[taskId] — delete task
  *
- * Stage transitions handled here:
- *   → needs_approval  : creates/submits expense + approval record
- *   → approved        : marks approval resolved, sets approvedBy/approvedAt
- *   → expense_created : creates/submits an expense record linked to the goal
- *   → work_order      : legacy stage now routed to expense approval path
+ * Simplified workflow:
+ *   todo → in_progress → completed (creates expense + approval)
+ *   
+ * When status → completed:
+ *   1. Creates expense record with task cost
+ *   2. Creates approval record for admin quorum voting
+ *   3. Task is marked as done
+ *   4. Admins vote on approval via /api/approvals/approve
+ *   5. When quorum is met → work order auto-generated, expense marked approved
  */
 import { json } from '@sveltejs/kit';
 import { RequestContext } from '$lib/infra/RequestContext';
@@ -17,10 +21,22 @@ const ALLOWED_FIELDS = [
 	'estimatedCost', 'actualCost', 'assignedTo', 'notes', 'progressContribution'
 ];
 
+function toNumber(value: unknown): number {
+	if (typeof value === 'number' && Number.isFinite(value)) return value;
+	if (typeof value === 'string') {
+		const normalized = value.replace(/[$,\s]/g, '');
+		const parsed = Number(normalized);
+		return Number.isFinite(parsed) ? parsed : 0;
+	}
+	return 0;
+}
+
 export const PATCH: RequestHandler = async ({ params, request, locals, url }) => {
 	const ctx = await RequestContext.fromApi(locals, url);
 	if (!ctx) return json({ message: 'Unauthorized' }, { status: 401 });
 	const body = await request.json().catch(() => ({}));
+
+	console.log('📝 Task PATCH endpoint:', { goalId: params.id, taskId: params.taskId, body });
 
 	const patch: Record<string, any> = {};
 	for (const key of ALLOWED_FIELDS) {
@@ -31,90 +47,117 @@ export const PATCH: RequestHandler = async ({ params, request, locals, url }) =>
 	try {
 		// Load current task
 		const current = await ctx.pb.collection('goal_tasks').getOne(params.taskId);
+		console.log('📋 Current task:', { id: current.id, status: current.status, expenseId: current.expenseId });
 		const newStatus: string | undefined = patch.status;
+        const isCompletionStatus = newStatus === 'completed' || newStatus === 'done';
 
-		const ensureSubmittedExpenseAndApproval = async () => {
-			const goal = await ctx.pb.collection('marketing_goals').getOne(params.id).catch(() => null);
-			const expensePayload = {
-				title:       current.title,
-				description: current.description ?? '',
-				amount:      current.actualCost ?? current.estimatedCost ?? 0,
-				status:      'submitted',
-				category:    'marketing',
-				notes:       `Created from goal task. Goal: ${goal?.name ?? params.id}`,
-				sourceType:  'goal_task',
-				sourceId:    params.taskId
-			};
+		// ── When moving to completed: create expense + approval for admin vote ───
+		if (isCompletionStatus && current.status !== 'completed' && current.status !== 'done') {
+			try {
+				console.log('💰 Logging expense for task:', params.taskId);
+				const goal = await ctx.pb.collection('marketing_goals').getOne(params.id).catch(() => null);
+				const normalizedAmount = toNumber(current.actualCost) || toNumber(current.estimatedCost);
+				if (normalizedAmount <= 0) {
+					throw new Error('Set an estimated or actual cost greater than $0 before logging expense.');
+				}
+				const profiles = await ctx.pb.collection('user_profiles').getFullList({
+					filter: `userId = "${ctx.userId}"`,
+					fields: 'id,userId'
+				}).catch(() => []);
+				const requesterId = (profiles[0] as any)?.id ?? ctx.userId;
 
-			const existingExpense = current.expenseId
-				? await ctx.pb.collection('expenses').getOne(current.expenseId).catch(() => null)
-				: await ctx.pb.collection('expenses').getFirstListItem(
-					`sourceType = \"goal_task\" && sourceId = \"${params.taskId}\"`
+				const expensePayload = {
+					description: (current.description ?? '').trim() || current.title,
+					amount:      normalizedAmount,
+					status:      'submitted',
+					category:    'Marketing',
+					date:        new Date().toISOString().slice(0, 10),
+					notes:       `Created from goal task. Goal: ${goal?.name ?? params.id}`,
+				};
+				console.log('📦 Expense payload:', expensePayload);
+
+				// Reuse existing linked expense when present; otherwise create fresh.
+				const existingExpense = current.expenseId
+					? await ctx.pb.collection('expenses').getOne(current.expenseId).catch(() => null)
+					: null;
+
+				let expense = existingExpense as any;
+				if (!expense) {
+					expense = await ctx.pb.collection('expenses').create(expensePayload);
+				} else if (expense.status !== 'submitted') {
+					// Best effort: move stale linked expense into submitted state, but never fail the flow.
+					expense = await ctx.pb.collection('expenses').update(expense.id, {
+						status: 'submitted',
+						amount: expensePayload.amount,
+						description: expensePayload.description,
+						notes: expensePayload.notes
+					}).catch(() => expense);
+				}
+
+				console.log('✅ Expense ready:', { id: expense.id, amount: expense.amount, status: expense.status });
+				patch.expenseId = expense.id;
+
+				// Create approval for this expense if one doesn't exist
+				const existingApproval = await ctx.pb.collection('approvals').getFirstListItem(
+					`entityType = \"expense\" && entityId = \"${expense.id}\" && status = \"pending\"`
 				).catch(() => null);
 
-			const expense = existingExpense
-				? await ctx.pb.collection('expenses').update(existingExpense.id, expensePayload)
-				: await ctx.pb.collection('expenses').create(expensePayload);
-
-			patch.expenseId = expense.id;
-
-			const existingApproval = await ctx.pb.collection('approvals').getFirstListItem(
-				`entityType = \"expense\" && entityId = \"${expense.id}\" && status = \"pending\"`
-			).catch(() => null);
-
-			if (existingApproval) {
-				patch.approvalId = existingApproval.id;
-				return;
-			}
-
-			const approval = await ctx.pb.collection('approvals').create({
-				entityType:    'expense',
-				entityId:      expense.id,
-				status:        'pending',
-				requestedBy:   ctx.userId,
-				requestedDate: new Date().toISOString(),
-				amount:        expense.amount ?? 0,
-				comments:      `Goal task: ${current.title}${goal ? ` (${goal.name})` : ''}`
-			}).catch(() => null);
-			if (approval) patch.approvalId = approval.id;
-		};
-
-		// ── needs_approval: route through submitted expense approval ───────────
-		if (newStatus === 'needs_approval' && current.status !== 'needs_approval') {
-			await ensureSubmittedExpenseAndApproval();
-		}
-
-		// ── approved: resolve approval record ────────────────────────────────
-		if (newStatus === 'approved' && current.status !== 'approved') {
-			patch.approvedBy = ctx.userId;
-			patch.approvedAt = new Date().toISOString();
-			if (current.approvalId) {
-				await ctx.pb.collection('approvals').update(current.approvalId, {
-					status:       'approved',
-					approver:     ctx.userId,
-					reviewedDate: new Date().toISOString()
-				}).catch(() => {});
+				if (!existingApproval) {
+					console.log('📋 Creating approval for expense:', expense.id);
+					const createdApproval = await ctx.pb.collection('approvals').create({
+						entityType:    'expense',
+						entityId:      expense.id,
+						status:        'pending',
+						requestedBy:   requesterId,
+						requestedDate: new Date().toISOString(),
+						amount:        expense.amount ?? 0,
+						comments:      `Task: ${current.title}${goal ? ` (Goal: ${goal.name})` : ''}`
+					});
+					patch.approvalId = createdApproval.id;
+					console.log('✅ Approval created:', createdApproval.id);
+				} else {
+					console.log('🆗 Approval already exists:', existingApproval.id);
+					patch.approvalId = existingApproval.id;
+				}
+			} catch (err: any) {
+				console.error('❌ Expense/approval creation failed:', err.message || err);
+				const pbData = err?.response?.data ? ` | ${JSON.stringify(err.response.data)}` : '';
+				const detailed = `${err?.response?.message ?? err?.message ?? 'Failed to create expense approval request'}${pbData}`;
+				throw new Error(detailed);
 			}
 		}
-
-		// ── expense_created: create/submit expense + approval ─────────────────
-		if (newStatus === 'expense_created' && current.status !== 'expense_created') {
-			await ensureSubmittedExpenseAndApproval();
-		}
-
-		// ── work_order: legacy stage, no direct work order creation ────────────
-		if (newStatus === 'work_order' && current.status !== 'work_order') {
-			await ensureSubmittedExpenseAndApproval();
-		}
-
-		const updated = await ctx.pb.collection('goal_tasks').update(params.taskId, patch);
 
 		// ── Recalculate goal progress when completion status changes ──────────
-		// Triggered when: status moves to/from 'completed', OR progressContribution changes.
 		const completionChanged =
 			newStatus === 'completed' ||
-			(current.status === 'completed' && newStatus && newStatus !== 'completed');
+			newStatus === 'done' ||
+			((current.status === 'completed' || current.status === 'done') && newStatus && newStatus !== 'completed' && newStatus !== 'done');
 		const contributionChanged = 'progressContribution' in patch;
+
+		let updated: any;
+		try {
+			updated = await ctx.pb.collection('goal_tasks').update(params.taskId, patch);
+		} catch (updateErr: any) {
+			// Some deployed schemas may not yet include linkage fields like approvalId/expenseId.
+			// Retry with only core editable fields so the workflow can proceed.
+			const retryPatch: Record<string, any> = {};
+			for (const key of ALLOWED_FIELDS) {
+				if (key in patch) retryPatch[key] = patch[key];
+			}
+			for (const key of ['expenseId', 'approvalId', 'workOrderId'] as const) {
+				if (key in patch) retryPatch[key] = patch[key];
+			}
+
+			// Production compatibility: some environments don't allow `completed` in goal_tasks.status.
+			// In that case, fall back to `done` (legacy schema).
+			const invalidStatus = updateErr?.response?.data?.status?.code === 'validation_invalid_value';
+			if (invalidStatus && retryPatch.status === 'completed') {
+				retryPatch.status = 'done';
+			}
+
+			if (Object.keys(retryPatch).length === 0) throw updateErr;
+			updated = await ctx.pb.collection('goal_tasks').update(params.taskId, retryPatch);
+		}
 
 		if (completionChanged || contributionChanged) {
 			await recalculateGoalProgress(ctx.pb, params.id);
@@ -122,7 +165,10 @@ export const PATCH: RequestHandler = async ({ params, request, locals, url }) =>
 
 		return json(updated);
 	} catch (err: any) {
-		return json({ message: err?.response?.message ?? err?.message ?? 'Failed' }, { status: 500 });
+		const pbData = err?.response?.data ? ` | ${JSON.stringify(err.response.data)}` : '';
+		const errorMsg = `${err?.response?.message ?? err?.message ?? 'Unknown error'}${pbData}`;
+		console.error('❌ Task PATCH failed:', { error: errorMsg, status: err?.status });
+		return json({ message: errorMsg }, { status: err?.status || 500 });
 	}
 };
 
@@ -160,7 +206,7 @@ async function recalculateGoalProgress(pb: any, goalId: string) {
 
 		// Sum contributions from completed tasks only
 		const completedContribution = contributing
-			.filter((t: any) => t.status === 'completed')
+			.filter((t: any) => t.status === 'completed' || t.status === 'done')
 			.reduce((sum: number, t: any) => sum + (t.progressContribution ?? 0), 0);
 
 		// Baseline: the value before any tasks contributed (stored on first switch to task-driven)

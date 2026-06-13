@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { invalidateAll } from '$app/navigation';
+	import { enhance } from '$app/forms';
 	import { Button } from '$lib/components/ui/button';
 	import { Badge } from '$lib/components/ui/badge';
 	import Card from '$lib/components/ui/card.svelte';
@@ -16,6 +17,7 @@
 
 	const getStatusColor = (s: string) => ({
 		'In Progress': 'bg-green-600 text-white',
+		'On Track':    'bg-emerald-600 text-white',
 		'Completed':   'bg-blue-600 text-white',
 		'Not Started': 'bg-gray-600 text-white',
 		'On Hold':     'bg-amber-600 text-white',
@@ -42,17 +44,17 @@
 		goal.targetValue ? Math.min(Math.round((goal.currentValue / goal.targetValue) * 100), 100) : 0
 	);
 
+	const GOAL_STATUS_OPTIONS = ['Not Started', 'In Progress', 'On Track', 'At Risk', 'Completed', 'On Hold'];
+	let savingGoal = $state(false);
+	let goalSaved = $state(false);
+
 	// ── Task pipeline stages ──────────────────────────────────────────────────
 
 	const STAGES = [
-		{ key: 'todo',            label: 'To Do',          icon: Circle,        color: 'text-slate-400',   bg: 'bg-slate-700/40 border-slate-600' },
-		{ key: 'in_progress',     label: 'In Progress',    icon: Clock,         color: 'text-blue-400',    bg: 'bg-blue-900/30 border-blue-700' },
-		{ key: 'needs_approval',  label: 'Needs Approval', icon: AlertCircle,   color: 'text-yellow-400',  bg: 'bg-yellow-900/30 border-yellow-700' },
-		{ key: 'approved',        label: 'Approved',       icon: CheckCircle2,  color: 'text-emerald-400', bg: 'bg-emerald-900/30 border-emerald-700' },
-		{ key: 'expense_created', label: 'Expense',        icon: DollarSign,    color: 'text-orange-400',  bg: 'bg-orange-900/30 border-orange-700' },
-		{ key: 'work_order',      label: 'Work Order',     icon: Hammer,        color: 'text-purple-400',  bg: 'bg-purple-900/30 border-purple-700' },
-		{ key: 'completed',       label: 'Completed',      icon: ClipboardCheck,color: 'text-teal-400',    bg: 'bg-teal-900/30 border-teal-700' },
-		{ key: 'cancelled',       label: 'Cancelled',      icon: X,             color: 'text-red-400',     bg: 'bg-red-900/20 border-red-800' }
+		{ key: 'todo',        label: 'To Do',       icon: Circle,        color: 'text-slate-400',   bg: 'bg-slate-700/40 border-slate-600' },
+		{ key: 'in_progress', label: 'In Progress', icon: Clock,         color: 'text-blue-400',    bg: 'bg-blue-900/30 border-blue-700' },
+		{ key: 'completed',   label: 'Completed',   icon: CheckCircle2,  color: 'text-emerald-400', bg: 'bg-emerald-900/30 border-emerald-700' },
+		{ key: 'cancelled',   label: 'Cancelled',   icon: X,             color: 'text-red-400',     bg: 'bg-red-900/20 border-red-800' }
 	];
 
 	const PRIORITY_COLORS: Record<string, string> = {
@@ -243,6 +245,57 @@
 				· baseline <span class="text-slate-300">{goal.progressBaseline ?? 0}</span>
 			</p>
 		{/if}
+
+		<form
+			method="POST"
+			action="?/updateProgress"
+			use:enhance={() => {
+				savingGoal = true;
+				goalSaved = false;
+				return async ({ result, update }) => {
+					savingGoal = false;
+					if (result.type === 'success') {
+						goalSaved = true;
+						setTimeout(() => goalSaved = false, 2200);
+					}
+					await update({ reset: false });
+				};
+			}}
+			class="mt-4 grid grid-cols-1 sm:grid-cols-3 gap-3"
+		>
+			<input type="hidden" name="id" value={goal.id} />
+			<div>
+				<label class="block text-xs text-slate-400 mb-1">Current Value</label>
+				<input
+					name="currentValue"
+					type="number"
+					min="0"
+					step="any"
+					value={goal.currentValue ?? 0}
+					class="w-full rounded-lg bg-slate-700 border border-slate-600 px-3 py-2 text-white text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
+				/>
+			</div>
+			<div>
+				<label class="block text-xs text-slate-400 mb-1">Status</label>
+				<select
+					name="status"
+					class="w-full rounded-lg bg-slate-700 border border-slate-600 px-3 py-2 text-white text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
+				>
+					{#each GOAL_STATUS_OPTIONS as status}
+						<option value={status} selected={goal.status === status}>{status}</option>
+					{/each}
+				</select>
+			</div>
+			<div class="flex items-end">
+				<button
+					type="submit"
+					disabled={savingGoal}
+					class="w-full rounded-lg bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white text-sm font-semibold py-2 transition-colors"
+				>
+					{savingGoal ? 'Saving...' : goalSaved ? 'Saved' : 'Update Goal'}
+				</button>
+			</div>
+		</form>
 	</div>
 
 	<!-- ── Tasks section ──────────────────────────────────────────────────── -->
