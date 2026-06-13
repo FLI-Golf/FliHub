@@ -115,6 +115,7 @@
 				{ title: 'Dashboard',       url: '/dashboard',                 icon: LayoutDashboard, roles: ['admin', 'leader', 'sales', 'marketing', 'marketing_lead'] },
 				{ title: 'Active Projects', url: '/dashboard/active-projects', icon: Zap,             roles: ['admin', 'leader', 'marketing', 'marketing_lead'] },
 				{ title: 'Active Goals',    url: '/dashboard/active-goals',    icon: Target,          roles: ['admin', 'leader', 'marketing', 'marketing_lead'] },
+				{ title: 'Manage Bank Accounts', url: '/dashboard/bank-accounts', icon: Landmark, roles: ['admin', 'leader'] },
 				{ title: 'Active Income',   url: '/dashboard/active-income',   icon: TrendingUp,      roles: ['admin', 'leader'] }
 			]
 		},

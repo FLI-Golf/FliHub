@@ -8,10 +8,17 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 	try {
 		const adminPb = await getAdminPocketBase();
 
-		const workOrders = await adminPb.collection('work_orders').getFullList({
+		const [workOrders, bankAccounts] = await Promise.all([
+			adminPb.collection('work_orders').getFullList({
 			sort:   '-id',
 			expand: 'claimId,expense,task,project,approver,submittedBy,qb_entered_by',
-		}).catch(() => []);
+			}).catch(() => []),
+			adminPb.collection('bank_accounts').getFullList({
+				filter: 'status = "active" || status = ""',
+				sort: 'sortOrder,code',
+				fields: 'id,code,name,accountType,groupType,status',
+			}).catch(() => [])
+		]);
 
 		const enriched = await Promise.all((workOrders as any[]).map(async (wo) => {
 			let claim       = wo.expand?.claimId       ?? null;
@@ -144,9 +151,9 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 			openAmount:  enriched.filter((w: any) => w.status === 'open').reduce((s: number, w: any) => s + (w.amount || 0), 0),
 		};
 
-		return { workOrders: enriched, stats };
+		return { workOrders: enriched, stats, bankAccounts };
 	} catch (e: any) {
 		console.error('work-orders load error:', e.message);
-		return { workOrders: [], stats: { total: 0, open: 0, paid: 0, cancelled: 0, totalAmount: 0, openAmount: 0 } };
+		return { workOrders: [], stats: { total: 0, open: 0, paid: 0, cancelled: 0, totalAmount: 0, openAmount: 0 }, bankAccounts: [] };
 	}
 };
