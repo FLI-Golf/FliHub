@@ -68,6 +68,7 @@
 		'/dashboard/player-profile': 'Player Profile',
 		'/dashboard/settings': 'Settings',
 		'/dashboard/income':           'Income Pipeline',
+		'/dashboard/active-goals':     'Active Goals',
 		'/dashboard/bids':             'Bid Pipeline',
 		'/dashboard/purchase-orders':  'Purchase Orders'
 	};

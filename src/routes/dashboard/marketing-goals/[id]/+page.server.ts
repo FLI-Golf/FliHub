@@ -1,6 +1,31 @@
 import { RequestContext } from '$lib/infra/RequestContext';
 import type { PageServerLoad } from './$types';
 import { error } from '@sveltejs/kit';
+import { fail } from '@sveltejs/kit';
+import type { Actions } from './$types';
+
+export const actions: Actions = {
+	updateProgress: async ({ locals, url, request, params }) => {
+		const { pb } = await RequestContext.from(locals, url);
+		const data = await request.formData();
+
+		const id = (data.get('id') as string) || params.id;
+		const currentValue = parseFloat((data.get('currentValue') as string) || '0');
+		const status = (data.get('status') as string) || '';
+
+		if (!id) return fail(400, { error: 'Missing goal id.' });
+
+		try {
+			const updated = await pb.collection('marketing_goals').update(id, {
+				currentValue: Number.isNaN(currentValue) ? 0 : currentValue,
+				...(status ? { status } : {}),
+			});
+			return { success: true, updated };
+		} catch (err: any) {
+			return fail(500, { error: err?.message ?? 'Update failed.' });
+		}
+	}
+};
 
 export const load: PageServerLoad = async ({ locals, url, params }) => {
 	const ctx = await RequestContext.from(locals, url);
