@@ -1,7 +1,15 @@
 import { json } from '@sveltejs/kit';
 import { RequestContext } from '$lib/infra/RequestContext';
 import { getAdminPocketBase } from '$lib/infra/pocketbase/pbClient';
+import { writeAuditLogBatch } from '$lib/domain/services/PaymentWorkOrderService';
 import type { RequestHandler } from './$types';
+
+const toPaymentStatus = (workOrderStatus: unknown): string => {
+	const s = String(workOrderStatus ?? '').toLowerCase();
+	if (s === 'paid') return 'paid';
+	if (s === 'cancelled') return 'cancelled';
+	return 'pending';
+};
 
 export const PATCH: RequestHandler = async ({ locals, url, params, request }) => {
 	const ctx = await RequestContext.fromApi(locals, url);
@@ -14,6 +22,7 @@ export const PATCH: RequestHandler = async ({ locals, url, params, request }) =>
 	try {
 		const body    = await request.json();
 		const adminPb = await getAdminPocketBase();
+		const before  = await adminPb.collection('work_orders').getOne(params.id).catch(() => null);
 
 		const update: Record<string, any> = {};
 
@@ -38,6 +47,56 @@ export const PATCH: RequestHandler = async ({ locals, url, params, request }) =>
 		if (body.paidDate !== undefined) update.paidDate = body.paidDate;
 
 		const record = await adminPb.collection('work_orders').update(params.id, update);
+
+		const qbTouched = (
+			body.qb_transaction_id !== undefined ||
+			body.qb_entered_date !== undefined ||
+			body.qb_account !== undefined ||
+			body.qb_notes !== undefined ||
+			body.status === 'paid'
+		);
+
+		if (qbTouched) {
+			const action = body.status === 'paid' ? 'marked_paid' : 'qb_entry_saved';
+			const actor = profile?.id ?? 'system';
+			const stampParts = [
+				`action=${action}`,
+				record.work_order_number ? `wo=${record.work_order_number}` : '',
+				record.qb_transaction_id ? `txn=${record.qb_transaction_id}` : '',
+				record.qb_account ? `account=${record.qb_account}` : '',
+				record.qb_entered_date ? `date=${record.qb_entered_date}` : '',
+				`by=${actor}`,
+			].filter(Boolean);
+			const auditStamp = `[AUDIT ${new Date().toISOString()}] ${stampParts.join('; ')}`;
+
+			// Keep a durable, append-only event trail directly on the work order.
+			const existingNotes = String(record.notes ?? '').trim();
+			const nextNotes = existingNotes ? `${existingNotes}\n${auditStamp}` : auditStamp;
+			await adminPb.collection('work_orders').update(params.id, { notes: nextNotes }).catch((e: any) => {
+				console.warn('[wo] audit note append failed:', e?.message);
+			});
+			record.notes = nextNotes;
+
+			// For pro payout work orders, also append to the canonical payment_audit_log table.
+			const paymentIds = Array.isArray(record.proPayment)
+				? record.proPayment.filter((id: any) => typeof id === 'string' && id.length > 0)
+				: [];
+
+			if (paymentIds.length > 0) {
+				await writeAuditLogBatch(adminPb, paymentIds.map((paymentId: string) => ({
+					paymentId,
+					workOrderId: record.id,
+					fromStatus: toPaymentStatus(before?.status),
+					toStatus: toPaymentStatus(record.status),
+					changedBy: actor,
+					amount: typeof record.amount === 'number' ? record.amount : Number(record.amount || 0),
+					paymentMethod: 'quickbooks',
+					notes: auditStamp,
+				}))).catch((e: any) => {
+					console.warn('[wo] payment_audit_log write failed:', e?.message);
+				});
+			}
+		}
 
 		// Keep reimbursement claim lifecycle in sync with work order payment status.
 		if (record.source === 'reimbursement' && record.claimId && body.status === 'paid') {

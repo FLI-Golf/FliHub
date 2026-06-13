@@ -5,6 +5,7 @@
 	import { invalidateAll } from '$app/navigation';
 
 	let { data }: { data: PageData } = $props();
+	const bankAccounts = $derived((data as any).bankAccounts ?? []);
 
 	const STATUS_OPTIONS = ['open', 'paid', 'cancelled'];
 	const SOURCE_OPTIONS = ['expense', 'reimbursement', 'bid'];
@@ -214,6 +215,12 @@
 	function userName(u: any) {
 		if (!u) return '—';
 		return [u.firstName, u.lastName].filter(Boolean).join(' ') || u.email || '—';
+	}
+
+	function accountOptionLabel(account: any) {
+		const code = String(account?.code ?? '').trim();
+		const name = String(account?.name ?? '').trim();
+		return code && name ? `${code} - ${name}` : name || code || 'Unknown account';
 	}
 
 	function generatePDF(wo: any) {
@@ -955,8 +962,18 @@ ${wo.notes ? `
 											</div>
 											<div>
 												<label class="block text-[10px] font-semibold uppercase tracking-wide text-slate-400 mb-1">QB Account</label>
-												<input bind:value={f.account} placeholder="e.g. Operating Expenses"
-													class="w-full rounded-md border border-slate-600 bg-slate-900 text-slate-100 px-3 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500 placeholder:text-slate-600" />
+												{#if bankAccounts.length > 0}
+													<select bind:value={f.account}
+														class="w-full rounded-md border border-slate-600 bg-slate-900 text-slate-100 px-3 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500">
+														<option value="">Select bank account</option>
+														{#each bankAccounts as account}
+															<option value={accountOptionLabel(account)}>{accountOptionLabel(account)}</option>
+														{/each}
+													</select>
+												{:else}
+													<input bind:value={f.account} placeholder="e.g. 1000 - Operating Checking"
+														class="w-full rounded-md border border-slate-600 bg-slate-900 text-slate-100 px-3 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500 placeholder:text-slate-600" />
+												{/if}
 											</div>
 											<div>
 												<label class="block text-[10px] font-semibold uppercase tracking-wide text-slate-400 mb-1">Date Entered in QB</label>
