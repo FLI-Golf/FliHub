@@ -11,11 +11,10 @@
 	let showAddResultModal = $state(false);
 	let clearingTestData   = $state(false);
 	let generatingWO       = $state(false);
-	let markingQb          = $state(false);
-	let showQbForm         = $state(false);
 	let showPayoutTable    = $state(false); // collapsed by default
 	let showResultsHelp    = $state(false);
-	let generatingExpenses = $state(false);
+	let generatingWorkOrders = $state(false);
+	let workOrderActionError = $state('');
 
 	// Per-pro inline manager cut editing (row-level)
 	let mgrEdits = $state<Record<string, { editing: boolean; cutPct: number; saving: boolean }>>({});
@@ -127,6 +126,10 @@
 			});
 		})()
 	);
+	const noFranchiseGroup = $derived(
+		byFranchise.find((g: any) => g.franchiseId === '__none__') ?? null
+	);
+	const unassignedFranchiseCount = $derived(noFranchiseGroup ? noFranchiseGroup.results.length : 0);
 
 	const totalProPayments = $derived(
 		(data.proPayments ?? []).filter((p: any) => p.recipient === 'pro').reduce((s: number, p: any) => s + (p.amount ?? 0), 0)
@@ -137,6 +140,52 @@
 	const totalPayments = $derived(totalProPayments + totalMgrPayments);
 	const pendingCount  = $derived((data.proPayments ?? []).filter((p: any) => p.status === 'pending').length);
 	const paidCount     = $derived((data.proPayments ?? []).filter((p: any) => p.status === 'paid').length);
+	const workOrderCount = $derived((data.workOrders ?? []).length);
+	const totalWorkOrderAmount = $derived((data.workOrders ?? []).reduce((s: number, wo: any) => s + (wo.amount ?? 0), 0));
+	const workOrdersByRecipient = $derived(() => {
+		const grouped = new Map<string, any[]>();
+		for (const workOrder of (data.workOrders ?? [])) {
+			const notes = String(workOrder.notes ?? '').toLowerCase();
+			const recipient = /\[fp:/i.test(notes) ? 'franchise' : notes.includes('manager') ? 'manager' : 'pro';
+			if (!grouped.has(recipient)) grouped.set(recipient, []);
+			grouped.get(recipient)!.push(workOrder);
+		}
+		for (const list of grouped.values()) {
+			list.sort((a, b) => String(a.work_order_number ?? '').localeCompare(String(b.work_order_number ?? '')));
+		}
+		return Array.from(grouped.entries()).map(([recipient, workOrders]) => ({
+			recipient,
+			workOrders,
+			total: workOrders.reduce((sum, wo) => sum + (wo.amount ?? 0), 0),
+		}));
+	});
+	const workOrderMappings = $derived(() => {
+		const byPaymentId = new Map<string, any>();
+		for (const wo of (data.workOrders ?? [])) {
+			const idsFromRelation = Array.isArray(wo.proPayment) ? wo.proPayment : [];
+			const idsFromNotes = Array.from(String(wo.notes ?? '').matchAll(/\[PP:([a-zA-Z0-9]+)\]/g)).map(match => match[1]);
+			for (const paymentId of [...new Set([...idsFromRelation, ...idsFromNotes])]) {
+				byPaymentId.set(paymentId, wo);
+			}
+		}
+
+		return (data.proPayments ?? [])
+			.map((payment: any) => {
+				const workOrder = byPaymentId.get(payment.id) ?? null;
+				return {
+					paymentId: payment.id,
+					paymentName: payment.expand?.pro?.name ?? payment.pro ?? 'Unknown',
+					recipient: payment.recipient ?? 'n/a',
+					amount: payment.amount ?? 0,
+					workOrderNumber: workOrder?.work_order_number ?? 'n/a',
+					workOrderStatus: workOrder?.status ?? 'missing',
+				};
+			})
+			.sort((a: any, b: any) => {
+				const recipientOrder = a.recipient.localeCompare(b.recipient);
+				return recipientOrder !== 0 ? recipientOrder : a.paymentName.localeCompare(b.paymentName);
+			});
+	});
 
 	let expandedFranchises = $state<Set<string>>(new Set());
 	let expandedPayout     = $state<number | null>(null);
@@ -416,7 +465,7 @@
 		<div class="border-b border-slate-700">
 			<div class="flex items-center justify-between px-5 py-3 gap-2 flex-wrap">
 				<div class="flex items-center gap-2">
-					<p class="font-semibold text-slate-200 text-sm">Results by Franchise ({data.results.length})</p>
+					<p class="font-semibold text-slate-200 text-sm">Results by Franchise ({franchiseOrder.length})</p>
 					{#if franchiseOrderDirty}
 						<button type="button" onclick={saveFranchiseOrder} disabled={franchiseSaving}
 							class="flex items-center gap-1 text-xs px-2.5 py-1 rounded-lg bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white font-semibold transition-colors">
@@ -448,6 +497,12 @@
 				</div>
 			</div>
 		</div>
+
+		{#if unassignedFranchiseCount > 0}
+			<div class="px-5 py-2.5 border-b border-amber-900/40 bg-amber-950/20 text-xs text-amber-300">
+				{unassignedFranchiseCount} result{unassignedFranchiseCount === 1 ? '' : 's'} currently have no franchise assignment.
+			</div>
+		{/if}
 
 		{#if showResultsHelp}
 			<div class="border-b border-slate-700 bg-slate-900/60 px-5 py-4 text-xs text-slate-400">
@@ -665,83 +720,62 @@
 	</div>
 </div>
 
-<!-- Work Order & QuickBooks Panel -->
+<!-- Tournament Work Orders -->
 {#if data.results.length > 0}
 <div class="container mx-auto px-6 pb-2">
-	<div class="rounded-xl border {data.workOrder ? (data.workOrder.status === 'paid' ? 'border-emerald-700 bg-emerald-950/20' : 'border-blue-700 bg-blue-950/20') : 'border-slate-700 bg-slate-800/40'} overflow-hidden">
+	<div class="rounded-xl border border-slate-700 bg-slate-800/40 overflow-hidden">
 
 		<!-- Header -->
 		<div class="flex items-center justify-between px-5 py-4 gap-3 flex-wrap">
 			<div class="flex items-center gap-3">
-				<div class="size-9 rounded-lg flex items-center justify-center shrink-0
-					{data.workOrder?.status === 'paid' ? 'bg-emerald-900/60 border border-emerald-700' : 'bg-blue-900/40 border border-blue-700'}">
-					{#if data.workOrder?.status === 'paid'}
-						<CheckCircle class="size-4 text-emerald-400" />
-					{:else}
-						<FileText class="size-4 text-blue-400" />
-					{/if}
+				<div class="size-9 rounded-lg flex items-center justify-center shrink-0 bg-blue-900/40 border border-blue-700">
+					<FileText class="size-4 text-blue-400" />
 				</div>
 				<div>
 					<p class="font-bold text-white text-sm">
-						{#if data.workOrder}
-							Work Order <span class="font-mono text-blue-300">{data.workOrder.work_order_number}</span>
-						{:else}
-							Work Order
-						{/if}
+						Tournament Work Orders
 					</p>
 					<p class="text-xs text-slate-500 mt-0.5">
-						{#if data.workOrder}
-							{fmt(data.workOrder.amount)} total · {data.workOrder.status}
-							{#if data.workOrder.qb_entered_date} · QB entered {data.workOrder.qb_entered_date}{/if}
-						{:else}
-							{(data.proPayments ?? []).length} payment records ready · {fmt(totalPayments)} total
-						{/if}
+						{workOrderCount} work orders · {fmt(totalWorkOrderAmount)} total
 					</p>
 				</div>
 			</div>
 
 			<div class="flex items-center gap-2 shrink-0">
-				{#if !data.workOrder}
-					<!-- Generate WO -->
-					<form method="POST" action="?/generateWorkOrder" use:enhance={() => {
-						generatingWO = true;
-						return async ({ update }) => { await update(); generatingWO = false; };
-					}}>
-						<button type="submit" disabled={generatingWO || (data.proPayments ?? []).length === 0}
-							class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white text-xs font-semibold transition-colors">
-							{#if generatingWO}<Loader2 class="size-3.5 animate-spin" />{:else}<FileText class="size-3.5" />{/if}
-							Generate Work Order
-						</button>
-					</form>
-				{:else if data.workOrder.status !== 'paid'}
-					<!-- Regenerate -->
-					<form method="POST" action="?/generateWorkOrder" use:enhance={() => {
-						generatingWO = true;
-						return async ({ update }) => { await update(); generatingWO = false; };
-					}}>
-						<button type="submit" disabled={generatingWO}
-							class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-700 hover:bg-slate-600 border border-slate-600 disabled:opacity-50 text-slate-300 text-xs transition-colors">
-							{#if generatingWO}<Loader2 class="size-3.5 animate-spin" />{:else}<RotateCcw class="size-3.5" />{/if}
-							Refresh
-						</button>
-					</form>
-					<!-- Mark QB entered -->
-					<button type="button" onclick={() => showQbForm = !showQbForm}
-						class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold transition-colors">
-						<CheckCircle class="size-3.5" /> Mark QB Entered
+				<form method="POST" action="?/generateWorkOrders" use:enhance={() => {
+					workOrderActionError = '';
+					generatingWO = true;
+					return async ({ result, update }) => {
+						try {
+							await update();
+							if (result.type === 'failure' && result.data?.error) {
+								workOrderActionError = String(result.data.error);
+							}
+							await invalidateAll();
+						} finally {
+							generatingWO = false;
+						}
+					};
+				}}>
+					<button type="submit" disabled={generatingWO}
+						class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white text-xs font-semibold transition-colors">
+						{#if generatingWO}<Loader2 class="size-3.5 animate-spin" />{:else}<FileText class="size-3.5" />{/if}
+						Generate Work Orders
 					</button>
-				{:else}
-					<span class="text-xs text-emerald-400 font-semibold flex items-center gap-1">
-						<CheckCircle class="size-3.5" /> Entered in QuickBooks
-					</span>
-				{/if}
+				</form>
 				<a href="/dashboard/work-orders" class="p-1.5 rounded-lg bg-slate-700 hover:bg-slate-600 text-slate-400 transition-colors" title="View all work orders">
 					<ExternalLink class="size-3.5" />
 				</a>
 			</div>
 		</div>
 
-		<!-- Payment summary strip -->
+		{#if workOrderActionError}
+			<div class="border-t border-red-900/40 px-5 py-3 text-xs text-red-300 bg-red-950/20">
+				{workOrderActionError}
+			</div>
+		{/if}
+
+		<!-- Work order summary strip -->
 		{#if (data.proPayments ?? []).length > 0}
 			<div class="border-t border-slate-700/50 px-5 py-3 flex flex-wrap gap-5 text-xs bg-slate-900/30">
 				<span class="text-slate-400">Pros: <span class="text-emerald-300 font-semibold">{fmt(totalProPayments)}</span></span>
@@ -757,119 +791,73 @@
 				</span>
 			</div>
 		{/if}
+		<!-- Work order list -->
+		{#if (data.workOrders ?? []).length > 0}
+			<div class="border-t border-slate-700/50 px-5 py-4 space-y-3">
+				<div class="rounded-lg border border-slate-700 bg-slate-950/40 overflow-hidden">
+					<div class="px-4 py-2 border-b border-slate-800 flex items-center justify-between">
+						<p class="text-xs font-semibold text-slate-300">Payment to Work Order Mapping</p>
+						<p class="text-[10px] text-slate-500">Grouped by recipient</p>
+					</div>
+					<div class="overflow-x-auto">
+						<table class="min-w-full text-left text-xs">
+							<thead class="text-slate-500 uppercase tracking-wide">
+								<tr class="border-b border-slate-800">
+									<th class="px-4 py-2 font-semibold">Recipient</th>
+									<th class="px-4 py-2 font-semibold">Payment</th>
+									<th class="px-4 py-2 font-semibold">Work Order</th>
+									<th class="px-4 py-2 font-semibold text-right">Amount</th>
+								</tr>
+							</thead>
+							<tbody>
+								{#each workOrderMappings as row}
+									<tr class="border-b border-slate-800/70 last:border-b-0">
+										<td class="px-4 py-2 align-top">
+											<Badge class={row.recipient === 'manager' ? 'bg-amber-900/40 text-amber-300 border border-amber-700' : row.recipient === 'franchise' ? 'bg-purple-900/40 text-purple-300 border border-purple-700' : 'bg-emerald-900/40 text-emerald-300 border border-emerald-700'}>
+												{row.recipient}
+											</Badge>
+										</td>
+										<td class="px-4 py-2 align-top text-slate-200">{row.paymentName}</td>
+										<td class="px-4 py-2 align-top font-mono text-blue-300">{row.workOrderNumber}</td>
+										<td class="px-4 py-2 align-top text-right font-semibold text-slate-100">{fmt(row.amount)}</td>
+									</tr>
+								{/each}
+							</tbody>
+						</table>
+					</div>
+				</div>
 
-		<!-- QB entry form -->
-		{#if showQbForm && data.workOrder && data.workOrder.status !== 'paid'}
-			<div class="border-t border-slate-700 px-5 py-4 bg-slate-900/60">
-				<p class="text-xs font-semibold text-slate-300 mb-3">QuickBooks Entry Details</p>
-				<form method="POST" action="?/markQbEntered" use:enhance={() => {
-					markingQb = true;
-					return async ({ update }) => { await update(); markingQb = false; showQbForm = false; };
-				}} class="space-y-3">
-					<input type="hidden" name="woId" value={data.workOrder.id} />
-					<div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-						<div>
-							<label class="block text-[10px] text-slate-500 uppercase tracking-wide mb-1">QB Account</label>
-							<input type="text" name="qbAccount"
-								value={data.workOrder.qb_account || 'Player Payouts'}
-								class="w-full rounded-lg border border-slate-600 bg-slate-800 text-slate-100 px-3 py-2 text-sm" />
+				{#each workOrdersByRecipient() as group}
+					<div class="rounded-lg border border-slate-700 bg-slate-900/40 overflow-hidden">
+						<div class="px-4 py-2.5 flex items-center justify-between gap-3 border-b border-slate-800">
+							<div class="flex items-center gap-2 min-w-0">
+								<Badge class={group.recipient === 'manager' ? 'bg-amber-900/40 text-amber-300 border border-amber-700' : group.recipient === 'franchise' ? 'bg-purple-900/40 text-purple-300 border border-purple-700' : 'bg-emerald-900/40 text-emerald-300 border border-emerald-700'}>
+									{group.recipient}
+								</Badge>
+								<p class="text-xs text-slate-400 truncate">{group.workOrders.length} work order{group.workOrders.length === 1 ? '' : 's'}</p>
+							</div>
+							<p class="text-xs font-semibold text-slate-200">{fmt(group.total)}</p>
 						</div>
-						<div>
-							<label class="block text-[10px] text-slate-500 uppercase tracking-wide mb-1">QB Notes</label>
-							<input type="text" name="qbNotes"
-								value={data.workOrder.qb_notes || ''}
-								placeholder="Transaction reference, memo..."
-								class="w-full rounded-lg border border-slate-600 bg-slate-800 text-slate-100 px-3 py-2 text-sm" />
+						<div class="divide-y divide-slate-800">
+							{#each group.workOrders as workOrder}
+								<div class="px-4 py-2.5 flex items-center justify-between gap-3">
+									<div class="min-w-0">
+										<p class="font-mono text-xs text-blue-300 truncate">{workOrder.work_order_number}</p>
+										<p class="text-[10px] text-slate-500 truncate">{workOrder.description || 'Tournament payout work order'} · {workOrder.status}</p>
+									</div>
+									<div class="text-right shrink-0">
+										<p class="text-xs font-bold text-emerald-300">{fmt(workOrder.amount ?? 0)}</p>
+										<p class="text-[10px] text-slate-500">{workOrder.proPayment?.length ?? 0} payment(s)</p>
+									</div>
+								</div>
+							{/each}
 						</div>
 					</div>
-					<div class="flex items-center gap-2 justify-end">
-						<button type="button" onclick={() => showQbForm = false}
-							class="px-3 py-1.5 rounded-lg border border-slate-600 text-slate-400 text-xs hover:bg-slate-700 transition-colors">Cancel</button>
-						<button type="submit" disabled={markingQb}
-							class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white text-xs font-semibold transition-colors">
-							{#if markingQb}<Loader2 class="size-3.5 animate-spin" />{:else}<CheckCircle class="size-3.5" />{/if}
-							Confirm — Mark Paid & QB Entered
-						</button>
-					</div>
-				</form>
-			</div>
-		{/if}
-
-	</div>
-</div>
-{/if}
-
-<!-- Expense & Approval Status -->
-{#if data.results.length > 0}
-<div class="container mx-auto px-6 pb-2">
-	<div class="rounded-xl border {data.expenses?.length > 0 ? 'border-slate-600 bg-slate-800/40' : 'border-slate-700/50 bg-slate-800/20'} overflow-hidden">
-		<div class="flex items-center justify-between px-5 py-4 gap-3 flex-wrap">
-			<div>
-				<p class="font-bold text-white text-sm">Expense Approvals</p>
-				<p class="text-xs text-slate-500 mt-0.5">
-					{#if data.expenses?.length > 0}
-						{data.expenses.length} expense records ·
-						{data.approvals?.filter((a: any) => a.status === 'approved').length ?? 0} approved ·
-						{data.approvals?.filter((a: any) => a.status === 'pending').length ?? 0} pending
-					{:else}
-						{@const hasCuts = (data.results ?? []).some((r: any) => (r.managerCutPercentage ?? 0) > 0)}
-						{@const hasWO   = !!data.workOrder}
-						{@const hasPmts = (data.proPayments ?? []).length > 0 || (data.results ?? []).length > 0}
-						<span class="flex flex-col gap-0.5">
-							<span class="{hasCuts ? 'text-emerald-400' : 'text-slate-500'}">{hasCuts ? '✅' : '❌'} Manager cuts set</span>
-							<span class="{hasWO   ? 'text-emerald-400' : 'text-slate-500'}">{hasWO   ? '✅' : '❌'} Work order created</span>
-							<span class="{hasPmts ? 'text-emerald-400' : 'text-slate-500'}">{hasPmts ? '✅' : '❌'} Pro payments generated</span>
-						</span>
-					{/if}
-				</p>
-			</div>
-			<div class="flex items-center gap-2 shrink-0">
-				{#if data.expenses?.length > 0}
-					<a href="/dashboard/expenses" class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-700 hover:bg-slate-600 border border-slate-600 text-slate-300 text-xs transition-colors">
-						<ExternalLink class="size-3.5" /> View Expenses
-					</a>
-				{:else}
-					<form method="POST" action="?/generateExpenses" use:enhance={() => {
-						generatingExpenses = true;
-						return async ({ update }) => {
-							try {
-								await update();
-								await invalidateAll();
-							} finally {
-								generatingExpenses = false;
-							}
-						};
-					}}>
-						<button type="submit"
-							disabled={generatingExpenses || !data.workOrder || ((data.proPayments ?? []).length === 0 && (data.results ?? []).length === 0)}
-							class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-600 hover:bg-slate-500 disabled:opacity-40 border border-slate-500 text-white text-xs font-semibold transition-colors"
-							title={!data.workOrder ? 'Generate work order first' : ''}>
-							{#if generatingExpenses}
-								<Loader2 class="size-3.5 animate-spin" /> Generating...
-							{:else}
-								<FileText class="size-3.5" /> Generate Expense Approvals
-							{/if}
-						</button>
-					</form>
-				{/if}
-			</div>
-		</div>
-
-		{#if data.expenses?.length > 0}
-			<!-- Approval status breakdown -->
-			<div class="border-t border-slate-700/50 px-5 py-3 flex flex-wrap gap-3">
-				{#each ['pending','approved','rejected'] as st}
-					{@const count = data.approvals?.filter((a: any) => a.status === st).length ?? 0}
-					{#if count > 0}
-						<span class="text-xs font-semibold px-2.5 py-1 rounded-full border
-							{st === 'approved' ? 'text-emerald-400 border-emerald-700 bg-emerald-950/40' :
-							 st === 'rejected' ? 'text-red-400 border-red-700 bg-red-950/40' :
-							 'text-amber-400 border-amber-700 bg-amber-950/40'}">
-							{count} {st}
-						</span>
-					{/if}
 				{/each}
-				<span class="text-xs text-slate-400 ml-auto">Total: <span class="text-white font-semibold">{fmt(data.expenses.reduce((s: number, e: any) => s + (e.amount ?? 0), 0))}</span></span>
+			</div>
+		{:else}
+			<div class="border-t border-slate-700/50 px-5 py-4 text-sm text-slate-500">
+				No work orders yet. Use <span class="text-slate-300 font-semibold">Generate Work Orders</span> to create one work order per payment.
 			</div>
 		{/if}
 	</div>

@@ -2,15 +2,13 @@ import { RequestContext } from '$lib/infra/RequestContext';
 import { getAdminPocketBase } from '$lib/infra/pocketbase/pbClient';
 import type { PageServerLoad, Actions } from './$types';
 import { TournamentResultRepo } from '$lib/infra/pocketbase/repositories';
-import { error, fail } from '@sveltejs/kit';
+import { error, fail, redirect } from '@sveltejs/kit';
 import {
 	calculatePlacementPayouts,
 	calculateFranchisePayout,
-	seasonConfigFromRecord,
 	formatCurrency
 } from '$lib/domain/services/PayoutCalculator';
 import {
-	upsertTournamentWorkOrder,
 	writeAuditLog,
 } from '$lib/domain/services/PaymentWorkOrderService';
 
@@ -50,23 +48,71 @@ export const load: PageServerLoad = async ({ locals, url, params }) => {
 		);
 		const divisionPurse = proCut / 2;
 		const payoutStructure = calculatePlacementPayouts(divisionPurse, numberOfPlacements, franchiseCutPercentage);
+		const payoutByPlacement = new Map<number, number>(
+			payoutStructure.map((entry) => [Number(entry.placement), Number(entry.amount) || 0])
+		);
+		const round2 = (value: number) => Math.round((Number(value) || 0) * 100) / 100;
 
 		// Build a quick-lookup map of pro id → pro record (with manager fields)
 		const prosMap = Object.fromEntries(pros.map((p: any) => [p.id, p]));
+		const franchiseById = new Map<string, any>(franchises.map((f: any) => [String(f.id), f]));
+		const rosterFranchiseByTalentId = new Map<string, string>();
+		for (const franchise of franchises) {
+			const franchiseId = String(franchise.id);
+			const rosterIds = [
+				franchise.malePro,
+				franchise.femalePro,
+				...(Array.isArray(franchise.additionalPros) ? franchise.additionalPros : []),
+			].filter(Boolean).map((id: any) => String(id));
+			for (const talentId of rosterIds) {
+				if (!rosterFranchiseByTalentId.has(talentId)) rosterFranchiseByTalentId.set(talentId, franchiseId);
+			}
+		}
 
-		// Enrich each result with manager earnings and division derived from pro gender
+		// Enrich each result with derived payout values when seed created standings-only rows.
+		// If stored payout values already exist, preserve them.
 		const enrichedResults = results.items.map((r: any) => {
 			const pro = prosMap[r.pro];
+			const storedFranchiseId = Array.isArray(r.franchise) ? String(r.franchise[0] ?? '') : String(r.franchise ?? '');
+			const rosterFranchiseId = rosterFranchiseByTalentId.get(String(r.pro)) ?? '';
+			const effectiveFranchiseId = rosterFranchiseId || storedFranchiseId || '';
+			const effectiveFranchise = effectiveFranchiseId ? franchiseById.get(effectiveFranchiseId) : null;
+			const placement = Number(r.placement) || 0;
+			const storedProEarnings = Number(r.proEarnings || 0);
+			const fallbackProEarnings = payoutByPlacement.get(placement) || 0;
+			const proEarnings = storedProEarnings > 0 ? storedProEarnings : fallbackProEarnings;
+
+			const storedFranchiseEarnings = Number(r.franchiseEarnings || 0);
+			const franchiseEarnings = storedFranchiseEarnings > 0
+				? storedFranchiseEarnings
+				: (franchiseCutPercentage > 0
+					? round2((proEarnings / (100 - franchiseCutPercentage)) * franchiseCutPercentage)
+					: 0);
+
 			const managerCutPct = pro?.managerCutPercentage ?? 0;
-			const managerEarnings = managerCutPct > 0
-				? Math.round((r.proEarnings || 0) * (managerCutPct / 100) * 100) / 100
-				: (r.managerEarnings ?? 0);
-			const netProEarnings = (r.proEarnings || 0) - managerEarnings;
+			const storedManagerEarnings = Number(r.managerEarnings || 0);
+			const managerEarnings = storedManagerEarnings > 0
+				? storedManagerEarnings
+				: (managerCutPct > 0 ? round2(proEarnings * (managerCutPct / 100)) : 0);
+			const netProEarnings = round2(proEarnings - managerEarnings);
+			const storedTotalEarnings = Number(r.earnings || 0);
+			const totalEarnings = storedTotalEarnings > 0
+				? storedTotalEarnings
+				: round2(proEarnings + franchiseEarnings);
+
 			// Division: use stored value if present, otherwise derive from pro gender
 			const division = r.division || (pro?.gender === 'female' ? 'womens' : 'mens');
 			return {
 				...r,
+				franchise: effectiveFranchiseId || r.franchise,
+				expand: {
+					...(r.expand ?? {}),
+					franchise: effectiveFranchise ?? r.expand?.franchise,
+				},
 				division,
+				earnings: totalEarnings,
+				proEarnings,
+				franchiseEarnings,
 				managerEarnings,
 				managerCutPercentage: managerCutPct,
 				netProEarnings,
@@ -75,12 +121,11 @@ export const load: PageServerLoad = async ({ locals, url, params }) => {
 			};
 		});
 
-		// Load existing work order for this tournament
-		const workOrder = await pb.collection('work_orders')
-			.getFirstListItem(`projectId = '${params.id}' && source = 'pro_payment'`, {
-				expand: 'qb_entered_by',
-			})
-			.catch(() => null);
+		const workOrders = await pb.collection('work_orders').getFullList({
+			filter: `projectId = '${params.id}' && source = 'expense'`,
+			sort: '-created',
+			expand: 'qb_entered_by',
+		}).catch(() => [] as any[]);
 
 		// Load pro_payments for this tournament
 		const proPayments = await pb.collection('pro_payments').getFullList({
@@ -88,24 +133,6 @@ export const load: PageServerLoad = async ({ locals, url, params }) => {
 			sort: 'recipient',
 			expand: 'pro',
 		}).catch(() => [] as any[]);
-
-		// Load expenses linked to this tournament's work order
-		const woNumber = workOrder?.work_order_number ?? '';
-		const expenses = woNumber
-			? await pb.collection('expenses').getFullList({
-				filter: `work_order_number = '${woNumber}'`,
-				sort:   'date',
-			}).catch(() => [] as any[])
-			: [];
-
-		// Load approvals for those expenses
-		const expenseIds = expenses.map((e: any) => e.id);
-		const approvals = expenseIds.length
-			? await pb.collection('approvals').getFullList({
-				filter: expenseIds.map((id: string) => `expenseId = '${id}'`).join(' || '),
-				sort:   'requestedDate',
-			}).catch(() => [] as any[])
-			: [];
 
 		return {
 			tournament,
@@ -120,10 +147,8 @@ export const load: PageServerLoad = async ({ locals, url, params }) => {
 			proCut,
 			divisionPurse,
 			franchiseCutPercentage,
-			workOrder,
+			workOrders,
 			proPayments,
-			expenses,
-			approvals,
 		};
 	} catch (err) {
 		console.error('Error loading tournament:', err);
@@ -237,20 +262,9 @@ export const actions: Actions = {
 				});
 			}
 
-			// Upsert one work order per tournament covering all pro_payment records
-			const paymentIds = [proPaymentRecord.id, managerPaymentRecord?.id].filter(Boolean) as string[];
-			const workOrderId = await upsertTournamentWorkOrder(
-				pb,
-				params.id,
-				tournament.name,
-				proEarnings, // gross amount this result contributes
-				paymentIds,
-			);
-
 			// Audit log — initial 'created' → 'pending' entry for each payment
 			await writeAuditLog(pb, {
 				paymentId:  proPaymentRecord.id,
-				workOrderId,
 				fromStatus: 'created',
 				toStatus:   'pending',
 				changedBy:  'system',
@@ -261,7 +275,6 @@ export const actions: Actions = {
 			if (managerPaymentRecord) {
 				await writeAuditLog(pb, {
 					paymentId:  managerPaymentRecord.id,
-					workOrderId,
 					fromStatus: 'created',
 					toStatus:   'pending',
 					changedBy:  'system',
@@ -514,124 +527,341 @@ export const actions: Actions = {
 		return { success: true, applied: cuts.length };
 	},
 
-	// Generate expense + approval records for all pro payments
-	generateExpenses: async ({ locals, params }) => {
+	// Generate one work order per pending tournament payment (pro + manager) and per pending franchise payout.
+	generateWorkOrders: async ({ locals, params }) => {
 		const pb = await getAdminPocketBase();
 		const tournament = await pb.collection('tournaments').getOne(params.id);
+		const [resultsForValidation, talentsForValidation, franchisesForValidation] = await Promise.all([
+			pb.collection('tournament_results').getFullList({ filter: `tournament = '${params.id}'` }).catch(() => [] as any[]),
+			pb.collection('talent').getFullList({ fields: 'id,name' }).catch(() => [] as any[]),
+			pb.collection('franchises').getFullList({ fields: 'id,name,malePro,femalePro,additionalPros' }).catch(() => [] as any[]),
+		]);
 
-		const payments = await pb.collection('pro_payments').getFullList({
+		// Build franchise lookups — hoisted so they're reusable in both validation and franchise WO generation.
+		const franchiseIdSet = new Set(franchisesForValidation.map((f: any) => String(f.id)));
+		const franchiseNameById = new Map<string, string>(franchisesForValidation.map((f: any) => [String(f.id), String(f.name ?? f.id)]));
+		const rosterFranchiseByTalentId = new Map<string, string>();
+		for (const franchise of franchisesForValidation) {
+			const fid = String(franchise.id);
+			const rosterIds = [
+				franchise.malePro,
+				franchise.femalePro,
+				...(Array.isArray(franchise.additionalPros) ? franchise.additionalPros : []),
+			].filter(Boolean).map((id: any) => String(id));
+			for (const talentId of rosterIds) {
+				if (!rosterFranchiseByTalentId.has(talentId)) rosterFranchiseByTalentId.set(talentId, fid);
+			}
+		}
+
+		if (resultsForValidation.length > 0) {
+			const talentMap = new Map<string, any>(talentsForValidation.map((t: any) => [String(t.id), t]));
+			const unresolvedFranchisePros = new Set<string>();
+			const invalidFranchisePros = new Set<string>();
+
+			for (const result of resultsForValidation) {
+				const proTalent = talentMap.get(String(result.pro)) || {};
+				const resultFranchise = Array.isArray(result.franchise) ? result.franchise[0] : result.franchise;
+				const rosterFranchise = rosterFranchiseByTalentId.get(String(result.pro));
+				const effectiveFranchise = String(rosterFranchise || '');
+				const proName = String(proTalent.name || result.pro || 'Unknown');
+
+				if (!effectiveFranchise) {
+					unresolvedFranchisePros.add(proName);
+					continue;
+				}
+				if (!franchiseIdSet.has(effectiveFranchise)) {
+					invalidFranchisePros.add(proName);
+					continue;
+				}
+				if (String(resultFranchise || '') !== effectiveFranchise) {
+					await pb.collection('tournament_results').update(result.id, { franchise: effectiveFranchise }).catch(() => null);
+				}
+			}
+
+			if (unresolvedFranchisePros.size > 0) {
+				return fail(400, {
+					error: `Cannot generate work orders. Missing franchise assignment for: ${Array.from(unresolvedFranchisePros).join(', ')}`,
+				});
+			}
+			if (invalidFranchisePros.size > 0) {
+				return fail(400, {
+					error: `Cannot generate work orders. Invalid franchise assignment for: ${Array.from(invalidFranchisePros).join(', ')}`,
+				});
+			}
+		}
+
+		let payments = await pb.collection('pro_payments').getFullList({
 			filter: `tournament = '${params.id}'`,
 			expand: 'pro',
 		}).catch(() => [] as any[]);
 
-		if (payments.length === 0) return fail(400, { error: 'No payments to generate expenses for' });
+		// Initial standings seed may not create payment records. Bootstrap them from
+		// result placements so work orders can still be generated on demand.
+		if (payments.length === 0) {
+			const [results, talents, franchises] = await Promise.all([
+				pb.collection('tournament_results').getFullList({ filter: `tournament = '${params.id}'` }).catch(() => [] as any[]),
+				pb.collection('talent').getFullList({ fields: 'id,name,franchise,managerName,managerEmail,managerCutPercentage' }).catch(() => [] as any[]),
+				pb.collection('franchises').getFullList({ fields: 'id,malePro,femalePro,additionalPros' }).catch(() => [] as any[]),
+			]);
 
-		// Get existing work order number
-		const wo = await pb.collection('work_orders')
-			.getFirstListItem(`projectId = '${params.id}' && source = 'pro_payment'`)
-			.catch(() => null);
+			if (results.length > 0) {
 
-		const woNumber   = wo?.work_order_number ?? '';
-		const today      = new Date().toISOString().slice(0, 10);
-		const totalAmount = payments.reduce((sum: number, p: any) => sum + (p.amount ?? 0), 0);
-		const proCount = payments.filter((p: any) => p.recipient === 'pro').length;
-		const mgrCount = payments.filter((p: any) => p.recipient === 'manager').length;
+				let seasonRecord: any = null;
+				if (tournament.seasonRef) {
+					seasonRecord = await pb.collection('seasons').getOne(tournament.seasonRef).catch(() => null);
+				}
+				const franchiseCutPercentage = seasonRecord
+					? (seasonRecord.franchiseCutPercentage ?? 0)
+					: (tournament.franchiseCutPercentage ?? 20);
+				const numberOfPlacements = seasonRecord
+					? (seasonRecord.numberOfPlacements ?? franchises.length)
+					: (franchises.length || 12);
+				const { proCut } = calculateFranchisePayout(tournament.prizePool, franchiseCutPercentage);
+				const divisionPurse = proCut / 2;
+				const payoutStructure = calculatePlacementPayouts(divisionPurse, numberOfPlacements, franchiseCutPercentage);
+				const payoutByPlacement = new Map<number, number>(payoutStructure.map((p) => [Number(p.placement), Number(p.amount) || 0]));
+				const talentMap = new Map<string, any>(talents.map((t: any) => [String(t.id), t]));
+				const existing = new Map<string, any>();
+				for (const p of payments) {
+					existing.set(`${p.tournamentResult}:${p.recipient}`, p);
+				}
+				const round2 = (v: number) => Math.round((Number(v) || 0) * 100) / 100;
 
-		// Resolve user_profile id for requestedBy (approvals relation points to user_profiles)
-		const userId = locals.pb.authStore.record?.id ?? '';
-		let submittedBy: string | undefined;
-		if (userId) {
-			const profiles = await pb.collection('user_profiles').getFullList({
-				filter: `userId = '${userId}'`, fields: 'id'
+				for (const result of results) {
+					const proTalent = talentMap.get(String(result.pro)) || {};
+
+					const placement = Number(result.placement) || 0;
+					const proEarnings = Number(result.proEarnings || 0) > 0
+						? Number(result.proEarnings || 0)
+						: Number(payoutByPlacement.get(placement) || 0);
+					const managerCutPercentage = Number(proTalent.managerCutPercentage ?? result.managerCutPercentage ?? 0);
+					const managerEarnings = Number(result.managerEarnings || 0) > 0
+						? Number(result.managerEarnings || 0)
+						: (managerCutPercentage > 0 ? round2(proEarnings * (managerCutPercentage / 100)) : 0);
+					const netProEarnings = Number(result.netProEarnings || 0) > 0
+						? Number(result.netProEarnings || 0)
+						: round2(proEarnings - managerEarnings);
+					const description = `${tournament.name} — ${result.division === 'womens' ? "Women's" : "Men's"} ${placement}${placement === 1 ? 'st' : placement === 2 ? 'nd' : placement === 3 ? 'rd' : 'th'} place`;
+					const dueDate = (() => { const d = new Date(); d.setDate(d.getDate() + 14); return d.toISOString().split('T')[0]; })();
+
+					const proKey = `${result.id}:pro`;
+					const proPayload = {
+						tournament: params.id,
+						pro: result.pro,
+						tournamentResult: result.id,
+						paymentType: 'tournament',
+						recipient: 'pro',
+						amount: netProEarnings,
+						grossAmount: proEarnings,
+						netProAmount: netProEarnings,
+						managerAmount: managerEarnings,
+						managerCutPercentage,
+						managerName: proTalent.managerName || undefined,
+						managerEmail: proTalent.managerEmail || undefined,
+						status: 'pending',
+						dueDate,
+						description,
+					};
+					if (existing.has(proKey)) {
+						await pb.collection('pro_payments').update(existing.get(proKey).id, proPayload).catch(() => null);
+					} else {
+						const created = await pb.collection('pro_payments').create(proPayload).catch(() => null);
+						if (created) existing.set(proKey, created);
+					}
+
+					const mgrKey = `${result.id}:manager`;
+					if (managerEarnings > 0) {
+						const mgrPayload = {
+							tournament: params.id,
+							pro: result.pro,
+							tournamentResult: result.id,
+							paymentType: 'tournament',
+							recipient: 'manager',
+							amount: managerEarnings,
+							managerAmount: managerEarnings,
+							grossAmount: proEarnings,
+							managerCutPercentage,
+							managerName: proTalent.managerName || undefined,
+							managerEmail: proTalent.managerEmail || undefined,
+							status: 'pending',
+							dueDate,
+							description: `Manager cut (${managerCutPercentage}%) — ${proTalent.name ?? result.pro} — ${tournament.name}`,
+						};
+						if (existing.has(mgrKey)) {
+							await pb.collection('pro_payments').update(existing.get(mgrKey).id, mgrPayload).catch(() => null);
+						} else {
+							const created = await pb.collection('pro_payments').create(mgrPayload).catch(() => null);
+							if (created) existing.set(mgrKey, created);
+						}
+					}
+				}
+			}
+
+			payments = await pb.collection('pro_payments').getFullList({
+				filter: `tournament = '${params.id}'`,
+				expand: 'pro',
 			}).catch(() => [] as any[]);
-			submittedBy = profiles[0]?.id;
-		}
-		// Fall back to first admin profile if no session
-		if (!submittedBy) {
-			const admins = await pb.collection('user_profiles').getFullList({
-				filter: `role = 'admin'`, fields: 'id', perPage: 1
-			}).catch(() => [] as any[]);
-			submittedBy = admins[0]?.id;
 		}
 
-		const proNames = Array.from(new Set(
-			payments.map((p: any) => p.expand?.pro?.name ?? p.pro).filter(Boolean)
-		)).slice(0, 6);
-		const transactionManifest = payments.map((p: any, index: number) => {
-			const proName = p.expand?.pro?.name ?? p.pro ?? 'Unknown';
-			const method = p.paymentMethod || 'n/a';
-			const reference = p.transactionId || 'n/a';
-			const recipient = p.recipient || 'n/a';
-			const amount = Number(p.amount ?? 0).toFixed(2);
-			return `${index + 1}. ${proName} | ${recipient} | ${method} | ref ${reference} | $${amount}`;
-		}).join(' ; ');
-		const category = 'Expenses/MPO (Male)';
-		const description = `${tournament.name} tournament payout batch`;
-		const notes = [
-			`Tournament: ${tournament.name}`,
-			`Work order: ${woNumber || 'pending'}`,
-			`Payments: ${payments.length} (${proCount} pros, ${mgrCount} managers)`,
-			`Pro sample: ${proNames.join(', ') || 'n/a'}`,
-			`Payment IDs: ${payments.map((p: any) => p.id).join(', ')}`,
-			`Transaction manifest: ${transactionManifest || 'n/a'}`,
-		].join(' | ');
+		if (payments.length === 0) return fail(400, { error: 'No payments to generate work orders for' });
 
-		const existingExpenses = await pb.collection('expenses').getFullList({
-			filter: woNumber
-				? `work_order_number = '${woNumber}'`
-				: `sourceType = 'tournament_payout' && sourceId = '${params.id}'`,
+		const existing = await pb.collection('work_orders').getFullList({
+			filter: `projectId = '${params.id}' && source = 'expense'`,
+			fields: 'id,notes',
+		}).catch(() => [] as any[]);
+		const existingMarkers = new Set(
+			existing.flatMap((wo: any) => {
+				const notes = String(wo.notes ?? '');
+				const match = notes.match(/\[PP:([a-zA-Z0-9]+)\]/g) || [];
+				return match.map(m => m.replace(/^\[PP:|\]$/g, '').trim());
+			})
+		);
+
+		const allWOs = await pb.collection('work_orders').getFullList({
+			fields: 'work_order_number',
+			sort: '-created'
 		}).catch(() => [] as any[]);
 
-		const canonicalExpense = existingExpenses.find((expense: any) => expense.sourceType === 'tournament_payout' && expense.sourceId === params.id) ?? existingExpenses[0] ?? null;
-		const staleExpenses = canonicalExpense
-			? existingExpenses.filter((expense: any) => expense.id !== canonicalExpense.id)
-			: existingExpenses;
-		const targetExpenseIds = new Set<string>([...existingExpenses.map((expense: any) => expense.id)]);
+		const startSeq = allWOs.length + 1;
+		const createPayloads = payments
+			.filter((payment: any) => !existingMarkers.has(payment.id))
+			.map((payment: any, index: number) => {
+				const proName = payment.expand?.pro?.name ?? payment.pro ?? 'Unknown';
+				const recipient = payment.recipient || 'n/a';
+				const method = payment.paymentMethod || 'n/a';
+				const reference = payment.transactionId || 'n/a';
+				const amount = Number(payment.amount ?? 0);
+				const woNumber = `WO-TOUR-${params.id.slice(-6).toUpperCase()}-${String(startSeq + index).padStart(4, '0')}`;
 
-		const allApprovals = targetExpenseIds.size > 0
-			? await pb.collection('approvals').getFullList({ filter: `entityType = 'expense'` }).catch(() => [] as any[])
-			: [] as any[];
-		const approvalsToDelete = allApprovals.filter((approval: any) => {
-			const entityId = String(approval.entityId ?? '');
-			const expenseId = String(approval.expenseId ?? '');
-			return targetExpenseIds.has(entityId) || targetExpenseIds.has(expenseId);
-		});
+				return {
+					work_order_number: woNumber,
+					source: 'expense' as const,
+					status: 'open' as const,
+					projectId: params.id,
+					projectName: tournament.name,
+					projectCode: 'TOUR',
+					proPayment: [payment.id],
+					amount,
+					description: `${tournament.name} payout - ${proName} (${recipient})`,
+					notes: `[PP:${payment.id}] ${proName} | ${recipient} | ${method} | ref ${reference} | $${amount.toFixed(2)}`,
+					approvedDate: new Date().toISOString().split('T')[0],
+					approvedBy: locals.pb.authStore.record?.id ?? undefined,
+				};
+			});
 
-		await Promise.all([
-			...staleExpenses.map((expense: any) => pb.collection('expenses').delete(expense.id).catch(() => null)),
-			...approvalsToDelete.map((approval: any) => pb.collection('approvals').delete(approval.id).catch(() => null)),
-		]);
+		const createResults = await Promise.allSettled(
+			createPayloads.map(payload => pb.collection('work_orders').create(payload).catch((e: any) => {
+				console.error('❌ tournament payout work_order create failed:', e.message, JSON.stringify(e.data ?? {}));
+				throw e;
+			}))
+		);
 
-		const expensePayload = {
-			title: `Tournament Payouts — ${tournament.name}`,
-			description,
-			amount: totalAmount,
-			status: 'submitted',
-			date: today,
-			category,
-			notes,
-			work_order_number: woNumber,
-			sourceType: 'tournament_payout',
-			sourceId: params.id,
-			...(submittedBy ? { submittedBy } : {}),
-		};
+		const createdCount = createResults.filter(result => result.status === 'fulfilled').length;
+		const failedCount = createResults.length - createdCount;
 
-		const expense = canonicalExpense
-			? await pb.collection('expenses').update(canonicalExpense.id, expensePayload)
-			: await pb.collection('expenses').create(expensePayload);
+		if (failedCount > 0) {
+			console.warn(`[tournament payout] ${failedCount} work order(s) failed during generation for tournament ${params.id}`);
+		}
 
-		await pb.collection('approvals').create({
-			entityType: 'expense',
-			entityId: expense.id,
-			expenseId: expense.id,
-			status: 'pending',
-			requestedDate: new Date().toISOString(),
-			amount: totalAmount,
-			comments: `<p>${tournament.name} payout batch submitted for approval.</p><p>${transactionManifest || 'n/a'}</p>`,
-			...(submittedBy ? { requestedBy: submittedBy } : {}),
-		}).catch(() => null);
+		// ── Franchise payout work orders ─────────────────────────────────────────
+		let franchiseCutPct = 0;
+		if (tournament.seasonRef) {
+			const sr = await pb.collection('seasons').getOne(tournament.seasonRef).catch(() => null);
+			franchiseCutPct = Number(sr?.franchiseCutPercentage ?? tournament.franchiseCutPercentage ?? 0);
+		} else {
+			franchiseCutPct = Number(tournament.franchiseCutPercentage ?? 0);
+		}
 
-		return { success: true, created: 1, expenseId: expense.id, approvalCount: 1, removedExpenses: staleExpenses.length, removedApprovals: approvalsToDelete.length };
+		if (franchiseCutPct > 0) {
+			// Bootstrap franchise_payouts from results if none exist yet.
+			const existingFranchisePayouts = await pb.collection('franchise_payouts').getFullList({
+				filter: `tournament = '${params.id}'`,
+				fields: 'id,franchise,totalEarnings,mensEarnings,womensEarnings,numberOfPros,status',
+			}).catch(() => [] as any[]);
+
+			if (existingFranchisePayouts.length === 0 && resultsForValidation.length > 0) {
+				const franchiseAccum = new Map<string, { mens: number; womens: number; count: number }>();
+				for (const result of resultsForValidation) {
+					const franchiseId = rosterFranchiseByTalentId.get(String(result.pro));
+					if (!franchiseId) continue;
+					const proEarnings = Number(result.proEarnings || 0);
+					const franchiseEarnings = proEarnings > 0
+						? Math.round((proEarnings / (100 - franchiseCutPct)) * franchiseCutPct * 100) / 100
+						: 0;
+					if (!franchiseAccum.has(franchiseId)) franchiseAccum.set(franchiseId, { mens: 0, womens: 0, count: 0 });
+					const acc = franchiseAccum.get(franchiseId)!;
+					if (result.division === 'womens') acc.womens = Math.round((acc.womens + franchiseEarnings) * 100) / 100;
+					else acc.mens = Math.round((acc.mens + franchiseEarnings) * 100) / 100;
+					acc.count += 1;
+				}
+				await Promise.allSettled(
+					Array.from(franchiseAccum.entries()).map(([franchiseId, acc]) =>
+						pb.collection('franchise_payouts').create({
+							franchise: franchiseId,
+							tournament: params.id,
+							totalEarnings: Math.round((acc.mens + acc.womens) * 100) / 100,
+							mensEarnings: acc.mens,
+							womensEarnings: acc.womens,
+							numberOfPros: acc.count,
+							status: 'pending',
+						}).catch(() => null)
+					)
+				);
+			}
+
+			// Load pending franchise_payouts and create one WO each (skipping already-marked ones).
+			const pendingFranchisePayouts = await pb.collection('franchise_payouts').getFullList({
+				filter: `tournament = '${params.id}' && status = 'pending'`,
+				fields: 'id,franchise,totalEarnings,status',
+			}).catch(() => [] as any[]);
+
+			if (pendingFranchisePayouts.length > 0) {
+				const allExistingWOs = await pb.collection('work_orders').getFullList({
+					filter: `projectId = '${params.id}' && source = 'expense'`,
+					fields: 'id,notes',
+				}).catch(() => [] as any[]);
+				const existingFPMarkers = new Set(
+					allExistingWOs.flatMap((wo: any) => {
+						const notes = String(wo.notes ?? '');
+						const match = notes.match(/\[FP:([a-zA-Z0-9]+)\]/g) || [];
+						return match.map((m: string) => m.replace(/^\[FP:|\]$/g, '').trim());
+					})
+				);
+				const allWOsNow = await pb.collection('work_orders').getFullList({
+					fields: 'work_order_number',
+					sort: '-created',
+				}).catch(() => [] as any[]);
+				let franchiseSeq = allWOsNow.length + 1;
+
+				await Promise.allSettled(
+					pendingFranchisePayouts
+						.filter((fp: any) => !existingFPMarkers.has(fp.id))
+						.map((fp: any) => {
+							const franchiseName = franchiseNameById.get(String(fp.franchise)) ?? String(fp.franchise);
+							const amount = Number(fp.totalEarnings ?? 0);
+							const woNumber = `WO-FRAN-${params.id.slice(-6).toUpperCase()}-${String(franchiseSeq++).padStart(4, '0')}`;
+							return pb.collection('work_orders').create({
+								work_order_number: woNumber,
+								source: 'expense' as const,
+								status: 'open' as const,
+								projectId: params.id,
+								projectName: tournament.name,
+								projectCode: 'FRAN',
+								franchise_payouts: fp.id,
+								amount,
+								description: `${tournament.name} franchise share - ${franchiseName}`,
+								notes: `[FP:${fp.id}] ${franchiseName} | franchise | $${amount.toFixed(2)}`,
+								approvedDate: new Date().toISOString().split('T')[0],
+								approvedBy: locals.pb.authStore.record?.id ?? undefined,
+							}).catch((e: any) => {
+								console.error('❌ franchise WO create failed:', e.message, JSON.stringify(e.data ?? {}));
+							});
+						})
+				);
+			}
+		}
+
+		throw redirect(303, '/dashboard/work-orders');
 	},
 
 	generateWorkOrder: async ({ locals, params }) => {
@@ -660,40 +890,46 @@ export const actions: Actions = {
 		const dateStr   = new Date().toISOString().slice(0, 10).replace(/-/g, '');
 		const woNumber  = `WO-TOUR-${params.id.slice(-6).toUpperCase()}-${dateStr}`;
 
-		// Check if WO already exists
-		const existing = await pb.collection('work_orders')
-			.getFirstListItem(`projectId = '${params.id}' && source = 'pro_payment'`)
-			.catch(() => null);
+		// Keep manual generation as a fallback, but generate one WO per payment.
+		const existingMarkers = new Set(
+			await pb.collection('work_orders').getFullList({
+				filter: `projectId = '${params.id}' && source = 'expense'`,
+				fields: 'notes',
+			}).then((rows: any[]) => rows.flatMap((wo: any) => {
+				const match = String(wo.notes ?? '').match(/\[PP:([a-zA-Z0-9]+)\]/g) || [];
+				return match.map(m => m.replace(/^\[PP:|\]$/g, '').trim());
+			})).catch(() => [])
+		);
 
-		if (existing) {
-			// Update with latest payment list and amount
-			await pb.collection('work_orders').update(existing.id, {
-				proPayment: paymentIds,
-				amount:     totalAmount,
-				notes:      `${payments.length} payment records · updated ${new Date().toISOString().slice(0, 10)} · ${transactionManifest || 'n/a'}`,
-				qb_notes:   `FLI Golf ${tournament.name} — ${payments.length} payments. Manifest: ${transactionManifest || 'n/a'}`,
+		const allWOs = await pb.collection('work_orders').getFullList({ fields: 'work_order_number', sort: '-created' }).catch(() => [] as any[]);
+		let seq = allWOs.length + 1;
+		let createdCount = 0;
+		for (const payment of payments) {
+			if (existingMarkers.has(payment.id)) continue;
+			const proName = payment.expand?.pro?.name ?? payment.pro ?? 'Unknown';
+			const recipient = payment.recipient || 'n/a';
+			const method = payment.paymentMethod || 'n/a';
+			const reference = payment.transactionId || 'n/a';
+			const amount = Number(payment.amount ?? 0);
+			const woNumber = `WO-TOUR-${params.id.slice(-6).toUpperCase()}-${String(seq).padStart(4, '0')}`;
+			seq += 1;
+			await pb.collection('work_orders').create({
+				work_order_number: woNumber,
+				source: 'expense',
+				status: 'open',
+				projectId: params.id,
+				projectName: tournament.name,
+				projectCode: 'TOUR',
+				proPayment: [payment.id],
+				amount,
+				description: `${tournament.name} payout - ${proName} (${recipient})`,
+				notes: `[PP:${payment.id}] ${proName} | ${recipient} | ${method} | ref ${reference} | $${amount.toFixed(2)}`,
+				approvedDate: new Date().toISOString().split('T')[0],
 			});
-			return { success: true, workOrderId: existing.id, updated: true };
+			createdCount += 1;
 		}
 
-		const proCount = payments.filter((p: any) => p.recipient === 'pro').length;
-		const mgrCount = payments.filter((p: any) => p.recipient === 'manager').length;
-
-		const wo = await pb.collection('work_orders').create({
-			work_order_number: woNumber,
-			source:            'pro_payment',
-			status:            'open',
-			projectId:         params.id,
-			projectName:       tournament.name,
-			description:       `Tournament player payouts — ${tournament.name}`,
-			amount:            totalAmount,
-			proPayment:        paymentIds,
-			notes:             `${payments.length} payment records (${proCount} pros, ${mgrCount} managers) · generated ${new Date().toISOString().slice(0, 10)} · ${transactionManifest || 'n/a'}`,
-			qb_account:        'Player Payouts',
-			qb_notes:          `FLI Golf ${tournament.name} — ${proCount} pro payments + ${mgrCount} manager cuts. Total: $${totalAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}. Manifest: ${transactionManifest || 'n/a'}`,
-		});
-
-		return { success: true, workOrderId: wo.id, updated: false };
+		throw redirect(303, '/dashboard/work-orders');
 	},
 
 	markQbEntered: async ({ request, locals, params }) => {
@@ -737,7 +973,7 @@ export const actions: Actions = {
 		const [results, payments, wos] = await Promise.all([
 			pb.collection('tournament_results').getFullList({ filter: `tournament = '${tournamentId}'` }).catch(() => [] as any[]),
 			pb.collection('pro_payments').getFullList({ filter: `tournament = '${tournamentId}'` }).catch(() => [] as any[]),
-			pb.collection('work_orders').getFullList({ filter: `projectId = '${tournamentId}' && source = 'pro_payment'` }).catch(() => [] as any[]),
+			pb.collection('work_orders').getFullList({ filter: `projectId = '${tournamentId}' && source = 'expense'` }).catch(() => [] as any[]),
 		]);
 
 		await Promise.all([

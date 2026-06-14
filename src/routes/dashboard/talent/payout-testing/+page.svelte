@@ -3,7 +3,7 @@
 	import { enhance } from '$app/forms';
 	import { invalidateAll } from '$app/navigation';
 	import {
-		DollarSign, CheckCircle, Clock, TrendingUp, Users, FileText,
+		DollarSign, CheckCircle, Clock, TrendingUp, Users,
 		ChevronDown, ChevronUp, History, AlertTriangle, Trophy, Wallet,
 		Play, RotateCcw, ArrowRight, Loader2, Building2
 	} from 'lucide-svelte';
@@ -37,7 +37,7 @@
 
 	function getTournamentStep(t: typeof data.byTournament[0]): 'seed' | 'pay-pros' | 'pay-managers' | 'pay-franchises' | 'done' {
 		if (t.resultCount === 0) return 'seed';
-		if (t.paymentCount === 0) return 'seed'; // results exist but no payments yet (shouldn't happen, but guard)
+		if (t.paymentCount === 0) return 'done';
 		if (t.pendingProCount > 0) return 'pay-pros';
 		if (t.pendingMgrCount > 0) return 'pay-managers';
 		if (t.pendingFranchiseCount > 0) return 'pay-franchises';
@@ -106,9 +106,6 @@
 			</form>
 			<a href="/dashboard/talent/payments" class="text-xs px-3 py-1.5 rounded-lg bg-slate-800 border border-slate-700 hover:bg-slate-700 text-slate-300 transition-colors">Payments</a>
 			<a href="/dashboard/talent/tournaments" class="text-xs px-3 py-1.5 rounded-lg bg-slate-800 border border-slate-700 hover:bg-slate-700 text-slate-300 transition-colors">Tournaments</a>
-			<a href="/dashboard/work-orders" class="text-xs px-3 py-1.5 rounded-lg bg-slate-800 border border-slate-700 hover:bg-slate-700 text-slate-300 transition-colors flex items-center gap-1">
-				<FileText class="size-3" /> Work Orders
-			</a>
 		</div>
 	</div>
 
@@ -128,7 +125,6 @@
 			{ label: 'To Managers',   value: fmt(s.managerPaymentTotal),   icon: Users,      color: 'border-amber-700',   ic: 'text-amber-400'   },
 			{ label: 'Paid Out',      value: fmt(s.totalPaid),             icon: CheckCircle,color: 'border-emerald-700', ic: 'text-emerald-400' },
 			{ label: 'Pending',       value: fmt(s.totalPending),          icon: Clock,      color: 'border-amber-700',   ic: 'text-amber-400'   },
-			{ label: 'Work Orders',   value: s.workOrderCount,             icon: FileText,   color: 'border-blue-700',    ic: 'text-blue-400'    },
 			{ label: 'Audit Entries', value: s.auditEntries,               icon: History,    color: 'border-slate-600',   ic: 'text-slate-400'   },
 		] as stat}
 			<div class="rounded-xl border {stat.color} bg-slate-800/40 px-3 py-2.5">
@@ -144,8 +140,12 @@
 		<div class="rounded-xl border border-emerald-700 bg-emerald-950/30 px-5 py-4 flex items-center gap-3">
 			<CheckCircle class="size-5 text-emerald-400 shrink-0" />
 			<div>
-				<p class="font-bold text-emerald-300">All tournaments paid out</p>
-				<p class="text-xs text-emerald-600 mt-0.5">{fmt(s.totalPaid)} distributed · {s.paymentRecords} payment records · {s.workOrderCount} work orders · {s.auditEntries} audit entries</p>
+				<p class="font-bold text-emerald-300">{s.paymentRecords > 0 ? 'All tournaments paid out' : 'All tournaments seeded'}</p>
+				<p class="text-xs text-emerald-600 mt-0.5">
+					{s.paymentRecords > 0
+						? `${fmt(s.totalPaid)} distributed · ${s.paymentRecords} payment records · ${s.auditEntries} audit entries`
+						: `${s.seededCount} tournaments seeded with standings`}
+				</p>
 			</div>
 		</div>
 	{/if}
@@ -354,9 +354,6 @@
 						<span class="text-slate-400">Settled: <span class="{t.mathOk ? 'text-emerald-400' : 'text-red-400'} font-semibold">{fmtFull(t.settledTotal)}</span></span>
 						<ArrowRight class="size-3 text-slate-600" />
 						<span class="text-slate-400">Diff: <span class="{t.mathOk ? 'text-emerald-400' : 'text-red-400'} font-semibold">{fmtFull(t.settledTotal - t.tournament.prizePool)}</span></span>
-						{#if t.wo}
-							<span class="ml-auto font-mono text-blue-400 text-[10px] border border-blue-800 rounded px-1.5 py-0.5">{t.wo.work_order_number}</span>
-						{/if}
 					</div>
 
 					<!-- Team standings by franchise -->
@@ -489,26 +486,5 @@
 			{/if}
 		</div>
 	{/each}
-
-	<!-- Work orders -->
-	{#if data.workOrders.length > 0}
-		<div>
-			<p class="text-xs text-slate-500 uppercase tracking-wide mb-2 flex items-center gap-1.5">
-				<FileText class="size-3" /> Work Orders ({data.workOrders.length})
-			</p>
-			<div class="flex flex-wrap gap-2">
-				{#each data.workOrders as wo}
-					<div class="flex items-center gap-2 rounded-lg border border-blue-800/50 bg-blue-950/20 px-3 py-2 text-xs">
-						<span class="font-mono font-bold text-blue-300">{wo.work_order_number}</span>
-						<span class="text-slate-500">·</span>
-						<span class="text-slate-300">{wo.projectName}</span>
-						<span class="text-slate-500">·</span>
-						<span class="font-semibold text-white">{fmt(wo.amount)}</span>
-						<span class="text-[10px] uppercase px-1.5 py-0.5 rounded border {wo.status === 'paid' ? 'text-emerald-400 border-emerald-700' : 'text-amber-400 border-amber-700'}">{wo.status}</span>
-					</div>
-				{/each}
-			</div>
-		</div>
-	{/if}
 
 </div>
