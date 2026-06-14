@@ -28,6 +28,8 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 			let approver    = wo.expand?.approver      ?? null;
 			let submittedBy = wo.expand?.submittedBy   ?? null;
 			let qbEnteredBy = wo.expand?.qb_entered_by ?? null;
+			let goalTask: any = null;
+			let goal: any = null;
 			let claimItems: any[] = [];
 			let approval: any    = null;
 			let bid: any         = null;
@@ -125,6 +127,50 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 				}
 			}
 
+			// Goal task: load linked goal task, goal, approval, and requested/assigned profile context.
+			if (wo.source === 'goal_task') {
+				if (!expense && wo.expenseId) {
+					expense = await adminPb.collection('expenses').getOne(wo.expenseId).catch(() => null);
+				}
+
+				const goalTasks = await adminPb.collection('goal_tasks').getFullList({
+					filter: `expenseId="${wo.expenseId || ''}" || workOrderId="${wo.work_order_number}"`,
+					sort: '-created'
+				}).catch(() => []);
+				goalTask = (goalTasks as any[])[0] ?? null;
+
+				if (goalTask?.goalId) {
+					goal = await adminPb.collection('marketing_goals').getOne(goalTask.goalId).catch(() => null);
+				}
+
+				if (goalTask?.approvalId) {
+					approval = await adminPb.collection('approvals').getOne(goalTask.approvalId, {
+						expand: 'requestedBy,approver'
+					}).catch(() => null);
+				} else {
+					const approvals = await adminPb.collection('approvals').getFullList({
+						filter: `entityType="goal_task" && entityId="${goalTask?.id || ''}"`,
+						expand: 'requestedBy,approver',
+						sort: '-created'
+					}).catch(() => []);
+					approval = (approvals as any[])[0] ?? null;
+				}
+
+				if (!submittedBy) {
+					if (approval?.expand?.requestedBy) {
+						submittedBy = approval.expand.requestedBy;
+					} else if (goalTask?.assignedTo) {
+						submittedBy = await adminPb.collection('user_profiles').getOne(goalTask.assignedTo, {
+							fields: 'id,firstName,lastName,email,role'
+						}).catch(() => null);
+					}
+				}
+
+				if (!approver && approval?.expand?.approver) {
+					approver = approval.expand.approver;
+				}
+			}
+
 			return {
 				...wo,
 				_claim:          claim,
@@ -132,6 +178,8 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 				_expense:        expense,
 				_task:           task,
 				_project:        project,
+				_goalTask:       goalTask,
+				_goal:           goal,
 				_approver:       approver,
 				_submittedBy:    submittedBy,
 				_claimItems:     claimItems,
