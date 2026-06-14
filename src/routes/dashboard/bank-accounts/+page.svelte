@@ -2,7 +2,7 @@
     import type { ActionData } from './$types';
 	import type { PageData } from './$types';
 	import Card from '$lib/components/ui/card.svelte';
-	import { ArrowDown, ArrowUp, ArrowUpDown, Landmark, Search, ShieldCheck, Wallet, X } from 'lucide-svelte';
+	import { ArrowDown, ArrowUp, ArrowUpDown, BarChart2, Landmark, Search, ShieldCheck, Table2, Wallet, X } from 'lucide-svelte';
 
 	let { data, form }: { data: PageData; form: ActionData } = $props();
 	type BankAccount = {
@@ -30,6 +30,7 @@
 	let sortBy = $state<SortKey>('code');
 	let sortDir = $state<SortDir>('asc');
 	let overrideOpenId = $state<string | null>(null);
+	let viewMode = $state<'chart' | 'table'>('table');
 
 	function fmt(amount: number) {
 		return new Intl.NumberFormat('en-US', {
@@ -52,6 +53,28 @@
 
 	function statusLabel(value?: string) {
 		return (value || 'active').replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+	}
+
+	function groupTone(value: string) {
+		if (value === 'reserve_treasury') {
+			return {
+				bar: 'from-blue-900 via-blue-700 to-blue-500',
+				chip: 'border-blue-800/50 bg-blue-950/40 text-blue-200',
+				dot: 'bg-blue-500'
+			};
+		}
+		if (value === 'restricted') {
+			return {
+				bar: 'from-green-900 via-green-700 to-green-400',
+				chip: 'border-green-800/50 bg-green-950/40 text-green-200',
+				dot: 'bg-green-500'
+			};
+		}
+		return {
+			bar: 'from-green-800 via-emerald-600 to-teal-400',
+			chip: 'border-emerald-800/50 bg-emerald-950/40 text-emerald-200',
+			dot: 'bg-emerald-400'
+		};
 	}
 
 	function allocationValue(v: unknown): number {
@@ -160,6 +183,18 @@
 	}));
 
 	const filteredTotalAllocation = $derived(sortedAccounts.reduce((sum, account) => sum + allocationValue(account.allocation), 0));
+	const chartAccounts = $derived([...sortedAccounts].sort((a, b) => allocationValue(b.allocation) - allocationValue(a.allocation)));
+	const maxChartAllocation = $derived(chartAccounts.length ? Math.max(...chartAccounts.map((account) => allocationValue(account.allocation))) : 0);
+	const groupSummaries = $derived([
+		{ key: 'operating', label: 'Operating', accounts: filteredAccounts.filter((account) => account.groupType === 'operating') },
+		{ key: 'reserve_treasury', label: 'Reserve & Treasury', accounts: filteredAccounts.filter((account) => account.groupType === 'reserve_treasury') },
+		{ key: 'restricted', label: 'Restricted', accounts: filteredAccounts.filter((account) => account.groupType === 'restricted') },
+	].map((group) => ({
+		...group,
+		total: group.accounts.reduce((sum, account) => sum + allocationValue(account.allocation), 0),
+		count: group.accounts.length,
+		tone: groupTone(group.key),
+	})));
 	const hasActiveFilters = $derived(Boolean(
 		searchTerm.trim() ||
 		selectedGroup !== 'all' ||
@@ -302,6 +337,109 @@
 		</div>
 	</Card>
 
+	<div class="flex items-center justify-between gap-3 flex-wrap">
+		<div>
+			<p class="text-[10px] uppercase tracking-[0.26em] text-slate-500">View</p>
+			<p class="text-sm text-slate-400 mt-1">Switch between the visual allocation chart and the full account table.</p>
+		</div>
+		<div class="inline-flex rounded-xl border border-slate-700 bg-slate-900/60 p-1">
+			<button
+				type="button"
+				onclick={() => (viewMode = 'chart')}
+				class={`inline-flex items-center gap-1.5 rounded-lg px-4 py-2 text-sm transition-colors ${viewMode === 'chart' ? 'bg-amber-500 text-slate-950 font-semibold' : 'text-slate-300 hover:bg-slate-800'}`}
+			>
+				<BarChart2 class="size-4" /> Chart
+			</button>
+			<button
+				type="button"
+				onclick={() => (viewMode = 'table')}
+				class={`inline-flex items-center gap-1.5 rounded-lg px-4 py-2 text-sm transition-colors ${viewMode === 'table' ? 'bg-amber-500 text-slate-950 font-semibold' : 'text-slate-300 hover:bg-slate-800'}`}
+			>
+				<Table2 class="size-4" /> Table
+			</button>
+		</div>
+	</div>
+
+	{#if viewMode === 'chart'}
+	<Card class="border-slate-700/70 bg-slate-900/40 p-4 lg:p-5 space-y-5 overflow-hidden">
+		<div class="flex flex-wrap items-start justify-between gap-4">
+			<div>
+				<p class="text-[10px] uppercase tracking-[0.28em] text-slate-500 mb-1">Allocation Chart</p>
+				<h2 class="text-lg font-semibold text-white">Bank Account Balances at a Glance</h2>
+				<p class="text-sm text-slate-400 mt-1">Visual breakdown of the currently filtered account allocations.</p>
+			</div>
+			<div class="rounded-xl border border-slate-700/70 bg-slate-950/60 px-4 py-3 min-w-[220px]">
+				<p class="text-[10px] uppercase tracking-wide text-slate-500">Largest Visible Account</p>
+				{#if chartAccounts[0]}
+					<p class="mt-1 text-sm font-medium text-white">{chartAccounts[0].code} · {chartAccounts[0].name}</p>
+					<p class="text-xl font-semibold text-amber-200 mt-1">{fmt(allocationValue(chartAccounts[0].allocation))}</p>
+				{:else}
+					<p class="mt-1 text-sm text-slate-400">No accounts in the current filter.</p>
+				{/if}
+			</div>
+		</div>
+
+		<div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+			{#each groupSummaries as group}
+				<div class={`rounded-xl border px-4 py-3 ${group.tone.chip}`}>
+					<div class="flex items-center justify-between gap-3">
+						<div class="flex items-center gap-2">
+							<span class={`size-2.5 rounded-full ${group.tone.dot}`}></span>
+							<p class="text-sm font-medium">{group.label}</p>
+						</div>
+						<p class="text-xs uppercase tracking-wide opacity-80">{group.count} account{group.count === 1 ? '' : 's'}</p>
+					</div>
+					<p class="mt-3 text-2xl font-semibold text-white">{fmt(group.total)}</p>
+				</div>
+			{/each}
+		</div>
+
+		{#if chartAccounts.length > 0}
+			<div class="rounded-2xl border border-slate-800 bg-[radial-gradient(circle_at_top_left,_rgba(245,158,11,0.14),_transparent_36%),linear-gradient(180deg,rgba(15,23,42,0.96),rgba(2,6,23,0.92))] p-4 lg:p-5">
+				<div class="flex items-center justify-between gap-3 mb-4">
+					<p class="text-xs uppercase tracking-[0.24em] text-slate-400">Allocation Distribution</p>
+					<p class="text-xs text-slate-500">Scaled to {fmt(maxChartAllocation)}</p>
+				</div>
+				<div class="space-y-3">
+					{#each chartAccounts as account}
+						{@const tone = groupTone(account.groupType)}
+						{@const allocation = allocationValue(account.allocation)}
+						{@const widthPercent = maxChartAllocation > 0 ? Math.max((allocation / maxChartAllocation) * 100, allocation > 0 ? 4 : 0) : 0}
+						<div class="grid grid-cols-[minmax(0,220px)_minmax(0,1fr)_110px] gap-3 items-center">
+							<div class="min-w-0">
+								<div class="flex items-center gap-2 min-w-0">
+									<span class={`size-2.5 rounded-full shrink-0 ${tone.dot}`}></span>
+									<p class="truncate text-sm font-medium text-slate-100">{account.code} · {account.name}</p>
+								</div>
+								<p class="mt-1 text-xs text-slate-500 truncate">{groupLabel(account.groupType)} · {typeLabel(account.accountType)}</p>
+							</div>
+							<div class="relative h-10 rounded-xl border border-slate-800/90 bg-slate-950/70 overflow-hidden">
+								<div class="absolute inset-y-0 left-0 rounded-xl bg-gradient-to-r {tone.bar} shadow-[0_0_30px_rgba(245,158,11,0.18)]" style={`width:${widthPercent}%`}></div>
+							<div class="absolute inset-0 flex items-center px-3">
+								{#if allocation > 0}
+									<span class="text-[11px] font-semibold text-white drop-shadow-[0_1px_3px_rgba(0,0,0,0.9)]">{((allocation / (filteredTotalAllocation || 1)) * 100).toFixed(1)}% of visible total</span>
+								{:else}
+									<span class="text-[11px] text-slate-500">No allocation</span>
+									{/if}
+								</div>
+							</div>
+							<div class="text-right">
+								<p class="text-sm font-semibold text-white">{fmt(allocation)}</p>
+								<p class="text-[11px] text-slate-500">{statusLabel(account.status)}</p>
+							</div>
+						</div>
+					{/each}
+				</div>
+			</div>
+		{:else}
+			<div class="rounded-xl border border-dashed border-slate-700 bg-slate-950/40 px-4 py-8 text-center text-sm text-slate-400">
+				Adjust the filters to display account allocations in the chart.
+			</div>
+		{/if}
+	</Card>
+	{/if}
+
+	{#if viewMode === 'table'}
 	<Card class="overflow-hidden border-slate-700/70 bg-slate-900/40">
 		<div class="overflow-x-auto">
 			<table class="w-full min-w-[1040px] text-sm">
@@ -442,4 +580,5 @@
 			</table>
 		</div>
 	</Card>
+	{/if}
 </div>

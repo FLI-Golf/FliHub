@@ -11,6 +11,43 @@ const toPaymentStatus = (workOrderStatus: unknown): string => {
 	return 'pending';
 };
 
+const accountOptionLabel = (account: any): string => {
+	const code = String(account?.code ?? '').trim();
+	const name = String(account?.name ?? '').trim();
+	return code && name ? `${code} - ${name}` : name || code || '';
+};
+
+const resolveBankAccount = async (adminPb: any, rawAccountId: unknown, rawAccountLabel: unknown) => {
+	const accountId = String(rawAccountId ?? '').trim();
+	if (accountId) {
+		const byId = await adminPb.collection('bank_accounts').getOne(accountId, {
+			fields: 'id,code,name,allocation,notes,status'
+		}).catch(() => null);
+		if (byId) return byId;
+	}
+
+	const accountLabel = String(rawAccountLabel ?? '').trim();
+	if (!accountLabel) return null;
+
+	const accounts = await adminPb.collection('bank_accounts').getFullList({
+		filter: 'status = "active" || status = ""',
+		sort: 'sortOrder,code',
+		fields: 'id,code,name,allocation,notes,status'
+	}).catch(() => []);
+
+	const normalizedLabel = accountLabel.toLowerCase();
+	const parsedCode = accountLabel.match(/^([0-9]+)\s*-/)?.[1] ?? '';
+
+	return (accounts as any[]).find((account: any) => {
+		const code = String(account?.code ?? '').trim();
+		const name = String(account?.name ?? '').trim();
+		return code === accountLabel
+			|| name.toLowerCase() === normalizedLabel
+			|| accountOptionLabel(account).toLowerCase() === normalizedLabel
+			|| (parsedCode !== '' && code === parsedCode);
+	}) ?? null;
+};
+
 export const PATCH: RequestHandler = async ({ locals, url, params, request }) => {
 	const ctx = await RequestContext.fromApi(locals, url);
 	if (!ctx) return json({ message: 'Unauthorized' }, { status: 401 });
@@ -23,6 +60,7 @@ export const PATCH: RequestHandler = async ({ locals, url, params, request }) =>
 		const body    = await request.json();
 		const adminPb = await getAdminPocketBase();
 		const before  = await adminPb.collection('work_orders').getOne(params.id).catch(() => null);
+		const wasPaid = toPaymentStatus(before?.status) === 'paid';
 
 		const update: Record<string, any> = {};
 
@@ -47,6 +85,56 @@ export const PATCH: RequestHandler = async ({ locals, url, params, request }) =>
 		if (body.paidDate !== undefined) update.paidDate = body.paidDate;
 
 		const record = await adminPb.collection('work_orders').update(params.id, update);
+		const isNowPaid = toPaymentStatus(record.status) === 'paid';
+		const shouldDeductBankAccount = !wasPaid && isNowPaid;
+		let bankAccountDeducted: { id: string; label: string; amount: number; newAllocation: number } | null = null;
+		let bankAccountWarning: string | null = null;
+
+		if (shouldDeductBankAccount) {
+			const paymentAmount = typeof record.amount === 'number' ? record.amount : Number(record.amount || 0);
+			const account = await resolveBankAccount(adminPb, body.qb_account_id, body.qb_account ?? record.qb_account);
+
+			if (!Number.isFinite(paymentAmount) || paymentAmount <= 0) {
+				bankAccountWarning = 'Paid work order has no valid amount, so no bank account deduction was recorded.';
+			} else if (!account) {
+				bankAccountWarning = 'Unable to resolve the selected bank account, so no bank account deduction was recorded.';
+			} else {
+				const currentAllocation = typeof account.allocation === 'number'
+					? account.allocation
+					: Number(account.allocation || 0);
+
+				if (!Number.isFinite(currentAllocation)) {
+					bankAccountWarning = `Bank account ${accountOptionLabel(account)} has an invalid allocation value.`;
+				} else if (currentAllocation < paymentAmount) {
+					bankAccountWarning = `Bank account ${accountOptionLabel(account)} has insufficient allocation for a ${paymentAmount.toLocaleString('en-US')} deduction.`;
+				} else {
+					const nextAllocation = currentAllocation - paymentAmount;
+					const actor = profile?.id ?? 'system';
+					const stamp = [
+						`[WORK_ORDER_PAYMENT ${new Date().toISOString()}]`,
+						`wo=${record.work_order_number || record.id}`,
+						`amount=${paymentAmount}`,
+						record.qb_transaction_id ? `txn=${record.qb_transaction_id}` : '',
+						`old=${currentAllocation}`,
+						`new=${nextAllocation}`,
+						`by=${actor}`,
+					].filter(Boolean).join(' ');
+					const existingNotes = String(account.notes ?? '').trim();
+
+					await adminPb.collection('bank_accounts').update(account.id, {
+						allocation: nextAllocation,
+						notes: existingNotes ? `${existingNotes}\n${stamp}` : stamp,
+					});
+
+					bankAccountDeducted = {
+						id: account.id,
+						label: accountOptionLabel(account),
+						amount: paymentAmount,
+						newAllocation: nextAllocation,
+					};
+				}
+			}
+		}
 
 		const qbTouched = (
 			body.qb_transaction_id !== undefined ||
@@ -163,7 +251,11 @@ export const PATCH: RequestHandler = async ({ locals, url, params, request }) =>
 			}
 		}
 
-		return json(record);
+		return json({
+			...record,
+			_bankAccountDeducted: bankAccountDeducted,
+			_bankAccountWarning: bankAccountWarning,
+		});
 	} catch (e: any) {
 		const status = e?.status === 404 ? 404 : 500;
 		return json({ message: e?.response?.message ?? e?.message ?? 'Failed' }, { status });

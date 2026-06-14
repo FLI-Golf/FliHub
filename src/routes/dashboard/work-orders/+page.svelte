@@ -8,7 +8,7 @@
 	const bankAccounts = $derived((data as any).bankAccounts ?? []);
 
 	const STATUS_OPTIONS = ['open', 'paid', 'cancelled'];
-	const SOURCE_OPTIONS = ['expense', 'reimbursement', 'bid'];
+	const SOURCE_OPTIONS = ['expense', 'reimbursement', 'bid', 'goal_task'];
 
 	let searchTerm = $state('');
 	let selectedStatuses = $state<string[]>([...STATUS_OPTIONS]);
@@ -28,17 +28,19 @@
 	let qbResult      = $state<{ woId: string; expenseCreated: boolean; expenseId?: string; warning?: string } | null>(null);
 
 	// QB form state per WO
-	let qbForms = $state<Record<string, { txnId: string; enteredBy: string; enteredDate: string; account: string; notes: string }>>({});
+	let qbForms = $state<Record<string, { txnId: string; enteredBy: string; enteredDate: string; account: string; accountId: string; notes: string }>>({});
 
 	$effect(() => {
 		const today = new Date().toISOString().slice(0, 10);
 		for (const wo of data.workOrders as any[]) {
+			const matchedAccount = findBankAccountByLabel(String(wo.qb_account ?? ''));
 			if (!qbForms[wo.id]) {
 				qbForms[wo.id] = {
 					txnId:       wo.qb_transaction_id  ?? '',
 					enteredBy:   wo.qb_entered_by      ?? '',
 					enteredDate: wo.qb_entered_date?.slice(0,10) ?? today,
 					account:     wo.qb_account         ?? '',
+					accountId:   matchedAccount?.id    ?? '',
 					notes:       wo.qb_notes           ?? '',
 				};
 			}
@@ -49,13 +51,15 @@
 		savingQB = woId;
 		qbResult = null;
 		const f = qbForms[woId];
+		const selectedAccount = bankAccounts.find((account: any) => account.id === f.accountId);
 		const res = await fetch(`/api/work-orders/${woId}`, {
 			method: 'PATCH',
 			headers: { 'Content-Type': 'application/json' },
 			body: JSON.stringify({
 				qb_transaction_id: f.txnId,
 				qb_entered_date:   f.enteredDate,
-				qb_account:        f.account,
+				qb_account:        selectedAccount ? accountOptionLabel(selectedAccount) : f.account,
+				qb_account_id:     selectedAccount?.id ?? '',
 				qb_notes:          f.notes,
 				status:            'paid',
 			})
@@ -217,6 +221,13 @@
 		return [u.firstName, u.lastName].filter(Boolean).join(' ') || u.email || '—';
 	}
 
+	function findBankAccountByLabel(label: string) {
+		const normalizedLabel = String(label ?? '').trim().toLowerCase();
+		if (!normalizedLabel) return null;
+
+		return bankAccounts.find((account: any) => accountOptionLabel(account).toLowerCase() === normalizedLabel) ?? null;
+	}
+
 	function accountOptionLabel(account: any) {
 		const code = String(account?.code ?? '').trim();
 		const name = String(account?.name ?? '').trim();
@@ -253,7 +264,15 @@
 
 		const isReimb   = wo.source === 'reimbursement';
 		const isExpense = wo.source === 'expense';
+		const isGoalTask = wo.source === 'goal_task';
 		const isBid     = wo.source === 'bid';
+		const goalName = wo._goal?.goalName || wo._goal?.name || wo.projectName || '—';
+		const goalDescription = (wo._goal?.description || wo._goal?.descriptionOfGoal || '').replace(/<[^>]*>/g, '');
+		const goalProgress = wo._goal?.targetValue
+			? `${wo._goal?.currentValue ?? 0} / ${wo._goal?.targetValue ?? 0}`
+			: String(wo._goal?.currentValue ?? '—');
+		const goalTaskTitle = wo._goalTask?.title || wo._expense?.description || wo.description || '—';
+		const goalTaskDescription = (wo._goalTask?.description || '').replace(/<[^>]*>/g, '');
 
 		const claimItems = (wo._claimItems ?? []).map((item: any) => `
 			<tr>
@@ -353,7 +372,7 @@
     <div style="margin-top:4px">
       <span class="badge ${wo.status === 'paid' ? 'badge-paid' : 'badge-open'}">${wo.status}</span>
       &nbsp;
-      <span class="badge ${isReimb ? 'badge-reimb' : isBid ? 'badge-bid' : 'badge-expense'}">${isReimb ? 'Reimbursement' : isBid ? 'Bid Award' : 'Expense'}</span>
+	<span class="badge ${isReimb ? 'badge-reimb' : isBid ? 'badge-bid' : isGoalTask ? 'badge-open' : 'badge-expense'}">${isReimb ? 'Reimbursement' : isBid ? 'Bid Award' : isGoalTask ? 'Goal Task' : 'Expense'}</span>
     </div>
     <div style="color:#718096;font-size:11px;margin-top:6px">Generated ${new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}</div>
   </div>
@@ -379,7 +398,7 @@
     <div class="chain-step"><strong>3. Payment</strong>Marked paid · ${d(wo.paidDate)}</div>
     <span class="arrow">→</span>
     <div class="chain-step"><strong>4. Work Order</strong>${wo.work_order_number} created for QuickBooks</div>
-    ` : isBid ? `
+	` : isBid ? `
     <div class="chain-step"><strong>1. Bid Submitted</strong>${userName(wo._submittedBy)} submitted bid from ${wo._vendor?.name || '—'}</div>
     <span class="arrow">→</span>
     <div class="chain-step"><strong>2. Shortlisted</strong>Bid moved to shortlist for committee review</div>
@@ -389,7 +408,15 @@
     <div class="chain-step"><strong>4. Awarded</strong>Bid awarded · ${d(wo._bid?.awardedAt)}</div>
     <span class="arrow">→</span>
     <div class="chain-step"><strong>5. Work Order</strong>${wo.work_order_number} created for QuickBooks</div>
-    ` : `
+	` : isGoalTask ? `
+	<div class="chain-step"><strong>1. Goal Task</strong>${goalTaskTitle}</div>
+	<span class="arrow">→</span>
+	<div class="chain-step"><strong>2. Goal</strong>${goalName}</div>
+	<span class="arrow">→</span>
+	<div class="chain-step"><strong>3. Approval</strong>${wo._approval ? `Approved by ${userName(wo._approval?.expand?.approver)} on ${d(wo._approval?.reviewedDate)}` : 'Approved'}</div>
+	<span class="arrow">→</span>
+	<div class="chain-step"><strong>4. Work Order</strong>${wo.work_order_number} created for QuickBooks</div>
+	` : `
     <div class="chain-step"><strong>1. Submission</strong>${userName(wo._submittedBy)} submitted an expense</div>
     <span class="arrow">→</span>
     <div class="chain-step"><strong>2. Approval</strong>${wo._approval ? `Approved by ${userName(wo._approval?.expand?.approver)} on ${d(wo._approval?.reviewedDate)}` : 'Approved'}</div>
@@ -465,6 +492,44 @@ ${wo._project || wo._task ? `
     ${wo._project ? `<div class="field"><label>Project</label><span>${wo._project?.name || '—'}</span></div>` : ''}
     ${wo._task ? `<div class="field"><label>Task</label><span>${wo._task?.title || '—'}</span></div>` : ''}
   </div>
+</div>` : ''}
+
+${isGoalTask ? `
+<div class="section">
+	<div class="section-title">Goal Reference</div>
+	<div class="grid3">
+		<div class="field"><label>Goal</label><span>${goalName}</span></div>
+		<div class="field"><label>Status</label><span>${wo._goal?.status || '—'}</span></div>
+		<div class="field"><label>Priority</label><span>${wo._goal?.priority || wo._goalTask?.priority || '—'}</span></div>
+	</div>
+	<div class="grid3" style="margin-top:10px">
+		<div class="field"><label>Category</label><span>${wo._goal?.category || '—'}</span></div>
+		<div class="field"><label>Deadline</label><span>${d(wo._goal?.deadline || wo._goal?.dueDate || wo._goalTask?.dueDate)}</span></div>
+		<div class="field"><label>Progress</label><span>${goalProgress}</span></div>
+	</div>
+	${(wo._goal?.targetMetric || wo._goal?.responsiblePerson || wo._goal?.progressMode) ? `
+	<div class="grid3" style="margin-top:10px">
+		<div class="field"><label>Target Metric</label><span>${wo._goal?.targetMetric || '—'}</span></div>
+		<div class="field"><label>Responsible</label><span>${wo._goal?.responsiblePerson || '—'}</span></div>
+		<div class="field"><label>Progress Mode</label><span>${String(wo._goal?.progressMode || '—').replace('_',' ')}</span></div>
+	</div>` : ''}
+	${goalDescription ? `<div class="note" style="margin-top:12px"><strong>Goal Summary:</strong> ${goalDescription}</div>` : ''}
+</div>
+
+<div class="section">
+	<div class="section-title">Goal Task Detail</div>
+	<div class="grid3">
+		<div class="field"><label>Task</label><span>${goalTaskTitle}</span></div>
+		<div class="field"><label>Task Status</label><span>${wo._goalTask?.status || '—'}</span></div>
+		<div class="field"><label>Task Due Date</label><span>${d(wo._goalTask?.dueDate)}</span></div>
+	</div>
+	<div class="grid3" style="margin-top:10px">
+		<div class="field"><label>Estimated Cost</label><span>${fmt2(wo._goalTask?.estimatedCost)}</span></div>
+		<div class="field"><label>Actual Cost</label><span>${fmt2(wo._goalTask?.actualCost)}</span></div>
+		<div class="field"><label>Contribution</label><span>${wo._goalTask?.progressContribution ?? '—'}</span></div>
+	</div>
+	${goalTaskDescription ? `<div class="note" style="margin-top:12px"><strong>Task Summary:</strong> ${goalTaskDescription}</div>` : ''}
+	${wo._goalTask?.notes ? `<div class="note" style="margin-top:8px">${String(wo._goalTask.notes).replace(/<[^>]*>/g,'')}</div>` : ''}
 </div>` : ''}
 
 ${isReimb && wo._claim ? `
@@ -921,7 +986,7 @@ ${wo.notes ? `
 
 							<!-- QB entry panel -->
 							{#if expandedQB === wo.id}
-							{@const f = qbForms[wo.id] ?? { txnId:'', enteredBy:'', enteredDate: new Date().toISOString().slice(0,10), account:'', notes:'' }}
+							{@const f = qbForms[wo.id] ?? { txnId:'', enteredBy:'', enteredDate: new Date().toISOString().slice(0,10), account:'', accountId:'', notes:'' }}
 							<tr class="bg-blue-950/20 border-b border-blue-800/30">
 								<td colspan="8" class="px-6 py-4">
 									<div class="max-w-3xl space-y-3">
@@ -963,11 +1028,11 @@ ${wo.notes ? `
 											<div>
 												<label class="block text-[10px] font-semibold uppercase tracking-wide text-slate-400 mb-1">QB Account</label>
 												{#if bankAccounts.length > 0}
-													<select bind:value={f.account}
+													<select bind:value={f.accountId}
 														class="w-full rounded-md border border-slate-600 bg-slate-900 text-slate-100 px-3 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500">
 														<option value="">Select bank account</option>
 														{#each bankAccounts as account}
-															<option value={accountOptionLabel(account)}>{accountOptionLabel(account)}</option>
+															<option value={account.id}>{accountOptionLabel(account)}</option>
 														{/each}
 													</select>
 												{:else}
