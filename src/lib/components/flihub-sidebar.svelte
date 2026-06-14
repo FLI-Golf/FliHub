@@ -82,6 +82,9 @@
 			roles: ['manager', 'pro', 'broadcaster'],
 			items: [
 				{ title: 'My Payments', url: '/dashboard/my-payments', icon: Wallet, roles: ['manager', 'pro', 'broadcaster'] },
+				{ title: 'My Reimbursements', url: '/dashboard/reimbursements', icon: Receipt, roles: ['manager', 'pro', 'broadcaster'] },
+				{ title: 'My Profile', url: '/dashboard/player-profile', icon: UserCircle, roles: ['manager', 'pro', 'broadcaster'] },
+				{ title: 'Settings', url: '/dashboard/settings', icon: BadgeCheck, roles: ['manager', 'pro', 'broadcaster'] },
 			]
 		},
 		// ── My Onboarding — pro, manager, broadcaster ──
@@ -280,11 +283,18 @@
 
 	const sidebar = useSidebar();
 
-	const isActive = (url: string) => $page.url.pathname === url;
+	const isActive = (url: string) => {
+		if (url === '/dashboard/my-payments') {
+			return $page.url.pathname === url || $page.url.pathname.startsWith('/dashboard/my-payments/');
+		}
+		return $page.url.pathname === url;
+	};
 
 	const userRole = $derived($page.data?.userProfile?.role || 'admin');
 
 	let expandedGroups = $state<Record<string, boolean>>({
+		'manager-portal': true,
+		onboarding: true,
 		overview: true,
 		sales: true,
 		operations: true,
@@ -309,6 +319,25 @@
 		if (userRole === 'admin') return true;
 		if (item.roles && !item.roles.includes(userRole)) return false;
 		return true;
+	}
+
+	function resolveItemUrl(item: NavItem): string {
+		if (item.url !== '/dashboard/my-payments') return item.url;
+
+		const profile = $page.data?.userProfile;
+		if (!profile) return item.url;
+
+		if (userRole === 'pro' || userRole === 'broadcaster') {
+			const proReference = (profile.proReference || profile.talentReference || '') as string;
+			if (proReference) return `/dashboard/my-payments/${proReference}`;
+			return profile.id ? `/dashboard/my-payments/${profile.id}` : '/dashboard/my-payments';
+		}
+
+		if (userRole === 'manager') {
+			return profile.id ? `/dashboard/my-payments/${profile.id}` : item.url;
+		}
+
+		return item.url;
 	}
 
 	const visibleGroups = $derived(navGroups.filter(canSeeGroup));
@@ -367,7 +396,7 @@
 								{@const active = isActive(item.url)}
 								{@const Icon = item.icon}
 								<a
-									href={item.url}
+									href={resolveItemUrl(item)}
 									class="
 										group/item relative flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium
 										transition-all duration-150 border-l-2

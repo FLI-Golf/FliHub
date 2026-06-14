@@ -3,6 +3,7 @@
 	import { Badge } from '$lib/components/ui/badge';
 	import type { PageData } from './$types';
 	import { enhance } from '$app/forms';
+	import { Heart } from 'lucide-svelte';
 
 	let { data }: { data: PageData } = $props();
 
@@ -12,6 +13,13 @@
 	let showSeasonModal = $state(false);
 	let editingSeason = $state<any>(null);
 	let seasonSaving = $state(false);
+	const canManage = data.canManage;
+	const canShowInterest = data.canShowInterest;
+	let interestMap = $state<Record<string, boolean>>({});
+
+	$effect(() => {
+		interestMap = Object.fromEntries((data.userInterests ?? []).map((interest: any) => [interest.tournament, true]));
+	});
 
 	const openSeasonModal = (s?: any) => { editingSeason = s ?? null; showSeasonModal = true; };
 	const closeSeasonModal = () => { showSeasonModal = false; editingSeason = null; };
@@ -79,17 +87,22 @@
 	<div class="flex items-center justify-between">
 		<div>
 			<h1 class="text-3xl font-bold">Tournaments</h1>
-			<p class="text-muted-foreground">Manage tournament events and prize pools</p>
+			<p class="text-muted-foreground">{canManage ? 'Manage tournament events and prize pools' : 'Browse tournament opportunities and signal booking interest'}</p>
 		</div>
 		<div class="flex gap-2">
 			<Button href="/dashboard/talent">← Back to Pros</Button>
-			{#if activeTab === 'seasons'}
+			{#if canManage && activeTab === 'seasons'}
 				<Button onclick={() => openSeasonModal()}>+ New Season</Button>
-			{:else}
+			{:else if canManage}
 				<Button onclick={openCreateModal}>Create Tournament</Button>
 			{/if}
 		</div>
 	</div>
+	{#if canShowInterest}
+		<div class="rounded-xl border border-emerald-800/60 bg-emerald-950/30 px-5 py-3 text-sm text-emerald-200">
+			Use the heart icon to register vendor interest in a tournament. This creates a lightweight pipeline for future booking review without exposing tournament management.
+		</div>
+	{/if}
 
 	<!-- Phase 2 context banner -->
 	<div class="rounded-xl border border-emerald-800/60 bg-emerald-950/30 px-5 py-3 flex items-center gap-4 flex-wrap">
@@ -110,6 +123,7 @@
 	</div>
 
 	<!-- Tab toggle -->
+	{#if canManage}
 	<div class="flex gap-2">
 		<button
 			class="px-4 py-1.5 rounded-full text-sm font-semibold transition-colors {activeTab === 'tournaments' ? 'bg-orange-500 text-white' : 'bg-slate-800 text-slate-400 hover:text-white'}"
@@ -120,6 +134,7 @@
 			onclick={() => activeTab = 'seasons'}
 		>Season Settings</button>
 	</div>
+	{/if}
 
 	{#if activeTab === 'tournaments'}
 	<!-- Filters -->
@@ -289,14 +304,30 @@
 							</div>
 
 							<div class="flex gap-2 justify-end">
+								{#if canShowInterest}
+									<form method="POST" action="?/showInterest" use:enhance class="flex items-center">
+										<input type="hidden" name="tournamentId" value={tournament.id} />
+										<button
+											type="submit"
+											class="p-2 rounded transition-colors {interestMap[tournament.id]
+												? 'text-red-400 hover:text-red-300 bg-red-900/30 hover:bg-red-900/50'
+												: 'text-slate-400 hover:text-red-400 hover:bg-red-900/30'}"
+											title={interestMap[tournament.id] ? 'Remove interest' : 'Show interest'}
+										>
+											<Heart class="w-4 h-4 {interestMap[tournament.id] ? 'fill-current' : ''}" />
+										</button>
+									</form>
+								{/if}
 								<Button
 									href="/dashboard/talent/tournaments/{tournament.id}"
 									variant="outline"
 									size="sm">View</Button
 								>
-								<Button onclick={() => openEditModal(tournament)} variant="outline" size="sm"
-									>Edit</Button
-								>
+								{#if canManage}
+									<Button onclick={() => openEditModal(tournament)} variant="outline" size="sm"
+										>Edit</Button
+									>
+								{/if}
 							</div>
 						</div>
 					</div>
@@ -314,7 +345,7 @@
 <!-- Create/Edit Modal -->
 
 <!-- ── Seasons Settings Tab ──────────────────────────────────────────────── -->
-{#if activeTab === 'seasons'}
+{#if canManage && activeTab === 'seasons'}
 <div class="space-y-4">
 	{#if data.seasonRecords?.length === 0}
 		<div class="text-center py-12 text-slate-400">

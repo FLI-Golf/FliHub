@@ -1,7 +1,8 @@
-import { fail } from '@sveltejs/kit';
+import { fail, redirect } from '@sveltejs/kit';
 import type { PageServerLoad, Actions } from './$types';
 import { writeAuditLog, writeAuditLogBatch } from '$lib/domain/services/PaymentWorkOrderService';
 import { adminFetch, getAdminPocketBase } from '$lib/infra/pocketbase/pbClient';
+import { RequestContext } from '$lib/infra/RequestContext';
 
 const relFirst = (v: any): string => (Array.isArray(v) ? (v[0] ?? '') : (v ?? ''));
 const toNumber = (v: any): number => {
@@ -30,6 +31,13 @@ const sanitizeSortDir = (value: string | null): 'asc' | 'desc' =>
 	SORT_DIRS.has(value ?? '') ? (value as 'asc' | 'desc') : 'desc';
 
 export const load: PageServerLoad = async ({ locals, url }) => {
+	const ctx = await RequestContext.from(locals, url);
+	
+	// Restrict access: only admins and leaders can view earnings/payments
+	if (!['admin', 'leader'].includes(ctx.role)) {
+		throw redirect(303, '/dashboard/welcome');
+	}
+	
 	const pb = await getAdminPocketBase();
 
 	const filterStatus = url.searchParams.get('status') ?? '';

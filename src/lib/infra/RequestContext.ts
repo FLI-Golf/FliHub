@@ -37,6 +37,7 @@ export interface UserProfile {
 	lastName?: string;
 	vendorId?: string;
 	proReference?: string;
+	talentReference?: string;
 	[key: string]: unknown;
 }
 
@@ -124,7 +125,7 @@ export class RequestContext {
 		try {
 			const records = await pb.collection('user_profiles').getFullList({
 				filter: `userId = "${userId}"`,
-				fields: 'id,userId,role,firstName,lastName,vendorId,proReference'
+				fields: 'id,userId,role,firstName,lastName,vendorId,proReference,talentReference'
 			});
 			profile = (records[0] as unknown as UserProfile) ?? null;
 		} catch {
@@ -164,7 +165,7 @@ export class RequestContext {
 		try {
 			const records = await pb.collection('user_profiles').getFullList({
 				filter: `userId = "${userId}"`,
-				fields: 'id,userId,role,firstName,lastName,vendorId,proReference'
+				fields: 'id,userId,role,firstName,lastName,vendorId,proReference,talentReference'
 			});
 			profile = (records[0] as unknown as UserProfile) ?? null;
 		} catch {
