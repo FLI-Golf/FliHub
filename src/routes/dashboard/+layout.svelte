@@ -44,7 +44,6 @@
 		'/dashboard/reimbursements': 'Reimbursements',
 		'/dashboard/trademarks': 'Trademark Pipeline',
 		'/dashboard/import': 'Import Data',
-		'/dashboard/schema-guide': 'Schema Guide',
 		'/dashboard/admin': 'Admin Panel',
 		'/dashboard/funding-model': 'Funding Model',
 		'/dashboard/use-of-proceeds': 'Use of Proceeds',
@@ -71,7 +70,8 @@
 		'/dashboard/bank-accounts':    'Manage Bank Accounts',
 		'/dashboard/active-goals':     'Active Goals',
 		'/dashboard/bids':             'Bid Pipeline',
-		'/dashboard/purchase-orders':  'Purchase Orders'
+		'/dashboard/purchase-orders':  'Purchase Orders',
+		'/dashboard/continuous-improvements': 'Continuous Improvements'
 	};
 
 	$: currentLabel = routeLabels[$page.url.pathname] ?? 'Dashboard';

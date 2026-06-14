@@ -1,4 +1,5 @@
 import { json } from '@sveltejs/kit';
+import { requireAdminNonProductionApi } from '$lib/infra/api-route-guards';
 import type { RequestHandler } from './$types';
 
 const TRANSCRIPT_TEST_SOURCES = new Set([
@@ -69,12 +70,10 @@ async function deleteRecords(pb: any, collection: string, records: any[]) {
 	return { deleted, failed };
 }
 
-export const DELETE: RequestHandler = async ({ locals }) => {
-	const pb = locals.pb;
-
-	if (!pb.authStore.isValid) {
-		return json({ message: 'Unauthorized' }, { status: 401 });
-	}
+export const DELETE: RequestHandler = async ({ locals, url }) => {
+	const guard = await requireAdminNonProductionApi(locals, url);
+	if (guard.error) return guard.error;
+	const pb = guard.ctx.pb;
 
 	try {
 		const [transcripts, packages] = await Promise.all([

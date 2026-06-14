@@ -54,7 +54,6 @@ export const actions: Actions = {
 					welcomeSeen: true,
 					documentsInitialed: false,
 					contractSigned: false,
-					profileCompleted: true,
 					...payload
 				});
 			}

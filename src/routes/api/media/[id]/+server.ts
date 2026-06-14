@@ -89,11 +89,21 @@ async function loadAssetSponsorFulfillment(pb: any, assetId: string) {
 		pb.collection('sponsor_media_appearances').getFullList({ filter: `asset = "${assetId}"` }).catch(() => [])
 	]);
 
-	const recapIds = Array.from(new Set(deliverables.map((row: any) => row.recap_package).filter(Boolean)));
-	const sponsorIds = Array.from(new Set([
-		...deliverables.map((row: any) => row.sponsor).filter(Boolean),
-		...appearances.map((row: any) => row.sponsor).filter(Boolean)
-	]));
+	const recapIds: string[] = Array.from(
+		new Set(
+			deliverables
+				.map((row: any) => row.recap_package)
+				.filter((id: unknown): id is string => typeof id === 'string' && id.length > 0)
+		)
+	);
+	const sponsorIds: string[] = Array.from(
+		new Set(
+			[
+				...deliverables.map((row: any) => row.sponsor),
+				...appearances.map((row: any) => row.sponsor)
+			].filter((id: unknown): id is string => typeof id === 'string' && id.length > 0)
+		)
+	);
 
 	const [recapRows, sponsorRows] = await Promise.all([
 		Promise.all(recapIds.map((id: string) => pb.collection('sponsor_recap_packages').getOne(id).catch(() => null))),

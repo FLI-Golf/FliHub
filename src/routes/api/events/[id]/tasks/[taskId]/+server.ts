@@ -1,10 +1,12 @@
 import { json } from '@sveltejs/kit';
-import { getAdminPocketBase } from '$lib/infra/pocketbase/pbClient';
+import { requireAdminApi } from '$lib/infra/api-route-guards';
 import type { RequestHandler } from './$types';
 
-export const PATCH: RequestHandler = async ({ request, params }) => {
+export const PATCH: RequestHandler = async ({ locals, url, request, params }) => {
 	try {
-		const pb = await getAdminPocketBase();
+		const guard = await requireAdminApi(locals, url);
+		if (guard.error) return guard.error;
+		const pb = guard.ctx.pb;
 		const body = await request.json();
 
 		// Auto-set completedDate when marking done
@@ -19,9 +21,11 @@ export const PATCH: RequestHandler = async ({ request, params }) => {
 	}
 };
 
-export const DELETE: RequestHandler = async ({ params }) => {
+export const DELETE: RequestHandler = async ({ locals, url, params }) => {
 	try {
-		const pb = await getAdminPocketBase();
+		const guard = await requireAdminApi(locals, url);
+		if (guard.error) return guard.error;
+		const pb = guard.ctx.pb;
 		await pb.collection('event_tasks').delete(params.taskId);
 		return json({ ok: true });
 	} catch (err: any) {

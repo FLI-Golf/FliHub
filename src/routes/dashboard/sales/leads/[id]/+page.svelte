@@ -8,6 +8,7 @@
 	} from 'lucide-svelte';
 
 	let { data }: { data: PageData } = $props();
+	const leadValue = (key: string, fallback: any = '') => (data.lead as any)?.[key] ?? fallback;
 
 	const territories  = $derived(data.territories  ?? []);
 	const userProfiles = $derived(data.userProfiles ?? []);
@@ -19,22 +20,22 @@
 	let error   = $state('');
 
 	// Editable fields — initialised from lead
-	let firstName        = $state(data.lead.firstName        ?? '');
-	let lastName         = $state(data.lead.lastName         ?? '');
-	let email            = $state(data.lead.email            ?? '');
-	let phone            = $state(data.lead.phone            ?? '');
-	let company          = $state(data.lead.company          ?? '');
-	let location         = $state(data.lead.location         ?? '');
-	let territory        = $state(data.lead.territory        ?? '');
-	let source           = $state(data.lead.source           ?? 'other');
-	let status           = $state(data.lead.status           ?? 'new');
-	let netWorth         = $state(data.lead.netWorth         ?? '');
-	let liquidCapital    = $state(data.lead.liquidCapital    ?? '');
-	let experienceLevel  = $state(data.lead.experienceLevel  ?? 'none');
-	let isExistingSponsor= $state(data.lead.isExistingSponsor ?? false);
-	let sponsorId        = $state(data.lead.sponsorId        ?? '');
-	let assignedTo       = $state(data.lead.assignedTo       ?? '');
-	let notes            = $state(data.lead.notes            ?? '');
+	let firstName        = $state(leadValue('firstName', ''));
+	let lastName         = $state(leadValue('lastName', ''));
+	let email            = $state(leadValue('email', ''));
+	let phone            = $state(leadValue('phone', ''));
+	let company          = $state(leadValue('company', ''));
+	let location         = $state(leadValue('location', ''));
+	let territory        = $state(leadValue('territory', ''));
+	let source           = $state(leadValue('source', 'other'));
+	let status           = $state(leadValue('status', 'new'));
+	let netWorth         = $state(leadValue('netWorth', ''));
+	let liquidCapital    = $state(leadValue('liquidCapital', ''));
+	let experienceLevel  = $state(leadValue('experienceLevel', 'none'));
+	let isExistingSponsor= $state(leadValue('isExistingSponsor', false));
+	let sponsorId        = $state(leadValue('sponsorId', ''));
+	let assignedTo       = $state(leadValue('assignedTo', ''));
+	let notes            = $state(leadValue('notes', ''));
 
 	const STATUS_COLORS: Record<string,string> = {
 		new:         'bg-blue-900/40 text-blue-300 border-blue-700/40',

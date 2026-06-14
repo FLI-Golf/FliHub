@@ -1,21 +1,11 @@
 import { json } from '@sveltejs/kit';
+import { requireAdminNonProductionApi } from '$lib/infra/api-route-guards';
 import type { RequestHandler } from './$types';
 
-export const POST: RequestHandler = async ({ locals }) => {
-	const pb = locals.pb;
-
-	if (!pb.authStore.isValid || !pb.authStore.model?.id) {
-		return json({ error: 'Unauthorized' }, { status: 403 });
-	}
-
-	const profiles = await pb.collection('user_profiles').getFullList({
-		filter: `userId = "${pb.authStore.model.id}"`
-	}).catch(() => []);
-	const userProfile = (profiles as any[])[0];
-
-	if (!userProfile || userProfile.role !== 'admin') {
-		return json({ error: 'Admin access required' }, { status: 403 });
-	}
+export const POST: RequestHandler = async ({ locals, url }) => {
+	const guard = await requireAdminNonProductionApi(locals, url);
+	if (guard.error) return guard.error;
+	const pb = guard.ctx.pb;
 
 	const results: Record<string, number> = {
 		work_orders: 0, approvals: 0, expenses: 0,

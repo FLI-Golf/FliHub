@@ -150,7 +150,7 @@
 		}
 	}
 
-	const s = data.stats;
+	const s = $derived(data.stats);
 </script>
 
 <svelte:head><title>Onboarding Pipeline — FliHub</title></svelte:head>

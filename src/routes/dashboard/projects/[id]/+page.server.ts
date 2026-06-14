@@ -45,7 +45,7 @@ export const load: PageServerLoad = async ({ locals, url, params }) => {
 		}
 
 		// Fetch tasks for this project
-		let tasks = [];
+		let tasks: any[] = [];
 		try {
 			const result = await pb.collection('tasks').getList(1, 50, {
 				filter: `projectId = "${params.id}"`
@@ -72,7 +72,7 @@ export const load: PageServerLoad = async ({ locals, url, params }) => {
 		};
 
 		// Fetch all vendors for selection
-		let allVendors = [];
+		let allVendors: any[] = [];
 		try {
 			allVendors = await pb.collection('vendors').getFullList({
 				sort: 'name'

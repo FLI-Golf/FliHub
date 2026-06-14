@@ -4,12 +4,14 @@
  * or falls back to the event's defaultRate.
  */
 import { json } from '@sveltejs/kit';
-import { getAdminPocketBase } from '$lib/infra/pocketbase/pbClient';
+import { requireAdminApi } from '$lib/infra/api-route-guards';
 import type { RequestHandler } from './$types';
 
-export const POST: RequestHandler = async ({ request, params }) => {
+export const POST: RequestHandler = async ({ locals, url, request, params }) => {
 	try {
-		const pb = await getAdminPocketBase();
+		const guard = await requireAdminApi(locals, url);
+		if (guard.error) return guard.error;
+		const pb = guard.ctx.pb;
 		const { talentId, talentGroupId, entityType, role, rateOverride, status } = await request.json();
 		const bookingEntityType = entityType === 'group' || talentGroupId ? 'group' : 'individual';
 

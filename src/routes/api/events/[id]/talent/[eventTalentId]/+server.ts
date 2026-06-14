@@ -1,6 +1,6 @@
 import { json } from '@sveltejs/kit';
-import { getAdminPocketBase } from '$lib/infra/pocketbase/pbClient';
-import { RequestContext } from '$lib/infra/RequestContext';
+import { requireAdminApi } from '$lib/infra/api-route-guards';
+import type PocketBase from 'pocketbase';
 import type { RequestHandler } from './$types';
 
 type FinancePayload = {
@@ -11,7 +11,7 @@ type FinancePayload = {
 };
 
 async function createExpenseWithApproval(
-	pb: Awaited<ReturnType<typeof getAdminPocketBase>>,
+	pb: PocketBase,
 	{
 		amount,
 		category,
@@ -60,8 +60,10 @@ async function createExpenseWithApproval(
 
 export const PATCH: RequestHandler = async ({ locals, url, request, params }) => {
 	try {
-		const ctx = await RequestContext.fromApi(locals, url);
-		const pb = await getAdminPocketBase();
+		const guard = await requireAdminApi(locals, url);
+		if (guard.error) return guard.error;
+		const ctx = guard.ctx;
+		const pb = ctx.pb;
 		const body = await request.json();
 		const payload: Record<string, unknown> = {};
 		const finance: FinancePayload | null = body.finance ?? null;

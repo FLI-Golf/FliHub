@@ -105,7 +105,7 @@
 
 	const INPUT = 'w-full rounded-lg border border-slate-600 bg-slate-800 text-slate-100 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 placeholder:text-slate-500';
 	const LABEL = 'block text-xs font-medium text-slate-400 mb-1';
-	const s = data.stats;
+	const s = $derived(data.stats);
 </script>
 
 <svelte:head><title>Scoreboard Pipeline — FliHub</title></svelte:head>

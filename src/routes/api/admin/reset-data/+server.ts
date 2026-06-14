@@ -1,14 +1,12 @@
 import { json } from '@sveltejs/kit';
+import { requireAdminNonProductionApi } from '$lib/infra/api-route-guards';
 import type { RequestHandler } from './$types';
 import type PocketBase from 'pocketbase';
 
-export const POST: RequestHandler = async ({ request, locals }) => {
-  const pb = locals.pb as PocketBase;
-
-  // Check if user is admin
-  if (!pb.authStore.isValid) {
-    return json({ error: 'Unauthorized' }, { status: 401 });
-  }
+export const POST: RequestHandler = async ({ request, locals, url }) => {
+  const guard = await requireAdminNonProductionApi(locals, url);
+  if (guard.error) return guard.error;
+  const pb = guard.ctx.pb as PocketBase;
 
   try {
     const { deleteExpenses = false, deleteVendors = false, confirmation } = await request.json();

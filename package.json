@@ -8,6 +8,7 @@
     "build": "vite build",
     "preview": "vite preview",
     "check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
+    "test:auth-guards": "node scripts/security/api-auth-regression.mjs",
     "check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch",
     "migrate": "tsx src/lib/migrations/migrate.ts",
     "import-data": "tsx src/lib/migrations/import-data.ts",

@@ -1,6 +1,5 @@
 import { json } from '@sveltejs/kit';
-import { RequestContext } from '$lib/infra/RequestContext';
-import { getAdminPocketBase } from '$lib/infra/pocketbase/pbClient';
+import { requireAdminNonProductionApi } from '$lib/infra/api-route-guards';
 import type { RequestHandler } from './$types';
 
 const USERS = [
@@ -51,14 +50,9 @@ function randDate(daysBack = 90) {
 
 // ── DELETE — wipe all expenses, approvals, work_orders and reset actuals ──────
 export const DELETE: RequestHandler = async ({ locals, url }) => {
-	const ctx = await RequestContext.fromApi(locals, url);
-	if (!ctx) return json({ message: 'Unauthorized' }, { status: 401 });
-	const profile = ctx.profile;
-	if (profile?.role !== 'admin' && profile?.role !== 'leader') {
-		return json({ message: 'Unauthorized' }, { status: 403 });
-	}
-
-	const adminPb = await getAdminPocketBase();
+	const guard = await requireAdminNonProductionApi(locals, url);
+	if (guard.error) return guard.error;
+	const adminPb = guard.ctx.pb;
 	const results: Record<string, number> = { work_orders: 0, approvals: 0, expenses: 0, tasks_cleared: 0, projects_cleared: 0 };
 
 	// Delete work orders
@@ -96,18 +90,14 @@ export const DELETE: RequestHandler = async ({ locals, url }) => {
 
 // ── POST — seed N approvals (each with a linked expense) ─────────────────────
 export const POST: RequestHandler = async ({ locals, url, request }) => {
-	const ctx = await RequestContext.fromApi(locals, url);
-	if (!ctx) return json({ message: 'Unauthorized' }, { status: 401 });
-	const profile = ctx.profile;
-	if (profile?.role !== 'admin' && profile?.role !== 'leader') {
-		return json({ message: 'Unauthorized' }, { status: 403 });
-	}
+	const guard = await requireAdminNonProductionApi(locals, url);
+	if (guard.error) return guard.error;
 
 	const body = await request.json().catch(() => ({}));
 	const count    = Math.min(Math.max(parseInt(body.count ?? 10), 1), 200);
 	const statuses: string[] = body.statuses?.length ? body.statuses : STATUSES;
 
-	const adminPb = await getAdminPocketBase();
+	const adminPb = guard.ctx.pb;
 
 	// Get real task IDs to link expenses to
 	const tasks = await adminPb.collection('tasks').getFullList({ fields: 'id', sort: '-id' }).catch(() => []);

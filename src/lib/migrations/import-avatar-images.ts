@@ -142,7 +142,7 @@ async function importAvatarImages(csvPath?: string) {
 				writeFileSync(tempPath, imageBuffer);
 				
 				// Create File object for Node.js
-				const file = new File([imageBuffer], fileName, { type: `image/${ext}` });
+				const file = new File([new Uint8Array(imageBuffer)], fileName, { type: `image/${ext}` });
 				
 				// Create FormData and upload to PocketBase
 				const formData = new FormData();

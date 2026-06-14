@@ -118,6 +118,23 @@ export const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
 		'contracts:read:managed',
 		'tournaments:read',
 		'profile:*:own'
+	],
+
+	marketing: [
+		'campaigns:*',
+		'tasks:*',
+		'projects:read',
+		'reports:read:own',
+		'profile:*:own'
+	],
+
+	marketing_lead: [
+		'campaigns:*',
+		'tasks:*',
+		'projects:*',
+		'approvals:read',
+		'reports:read',
+		'profile:*:own'
 	]
 };
 
@@ -130,5 +147,7 @@ export const DEFAULT_ROUTES: Record<UserRole, string> = {
 	franchise_owner: '/dashboard/franchise',
 	league_owner: '/dashboard/league',
 	broadcaster: '/dashboard/broadcasts',
-	manager: '/dashboard/managed-pros'
+	manager: '/dashboard/managed-pros',
+	marketing: '/dashboard/marketing-goals',
+	marketing_lead: '/dashboard/marketing-goals'
 };

@@ -83,9 +83,10 @@ export const POST: RequestHandler = async ({ locals, url, request }) => {
 	}
 
 	const body = await request.json().catch(() => ({}));
-	const claimIds: string[] = Array.isArray(body.claimIds)
-		? [...new Set(body.claimIds.filter((id: unknown) => typeof id === 'string' && id.trim()))]
-		: [];
+	const rawClaimIds: unknown[] = Array.isArray((body as any).claimIds) ? (body as any).claimIds : [];
+	const claimIds: string[] = [...new Set(rawClaimIds)].filter(
+		(id: unknown): id is string => typeof id === 'string' && id.trim().length > 0
+	);
 
 	if (claimIds.length < 2) {
 		return json({ message: 'Select at least 2 claims to roll up' }, { status: 400 });

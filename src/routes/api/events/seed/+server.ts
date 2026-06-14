@@ -5,7 +5,7 @@
  * Only callable in non-production environments or by admin users.
  */
 import { json } from '@sveltejs/kit';
-import { getAdminPocketBase } from '$lib/infra/pocketbase/pbClient';
+import { requireAdminNonProductionApi } from '$lib/infra/api-route-guards';
 import type { RequestHandler } from './$types';
 
 const SEASON_ID = 't9yegq2db2sml8j';
@@ -165,9 +165,11 @@ async function runSeed(pb: any) {
 	return { events: 8 };
 }
 
-export const POST: RequestHandler = async () => {
+export const POST: RequestHandler = async ({ locals, url }) => {
 	try {
-		const pb = await getAdminPocketBase();
+		const guard = await requireAdminNonProductionApi(locals, url);
+		if (guard.error) return guard.error;
+		const pb = guard.ctx.pb;
 		const result = await runSeed(pb);
 		return json({ ok: true, message: `Seeded ${result.events} test events` });
 	} catch (err: any) {
@@ -175,9 +177,11 @@ export const POST: RequestHandler = async () => {
 	}
 };
 
-export const DELETE: RequestHandler = async () => {
+export const DELETE: RequestHandler = async ({ locals, url }) => {
 	try {
-		const pb = await getAdminPocketBase();
+		const guard = await requireAdminNonProductionApi(locals, url);
+		if (guard.error) return guard.error;
+		const pb = guard.ctx.pb;
 		const result = await clearSeed(pb);
 		return json({ ok: true, message: `Cleared ${result.events} seed events and related records` });
 	} catch (err: any) {

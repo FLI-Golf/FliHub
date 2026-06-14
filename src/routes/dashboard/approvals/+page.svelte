@@ -29,7 +29,7 @@
 
 	// Quorum editor state
 	let editingQuorum  = $state(false);
-	let quorumInput    = $state(String(data.quorum ?? 2));
+	let quorumInput    = $state('2');
 	let savingQuorum   = $state(false);
 	let quorumError    = $state('');
 
@@ -130,12 +130,20 @@
 		return [...ordered, ...remainder];
 	});
 
-	if (selectedStatuses.length === 0 && statusOptions.length > 0) {
-		selectedStatuses = [...statusOptions];
-	}
-	if (selectedTypes.length === 0 && typeOptions.length > 0) {
-		selectedTypes = [...typeOptions];
-	}
+	$effect(() => {
+		if (!editingQuorum) {
+			quorumInput = String(data.quorum ?? 2);
+		}
+	});
+
+	$effect(() => {
+		if (selectedStatuses.length === 0 && statusOptions.length > 0) {
+			selectedStatuses = [...statusOptions];
+		}
+		if (selectedTypes.length === 0 && typeOptions.length > 0) {
+			selectedTypes = [...typeOptions];
+		}
+	});
 
 	function toggleStatus(status: string) {
 		selectedStatuses = selectedStatuses.includes(status)
@@ -398,8 +406,8 @@
 					<p class="text-xs font-semibold text-amber-400 uppercase tracking-wide">Seed Approvals</p>
 
 					<div class="flex items-center gap-3">
-						<label class="text-xs text-slate-400 whitespace-nowrap">Count</label>
-						<input type="number" bind:value={seedCount} min="1" max="200"
+						<label for="approvals-seed-count" class="text-xs text-slate-400 whitespace-nowrap">Count</label>
+						<input id="approvals-seed-count" type="number" bind:value={seedCount} min="1" max="200"
 							class="w-24 rounded-md border border-slate-600 bg-slate-900 text-slate-100 px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-amber-500 [color-scheme:dark]" />
 					</div>
 
@@ -513,32 +521,33 @@
 		<div class="space-y-4">
 			<div class="flex flex-wrap items-end gap-3">
 				<div class="min-w-[220px] flex-1">
-					<label class="text-xs font-medium text-slate-400 mb-1.5 block uppercase tracking-wide">Search</label>
+					<label for="approvals-search" class="text-xs font-medium text-slate-400 mb-1.5 block uppercase tracking-wide">Search</label>
 					<input
+						id="approvals-search"
 						bind:value={searchTerm}
 						placeholder="Work order, vendor, requester, comments"
 						class="w-full px-3 py-2 rounded-lg bg-slate-800 border border-slate-600 text-slate-100 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 placeholder:text-slate-500"
 					/>
 				</div>
 				<div class="w-36">
-					<label class="text-xs font-medium text-slate-400 mb-1.5 block uppercase tracking-wide">Min Amount</label>
-					<input bind:value={minAmountFilter} type="number" min="0" placeholder="0" class="w-full px-3 py-2 rounded-lg bg-slate-800 border border-slate-600 text-slate-100 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 placeholder:text-slate-500" />
+					<label for="approvals-min-amount" class="text-xs font-medium text-slate-400 mb-1.5 block uppercase tracking-wide">Min Amount</label>
+					<input id="approvals-min-amount" bind:value={minAmountFilter} type="number" min="0" placeholder="0" class="w-full px-3 py-2 rounded-lg bg-slate-800 border border-slate-600 text-slate-100 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 placeholder:text-slate-500" />
 				</div>
 				<div class="w-36">
-					<label class="text-xs font-medium text-slate-400 mb-1.5 block uppercase tracking-wide">Max Amount</label>
-					<input bind:value={maxAmountFilter} type="number" min="0" placeholder="No max" class="w-full px-3 py-2 rounded-lg bg-slate-800 border border-slate-600 text-slate-100 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 placeholder:text-slate-500" />
+					<label for="approvals-max-amount" class="text-xs font-medium text-slate-400 mb-1.5 block uppercase tracking-wide">Max Amount</label>
+					<input id="approvals-max-amount" bind:value={maxAmountFilter} type="number" min="0" placeholder="No max" class="w-full px-3 py-2 rounded-lg bg-slate-800 border border-slate-600 text-slate-100 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 placeholder:text-slate-500" />
 				</div>
 				<div class="w-44">
-					<label class="text-xs font-medium text-slate-400 mb-1.5 block uppercase tracking-wide">Requested From</label>
-					<input bind:value={requestedFrom} type="date" class="w-full px-3 py-2 rounded-lg bg-slate-800 border border-slate-600 text-slate-100 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 [color-scheme:dark]" />
+					<label for="approvals-requested-from" class="text-xs font-medium text-slate-400 mb-1.5 block uppercase tracking-wide">Requested From</label>
+					<input id="approvals-requested-from" bind:value={requestedFrom} type="date" class="w-full px-3 py-2 rounded-lg bg-slate-800 border border-slate-600 text-slate-100 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 [color-scheme:dark]" />
 				</div>
 				<div class="w-44">
-					<label class="text-xs font-medium text-slate-400 mb-1.5 block uppercase tracking-wide">Requested To</label>
-					<input bind:value={requestedTo} type="date" class="w-full px-3 py-2 rounded-lg bg-slate-800 border border-slate-600 text-slate-100 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 [color-scheme:dark]" />
+					<label for="approvals-requested-to" class="text-xs font-medium text-slate-400 mb-1.5 block uppercase tracking-wide">Requested To</label>
+					<input id="approvals-requested-to" bind:value={requestedTo} type="date" class="w-full px-3 py-2 rounded-lg bg-slate-800 border border-slate-600 text-slate-100 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 [color-scheme:dark]" />
 				</div>
 				<div class="w-48">
-					<label class="text-xs font-medium text-slate-400 mb-1.5 block uppercase tracking-wide">Sort</label>
-					<select bind:value={sortBy} class="w-full px-3 py-2 rounded-lg bg-slate-800 border border-slate-600 text-slate-100 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 cursor-pointer">
+					<label for="approvals-sort" class="text-xs font-medium text-slate-400 mb-1.5 block uppercase tracking-wide">Sort</label>
+					<select id="approvals-sort" bind:value={sortBy} class="w-full px-3 py-2 rounded-lg bg-slate-800 border border-slate-600 text-slate-100 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 cursor-pointer">
 						<option value="requested_desc">Newest requested</option>
 						<option value="requested_asc">Oldest requested</option>
 						<option value="amount_desc">Amount high → low</option>

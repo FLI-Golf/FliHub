@@ -181,6 +181,9 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 		}
 
 		if (action === 'advance') {
+			if (!current) {
+				return json({ message: 'Package not found' }, { status: 404 });
+			}
 			const stage = nextStage(current.stage);
 			const updated = await pb.collection('content_production').update(id, {
 				stage,
@@ -190,6 +193,9 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 		}
 
 		if (action === 'approve') {
+			if (!current) {
+				return json({ message: 'Package not found' }, { status: 404 });
+			}
 			const updated = await pb.collection('content_production').update(id, {
 				approvalStatus: 'approved',
 				approvedBy: actor,
@@ -200,6 +206,9 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 		}
 
 		if (action === 'publish') {
+			if (!current) {
+				return json({ message: 'Package not found' }, { status: 404 });
+			}
 			const updated = await pb.collection('content_production').update(id, {
 				stage: 'published',
 				approvalStatus: 'approved',
