@@ -9,6 +9,7 @@
 		pro: 'Professional Player',
 		manager: 'Player Manager',
 		broadcaster: 'Broadcaster',
+		vendor: 'Vendor',
 		admin: 'Administrator',
 		leader: 'Leadership',
 		sales: 'Sales Team',
@@ -55,12 +56,29 @@
 		},
 		pro: {
 			title: 'Player Dashboard',
-			description: 'Track your performance, earnings, and opportunities',
+			description: 'Track your performance and opportunities',
 			actions: [
 				{ label: 'Player Profile', href: '/dashboard/player-profile', icon: Users, color: 'text-indigo-600' },
-				{ label: 'Tournaments', href: '/dashboard/talent/tournaments', icon: Trophy, color: 'text-emerald-600' },
-				{ label: 'Earnings', href: '/dashboard/talent/payments', icon: DollarSign, color: 'text-green-600' },
 				{ label: 'Events', href: '/dashboard/events', icon: Calendar, color: 'text-cyan-600' },
+				{ label: 'Media', href: '/dashboard/media', icon: Tv, color: 'text-pink-600' },
+				{ label: 'My Payments', href: '/dashboard/my-payments', icon: DollarSign, color: 'text-green-600' }
+			]
+		},
+		broadcaster: {
+			title: 'Broadcaster Opportunities',
+			description: 'Browse events and tournaments, then signal interest in broadcast work and appearances',
+			actions: [
+				{ label: 'Events', href: '/dashboard/events', icon: Calendar, color: 'text-cyan-600' },
+				{ label: 'Tournaments', href: '/dashboard/talent/tournaments', icon: Trophy, color: 'text-emerald-600' },
+				{ label: 'Media', href: '/dashboard/media', icon: Tv, color: 'text-pink-600' }
+			]
+		},
+		vendor: {
+			title: 'Vendor Opportunities',
+			description: 'Browse events, track tournament opportunities, and signal interest in future bookings',
+			actions: [
+				{ label: 'Events', href: '/dashboard/events', icon: Calendar, color: 'text-cyan-600' },
+				{ label: 'Tournaments', href: '/dashboard/talent/tournaments', icon: Trophy, color: 'text-emerald-600' },
 				{ label: 'Media', href: '/dashboard/media', icon: Tv, color: 'text-pink-600' }
 			]
 		},

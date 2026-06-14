@@ -2,13 +2,23 @@
 	import type { PageData } from './$types';
 	import { Button } from '$lib/components/ui/button';
 	import { Badge } from '$lib/components/ui/badge';
-	import { Calendar, DollarSign, Users, AlertCircle, Plus, ChevronRight, Star, FlaskConical, Trash2, RotateCcw, Music } from 'lucide-svelte';
+	import { Calendar, DollarSign, Users, AlertCircle, Plus, ChevronRight, Star, FlaskConical, Trash2, RotateCcw, Music, Heart } from 'lucide-svelte';
 	import { invalidateAll } from '$app/navigation';
+	import { enhance } from '$app/forms';
 
 	let { data }: { data: PageData } = $props();
 
 	const fmt$ = (n: number) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 0 }).format(n ?? 0);
 	const fmtDate = (d: string) => d ? new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—';
+
+	// Track user interests by event ID for opportunity roles
+	let userInterestMap = $state<Record<string, boolean>>({});
+	$effect(() => {
+		userInterestMap = Object.fromEntries((data.userInterests ?? []).map((interest: any) => [interest.event, true]));
+	});
+
+	const canManage = data.canManage;
+	const canShowInterest = ['pro', 'vendor', 'broadcaster'].includes(data.userProfile?.role ?? '');
 
 	const EVENT_TYPE_LABELS: Record<string, string> = {
 		appearance: 'Appearance', clinic: 'Clinic', media: 'Media',
@@ -111,17 +121,25 @@
 	<div class="flex items-center justify-between">
 		<div>
 			<h1 class="text-2xl font-bold text-white">Events</h1>
-			<p class="text-gray-400 text-sm mt-1">Appearances, broadcasts, clinics and talent assignments</p>
+			<p class="text-gray-400 text-sm mt-1">Appearances, broadcasts, clinics and talent opportunities</p>
 		</div>
-		<Button href="/dashboard/events/new">
-			<Plus class="w-4 h-4 mr-2" />New Event
-		</Button>
+		{#if canManage}
+			<Button href="/dashboard/events/new">
+				<Plus class="w-4 h-4 mr-2" />New Event
+			</Button>
+		{/if}
 	</div>
-	<div>
-		<Button href="/dashboard/events/bookings" variant="outline" class="gap-2">
-			<Music class="w-4 h-4" /> Event Booking Pipeline
-		</Button>
-	</div>
+	{#if canManage}
+		<div>
+			<Button href="/dashboard/events/bookings" variant="outline" class="gap-2">
+				<Music class="w-4 h-4" /> Event Booking Pipeline
+			</Button>
+		</div>
+	{:else if canShowInterest}
+		<div class="rounded-lg border border-emerald-800/60 bg-emerald-950/30 px-4 py-3 text-sm text-emerald-200">
+			Use the heart icon on any event to signal interest in additional work. This builds the future booking pipeline for pros, vendors, and broadcasters without giving edit access.
+		</div>
+	{/if}
 
 	<!-- Stats -->
 	{#if s}
@@ -181,7 +199,7 @@
 	</div>
 
 	<!-- Seed controls (admin only) -->
-	{#if isAdmin}
+	{#if canManage}
 	<div class="flex flex-wrap items-center gap-3 p-4 bg-gray-900 border border-dashed border-gray-600 rounded-lg">
 		<div class="flex items-center gap-2 text-xs text-gray-500 font-medium">
 			<FlaskConical class="w-4 h-4" />TEST DATA
@@ -204,13 +222,15 @@
 	<div class="text-center py-16 text-gray-500">
 		<Calendar class="w-12 h-12 mx-auto mb-3 opacity-40" />
 		<p class="text-lg">No events found</p>
-		<Button href="/dashboard/events/new" class="mt-4">Create your first event</Button>
+		{#if canManage}
+			<Button href="/dashboard/events/new" class="mt-4">Create your first event</Button>
+		{/if}
 	</div>
 	{:else}
 	<div class="space-y-2">
 		{#each events as event (event.id)}
-		<a href="/dashboard/events/{event.id}" class="flex items-center justify-between p-4 bg-gray-800 rounded-lg border border-gray-700 hover:border-gray-500 hover:bg-gray-750 transition-colors group">
-			<div class="flex items-center gap-4 min-w-0">
+		<div class="flex items-center justify-between p-4 bg-gray-800 rounded-lg border border-gray-700 hover:border-gray-500 hover:bg-gray-750 transition-colors group">
+			<a href="/dashboard/events/{event.id}" class="flex items-center gap-4 min-w-0 flex-1">
 				<div class="shrink-0">
 					<Badge class={EVENT_TYPE_COLORS[event.eventType] ?? 'bg-gray-700 text-gray-300'}>
 						{EVENT_TYPE_LABELS[event.eventType] ?? event.eventType}
@@ -224,7 +244,7 @@
 						{#if event.expand?.tournament}<span>🏆 {event.expand.tournament.name}</span>{/if}
 					</div>
 				</div>
-			</div>
+			</a>
 			<div class="flex items-center gap-4 shrink-0 ml-4">
 				<div class="text-right hidden sm:block">
 					<div class="text-sm font-semibold text-white">{fmt$(event.budget || 0)}</div>
@@ -235,9 +255,25 @@
 					{talentByEvent[event.id] ?? 0}
 				</div>
 				<Badge class={STATUS_COLORS[event.status] ?? 'bg-gray-700 text-gray-300'}>{event.status}</Badge>
-				<ChevronRight class="w-4 h-4 text-gray-500 group-hover:text-gray-300" />
+				{#if canShowInterest}
+					<form method="POST" action="?/showInterest" use:enhance class="flex items-center">
+						<input type="hidden" name="eventId" value={event.id} />
+						<button
+							type="submit"
+							class="p-2 rounded transition-colors {userInterestMap[event.id]
+								? 'text-red-400 hover:text-red-300 bg-red-900/30 hover:bg-red-900/50'
+								: 'text-gray-400 hover:text-red-400 hover:bg-red-900/30'}"
+							title={userInterestMap[event.id] ? 'Remove interest' : 'Show interest'}
+						>
+							<Heart class="w-4 h-4 {userInterestMap[event.id] ? 'fill-current' : ''}" />
+						</button>
+					</form>
+				{/if}
+				<a href="/dashboard/events/{event.id}" class="text-gray-500 group-hover:text-gray-300">
+					<ChevronRight class="w-4 h-4" />
+				</a>
 			</div>
-		</a>
+		</div>
 		{/each}
 	</div>
 	{/if}

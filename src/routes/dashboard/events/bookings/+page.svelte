@@ -1,14 +1,15 @@
 <script lang="ts">
+	import { enhance } from '$app/forms';
 	import type { PageData } from './$types';
 	import { invalidateAll } from '$app/navigation';
 	import Card from '$lib/components/ui/card.svelte';
 	import { Button } from '$lib/components/ui/button';
 	import { PipelineBoard } from '$lib/pipeline';
 	import { pipelineMove } from '$lib/pipeline';
-	import type { PipelineBoardConfig, PipelineCardItem, PipelineMoveEvent } from '$lib/pipeline';
-	import { AlertCircle, Calendar, DollarSign, Mic2, Music, Plus, Star, X } from 'lucide-svelte';
+	import type { ActionData, PipelineBoardConfig, PipelineCardItem, PipelineMoveEvent } from './$types';
+	import { AlertCircle, Calendar, DollarSign, Mic2, Music, Plus, Star, Trophy, Users, X } from 'lucide-svelte';
 
-	let { data }: { data: PageData } = $props();
+	let { data, form }: { data: PageData; form: ActionData } = $props();
 
 	const BOARD_CONFIG: PipelineBoardConfig = {
 		columnWidth: 'w-56',
@@ -36,6 +37,7 @@
 		new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 0 }).format(n ?? 0);
 	const fmtDate = (d: string) =>
 		d ? new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'No date';
+	const fmtRole = (role: string) => role.replaceAll('_', ' ');
 
 	let moveError = $state('');
 	let confirmFinanceModal = $state<{ id: string; name: string; eventName: string; rate: number; from: string; to: string } | null>(null);
@@ -259,6 +261,7 @@
 	const INPUT = 'w-full rounded-lg border border-slate-600 bg-slate-800 text-slate-100 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500 placeholder:text-slate-500';
 	const LABEL = 'block text-xs font-medium text-slate-400 mb-1';
 	const s = $derived(data.stats);
+	const duplicateReport = $derived(data.duplicateReport);
 </script>
 
 <svelte:head><title>Event Booking Pipeline — FliHub</title></svelte:head>
@@ -272,9 +275,14 @@
 			<h1 class="text-3xl font-bold tracking-tight">Event Booking Pipeline</h1>
 			<p class="text-muted-foreground mt-1">Book celebrity appearances and music acts, track fees, and hand booked talent into event payment generation.</p>
 		</div>
-		<Button onclick={() => showNew = true} class="gap-2 bg-violet-600 hover:bg-violet-700 text-white shrink-0">
-			<Plus class="size-4" /> New Booking
-		</Button>
+		<div class="flex items-center gap-2 shrink-0">
+			<Button href="/dashboard/events/bookings/export" variant="outline" class="gap-2">
+				Export CSV
+			</Button>
+			<Button onclick={() => showNew = true} class="gap-2 bg-violet-600 hover:bg-violet-700 text-white shrink-0">
+				<Plus class="size-4" /> New Booking
+			</Button>
+		</div>
 	</div>
 
 	{#if s}
@@ -339,6 +347,149 @@
 					<p class="text-xs text-slate-400">Booked talent uses the same event payment generation flow as broadcasters.</p>
 				</div>
 			</div>
+		</Card>
+	</div>
+
+	<Card class="p-4 bg-slate-800/40 border-slate-700">
+		<div class="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4">
+			<div>
+				<p class="font-semibold text-slate-100">Interest Duplicate Cleanup</p>
+				<p class="text-xs text-slate-400 mt-1">Detect and merge duplicate event or tournament interest rows that may have been created outside the normal toggle flow.</p>
+			</div>
+			<form method="POST" action="?/mergeDuplicateInterests" use:enhance class="flex items-center gap-2">
+				<input type="hidden" name="scope" value="all" />
+				<Button type="submit" variant="outline" class="gap-2">Merge Duplicates</Button>
+			</form>
+		</div>
+		<div class="grid grid-cols-1 md:grid-cols-2 gap-3 mt-4">
+			<div class="rounded-xl border border-slate-700 bg-slate-900/40 p-3">
+				<p class="text-xs uppercase tracking-wide text-slate-500">Event Interests</p>
+				<p class="mt-1 text-lg font-bold text-slate-100">{duplicateReport.event.groupCount} duplicate groups</p>
+				<p class="text-sm text-slate-400">{duplicateReport.event.duplicateRowCount} extra rows can be removed.</p>
+			</div>
+			<div class="rounded-xl border border-slate-700 bg-slate-900/40 p-3">
+				<p class="text-xs uppercase tracking-wide text-slate-500">Tournament Interests</p>
+				<p class="mt-1 text-lg font-bold text-slate-100">{duplicateReport.tournament.groupCount} duplicate groups</p>
+				<p class="text-sm text-slate-400">{duplicateReport.tournament.duplicateRowCount} extra rows can be removed.</p>
+			</div>
+		</div>
+		{#if form?.cleanupResult}
+			<div class="mt-4 rounded-lg border border-emerald-700/40 bg-emerald-950/20 px-3 py-2 text-sm text-emerald-300">
+				Merged {form.cleanupResult.totalGroupsMerged} duplicate group(s) and removed {form.cleanupResult.totalRowsDeleted} extra row(s).
+			</div>
+		{:else if form?.cleanupError}
+			<div class="mt-4 rounded-lg border border-red-700/40 bg-red-950/20 px-3 py-2 text-sm text-red-300">
+				{form.cleanupError}
+			</div>
+		{/if}
+		{#if (data.cleanupHistory ?? []).length > 0}
+			<div class="mt-4 border-t border-slate-700 pt-4">
+				<p class="text-xs uppercase tracking-wide text-slate-500 mb-3">Recent Cleanup History</p>
+				<div class="space-y-2">
+					{#each data.cleanupHistory.slice(0, 5) as item}
+						<div class="rounded-lg border border-slate-700 bg-slate-900/40 px-3 py-2 text-sm">
+							<div class="flex flex-col md:flex-row md:items-center md:justify-between gap-2">
+								<div class="text-slate-200">
+									<span class="font-medium capitalize">{item.scope}</span> cleanup by {item.performedBy}
+								</div>
+								<div class="text-xs text-slate-500">{fmtDate(item.created)}</div>
+							</div>
+							<div class="mt-1 text-xs text-slate-400">
+								Removed {item.totalRowsDeleted} rows across {item.totalGroupsMerged} duplicate group(s)
+							</div>
+						</div>
+					{/each}
+				</div>
+			</div>
+		{/if}
+	</Card>
+
+	<div class="grid grid-cols-1 xl:grid-cols-2 gap-4">
+		<Card class="p-4 bg-slate-800/40 border-slate-700">
+			<div class="flex items-start justify-between gap-3 mb-4">
+				<div>
+					<div class="flex items-center gap-2 text-slate-100 font-semibold">
+						<Calendar class="size-4 text-cyan-300" /> Event Interest Ranking
+					</div>
+					<p class="text-xs text-slate-400 mt-1">Pros and vendors signaling interest in event work opportunities.</p>
+				</div>
+				<div class="text-right text-xs text-slate-400">{data.eventInterestSummary?.length ?? 0} ranked</div>
+			</div>
+			{#if (data.eventInterestSummary ?? []).length === 0}
+				<p class="text-sm text-slate-500">No event interest signals yet.</p>
+			{:else}
+				<div class="space-y-3">
+					{#each data.eventInterestSummary as item}
+						<div class="rounded-xl border border-slate-700 bg-slate-900/40 p-3">
+							<div class="flex items-start justify-between gap-3">
+								<div>
+									<p class="font-medium text-slate-100">{item.name}</p>
+									<p class="text-xs text-slate-400 mt-1">{fmtDate(item.date)}{item.location ? ` · ${item.location}` : ''}</p>
+								</div>
+								<div class="text-right">
+									<p class="text-lg font-bold text-slate-100">{item.totalInterest}</p>
+									<p class="text-[11px] uppercase tracking-wide text-slate-500">Signals</p>
+								</div>
+							</div>
+							<div class="flex flex-wrap gap-2 mt-3 text-[11px]">
+								<span class="inline-flex items-center gap-1 rounded-full border border-cyan-700/50 bg-cyan-950/30 px-2 py-0.5 text-cyan-300"><Users class="size-3" /> Pros {item.proInterest}</span>
+								<span class="inline-flex items-center gap-1 rounded-full border border-violet-700/50 bg-violet-950/30 px-2 py-0.5 text-violet-300"><Mic2 class="size-3" /> Broadcasters {item.broadcasterInterest}</span>
+								<span class="inline-flex items-center gap-1 rounded-full border border-emerald-700/50 bg-emerald-950/30 px-2 py-0.5 text-emerald-300"><Star class="size-3" /> Vendors {item.vendorInterest}</span>
+							</div>
+							<div class="mt-3 flex flex-wrap gap-2">
+								{#each item.interestedUsers as user}
+									<span class="inline-flex items-center gap-1 rounded-full border border-slate-600 bg-slate-800 px-2 py-0.5 text-[11px] text-slate-300">
+										{user.name} · {fmtRole(user.role)}
+									</span>
+								{/each}
+							</div>
+						</div>
+					{/each}
+				</div>
+			{/if}
+		</Card>
+
+		<Card class="p-4 bg-slate-800/40 border-slate-700">
+			<div class="flex items-start justify-between gap-3 mb-4">
+				<div>
+					<div class="flex items-center gap-2 text-slate-100 font-semibold">
+						<Trophy class="size-4 text-emerald-300" /> Tournament Interest Ranking
+					</div>
+					<p class="text-xs text-slate-400 mt-1">Vendor demand signals for tournament-related bookings and support work.</p>
+				</div>
+				<div class="text-right text-xs text-slate-400">{data.tournamentInterestSummary?.length ?? 0} ranked</div>
+			</div>
+			{#if (data.tournamentInterestSummary ?? []).length === 0}
+				<p class="text-sm text-slate-500">No tournament interest signals yet.</p>
+			{:else}
+				<div class="space-y-3">
+					{#each data.tournamentInterestSummary as item}
+						<div class="rounded-xl border border-slate-700 bg-slate-900/40 p-3">
+							<div class="flex items-start justify-between gap-3">
+								<div>
+									<p class="font-medium text-slate-100">{item.name}</p>
+									<p class="text-xs text-slate-400 mt-1">{fmtDate(item.date)}{item.location ? ` · ${item.location}` : ''}</p>
+								</div>
+								<div class="text-right">
+									<p class="text-lg font-bold text-slate-100">{item.totalInterest}</p>
+									<p class="text-[11px] uppercase tracking-wide text-slate-500">Signals</p>
+								</div>
+							</div>
+							<div class="flex flex-wrap gap-2 mt-3 text-[11px]">
+								<span class="inline-flex items-center gap-1 rounded-full border border-violet-700/50 bg-violet-950/30 px-2 py-0.5 text-violet-300"><Mic2 class="size-3" /> Broadcasters {item.broadcasterInterest}</span>
+								<span class="inline-flex items-center gap-1 rounded-full border border-emerald-700/50 bg-emerald-950/30 px-2 py-0.5 text-emerald-300"><Star class="size-3" /> Vendors {item.vendorInterest}</span>
+							</div>
+							<div class="mt-3 flex flex-wrap gap-2">
+								{#each item.interestedUsers as user}
+									<span class="inline-flex items-center gap-1 rounded-full border border-slate-600 bg-slate-800 px-2 py-0.5 text-[11px] text-slate-300">
+										{user.name} · {fmtRole(user.role)}
+									</span>
+								{/each}
+							</div>
+						</div>
+					{/each}
+				</div>
+			{/if}
 		</Card>
 	</div>
 

@@ -2,9 +2,43 @@ import { RequestContext } from '$lib/infra/RequestContext';
 import { redirect } from '@sveltejs/kit';
 import type { PageServerLoad } from './$types';
 
+const normalize = (value: unknown): string =>
+	String(value ?? '')
+		.trim()
+		.toLowerCase()
+		.replace(/\s+/g, ' ');
+
 export const load: PageServerLoad = async ({ locals, url }) => {
 	const ctx = await RequestContext.from(locals, url);
 	const { pb, profile } = ctx;
+
+	if (ctx.role === 'manager') {
+		if (profile?.id) throw redirect(303, `/dashboard/my-payments/${profile.id}`);
+		throw redirect(303, '/dashboard');
+	}
+
+	if (ctx.role === 'pro' || ctx.role === 'broadcaster') {
+		let proReference = ((profile as any)?.proReference || (profile as any)?.talentReference || '') as string;
+		if (!proReference) {
+			const userEmail = (locals.pb?.authStore?.model?.email ?? '') as string;
+			if (userEmail) {
+				const talent = await pb.collection('talent').getFirstListItem(`email = "${userEmail}"`, { fields: 'id' }).catch(() => null);
+				proReference = (talent?.id ?? '') as string;
+			}
+		}
+		if (!proReference) {
+			const fullName = normalize(`${profile?.firstName ?? ''} ${profile?.lastName ?? ''}`);
+			if (fullName) {
+				const talentRows = await pb.collection('talent').getFullList({ fields: 'id,name' }).catch(() => []);
+				const exact = (talentRows as any[]).find((t: any) => normalize(t.name) === fullName);
+				const startsWith = (talentRows as any[]).find((t: any) => normalize(t.name).startsWith(fullName));
+				proReference = (exact?.id || startsWith?.id || '') as string;
+			}
+		}
+		if (proReference) throw redirect(303, `/dashboard/my-payments/${proReference}`);
+		if (profile?.id) throw redirect(303, `/dashboard/my-payments/${profile.id}`);
+		throw redirect(303, '/dashboard');
+	}
 
 	// Only managers (and admins previewing) can access this page
 	if (ctx.role !== 'manager' && ctx.role !== 'admin') {

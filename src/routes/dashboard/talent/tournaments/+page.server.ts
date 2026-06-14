@@ -1,4 +1,5 @@
 import { RequestContext } from '$lib/infra/RequestContext';
+import { redirect } from '@sveltejs/kit';
 import type { PageServerLoad, Actions } from './$types';
 import { TournamentRepo } from '$lib/infra/pocketbase/repositories';
 import { fail } from '@sveltejs/kit';
@@ -7,9 +8,18 @@ import {
 	seasonConfigFromRecord,
 } from '$lib/domain/services/PayoutCalculator';
 
+const TOURNAMENT_VIEW_ROLES = new Set(['admin', 'leader', 'vendor', 'broadcaster']);
+const TOURNAMENT_MANAGE_ROLES = new Set(['admin', 'leader']);
+const TOURNAMENT_INTEREST_ROLES = new Set(['vendor', 'broadcaster']);
+
 export const load: PageServerLoad = async ({ locals, url }) => {
 	const ctx = await RequestContext.from(locals, url);
-	const { pb } = ctx;
+	
+	if (!TOURNAMENT_VIEW_ROLES.has(ctx.role)) {
+		throw redirect(303, '/dashboard/welcome');
+	}
+	
+	const { pb, role, userId } = ctx;
 	const tournamentRepo = new TournamentRepo(pb);
 
 	const seasonId = url.searchParams.get('season');
@@ -69,7 +79,18 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 			seasonProCut = seasonBudget - seasonFranchiseCut;
 		}
 
+		const userInterests = TOURNAMENT_INTEREST_ROLES.has(role)
+			? await pb.collection('tournament_interests').getFullList({
+				filter: `user = "${userId}"`,
+				fields: 'id,user,tournament,created'
+			}).catch(() => [])
+			: [];
+
 		return {
+			role,
+			canManage: TOURNAMENT_MANAGE_ROLES.has(role),
+			canShowInterest: TOURNAMENT_INTEREST_ROLES.has(role),
+			userInterests,
 			tournaments: tournaments.items,
 			seasonRecords,
 			activeSeasonRecord,
@@ -84,6 +105,10 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 	} catch (err) {
 		console.error('Error loading tournaments:', err);
 		return {
+			role: ctx.role,
+			canManage: TOURNAMENT_MANAGE_ROLES.has(ctx.role),
+			canShowInterest: TOURNAMENT_INTEREST_ROLES.has(ctx.role),
+			userInterests: [],
 			tournaments: [],
 			seasonRecords: [],
 			activeSeasonRecord: null,
@@ -99,6 +124,43 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 };
 
 export const actions: Actions = {
+	showInterest: async ({ request, locals, url }) => {
+		const ctx = await RequestContext.from(locals, url);
+		const { pb, role, userId } = ctx;
+
+		if (!TOURNAMENT_INTEREST_ROLES.has(role)) {
+			return fail(403, { error: 'Only vendors and broadcasters can show interest in tournaments' });
+		}
+
+		const fd = await request.formData();
+		const tournamentId = String(fd.get('tournamentId') ?? '');
+
+		if (!tournamentId) {
+			return fail(400, { error: 'Tournament is required' });
+		}
+
+		try {
+			const existing = await pb.collection('tournament_interests').getFullList({
+				filter: `user = "${userId}" && tournament = "${tournamentId}"`,
+				fields: 'id'
+			}).catch(() => []);
+
+			if (existing[0]?.id) {
+				await pb.collection('tournament_interests').delete(existing[0].id);
+				return { success: true, interested: false };
+			}
+
+			await pb.collection('tournament_interests').create({
+				user: userId,
+				tournament: tournamentId,
+			});
+
+			return { success: true, interested: true };
+		} catch (err: any) {
+			return fail(400, { error: err.message });
+		}
+	},
+
 	// ── Season CRUD ───────────────────────────────────────────────────────────
 	createSeason: async ({ request, locals }) => {
 		const pb = locals.pb;

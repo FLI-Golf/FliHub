@@ -28,7 +28,7 @@ export const load: PageServerLoad = async ({ locals }) => {
 			}
 
 			if (userProfile?.role === 'manager') {
-				throw redirect(303, '/dashboard/my-payments');
+				throw redirect(303, `/dashboard/my-payments/${userProfile.id}`);
 			}
 
 			if (['pro', 'broadcaster'].includes(userProfile?.role)) {
@@ -90,7 +90,7 @@ export const actions: Actions = {
 
 				// Manager — send to their payment portal
 				if (userProfile.role === 'manager') {
-					throw redirect(303, '/dashboard/my-payments');
+					throw redirect(303, `/dashboard/my-payments/${userProfile.id}`);
 				}
 
 				// Pro, broadcaster — send to welcome/onboarding flow
