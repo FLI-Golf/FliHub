@@ -160,6 +160,81 @@ export const POST: RequestHandler = async ({ locals, request }) => {
 					updatePayload.comments = `<p>Quorum reached — approved by ${voteCount} ${voteCount === 1 ? 'approver' : 'approvers'}. Reimbursement Work Order: ${workOrderNumber}</p>`;
 				} else {
 
+				if (expense.sourceType === 'tournament_payout' && expense.sourceId) {
+					const tournamentId = String(expense.sourceId);
+					const tournament = await pb.collection('tournaments').getOne(tournamentId).catch(() => null) as any;
+					const payments = await pb.collection('pro_payments').getFullList({
+						filter: `tournament = '${tournamentId}' && status = 'pending'`,
+						fields: 'id,amount,recipient',
+					}).catch(() => [] as any[]);
+
+					const allWOs = await pb.collection('work_orders').getFullList({
+						fields: 'work_order_number',
+						sort: '-created'
+					}).catch(() => [] as any[]);
+
+					const batchSize = 16;
+					const paymentBatches: any[][] = [];
+					for (let i = 0; i < payments.length; i += batchSize) {
+						paymentBatches.push(payments.slice(i, i + batchSize));
+					}
+
+					let seq = allWOs.length + 1;
+					const createdWorkOrders: Array<{ id: string; number: string }> = [];
+
+					for (let i = 0; i < paymentBatches.length; i++) {
+						const batch = paymentBatches[i];
+						const amount = batch.reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
+						const batchPaymentIds = batch.map((p: any) => p.id);
+						const proCount = batch.filter((p: any) => p.recipient === 'pro').length;
+						const managerCount = batch.filter((p: any) => p.recipient === 'manager').length;
+
+						const woNumber = `WO-TOUR-${tournamentId.slice(-6).toUpperCase()}-${String(seq).padStart(4, '0')}`;
+						seq += 1;
+
+						const wo = await pb.collection('work_orders').create({
+							work_order_number: woNumber,
+							source:            'expense',
+							status:            'open',
+							expenseId:         expense.id,
+							expense:           expense.id,
+							projectId:         tournamentId,
+							projectCode:       'TOUR',
+							projectName:       tournament?.name || expense.title || 'Tournament Payout',
+							approver:          userProfile.id,
+							approvedBy:        userProfile.id,
+							submittedBy:       expense.submittedBy || null,
+							description:       `Tournament payout batch ${i + 1}/${paymentBatches.length} — ${tournament?.name || ''}`.slice(0, 500),
+							amount,
+							approvedDate:      new Date().toISOString(),
+							proPayment:        batchPaymentIds,
+							notes:             `${batch.length} payments (${proCount} pros, ${managerCount} managers) tied to expense ${expense.id}`,
+						}).catch((e: any) => {
+							console.error('❌ tournament payout work_order create failed:', e.message, JSON.stringify(e.data ?? {}));
+							return null;
+						});
+
+						if (!wo) continue;
+
+						createdWorkOrders.push({ id: wo.id, number: woNumber });
+
+						await Promise.all(batchPaymentIds.map((pid: string) =>
+							pb.collection('pro_payments').update(pid, { workOrder: wo.id }).catch(() => null)
+						));
+					}
+
+					workOrderNumber = createdWorkOrders[0]?.number ?? null;
+
+					await pb.collection('expenses').update(expense.id, {
+						status:         'approved',
+						approvedBy:     userProfile.id,
+						approvedDate:   new Date().toISOString(),
+						work_order_number: workOrderNumber || '',
+					}).catch((e: any) => console.warn('expense update failed:', e.message));
+
+					updatePayload.comments = `<p>Quorum reached — approved by ${voteCount} ${voteCount === 1 ? 'approver' : 'approvers'}. Generated ${createdWorkOrders.length} tournament payout work orders${workOrderNumber ? ` (first: ${workOrderNumber})` : ''}.</p>`;
+				} else {
+
 				// 1. Resolve project via task
 				let project: any = null;
 				let taskRecord: any = null;
@@ -240,6 +315,127 @@ export const POST: RequestHandler = async ({ locals, request }) => {
 					}).catch((e: any) => console.warn('project budget update failed:', e.message));
 				}
 				}
+				}
+
+			} else if (approval.entityType === 'tournament_payout') {
+				const tournamentId = String(approval.entityId || '');
+				if (!tournamentId) {
+					return json({ error: 'Missing tournament id on payout approval' }, { status: 400 });
+				}
+
+				const tournament = await pb.collection('tournaments').getOne(tournamentId).catch(() => null) as any;
+				const payments = await pb.collection('pro_payments').getFullList({
+					filter: `tournament = '${tournamentId}' && status = 'pending'`,
+					expand: 'pro',
+					fields: 'id,amount,recipient,paymentMethod,transactionId,pro,expand.pro.name',
+				}).catch(() => [] as any[]);
+
+				if (payments.length === 0) {
+					return json({ error: 'No pending tournament payments found' }, { status: 409 });
+				}
+
+				const totalAmount = payments.reduce((sum: number, p: any) => sum + (Number(p.amount) || 0), 0);
+				const proCount = payments.filter((p: any) => p.recipient === 'pro').length;
+				const mgrCount = payments.filter((p: any) => p.recipient === 'manager').length;
+				const category = 'Expenses/MPO (Male)';
+				const description = `${tournament?.name || 'Tournament'} tournament payout batch`;
+				const proNames = Array.from(new Set(
+					payments.map((p: any) => p.expand?.pro?.name ?? p.pro).filter(Boolean)
+				)).slice(0, 6);
+				const transactionManifest = payments.map((p: any, index: number) => {
+					const proName = p.expand?.pro?.name ?? p.pro ?? 'Unknown';
+					const method = p.paymentMethod || 'n/a';
+					const reference = p.transactionId || 'n/a';
+					const recipient = p.recipient || 'n/a';
+					const amount = Number(p.amount ?? 0).toFixed(2);
+					return `${index + 1}. ${proName} | ${recipient} | ${method} | ref ${reference} | $${amount}`;
+				}).join(' ; ');
+				const notes = [
+					`Tournament: ${tournament?.name || tournamentId}`,
+					`Payments: ${payments.length} (${proCount} pros, ${mgrCount} managers)`,
+					`Pro sample: ${proNames.join(', ') || 'n/a'}`,
+					`Payment IDs: ${payments.map((p: any) => p.id).join(', ')}`,
+					`Transaction manifest: ${transactionManifest || 'n/a'}`,
+				].join(' | ');
+
+				const expense = await pb.collection('expenses').create({
+					title: `Tournament Payouts — ${tournament?.name || tournamentId}`,
+					description,
+					amount: totalAmount,
+					status: 'approved',
+					date: new Date().toISOString().slice(0, 10),
+					category,
+					notes,
+					work_order_number: '',
+					sourceType: 'tournament_payout',
+					sourceId: tournamentId,
+					approvedBy: userProfile.id,
+					approvedDate: new Date().toISOString(),
+					...(approval.requestedBy ? { submittedBy: approval.requestedBy } : {}),
+				});
+
+				const allWOs = await pb.collection('work_orders').getFullList({
+					fields: 'work_order_number',
+					sort: '-created'
+				}).catch(() => [] as any[]);
+
+				const batchSize = 16;
+				const paymentBatches: any[][] = [];
+				for (let i = 0; i < payments.length; i += batchSize) {
+					paymentBatches.push(payments.slice(i, i + batchSize));
+				}
+
+				let seq = allWOs.length + 1;
+				const createdWorkOrders: Array<{ id: string; number: string }> = [];
+
+				for (let i = 0; i < paymentBatches.length; i++) {
+					const batch = paymentBatches[i];
+					const amount = batch.reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
+					const batchPaymentIds = batch.map((p: any) => p.id);
+					const batchProCount = batch.filter((p: any) => p.recipient === 'pro').length;
+					const batchManagerCount = batch.filter((p: any) => p.recipient === 'manager').length;
+
+					const woNumber = `WO-TOUR-${tournamentId.slice(-6).toUpperCase()}-${String(seq).padStart(4, '0')}`;
+					seq += 1;
+
+					const wo = await pb.collection('work_orders').create({
+						work_order_number: woNumber,
+						source:            'expense',
+						status:            'open',
+						expenseId:         expense.id,
+						expense:           expense.id,
+						projectId:         tournamentId,
+						projectCode:       'TOUR',
+						projectName:       tournament?.name || expense.title || 'Tournament Payout',
+						approver:          userProfile.id,
+						approvedBy:        userProfile.id,
+						submittedBy:       approval.requestedBy || null,
+						description:       `Tournament payout batch ${i + 1}/${paymentBatches.length} — ${tournament?.name || ''}`.slice(0, 500),
+						amount,
+						approvedDate:      new Date().toISOString(),
+						proPayment:        batchPaymentIds,
+						notes:             `${batch.length} payments (${batchProCount} pros, ${batchManagerCount} managers) tied to expense ${expense.id}`,
+					}).catch((e: any) => {
+						console.error('❌ tournament payout work_order create failed:', e.message, JSON.stringify(e.data ?? {}));
+						return null;
+					});
+
+					if (!wo) continue;
+
+					createdWorkOrders.push({ id: wo.id, number: woNumber });
+					await Promise.all(batchPaymentIds.map((pid: string) =>
+						pb.collection('pro_payments').update(pid, { workOrder: wo.id }).catch(() => null)
+					));
+				}
+
+				workOrderNumber = createdWorkOrders[0]?.number ?? null;
+
+				await pb.collection('expenses').update(expense.id, {
+					work_order_number: workOrderNumber || '',
+				}).catch(() => null);
+
+				updatePayload.expenseId = expense.id;
+				updatePayload.comments = `<p>Quorum reached — approved by ${voteCount} ${voteCount === 1 ? 'approver' : 'approvers'}. Expense ${expense.id} created and ${createdWorkOrders.length} tournament payout work orders generated${workOrderNumber ? ` (first: ${workOrderNumber})` : ''}.</p>`;
 
 			} else if (approval.entityType === 'project') {
 				updatePayload.comments = `<p>Quorum reached — approved by ${voteCount} ${voteCount === 1 ? 'approver' : 'approvers'}.</p>`;
