@@ -59,43 +59,30 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 		const sdkSort = `${sortDir === 'desc' ? '-' : ''}${sortBy === 'proName' ? 'created' : sortBy}`;
 
 		const safeGetPayments = async () => {
+			const raw = await adminFetch('pro_payments', {
+				perPage: 2000,
+				fields: 'id,pro,tournament,tournamentResult,paymentType,recipient,amount,grossAmount,netProAmount,managerAmount,status,paymentDate,dueDate,paymentMethod,transactionId,description,notes,created,updated',
+				sort: sdkSort,
+				...(filterStr ? { filter: filterStr } : {}),
+			}).catch(() => null as any[] | null);
+
+			if (Array.isArray(raw)) {
+				if (raw.length > 0) {
+					console.log('[payments][raw-fallback]', { count: raw.length });
+				}
+				return raw;
+			}
+
 			try {
 				return await pb.collection('pro_payments').getFullList({
 					filter: filterStr,
 					sort: sdkSort,
-					expand: 'pro',
 				});
-			} catch (expandErr) {
-				try {
-					return await pb.collection('pro_payments').getFullList({
-						filter: filterStr,
-						sort: sdkSort,
-					});
-				} catch (sdkErr) {
-					console.error('[payments][sdk-error]', {
-						expandErr: (expandErr as any)?.message ?? expandErr,
-						sdkErr: (sdkErr as any)?.message ?? sdkErr,
-					});
-
-					// Raw HTTP fallback when SDK query paths fail on malformed legacy rows.
-					const raw = await adminFetch('pro_payments', {
-						perPage: 2000,
-						fields: 'id,pro,tournament,tournamentResult,paymentType,recipient,amount,grossAmount,netProAmount,managerAmount,status,paymentDate,dueDate,paymentMethod,transactionId,description,notes,created,updated',
-						sort: sdkSort,
-					}).catch(() => [] as any[]);
-
-					const matchesFilter = (p: any) => {
-						if (filterStatus && p.status !== filterStatus) return false;
-						if (filterRecipient && p.recipient !== filterRecipient) return false;
-						return true;
-					};
-
-					const filtered = raw.filter(matchesFilter);
-					if (filtered.length > 0) {
-						console.log('[payments][raw-fallback]', { count: filtered.length });
-					}
-					return filtered;
-				}
+			} catch (sdkErr) {
+				console.error('[payments][sdk-error]', {
+					sdkErr: (sdkErr as any)?.message ?? sdkErr,
+				});
+				return [] as any[];
 			}
 		};
 

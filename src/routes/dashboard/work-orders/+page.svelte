@@ -27,6 +27,8 @@
 	let savingQB      = $state<string | null>(null);
 	let qbResult      = $state<{ woId: string; expenseCreated: boolean; expenseId?: string; warning?: string } | null>(null);
 
+	const EVENT_OPERATIONS_ACCOUNT_KEY = 'event operations account';
+
 	// QB form state per WO
 	let qbForms = $state<Record<string, { txnId: string; enteredBy: string; enteredDate: string; account: string; accountId: string; notes: string }>>({});
 
@@ -48,17 +50,24 @@
 	});
 
 	async function saveQB(woId: string) {
-		savingQB = woId;
 		qbResult = null;
 		const f = qbForms[woId];
 		const selectedAccount = bankAccounts.find((account: any) => account.id === f.accountId);
+		const accountLabel = selectedAccount ? accountOptionLabel(selectedAccount) : String(f.account ?? '').trim();
+		if (!isEventOperationsAccountLabel(accountLabel)) {
+			qbResult = { woId, expenseCreated: false, warning: 'Select the Event Operations Account before generating this payout.' };
+			return;
+		}
+
+		savingQB = woId;
+		const generatedTxnId = f.txnId.trim() || generateInternalPaymentReference(woId);
 		const res = await fetch(`/api/work-orders/${woId}`, {
 			method: 'PATCH',
 			headers: { 'Content-Type': 'application/json' },
 			body: JSON.stringify({
-				qb_transaction_id: f.txnId,
+				qb_transaction_id: generatedTxnId,
 				qb_entered_date:   f.enteredDate,
-				qb_account:        selectedAccount ? accountOptionLabel(selectedAccount) : f.account,
+				qb_account:        accountLabel,
 				qb_account_id:     selectedAccount?.id ?? '',
 				qb_notes:          f.notes,
 				status:            'paid',
@@ -232,6 +241,17 @@
 		const code = String(account?.code ?? '').trim();
 		const name = String(account?.name ?? '').trim();
 		return code && name ? `${code} - ${name}` : name || code || 'Unknown account';
+	}
+
+	function isEventOperationsAccountLabel(label: string) {
+		return String(label ?? '').trim().toLowerCase().includes(EVENT_OPERATIONS_ACCOUNT_KEY);
+	}
+
+	function generateInternalPaymentReference(woId: string) {
+		const wo = (data.workOrders as any[]).find((item: any) => item.id === woId);
+		const base = String(wo?.work_order_number ?? woId).replace(/[^A-Za-z0-9]/g, '').slice(-8).toUpperCase();
+		const stamp = new Date().toISOString().replace(/[-:TZ.]/g, '').slice(0, 14);
+		return `EVOP-${base}-${stamp}`;
 	}
 
 	function generatePDF(wo: any) {
@@ -597,6 +617,8 @@ ${wo.notes ? `
   <div class="note">${wo.notes}</div>
 </div>` : ''}
 
+<p style="margin:4px 0 10px;color:#475569;font-size:12px;font-weight:600">A WO means it is ready to pay out from the Event Operations Account.</p>
+
 <div class="section" style="border:2px solid ${wo.qb_transaction_id ? '#276749' : '#e2e8f0'};border-radius:8px;padding:16px;background:${wo.qb_transaction_id ? '#f0fff4' : '#fffbeb'}">
   <div class="section-title" style="color:${wo.qb_transaction_id ? '#276749' : '#744210'}">QuickBooks Entry ${wo.qb_transaction_id ? '— Recorded' : '— Pending'}</div>
   ${wo.qb_transaction_id ? `
@@ -608,7 +630,7 @@ ${wo.notes ? `
   ${wo._qbEnteredBy ? `<div class="field" style="margin-top:8px"><label>Entered By</label><span>${userName(wo._qbEnteredBy)}</span></div>` : wo.qb_entered_by ? `<div class="field" style="margin-top:8px"><label>Entered By</label><span>${wo.qb_entered_by}</span></div>` : ''}
   ${wo.qb_notes ? `<div class="note" style="margin-top:10px;background:#c6f6d5;border-color:#9ae6b4;color:#276749">${wo.qb_notes}</div>` : ''}
   ` : `
-  <p style="color:#744210;font-size:12px">⚠️ This work order has not yet been recorded in QuickBooks. The audit chain is incomplete until a QB transaction ID is entered.</p>
+	  <p style="color:#744210;font-size:12px">⚠️ This work order has already moved through the payout pipeline. Finance can now manually enter the payment in QuickBooks using the WO number, total amount, and payment manifest below. No approval action is needed on this page.</p>
   `}
 </div>
 
@@ -653,7 +675,7 @@ ${wo.notes ? `
 	<!-- Header -->
 	<div>
 		<h1 class="text-4xl font-bold mb-1 tracking-tight">Work Orders</h1>
-		<p class="text-muted-foreground">Approved expenses ready for QuickBooks payment processing</p>
+		<p class="text-muted-foreground">Work orders ready for manual QuickBooks payment processing</p>
 	</div>
 
 	<!-- About this page -->
@@ -672,7 +694,7 @@ ${wo.notes ? `
 
 			<div class="space-y-1.5">
 				<p class="text-xs font-bold uppercase tracking-wide text-slate-400">What is a Work Order?</p>
-				<p>A Work Order (WO) is the single authoritative record of a payment made by FLI Golf. Every payment — whether from an approved expense or a paid reimbursement claim — generates exactly one Work Order. The WO number is the reference used when entering the payment in QuickBooks, and it is stamped on every related record so any payment can be fully traced from origin to settlement.</p>
+				<p>A Work Order (WO) is the single authoritative record of a payout batch made by FLI Golf. When a WO exists, the payout has already moved through the internal pipeline and finance can manually enter it in QuickBooks. The WO number is the reference used for that entry, and it is stamped on every related record so the payment can be fully traced from origin to settlement.</p>
 			</div>
 
 			<div class="space-y-3">
@@ -684,9 +706,9 @@ ${wo.notes ? `
 							{#each [
 								['Submitted', 'Team member submits an expense linked to a task'],
 								['Approval queue', 'Expense appears in /dashboard/approvals for admin review'],
-								['Approved', 'Admin approves — quorum met'],
+								['Approved', 'Admin approves and the payout is authorized'],
 								['Work Order created', 'WO number stamped on expense, task, and work_orders record'],
-								['QuickBooks', 'Finance enters payment using the WO number'],
+								['QuickBooks', 'Finance manually enters the payment using the WO number'],
 							] as [step, desc], i}
 								<div class="flex items-start gap-2">
 									<span class="size-5 rounded-full bg-blue-900/60 text-blue-300 text-[10px] font-bold flex items-center justify-center shrink-0 mt-0.5">{i+1}</span>
@@ -987,13 +1009,27 @@ ${wo.notes ? `
 							<!-- QB entry panel -->
 							{#if expandedQB === wo.id}
 							{@const f = qbForms[wo.id] ?? { txnId:'', enteredBy:'', enteredDate: new Date().toISOString().slice(0,10), account:'', accountId:'', notes:'' }}
+							{@const selectedAccount = bankAccounts.find((account: any) => account.id === f.accountId) ?? findBankAccountByLabel(f.account)}
+							{@const selectedAccountLabel = selectedAccount ? accountOptionLabel(selectedAccount) : String(f.account ?? '').trim()}
+							{@const accountGateOpen = isEventOperationsAccountLabel(selectedAccountLabel)}
 							<tr class="bg-blue-950/20 border-b border-blue-800/30">
 								<td colspan="8" class="px-6 py-4">
 									<div class="max-w-3xl space-y-3">
 										<p class="text-xs font-bold text-blue-300 uppercase tracking-wide flex items-center gap-2">
 											<DollarSign class="size-3.5" /> QuickBooks Transaction Entry
 										</p>
-										<p class="text-xs text-slate-400">Record the QB transaction details after entering this payment in QuickBooks. This completes the audit chain.</p>
+										<p class="text-xs text-slate-400">Select the payout account first. If the Event Operations Account is selected, the payout fields unlock and the payment can be generated for QuickBooks.</p>
+										{#if !accountGateOpen}
+											<div class="rounded-lg border border-amber-700/50 bg-amber-950/30 p-3">
+												<p class="text-xs font-semibold text-amber-300">Event Operations Account required</p>
+												<p class="text-xs text-amber-200/80 mt-1">Choose Event Operations Account to unlock the payout fields and generate the payment reference.</p>
+											</div>
+										{:else}
+											<div class="rounded-lg border border-emerald-700/50 bg-emerald-950/30 p-3">
+												<p class="text-xs font-semibold text-emerald-300">Event Operations Account selected</p>
+												<p class="text-xs text-emerald-200/80 mt-1">The payout is ready to generate. A system reference will be assigned if you leave the QB transaction field blank.</p>
+											</div>
+										{/if}
 
 										<!-- Expense preview — reimbursement WOs only -->
 										{#if wo.source === 'reimbursement' && !wo.expense}
@@ -1021,11 +1057,6 @@ ${wo.notes ? `
 										{/if}
 										<div class="grid grid-cols-2 md:grid-cols-4 gap-3">
 											<div>
-												<label class="block text-[10px] font-semibold uppercase tracking-wide text-slate-400 mb-1">QB Transaction ID *</label>
-												<input bind:value={f.txnId} placeholder="e.g. 1042"
-													class="w-full rounded-md border border-slate-600 bg-slate-900 text-slate-100 px-3 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500 placeholder:text-slate-600" />
-											</div>
-											<div>
 												<label class="block text-[10px] font-semibold uppercase tracking-wide text-slate-400 mb-1">QB Account</label>
 												{#if bankAccounts.length > 0}
 													<select bind:value={f.accountId}
@@ -1041,9 +1072,16 @@ ${wo.notes ? `
 												{/if}
 											</div>
 											<div>
+												<label class="block text-[10px] font-semibold uppercase tracking-wide text-slate-400 mb-1">QB Transaction ID *</label>
+												<input bind:value={f.txnId} placeholder="Auto-generated if blank"
+													disabled={!accountGateOpen}
+													class="w-full rounded-md border border-slate-600 bg-slate-900 text-slate-100 px-3 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500 placeholder:text-slate-600 disabled:opacity-50" />
+											</div>
+											<div>
 												<label class="block text-[10px] font-semibold uppercase tracking-wide text-slate-400 mb-1">Date Entered in QB</label>
 												<input type="date" bind:value={f.enteredDate}
-													class="w-full rounded-md border border-slate-600 bg-slate-900 text-slate-100 px-3 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500 [color-scheme:dark]" />
+													disabled={!accountGateOpen}
+													class="w-full rounded-md border border-slate-600 bg-slate-900 text-slate-100 px-3 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500 [color-scheme:dark] disabled:opacity-50" />
 											</div>
 											<div>
 
@@ -1055,16 +1093,25 @@ ${wo.notes ? `
 										<div>
 											<label class="block text-[10px] font-semibold uppercase tracking-wide text-slate-400 mb-1">QB Notes</label>
 											<input bind:value={f.notes} placeholder="Any additional notes for the QB entry…"
-												class="w-full rounded-md border border-slate-600 bg-slate-900 text-slate-100 px-3 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500 placeholder:text-slate-600" />
+												disabled={!accountGateOpen}
+												class="w-full rounded-md border border-slate-600 bg-slate-900 text-slate-100 px-3 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500 placeholder:text-slate-600 disabled:opacity-50" />
+										</div>
+										<div class="rounded-lg border border-slate-700 bg-slate-900/60 px-3 py-2 text-[11px] text-slate-400">
+											<span class="font-semibold text-slate-300">Internal reference:</span> {f.txnId.trim() || 'generated automatically on save'}
 										</div>
 										<div class="flex items-center gap-3 pt-1">
-											<button onclick={() => saveQB(wo.id)} disabled={savingQB === wo.id || !f.txnId.trim()}
+											<button onclick={() => saveQB(wo.id)} disabled={savingQB === wo.id || !accountGateOpen}
 												class="flex items-center gap-1.5 text-sm px-4 py-2 rounded-lg bg-blue-700/60 border border-blue-600/50 text-blue-100 hover:bg-blue-700/80 transition-colors disabled:opacity-50 font-semibold">
-												{savingQB === wo.id ? 'Saving…' : '✓ Save QB Entry'}
+												{savingQB === wo.id ? 'Saving…' : 'Generate Payment & Save QB Entry'}
 											</button>
 											<button onclick={() => expandedQB = null}
 												class="text-xs text-slate-500 hover:text-slate-300 underline underline-offset-2">Cancel</button>
 										</div>
+										{#if qbResult?.woId === wo.id && qbResult.warning}
+											<div class="rounded-lg border border-amber-700/50 bg-amber-950/30 px-3 py-2 text-xs text-amber-200">
+												{qbResult.warning}
+											</div>
+										{/if}
 									</div>
 								</td>
 							</tr>

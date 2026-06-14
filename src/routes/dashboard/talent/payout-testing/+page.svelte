@@ -5,7 +5,7 @@
 	import {
 		DollarSign, CheckCircle, Clock, TrendingUp, Users, FileText,
 		ChevronDown, ChevronUp, History, AlertTriangle, Trophy, Wallet,
-		Play, RotateCcw, ArrowRight, Loader2
+		Play, RotateCcw, ArrowRight, Loader2, Building2
 	} from 'lucide-svelte';
 
 	let { data, form }: { data: PageData; form: ActionData } = $props();
@@ -35,11 +35,12 @@
 
 	const s = $derived(data.seasonSummary);
 
-	function getTournamentStep(t: typeof data.byTournament[0]): 'seed' | 'pay-pros' | 'pay-managers' | 'done' {
+	function getTournamentStep(t: typeof data.byTournament[0]): 'seed' | 'pay-pros' | 'pay-managers' | 'pay-franchises' | 'done' {
 		if (t.resultCount === 0) return 'seed';
 		if (t.paymentCount === 0) return 'seed'; // results exist but no payments yet (shouldn't happen, but guard)
 		if (t.pendingProCount > 0) return 'pay-pros';
 		if (t.pendingMgrCount > 0) return 'pay-managers';
+		if (t.pendingFranchiseCount > 0) return 'pay-franchises';
 		return 'done';
 	}
 
@@ -58,7 +59,7 @@
 				<span class="text-xs font-bold text-emerald-400 uppercase tracking-wide">Phase 2 — Tournaments Live</span>
 			</div>
 			<h1 class="text-3xl font-bold">Payout Testing</h1>
-			<p class="text-muted-foreground mt-1">Seed results → pay pros → pay managers → verify math</p>
+			<p class="text-muted-foreground mt-1">Seed team standings → pay pros → pay managers → verify math</p>
 		</div>
 		<div class="flex items-center gap-2 flex-wrap">
 			<form method="POST" action="?/seedSeason" use:enhance={() => {
@@ -121,7 +122,8 @@
 	<div class="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2">
 		{#each [
 			{ label: 'Prize Pool',    value: fmt(s.totalPrizePool),        icon: Trophy,     color: 'border-slate-600',   ic: 'text-slate-400'   },
-			{ label: 'Payments',      value: fmt(s.totalPayments),         icon: DollarSign, color: 'border-slate-600',   ic: 'text-slate-400'   },
+			{ label: 'Pro+Mgr Paid',  value: fmt(s.totalPayments),         icon: DollarSign, color: 'border-slate-600',   ic: 'text-slate-400'   },
+			{ label: 'Franchise',     value: fmt(s.totalFranchisePayouts), icon: Building2,  color: 'border-violet-700',  ic: 'text-violet-400'  },
 			{ label: 'To Pros',       value: fmt(s.proPaymentTotal),       icon: TrendingUp, color: 'border-emerald-700', ic: 'text-emerald-400' },
 			{ label: 'To Managers',   value: fmt(s.managerPaymentTotal),   icon: Users,      color: 'border-amber-700',   ic: 'text-amber-400'   },
 			{ label: 'Paid Out',      value: fmt(s.totalPaid),             icon: CheckCircle,color: 'border-emerald-700', ic: 'text-emerald-400' },
@@ -180,7 +182,7 @@
 							 step === 'seed'          ? 'text-slate-400 border-slate-600 bg-slate-800' :
 							 step === 'pay-pros'      ? 'text-amber-400 border-amber-700 bg-amber-950/40' :
 							                           'text-orange-400 border-orange-700 bg-orange-950/40'}">
-							{step === 'done' ? 'Complete' : step === 'seed' ? 'Not seeded' : step === 'pay-pros' ? 'Pros pending' : 'Managers pending'}
+							{step === 'done' ? 'Complete' : step === 'seed' ? 'Not seeded' : step === 'pay-pros' ? 'Pros pending' : step === 'pay-managers' ? 'Managers pending' : 'Franchises pending'}
 						</span>
 						{#if t.paymentCount > 0}
 						{#if t.mathOk}
@@ -258,6 +260,25 @@
 								Pay {t.pendingMgrCount} Managers
 							</button>
 						</form>
+					{:else if step === 'pay-franchises'}
+						<form method="POST" action="?/markFranchisesPaid" use:enhance={() => {
+							setLoading(tid, 'franchises');
+							return async ({ update }) => {
+								try {
+									await update();
+								} finally {
+									clearLoading(tid);
+									await invalidateAll();
+								}
+							};
+						}}>
+							<input type="hidden" name="tournamentId" value={tid} />
+							<button type="submit" disabled={!!busy}
+								class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-violet-600 hover:bg-violet-500 disabled:opacity-50 text-white text-xs font-semibold transition-colors">
+								{#if busy === 'franchises'}<Loader2 class="size-3.5 animate-spin" />{:else}<Building2 class="size-3.5" />{/if}
+								Pay {t.pendingFranchiseCount} Franchises
+							</button>
+						</form>
 					{/if}
 
 					{#if t.resultCount > 0}
@@ -296,6 +317,27 @@
 				</div>
 			{/if}
 
+			<!-- Team standings summary -->
+			{#if t.byFranchise?.length}
+				<div class="px-5 py-3 bg-slate-900/40 border-t border-slate-800">
+					<div class="flex items-center justify-between mb-2">
+						<p class="text-[10px] font-semibold text-slate-500 uppercase tracking-wide">Team Standings</p>
+						<span class="text-[10px] text-slate-500">{t.byFranchise.length} teams</span>
+					</div>
+					<div class="grid grid-cols-1 sm:grid-cols-3 gap-2">
+						{#each t.byFranchise.slice(0, 3) as group}
+							<div class="rounded-lg border border-slate-700 bg-slate-800/50 px-3 py-2 flex items-center justify-between">
+								<div class="flex items-center gap-2 min-w-0">
+									<span class="size-5 rounded bg-amber-900/60 border border-amber-700/50 flex items-center justify-center text-[9px] font-black text-amber-300 shrink-0">#{group.teamPlacement}</span>
+									<span class="text-xs font-semibold text-slate-200 truncate">{group.franchiseName}</span>
+								</div>
+								<div class="text-[10px] text-slate-500">Score {group.teamScore}</div>
+							</div>
+						{/each}
+					</div>
+				</div>
+			{/if}
+
 			<!-- Expanded detail -->
 			{#if isOpen && t.resultCount > 0}
 				<div class="divide-y divide-slate-800">
@@ -305,15 +347,19 @@
 						<span class="text-slate-500 uppercase tracking-wide font-semibold">Math Check</span>
 						<span class="text-slate-400">Pool: <span class="text-white font-semibold">{fmtFull(t.tournament.prizePool)}</span></span>
 						<ArrowRight class="size-3 text-slate-600" />
-						<span class="text-slate-400">Payments: <span class="{t.mathOk ? 'text-emerald-400' : 'text-red-400'} font-semibold">{fmtFull(t.paymentSum)}</span></span>
+						<span class="text-slate-400">Pro+Mgr: <span class="text-slate-300 font-semibold">{fmtFull(t.paymentSum)}</span></span>
 						<ArrowRight class="size-3 text-slate-600" />
-						<span class="text-slate-400">Diff: <span class="{t.mathOk ? 'text-emerald-400' : 'text-red-400'} font-semibold">{fmtFull(t.paymentSum - t.tournament.prizePool)}</span></span>
+						<span class="text-slate-400">Franchise: <span class="text-violet-300 font-semibold">{fmtFull(t.franchisePayoutSum)}</span></span>
+						<ArrowRight class="size-3 text-slate-600" />
+						<span class="text-slate-400">Settled: <span class="{t.mathOk ? 'text-emerald-400' : 'text-red-400'} font-semibold">{fmtFull(t.settledTotal)}</span></span>
+						<ArrowRight class="size-3 text-slate-600" />
+						<span class="text-slate-400">Diff: <span class="{t.mathOk ? 'text-emerald-400' : 'text-red-400'} font-semibold">{fmtFull(t.settledTotal - t.tournament.prizePool)}</span></span>
 						{#if t.wo}
 							<span class="ml-auto font-mono text-blue-400 text-[10px] border border-blue-800 rounded px-1.5 py-0.5">{t.wo.work_order_number}</span>
 						{/if}
 					</div>
 
-					<!-- Results by franchise -->
+					<!-- Team standings by franchise -->
 					{#each t.byFranchise as group}
 						{@const groupGross = group.rows.reduce((s: number, r: any) => s + (r.proEarnings || 0), 0)}
 						{@const groupMgr   = group.rows.reduce((s: number, r: any) => s + (r.managerEarnings || 0), 0)}
@@ -322,8 +368,10 @@
 							<!-- Franchise header -->
 							<div class="px-5 py-2 bg-slate-900/50 flex items-center justify-between">
 								<div class="flex items-center gap-2">
+									<span class="size-5 rounded bg-amber-900/60 border border-amber-700/50 flex items-center justify-center text-[9px] font-black text-amber-300">#{group.teamPlacement}</span>
 									<span class="size-5 rounded bg-purple-900/60 border border-purple-700/50 flex items-center justify-center text-[9px] font-black text-purple-300">{group.rows.length}</span>
 									<span class="text-xs font-bold text-purple-300">{group.franchiseName}</span>
+									<span class="text-[10px] text-slate-500">Score {group.teamScore}</span>
 								</div>
 								<div class="flex items-center gap-4 text-xs">
 									<span class="text-slate-500">Gross <span class="text-slate-300 font-semibold">{fmt(groupGross)}</span></span>
@@ -340,7 +388,6 @@
 												<td class="py-1.5 pl-5 pr-3 font-black w-10 {row.placement <= 3 ? 'text-amber-400' : 'text-slate-600'}">#{row.placement}</td>
 												<td class="py-1.5 pr-3">
 													<span class="text-slate-200 font-medium">{row.proName}</span>
-													<span class="text-slate-600 ml-1.5 text-[10px]">{row.division}</span>
 												</td>
 												<td class="py-1.5 pr-3 text-right text-slate-300">{fmtFull(row.proEarnings)}</td>
 												<td class="py-1.5 pr-3 text-right">
@@ -381,7 +428,6 @@
 											class="w-full flex items-center justify-between px-3 py-2 bg-slate-800/40 hover:bg-slate-800 transition-colors text-left">
 											<div class="flex items-center gap-2">
 												<span class="text-sm font-semibold text-slate-200">{pro.proName}</span>
-												<span class="text-[10px] text-slate-500">{pro.division}</span>
 												{#if pro.managerName}
 													<span class="text-[10px] text-amber-400 border border-amber-800 rounded px-1.5 py-0.5">{pro.managerName}</span>
 												{/if}

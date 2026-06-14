@@ -64,72 +64,104 @@ export const actions: Actions = {
 };
 
 async function upsertProfile(ctx: any, data: FormData, status: 'draft' | 'submitted') {
-	const bool = (key: string) => data.get(key) === 'true' || data.get(key) === 'on';
+	const existing = await ctx.pb.collection('player_profiles').getFullList({
+		filter: `userId = "${ctx.userId}"`
+	});
+	const current = existing[0] ?? null;
+
+	const currentStep = String(data.get('currentStep') ?? '');
+	const STEP_BOOLEAN_FIELDS: Record<string, string[]> = {
+		branding: ['comfortableWithInterviews', 'openToBehindScenes'],
+		sponsorship: ['openToNewSponsors', 'wantsLeagueSponsorHelp'],
+		management: ['hasAgent'],
+		integrity: ['participatedInBetting', 'understandsIntegrityPolicy', 'priorIntegrityViolations']
+	};
+
+	const bool = (key: string) => {
+		const values = data.getAll(key).map((v) => String(v).toLowerCase());
+		if (values.length > 0) {
+			return values.some((v) => v === 'true' || v === 'on' || v === '1');
+		}
+
+		if ((STEP_BOOLEAN_FIELDS[currentStep] ?? []).includes(key)) {
+			return false;
+		}
+
+		return current?.[key] ?? false;
+	};
+
+	const text = (key: string) => (data.has(key) ? String(data.get(key) ?? '') : (current?.[key] ?? ''));
+	const num = (key: string) => {
+		if (!data.has(key)) return current?.[key] ?? null;
+		const raw = String(data.get(key) ?? '').trim();
+		if (raw === '') return null;
+		const parsed = Number(raw);
+		return Number.isFinite(parsed) ? parsed : null;
+	};
 
 	const payload = {
 		userId: ctx.userId,
 		// Personal
-		fullName: data.get('fullName') ?? '',
-		dateOfBirth: data.get('dateOfBirth') ?? '',
-		nationality: data.get('nationality') ?? '',
-		countryOfResidence: data.get('countryOfResidence') ?? '',
-		primaryLanguages: data.get('primaryLanguages') ?? '',
-		phone: data.get('phone') ?? '',
-		email: data.get('email') ?? '',
-		mailingAddress: data.get('mailingAddress') ?? '',
-		emergencyContactName: data.get('emergencyContactName') ?? '',
-		emergencyContactRelationship: data.get('emergencyContactRelationship') ?? '',
-		emergencyContactPhone: data.get('emergencyContactPhone') ?? '',
-		emergencyContactEmail: data.get('emergencyContactEmail') ?? '',
+		fullName: text('fullName'),
+		dateOfBirth: text('dateOfBirth'),
+		nationality: text('nationality'),
+		countryOfResidence: text('countryOfResidence'),
+		primaryLanguages: text('primaryLanguages'),
+		phone: text('phone'),
+		email: text('email'),
+		mailingAddress: text('mailingAddress'),
+		emergencyContactName: text('emergencyContactName'),
+		emergencyContactRelationship: text('emergencyContactRelationship'),
+		emergencyContactPhone: text('emergencyContactPhone'),
+		emergencyContactEmail: text('emergencyContactEmail'),
 		// Competitive
-		worldRanking: Number(data.get('worldRanking')) || null,
-		yearsCompeting: Number(data.get('yearsCompeting')) || null,
-		majorTournamentWins: data.get('majorTournamentWins') ?? '',
-		notableAchievements: data.get('notableAchievements') ?? '',
-		otherLeagues: data.get('otherLeagues') ?? '',
-		playingStyle: data.get('playingStyle') ?? '',
-		strongestSkills: data.get('strongestSkills') ?? '',
-		knownInjuries: data.get('knownInjuries') ?? '',
+		worldRanking: num('worldRanking'),
+		yearsCompeting: num('yearsCompeting'),
+		majorTournamentWins: text('majorTournamentWins'),
+		notableAchievements: text('notableAchievements'),
+		otherLeagues: text('otherLeagues'),
+		playingStyle: text('playingStyle'),
+		strongestSkills: text('strongestSkills'),
+		knownInjuries: text('knownInjuries'),
 		// Branding
-		broadcastNickname: data.get('broadcastNickname') ?? '',
-		instagram: data.get('instagram') ?? '',
-		twitter: data.get('twitter') ?? '',
-		youtube: data.get('youtube') ?? '',
-		otherSocialMedia: data.get('otherSocialMedia') ?? '',
-		personalWebsite: data.get('personalWebsite') ?? '',
-		mediaFeatures: data.get('mediaFeatures') ?? '',
+		broadcastNickname: text('broadcastNickname'),
+		instagram: text('instagram'),
+		twitter: text('twitter'),
+		youtube: text('youtube'),
+		otherSocialMedia: text('otherSocialMedia'),
+		personalWebsite: text('personalWebsite'),
+		mediaFeatures: text('mediaFeatures'),
 		comfortableWithInterviews: bool('comfortableWithInterviews'),
 		openToBehindScenes: bool('openToBehindScenes'),
 		// Sponsorship
-		currentSponsorships: data.get('currentSponsorships') ?? '',
+		currentSponsorships: text('currentSponsorships'),
 		openToNewSponsors: bool('openToNewSponsors'),
 		wantsLeagueSponsorHelp: bool('wantsLeagueSponsorHelp'),
-		personalBrandingGoals: data.get('personalBrandingGoals') ?? '',
+		personalBrandingGoals: text('personalBrandingGoals'),
 		// Management
 		hasAgent: bool('hasAgent'),
-		repName: data.get('repName') ?? '',
-		repAgency: data.get('repAgency') ?? '',
-		repPosition: data.get('repPosition') ?? '',
-		repPhone: data.get('repPhone') ?? '',
-		repEmail: data.get('repEmail') ?? '',
+		repName: text('repName'),
+		repAgency: text('repAgency'),
+		repPosition: text('repPosition'),
+		repPhone: text('repPhone'),
+		repEmail: text('repEmail'),
 		// Integrity
 		participatedInBetting: bool('participatedInBetting'),
 		understandsIntegrityPolicy: bool('understandsIntegrityPolicy'),
 		priorIntegrityViolations: bool('priorIntegrityViolations'),
-		integrityViolationDetails: data.get('integrityViolationDetails') ?? '',
+		integrityViolationDetails: text('integrityViolationDetails'),
 		// Additional
-		excitementAboutLeague: data.get('excitementAboutLeague') ?? '',
-		careerGoals: data.get('careerGoals') ?? '',
-		additionalInfo: data.get('additionalInfo') ?? '',
+		excitementAboutLeague: text('excitementAboutLeague'),
+		careerGoals: text('careerGoals'),
+		additionalInfo: text('additionalInfo'),
 		status,
-		submittedAt: status === 'submitted' ? new Date().toISOString() : null
+		submittedAt:
+			status === 'submitted'
+				? new Date().toISOString()
+				: (current?.submittedAt ?? null)
 	};
 
 	try {
-		const existing = await ctx.pb.collection('player_profiles').getFullList({
-			filter: `userId = "${ctx.userId}"`
-		});
-
 		if (existing.length > 0) {
 			await ctx.pb.collection('player_profiles').update(existing[0].id, payload);
 		} else {

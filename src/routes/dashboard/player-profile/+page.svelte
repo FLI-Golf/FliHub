@@ -88,6 +88,7 @@
 	</div>
 
 	<form method="POST" use:enhance class="space-y-6">
+		<input type="hidden" name="currentStep" value={steps[currentStep].id} />
 
 		<!-- ── Step 0: Personal Information ─────────────────────────────── -->
 		{#if currentStep === 0}
