@@ -533,6 +533,9 @@ export const actions: Actions = {
 
 		const woNumber   = wo?.work_order_number ?? '';
 		const today      = new Date().toISOString().slice(0, 10);
+		const totalAmount = payments.reduce((sum: number, p: any) => sum + (p.amount ?? 0), 0);
+		const proCount = payments.filter((p: any) => p.recipient === 'pro').length;
+		const mgrCount = payments.filter((p: any) => p.recipient === 'manager').length;
 
 		// Resolve user_profile id for requestedBy (approvals relation points to user_profiles)
 		const userId = locals.pb.authStore.record?.id ?? '';
@@ -551,129 +554,84 @@ export const actions: Actions = {
 			submittedBy = admins[0]?.id;
 		}
 
-		const createdExpenseIds: string[] = [];
+		const proNames = Array.from(new Set(
+			payments.map((p: any) => p.expand?.pro?.name ?? p.pro).filter(Boolean)
+		)).slice(0, 6);
+		const transactionManifest = payments.map((p: any, index: number) => {
+			const proName = p.expand?.pro?.name ?? p.pro ?? 'Unknown';
+			const method = p.paymentMethod || 'n/a';
+			const reference = p.transactionId || 'n/a';
+			const recipient = p.recipient || 'n/a';
+			const amount = Number(p.amount ?? 0).toFixed(2);
+			return `${index + 1}. ${proName} | ${recipient} | ${method} | ref ${reference} | $${amount}`;
+		}).join(' ; ');
+		const category = 'Expenses/MPO (Male)';
+		const description = `${tournament.name} tournament payout batch`;
+		const notes = [
+			`Tournament: ${tournament.name}`,
+			`Work order: ${woNumber || 'pending'}`,
+			`Payments: ${payments.length} (${proCount} pros, ${mgrCount} managers)`,
+			`Pro sample: ${proNames.join(', ') || 'n/a'}`,
+			`Payment IDs: ${payments.map((p: any) => p.id).join(', ')}`,
+			`Transaction manifest: ${transactionManifest || 'n/a'}`,
+		].join(' | ');
 
-		for (const p of payments) {
-			// Skip if expense already exists for this payment
-			const existing = await pb.collection('expenses')
-				.getFirstListItem(`work_order_number = '${woNumber}' && description ~ '${p.id}'`)
-				.catch(() => null);
-			if (existing) continue;
+		const existingExpenses = await pb.collection('expenses').getFullList({
+			filter: woNumber
+				? `work_order_number = '${woNumber}'`
+				: `sourceType = 'tournament_payout' && sourceId = '${params.id}'`,
+		}).catch(() => [] as any[]);
 
-			const proName    = p.expand?.pro?.name ?? p.pro;
-			const gender     = p.expand?.pro?.gender ?? 'male';
-			const isMgr      = p.recipient === 'manager';
-			const category   = isMgr
-				? (gender === 'female' ? 'Expenses/FPO (Female)' : 'Expenses/MPO (Male)')
-				: (gender === 'female' ? 'Expenses/FPO (Female)' : 'Expenses/MPO (Male)');
+		const canonicalExpense = existingExpenses.find((expense: any) => expense.sourceType === 'tournament_payout' && expense.sourceId === params.id) ?? existingExpenses[0] ?? null;
+		const staleExpenses = canonicalExpense
+			? existingExpenses.filter((expense: any) => expense.id !== canonicalExpense.id)
+			: existingExpenses;
+		const targetExpenseIds = new Set<string>([...existingExpenses.map((expense: any) => expense.id)]);
 
-			const description = isMgr
-				? `Manager cut — ${p.managerName || 'Manager'} (${p.managerCutPercentage}%) for ${proName} — ${tournament.name}`
-				: `Player payment — ${proName} — ${tournament.name}`;
-
-			const expense = await pb.collection('expenses').create({
-				description,
-				amount:      p.amount,
-				category,
-				status:      'submitted',
-				date:        today,
-				notes:       `Payment ID: ${p.id} | Tournament: ${tournament.name} | Recipient: ${p.recipient} | ${p.description ?? ''}`,
-				work_order_number: woNumber,
-				...(submittedBy ? { submittedBy } : {}),
-			});
-			createdExpenseIds.push(expense.id);
-
-			// Create approval record
-			await pb.collection('approvals').create({
-				entityType:    'expense',
-				entityId:      expense.id,
-				expenseId:     expense.id,
-				status:        'pending',
-				requestedDate: today,
-				amount:        p.amount,
-				...(submittedBy ? { requestedBy: submittedBy } : {}),
-			}).catch(() => null);
-		}
-
-		return { success: true, created: createdExpenseIds.length };
-	},
-
-	setManagerCut: async ({ request, locals, params }) => {
-		const pb  = locals.pb;
-		const fd  = await request.formData();
-		const proId     = fd.get('proId') as string;
-		const resultId  = fd.get('resultId') as string;
-		const cutPct    = parseFloat(fd.get('cutPct') as string ?? '0');
-
-		if (!proId || !resultId) return fail(400, { error: 'Missing proId or resultId' });
-
-		// Update the pro record with the manager cut %
-		await pb.collection('talent').update(proId, { managerCutPercentage: cutPct }).catch(() => null);
-
-		// Recalculate earnings from the result
-		const result = await pb.collection('tournament_results').getOne(resultId);
-		const gross  = result.proEarnings ?? 0;
-		const mgrAmt = cutPct > 0 ? Math.round(gross * cutPct) / 100 : 0;
-		const proNet = gross - mgrAmt;
-
-		// Update the result record
-		await pb.collection('tournament_results').update(resultId, {
-			managerCutPercentage: cutPct,
-			managerEarnings:      mgrAmt,
-			netProEarnings:       proNet,
+		const allApprovals = targetExpenseIds.size > 0
+			? await pb.collection('approvals').getFullList({ filter: `entityType = 'expense'` }).catch(() => [] as any[])
+			: [] as any[];
+		const approvalsToDelete = allApprovals.filter((approval: any) => {
+			const entityId = String(approval.entityId ?? '');
+			const expenseId = String(approval.expenseId ?? '');
+			return targetExpenseIds.has(entityId) || targetExpenseIds.has(expenseId);
 		});
 
-		// Update the pro_payment record for this result
-		const proPayment = await pb.collection('pro_payments')
-			.getFirstListItem(`tournamentResult = '${resultId}' && recipient = 'pro'`)
-			.catch(() => null);
-		if (proPayment) {
-			await pb.collection('pro_payments').update(proPayment.id, {
-				amount:               proNet,
-				netProAmount:         proNet,
-				managerCutPercentage: cutPct,
-			});
-		}
+		await Promise.all([
+			...staleExpenses.map((expense: any) => pb.collection('expenses').delete(expense.id).catch(() => null)),
+			...approvalsToDelete.map((approval: any) => pb.collection('approvals').delete(approval.id).catch(() => null)),
+		]);
 
-		// Update or create manager payment record
-		const mgrPayment = await pb.collection('pro_payments')
-			.getFirstListItem(`tournamentResult = '${resultId}' && recipient = 'manager'`)
-			.catch(() => null);
+		const expensePayload = {
+			title: `Tournament Payouts — ${tournament.name}`,
+			description,
+			amount: totalAmount,
+			status: 'submitted',
+			date: today,
+			category,
+			notes,
+			work_order_number: woNumber,
+			sourceType: 'tournament_payout',
+			sourceId: params.id,
+			...(submittedBy ? { submittedBy } : {}),
+		};
 
-		if (cutPct > 0 && mgrAmt > 0) {
-			const tournament = await pb.collection('tournaments').getOne(params.id);
-			const pro        = await pb.collection('talent').getOne(proId);
-			if (mgrPayment) {
-				await pb.collection('pro_payments').update(mgrPayment.id, {
-					amount:               mgrAmt,
-					managerAmount:        mgrAmt,
-					managerCutPercentage: cutPct,
-					managerName:          pro.managerName ?? '',
-					managerEmail:         pro.managerEmail ?? '',
-				});
-			} else {
-				await pb.collection('pro_payments').create({
-					tournament:           params.id,
-					pro:                  proId,
-					tournamentResult:     resultId,
-					paymentType:          'tournament',
-					recipient:            'manager',
-					amount:               mgrAmt,
-					managerAmount:        mgrAmt,
-					grossAmount:          gross,
-					managerCutPercentage: cutPct,
-					managerName:          pro.managerName ?? '',
-					managerEmail:         pro.managerEmail ?? '',
-					status:               'pending',
-					description:          `Manager cut (${cutPct}%) — ${pro.name} — ${tournament.name}`,
-				});
-			}
-		} else if (mgrPayment) {
-			// Cut set to 0 — remove manager payment
-			await pb.collection('pro_payments').delete(mgrPayment.id).catch(() => null);
-		}
+		const expense = canonicalExpense
+			? await pb.collection('expenses').update(canonicalExpense.id, expensePayload)
+			: await pb.collection('expenses').create(expensePayload);
 
-		return { success: true };
+		await pb.collection('approvals').create({
+			entityType: 'expense',
+			entityId: expense.id,
+			expenseId: expense.id,
+			status: 'pending',
+			requestedDate: new Date().toISOString(),
+			amount: totalAmount,
+			comments: `<p>${tournament.name} payout batch submitted for approval.</p><p>${transactionManifest || 'n/a'}</p>`,
+			...(submittedBy ? { requestedBy: submittedBy } : {}),
+		}).catch(() => null);
+
+		return { success: true, created: 1, expenseId: expense.id, approvalCount: 1, removedExpenses: staleExpenses.length, removedApprovals: approvalsToDelete.length };
 	},
 
 	generateWorkOrder: async ({ locals, params }) => {
@@ -690,6 +648,14 @@ export const actions: Actions = {
 		// Total = sum of all pro payments (pros + managers)
 		const totalAmount = payments.reduce((s: number, p: any) => s + (p.amount ?? 0), 0);
 		const paymentIds  = payments.map((p: any) => p.id);
+		const transactionManifest = payments.map((p: any, index: number) => {
+			const proName = p.expand?.pro?.name ?? p.pro ?? 'Unknown';
+			const method = p.paymentMethod || 'n/a';
+			const reference = p.transactionId || 'n/a';
+			const recipient = p.recipient || 'n/a';
+			const amount = Number(p.amount ?? 0).toFixed(2);
+			return `${index + 1}. ${proName} | ${recipient} | ${method} | ref ${reference} | $${amount}`;
+		}).join(' ; ');
 
 		const dateStr   = new Date().toISOString().slice(0, 10).replace(/-/g, '');
 		const woNumber  = `WO-TOUR-${params.id.slice(-6).toUpperCase()}-${dateStr}`;
@@ -704,7 +670,8 @@ export const actions: Actions = {
 			await pb.collection('work_orders').update(existing.id, {
 				proPayment: paymentIds,
 				amount:     totalAmount,
-				notes:      `${payments.length} payment records · updated ${new Date().toISOString().slice(0, 10)}`,
+				notes:      `${payments.length} payment records · updated ${new Date().toISOString().slice(0, 10)} · ${transactionManifest || 'n/a'}`,
+				qb_notes:   `FLI Golf ${tournament.name} — ${payments.length} payments. Manifest: ${transactionManifest || 'n/a'}`,
 			});
 			return { success: true, workOrderId: existing.id, updated: true };
 		}
@@ -721,9 +688,9 @@ export const actions: Actions = {
 			description:       `Tournament player payouts — ${tournament.name}`,
 			amount:            totalAmount,
 			proPayment:        paymentIds,
-			notes:             `${payments.length} payment records (${proCount} pros, ${mgrCount} managers) · generated ${new Date().toISOString().slice(0, 10)}`,
+			notes:             `${payments.length} payment records (${proCount} pros, ${mgrCount} managers) · generated ${new Date().toISOString().slice(0, 10)} · ${transactionManifest || 'n/a'}`,
 			qb_account:        'Player Payouts',
-			qb_notes:          `FLI Golf ${tournament.name} — ${proCount} pro payments + ${mgrCount} manager cuts. Total: $${totalAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}.`,
+			qb_notes:          `FLI Golf ${tournament.name} — ${proCount} pro payments + ${mgrCount} manager cuts. Total: $${totalAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}. Manifest: ${transactionManifest || 'n/a'}`,
 		});
 
 		return { success: true, workOrderId: wo.id, updated: false };

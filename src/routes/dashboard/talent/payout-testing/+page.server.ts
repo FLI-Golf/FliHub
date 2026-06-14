@@ -59,6 +59,16 @@ const MANAGER_DATA = [
 
 type ResultRow = { pro: { id: string; name: string }; franchise: string; placement: number };
 
+function splitAmountAcrossMembers(totalAmount: number, memberCount: number): number[] {
+	if (memberCount <= 0) return [];
+	const totalCents = Math.round(totalAmount * 100);
+	const baseCents = Math.floor(totalCents / memberCount);
+	let remainder = totalCents - baseCents * memberCount;
+	const out = new Array<number>(memberCount).fill(baseCents);
+	for (let i = 0; i < out.length && remainder > 0; i += 1, remainder -= 1) out[i] += 1;
+	return out.map((cents) => cents / 100);
+}
+
 const RESULTS_BY_TOURNAMENT: Record<string, { men: ResultRow[]; women: ResultRow[] }> = {
 	'2najeglkb5rq5av': {
 		men: [
@@ -289,32 +299,61 @@ function calcPayouts(divisionPurse: number, numPlacements = 12): number[] {
 	return pcts.map(pct => (divisionPurse * pct) / 100);
 }
 
+function clampPercent(value: number): number {
+	if (!Number.isFinite(value)) return 0;
+	return Math.max(0, Math.min(100, value));
+}
+
+async function getTournamentFranchiseCutPercentage(pb: any, tournament: any): Promise<number> {
+	let seasonRecord: any = null;
+	if (tournament.seasonRef) {
+		seasonRecord = await pb.collection('seasons').getOne(tournament.seasonRef).catch(() => null);
+	}
+	if (!seasonRecord && tournament.season) {
+		seasonRecord = await pb
+			.collection('seasons')
+			.getFirstListItem(`year = ${Number(tournament.season)}`)
+			.catch(() => null);
+	}
+
+	return clampPercent(Number(seasonRecord?.franchiseCutPercentage ?? tournament.franchiseCutPercentage ?? 0));
+}
+
 // ─── Load ─────────────────────────────────────────────────────────────────────
 
 export const load: PageServerLoad = async () => {
 	const pb = await getAdminPocketBase();
 
 	const safeGetPayments = async () => {
-		try {
-			return await pb.collection('pro_payments').getFullList({ sort: '-created', expand: 'pro' });
-		} catch (expandErr) {
-			try {
-				return await pb.collection('pro_payments').getFullList({ sort: '-created' });
-			} catch (sdkErr) {
-				console.error('[payout-testing][payments-sdk-error]', {
-					expandErr: (expandErr as any)?.message ?? expandErr,
-					sdkErr: (sdkErr as any)?.message ?? sdkErr,
-				});
-				return [] as any[];
+		const rawPayments = await adminFetch('pro_payments', {
+			perPage: 2000,
+			fields: 'id,pro,tournament,tournamentResult,recipient,amount,status,created',
+			sort: '-created',
+		}).catch(() => null as any[] | null);
+
+		if (Array.isArray(rawPayments)) {
+			if (rawPayments.length > 0) {
+				console.log('[payout-testing][payments-raw-fallback]', { count: rawPayments.length });
 			}
+			return rawPayments;
+		}
+
+		try {
+			return await pb.collection('pro_payments').getFullList({ sort: '-created' });
+		} catch (sdkErr) {
+			console.error('[payout-testing][payments-sdk-error]', {
+				sdkErr: (sdkErr as any)?.message ?? sdkErr,
+			});
+			return [] as any[];
 		}
 	};
 
-	const [tournaments, allResults, workOrders, auditLogs] = await Promise.all([
+	const [tournaments, allResults, workOrders, auditLogs, allFranchisePayouts] = await Promise.all([
 		pb.collection('tournaments').getFullList({ sort: 'tournamentNumber' }),
 		pb.collection('tournament_results').getFullList({ sort: 'placement', expand: 'pro,franchise' }).catch(() => [] as any[]),
 		pb.collection('work_orders').getFullList({ filter: `source = 'pro_payment'`, sort: '-created' }).catch(() => [] as any[]),
 		pb.collection('payment_audit_log').getFullList({ sort: 'changedAt' }).catch(() => [] as any[]),
+		pb.collection('franchise_payouts').getFullList({ sort: '-created', expand: 'franchise' }).catch(() => [] as any[]),
 	]);
 
 	let allPayments = await safeGetPayments();
@@ -342,12 +381,12 @@ export const load: PageServerLoad = async () => {
 		}).catch(() => [] as any[]);
 		if (rawPayments.length > 0) {
 			allPayments = rawPayments;
-			console.log('[payout-testing][payments-raw-fallback]', { count: rawPayments.length });
 		}
 	}
 
 	const byTournament = await Promise.all(tournaments.map(async (t: any) => {
 		const results     = allResults.filter((r: any) => r.tournament === t.id);
+		const franchisePayouts = allFranchisePayouts.filter((p: any) => p.tournament === t.id);
 		const resultIds   = new Set(results.map((r: any) => r.id));
 		let payments      = allPayments.filter((p: any) => {
 			const tournamentRef = getRelId(p.tournament);
@@ -382,7 +421,15 @@ export const load: PageServerLoad = async () => {
 		const totalPaid   = payments.filter((p: any) => p.status === 'paid').reduce((s: number, p: any) => s + (p.amount ?? 0), 0);
 		const totalPending = payments.filter((p: any) => p.status === 'pending').reduce((s: number, p: any) => s + (p.amount ?? 0), 0);
 		const paymentSum  = payments.reduce((s: number, p: any) => s + (p.amount ?? 0), 0);
-		const mathOk      = payments.length > 0 && Math.abs(paymentSum - (t.prizePool ?? 0)) < 1;
+		const franchisePayoutSum = franchisePayouts.reduce((s: number, p: any) => s + (p.totalEarnings ?? 0), 0);
+		const franchisePending = franchisePayouts
+			.filter((p: any) => p.status === 'pending')
+			.reduce((s: number, p: any) => s + (p.totalEarnings ?? 0), 0);
+		const franchisePaid = franchisePayouts
+			.filter((p: any) => p.status === 'paid')
+			.reduce((s: number, p: any) => s + (p.totalEarnings ?? 0), 0);
+		const settledTotal = paymentSum + franchisePayoutSum;
+		const mathOk = (payments.length > 0 || franchisePayouts.length > 0) && Math.abs(settledTotal - (t.prizePool ?? 0)) < 1;
 
 		// Build per-pro breakdown keyed by resultId (not proId) so multi-result pros work
 		const proBreakdown: any[] = [];
@@ -414,22 +461,49 @@ export const load: PageServerLoad = async () => {
 			}
 			franchiseMap.get(row.franchiseId)!.rows.push(row);
 		}
-		const byFranchise = Array.from(franchiseMap.values()).sort((a, b) => {
-			const aTotal = a.rows.reduce((s, r) => s + (r.proEarnings || 0), 0);
-			const bTotal = b.rows.reduce((s, r) => s + (r.proEarnings || 0), 0);
-			return bTotal - aTotal;
-		});
+		const byFranchise = Array.from(franchiseMap.values())
+			.map((group) => {
+				const placements = group.rows.map((r: any) => Number(r.placement ?? 999));
+				const teamScore = placements.reduce((sum, p) => sum + p, 0);
+				const bestPlacement = Math.min(...placements);
+				const teamGross = group.rows.reduce((s: number, r: any) => s + (r.proEarnings || 0), 0);
+				return {
+					...group,
+					teamScore,
+					bestPlacement,
+					teamGross,
+				};
+			})
+			.sort((a, b) => {
+				if (a.teamScore !== b.teamScore) return a.teamScore - b.teamScore;
+				if (a.bestPlacement !== b.bestPlacement) return a.bestPlacement - b.bestPlacement;
+				return b.teamGross - a.teamGross;
+			})
+			.map((group, idx) => ({
+				...group,
+				teamPlacement: idx + 1,
+			}));
 
 		return {
 			tournament: t,
 			results, payments, proPayments, mgrPayments,
+			franchisePayouts,
 			proBreakdown,
 			byFranchise,
-			wo, totalPaid, totalPending, paymentSum, mathOk,
+			wo,
+			totalPaid,
+			totalPending,
+			paymentSum,
+			franchisePayoutSum,
+			franchisePending,
+			franchisePaid,
+			settledTotal,
+			mathOk,
 			resultCount: results.length,
 			paymentCount: payments.length,
 			pendingProCount: proPayments.filter((p: any) => p.status === 'pending').length,
 			pendingMgrCount: mgrPayments.filter((p: any) => p.status === 'pending').length,
+			pendingFranchiseCount: franchisePayouts.filter((p: any) => p.status === 'pending').length,
 			paidProCount: proPayments.filter((p: any) => p.status === 'paid').length,
 			paidMgrCount: mgrPayments.filter((p: any) => p.status === 'paid').length,
 		};
@@ -458,8 +532,11 @@ const uniquePayments = Array.from(new Map(allLoadedPayments.map((p: any) => [p.i
 	const seasonSummary = {
 		totalPrizePool:      tournaments.reduce((s: number, t: any) => s + (t.prizePool ?? 0), 0),
 		totalPayments:       uniquePayments.reduce((s: number, p: any) => s + (p.amount ?? 0), 0),
+		totalFranchisePayouts: allFranchisePayouts.reduce((s: number, p: any) => s + (p.totalEarnings ?? 0), 0),
 		totalPaid:           uniquePayments.filter((p: any) => p.status === 'paid').reduce((s: number, p: any) => s + (p.amount ?? 0), 0),
 		totalPending:        uniquePayments.filter((p: any) => p.status === 'pending').reduce((s: number, p: any) => s + (p.amount ?? 0), 0),
+		franchisePaidTotal: allFranchisePayouts.filter((p: any) => p.status === 'paid').reduce((s: number, p: any) => s + (p.totalEarnings ?? 0), 0),
+		franchisePendingTotal: allFranchisePayouts.filter((p: any) => p.status === 'pending').reduce((s: number, p: any) => s + (p.totalEarnings ?? 0), 0),
 		proPaymentTotal:     uniquePayments.filter((p: any) => p.recipient === 'pro').reduce((s: number, p: any) => s + (p.amount ?? 0), 0),
 		managerPaymentTotal: uniquePayments.filter((p: any) => p.recipient === 'manager').reduce((s: number, p: any) => s + (p.amount ?? 0), 0),
 		paymentRecords:      uniquePayments.length,
@@ -482,10 +559,11 @@ const uniquePayments = Array.from(new Map(allLoadedPayments.map((p: any) => [p.i
 // ─── Actions ──────────────────────────────────────────────────────────────────
 
 async function resetTournamentData(pb: any, tournamentId: string) {
-	const [results, directPayments, wos] = await Promise.all([
+	const [results, directPayments, wos, franchisePayouts] = await Promise.all([
 		pb.collection('tournament_results').getFullList({ filter: `tournament = '${tournamentId}'` }).catch(() => [] as any[]),
 		pb.collection('pro_payments').getFullList({ filter: `tournament = '${tournamentId}'` }).catch(() => [] as any[]),
 		pb.collection('work_orders').getFullList({ filter: `projectId = '${tournamentId}' && source = 'pro_payment'` }).catch(() => [] as any[]),
+		pb.collection('franchise_payouts').getFullList({ filter: `tournament = '${tournamentId}'` }).catch(() => [] as any[]),
 	]);
 
 	const resultIdSet = new Set(results.map((r: any) => r.id));
@@ -516,6 +594,7 @@ async function resetTournamentData(pb: any, tournamentId: string) {
 	await Promise.all([
 		...Array.from(paymentsById.values()).map((p: any) => pb.collection('pro_payments').delete(p.id).catch(() => null)),
 		...wos.map((w: any) => pb.collection('work_orders').delete(w.id).catch(() => null)),
+		...franchisePayouts.map((fp: any) => pb.collection('franchise_payouts').delete(fp.id).catch(() => null)),
 		...auditRowsToDelete.map((a: any) => pb.collection('payment_audit_log').delete(a.id).catch(() => null)),
 	]);
 	await Promise.all(results.map((r: any) => pb.collection('tournament_results').delete(r.id).catch(() => null)));
@@ -524,6 +603,7 @@ async function resetTournamentData(pb: any, tournamentId: string) {
 	return {
 		deletedResults: results.length,
 		deletedPayments: paymentsById.size,
+		deletedFranchisePayouts: franchisePayouts.length,
 		deletedWorkOrders: wos.length,
 		deletedAuditLogs: auditRowsToDelete.length,
 	};
@@ -625,13 +705,15 @@ export const actions: Actions = {
 
 		const tournament = await pb.collection('tournaments').getOne(tournamentId).catch(() => null);
 		if (!tournament) return fail(404, { error: 'Tournament not found' });
+		const franchiseCutPercentage = await getTournamentFranchiseCutPercentage(pb, tournament);
 
 		const resultDefs = getResultDefinitions(tournament);
 		if (!resultDefs) return fail(400, { error: 'No result definitions for this tournament' });
 
-		const [existingResults, existingPayments] = await Promise.all([
+		const [existingResults, existingPayments, existingFranchisePayouts] = await Promise.all([
 			pb.collection('tournament_results').getFullList({ filter: `tournament = '${tournamentId}'`, fields: 'id' }).catch(() => [] as any[]),
 			pb.collection('pro_payments').getFullList({ filter: `tournament = '${tournamentId}'`, fields: 'id' }).catch(() => [] as any[]),
+			pb.collection('franchise_payouts').getFullList({ filter: `tournament = '${tournamentId}'`, fields: 'id' }).catch(() => [] as any[]),
 		]);
 		const resultIdSet = new Set(existingResults.map((r: any) => r.id));
 		const linkedPayments = existingResults.length
@@ -645,9 +727,10 @@ export const actions: Actions = {
 
 		// Always wipe any partial seed data (results + payments) before re-seeding.
 		// This recovers from previously failed runs that left orphaned records.
-		if (existingResults.length > 0 || allExistingPayments.size > 0) {
+		if (existingResults.length > 0 || allExistingPayments.size > 0 || existingFranchisePayouts.length > 0) {
 			await Promise.all([
 				...Array.from(allExistingPayments.values()).map((p: any) => pb.collection('pro_payments').delete(p.id).catch(() => null)),
+				...existingFranchisePayouts.map((fp: any) => pb.collection('franchise_payouts').delete(fp.id).catch(() => null)),
 			]);
 			await Promise.all(existingResults.map((r: any) => pb.collection('tournament_results').delete(r.id).catch(() => null)));
 		}
@@ -677,17 +760,17 @@ export const actions: Actions = {
 			.map((r) => {
 				const resolvedProId = resolveSeedProId(r.pro);
 				if (!resolvedProId) return null;
-				return { ...r, resolvedProId };
+				return { ...r, resolvedProId, seedDivision: 'mens' as const };
 			})
-			.filter(Boolean) as Array<ResultRow & { resolvedProId: string }>;
+			.filter(Boolean) as Array<ResultRow & { resolvedProId: string; seedDivision: 'mens' }>;
 
 		const womenRowsResolved = resultDefs.women
 			.map((r) => {
 				const resolvedProId = resolveSeedProId(r.pro);
 				if (!resolvedProId) return null;
-				return { ...r, resolvedProId };
+				return { ...r, resolvedProId, seedDivision: 'womens' as const };
 			})
-			.filter(Boolean) as Array<ResultRow & { resolvedProId: string }>;
+			.filter(Boolean) as Array<ResultRow & { resolvedProId: string; seedDivision: 'womens' }>;
 
 		if (menRowsResolved.length === 0 || womenRowsResolved.length === 0) {
 			return fail(400, {
@@ -714,28 +797,51 @@ export const actions: Actions = {
 			mgrMap[resolvedProId] = m;
 		}
 
-		const prizePool   = tournament.prizePool ?? 500000;
-		const divPurse    = prizePool / 2;
-		const menPayouts   = calcPayouts(divPurse, menRowsResolved.length);
-		const womenPayouts = calcPayouts(divPurse, womenRowsResolved.length);
+		const prizePool = tournament.prizePool ?? 500000;
+		const franchiseCutAmount = prizePool * (franchiseCutPercentage / 100);
+		const proPool = prizePool - franchiseCutAmount;
+		const allSeedRows = [...menRowsResolved, ...womenRowsResolved];
+		const franchiseMap = new Map<
+			string,
+			{ franchise: string; rows: Array<ResultRow & { resolvedProId: string; seedDivision: 'mens' | 'womens' }>; totalPlacement: number; bestPlacement: number }
+		>();
 
-		const assignPayoutsByRankOrder = (
-			rows: Array<ResultRow & { resolvedProId: string }>,
-			payouts: number[],
-			division: 'MPO' | 'FPO'
-		) => {
-			const rankedRows = [...rows].sort((a, b) => a.placement - b.placement);
-			return rankedRows.map((row, index) => ({
+		for (const row of allSeedRows) {
+			if (!franchiseMap.has(row.franchise)) {
+				franchiseMap.set(row.franchise, {
+					franchise: row.franchise,
+					rows: [],
+					totalPlacement: 0,
+					bestPlacement: Number.POSITIVE_INFINITY,
+				});
+			}
+			const entry = franchiseMap.get(row.franchise)!;
+			entry.rows.push(row);
+			entry.totalPlacement += row.placement;
+			entry.bestPlacement = Math.min(entry.bestPlacement, row.placement);
+		}
+
+		const teamStandings = Array.from(franchiseMap.values()).sort((a, b) => {
+			if (a.totalPlacement !== b.totalPlacement) return a.totalPlacement - b.totalPlacement;
+			return a.bestPlacement - b.bestPlacement;
+		});
+
+		const teamProPayouts = calcPayouts(proPool, teamStandings.length);
+		const teamFranchisePayouts = calcPayouts(franchiseCutAmount, teamStandings.length);
+		const allRows = teamStandings.flatMap((team, index) => {
+			const teamPlacement = index + 1;
+			const teamProPayout = teamProPayouts[index] ?? 0;
+			const teamFranchisePayout = teamFranchisePayouts[index] ?? 0;
+			const sortedRows = [...team.rows].sort((a, b) => a.placement - b.placement);
+			const perMemberPro = splitAmountAcrossMembers(teamProPayout, sortedRows.length);
+			const perMemberFranchise = splitAmountAcrossMembers(teamFranchisePayout, sortedRows.length);
+			return sortedRows.map((row, rowIdx) => ({
 				...row,
-				division,
-				payoutAmount: payouts[index] ?? 0,
+				teamPlacement,
+				proPayoutAmount: perMemberPro[rowIdx] ?? 0,
+				franchisePayoutAmount: perMemberFranchise[rowIdx] ?? 0,
 			}));
-		};
-
-		const allRows = [
-			...assignPayoutsByRankOrder(menRowsResolved, menPayouts, 'MPO'),
-			...assignPayoutsByRankOrder(womenRowsResolved, womenPayouts, 'FPO'),
-		];
+		});
 
 		const createdPaymentIds: string[] = [];
 		let totalPaymentAmount = 0;
@@ -743,12 +849,13 @@ export const actions: Actions = {
 		for (const row of allRows) {
 			const proId = row.resolvedProId;
 			const franchiseId = validFranchiseIds.has(row.franchise) ? row.franchise : undefined;
-			const gross     = row.payoutAmount ?? 0;
+			const gross     = row.proPayoutAmount ?? 0;
+			const franchiseEarnings = row.franchisePayoutAmount ?? 0;
 			const mgr       = mgrMap[proId];
 			const mgrCutPct = mgr?.managerCutPercentage ?? 0;
 			const mgrAmount = mgr ? Math.round(gross * mgrCutPct) / 100 : 0;
 			const proNet    = gross - mgrAmount;
-			const division  = row.division === 'MPO' ? 'mens' : 'womens';
+			const division = row.seedDivision;
 
 			let result: any;
 			try {
@@ -758,13 +865,13 @@ export const actions: Actions = {
 					franchise:            franchiseId,
 					division,
 					placement:            row.placement,
-					earnings:             gross,
-					franchiseEarnings:    0,
+					earnings:             gross + franchiseEarnings,
+					franchiseEarnings:    franchiseEarnings,
 					proEarnings:          gross,
 					managerEarnings:      mgrAmount,
 					netProEarnings:       proNet,
 					managerCutPercentage: mgrCutPct,
-					notes:                `${row.division} | ${row.pro.name}${mgr ? ` | mgr: ${mgr.managerName}` : ''}`,
+					notes:                `Team #${row.teamPlacement} | ${row.pro.name}${mgr ? ` | mgr: ${mgr.managerName}` : ''}`,
 				});
 			} catch (err: any) {
 				const details = err?.response?.data ? JSON.stringify(err.response.data) : (err?.message ?? 'Unknown error');
@@ -784,7 +891,7 @@ export const actions: Actions = {
 					grossAmount:          gross,
 					netProAmount:         proNet,
 					status:               'pending',
-					description:          `${row.division} Place #${row.placement} — ${tournament.name}`,
+					description:          `${row.seedDivision} Place #${row.placement} — ${tournament.name}`,
 					managerCutPercentage: mgrCutPct,
 				});
 			} catch (err: any) {
@@ -878,6 +985,47 @@ export const actions: Actions = {
 			}
 		}
 
+		const franchiseSummary = new Map<string, {
+			franchiseId: string;
+			totalEarnings: number;
+			mensEarnings: number;
+			womensEarnings: number;
+			numberOfPros: number;
+		}>();
+
+		for (const row of allRows) {
+			const franchiseId = validFranchiseIds.has(row.franchise) ? row.franchise : '';
+			if (!franchiseId) continue;
+			const amount = row.franchisePayoutAmount ?? 0;
+			if (!franchiseSummary.has(franchiseId)) {
+				franchiseSummary.set(franchiseId, {
+					franchiseId,
+					totalEarnings: 0,
+					mensEarnings: 0,
+					womensEarnings: 0,
+					numberOfPros: 0,
+				});
+			}
+			const entry = franchiseSummary.get(franchiseId)!;
+			entry.totalEarnings += amount;
+			entry.numberOfPros += 1;
+			if (row.seedDivision === 'mens') entry.mensEarnings += amount;
+			if (row.seedDivision === 'womens') entry.womensEarnings += amount;
+		}
+
+		for (const item of franchiseSummary.values()) {
+			if (item.totalEarnings <= 0) continue;
+			await pb.collection('franchise_payouts').create({
+				franchise: item.franchiseId,
+				tournament: tournamentId,
+				totalEarnings: item.totalEarnings,
+				mensEarnings: item.mensEarnings,
+				womensEarnings: item.womensEarnings,
+				numberOfPros: item.numberOfPros,
+				status: 'pending',
+			});
+		}
+
 		await upsertTournamentWorkOrder(pb, tournamentId, tournament.name, totalPaymentAmount, createdPaymentIds, 'payout-testing');
 		await writeAuditLogBatch(pb, createdPaymentIds.map(pid => ({
 			paymentId: pid, fromStatus: '', toStatus: 'pending',
@@ -930,6 +1078,29 @@ export const actions: Actions = {
 		})));
 
 		return { success: true, paid: payments.length };
+	},
+
+	markFranchisesPaid: async ({ request }) => {
+		const pb = await getAdminPocketBase();
+		const fd = await request.formData();
+		const tournamentId = fd.get('tournamentId') as string;
+		if (!tournamentId) return fail(400, { error: 'Missing tournamentId' });
+
+		const payouts = await pb.collection('franchise_payouts').getFullList({
+			filter: `tournament = '${tournamentId}' && status = 'pending'`,
+		}).catch(() => [] as any[]);
+
+		const paymentDate = new Date().toISOString().split('T')[0];
+		await Promise.all(
+			payouts.map((p: any) =>
+				pb.collection('franchise_payouts').update(p.id, {
+					status: 'paid',
+					paymentDate,
+				})
+			)
+		);
+
+		return { success: true, paid: payouts.length };
 	},
 
 	resetTournament: async ({ request }) => {

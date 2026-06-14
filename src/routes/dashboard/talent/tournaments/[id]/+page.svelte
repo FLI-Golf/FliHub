@@ -3,6 +3,7 @@
 	import { Badge } from '$lib/components/ui/badge';
 	import type { PageData } from './$types';
 	import { enhance } from '$app/forms';
+	import { invalidateAll } from '$app/navigation';
 	import { RotateCcw, Loader2, FileText, CheckCircle, ExternalLink, Users, ChevronDown, ChevronUp, X, Pencil } from 'lucide-svelte';
 
 	let { data }: { data: PageData } = $props();
@@ -14,6 +15,7 @@
 	let showQbForm         = $state(false);
 	let showPayoutTable    = $state(false); // collapsed by default
 	let showResultsHelp    = $state(false);
+	let generatingExpenses = $state(false);
 
 	// Per-pro inline manager cut editing (row-level)
 	let mgrEdits = $state<Record<string, { editing: boolean; cutPct: number; saving: boolean }>>({});
@@ -828,13 +830,25 @@
 					</a>
 				{:else}
 					<form method="POST" action="?/generateExpenses" use:enhance={() => {
-						return async ({ update }) => { await update(); };
+						generatingExpenses = true;
+						return async ({ update }) => {
+							try {
+								await update();
+								await invalidateAll();
+							} finally {
+								generatingExpenses = false;
+							}
+						};
 					}}>
 						<button type="submit"
-							disabled={!data.workOrder || ((data.proPayments ?? []).length === 0 && (data.results ?? []).length === 0)}
+							disabled={generatingExpenses || !data.workOrder || ((data.proPayments ?? []).length === 0 && (data.results ?? []).length === 0)}
 							class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-600 hover:bg-slate-500 disabled:opacity-40 border border-slate-500 text-white text-xs font-semibold transition-colors"
 							title={!data.workOrder ? 'Generate work order first' : ''}>
-							<FileText class="size-3.5" /> Generate Expense Approvals
+							{#if generatingExpenses}
+								<Loader2 class="size-3.5 animate-spin" /> Generating...
+							{:else}
+								<FileText class="size-3.5" /> Generate Expense Approvals
+							{/if}
 						</button>
 					</form>
 				{/if}
