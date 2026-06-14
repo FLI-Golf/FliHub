@@ -189,8 +189,7 @@ export class Department {
 			},
 			phases: {
 				phase1: buildPhase('phase1'),
-				phase2: buildPhase('phase2'),
-				phase3: buildPhase('phase3')
+				phase2: buildPhase('phase2')
 			}
 		};
 	}

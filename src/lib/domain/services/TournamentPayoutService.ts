@@ -13,7 +13,7 @@ import type PocketBase from 'pocketbase';
 import {
 	calculatePlacementPayouts,
 	calculateFranchisePayout,
-	get2027SeasonPurses,
+	getSeasonPurses,
 	type PlacementPayout
 } from './PayoutCalculator';
 

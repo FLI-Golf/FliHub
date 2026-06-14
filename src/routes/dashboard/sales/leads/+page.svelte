@@ -204,7 +204,7 @@
 			<Card class="p-4 border-l-4 {kpi.color} bg-slate-800/40">
 				<div class="flex items-center justify-between mb-1">
 					<p class="text-xs text-slate-400 uppercase tracking-wide">{kpi.label}</p>
-					<svelte:component this={kpi.icon} class="size-3.5 text-slate-500" />
+					<kpi.icon class="size-3.5 text-slate-500" />
 				</div>
 				<p class="text-2xl font-bold text-white">{kpi.value}</p>
 				<p class="text-xs text-slate-500 mt-0.5">{kpi.sub}</p>

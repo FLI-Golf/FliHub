@@ -1,5 +1,6 @@
 import Papa from 'papaparse';
-import type { Task, TaskStatus, TaskTrack, StrategicGoal, Quarter } from '$lib/domain/modules/projects';
+import { TaskStatus } from '$lib/domain/modules/projects';
+import type { Task, TaskTrack, StrategicGoal, Quarter } from '$lib/domain/modules/projects';
 
 // DEPRECATED: Managers are now user_profiles with role='leader'
 // Keeping these types for backward compatibility
@@ -120,9 +121,9 @@ export function taskCSVToRecord(row: TaskCSVRow) {
 	};
 
 	// Determine status based on context
-	let status: TaskStatus = 'Scheduled';
+	let status: TaskStatus = TaskStatus.SCHEDULED;
 	if (row.Task === 'In Progress') {
-		status = 'In Progress';
+		status = TaskStatus.IN_PROGRESS;
 	}
 
 	return {

@@ -21,7 +21,6 @@
 		Flag,
 		Megaphone,
 		BarChart3,
-		Network,
 		ShieldCheck,
 		ChevronRight,
 		Landmark,
@@ -161,7 +160,8 @@
 				{ title: 'Reimbursements',       url: '/dashboard/reimbursements',       icon: Wallet,       roles: ['admin', 'leader'] },
 				{ title: 'Reimbursements Admin', url: '/dashboard/reimbursements/admin', icon: ShieldCheck,  roles: ['admin', 'leader'] },
 				{ title: 'Media',                url: '/dashboard/media',                icon: Images,       roles: ['admin', 'leader'] },
-				{ title: 'Content Pipeline',     url: '/dashboard/content',              icon: FolderKanban, roles: ['admin', 'leader'] }
+				{ title: 'Content Pipeline',     url: '/dashboard/content',              icon: FolderKanban, roles: ['admin', 'leader'] },
+				{ title: 'Continuous Improvements', url: '/dashboard/continuous-improvements', icon: Zap, roles: ['admin', 'leader'] }
 			]
 		},
 		{
@@ -262,7 +262,6 @@
 			roles: ['admin'],
 			items: [
 				{ title: 'Import Data', url: '/dashboard/import', icon: Upload, roles: ['admin'] },
-				{ title: 'Schema Guide', url: '/dashboard/schema-guide', icon: Network, roles: ['admin'] },
 				{ title: 'Admin Panel', url: '/dashboard/admin', icon: ShieldCheck, roles: ['admin'] },
 				{ title: '[TEMP] Pipeline Tests', url: '/dashboard/pipeline-tests', icon: Zap, roles: ['admin'] }
 			]

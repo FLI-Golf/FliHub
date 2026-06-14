@@ -370,28 +370,33 @@ export const collections = [
 		type: 'base',
 		schema: [
 			{
-				name: 'name',
+				name: 'title',
 				type: 'text',
 				required: true
 			},
 			{
-				name: 'improvementId',
+				name: 'description',
 				type: 'text',
 				required: false
 			},
 			{
-				name: 'areaOfImprovement',
+				name: 'category',
 				type: 'text',
 				required: false
 			},
 			{
-				name: 'actionPlan',
+				name: 'currentState',
 				type: 'editor',
 				required: false
 			},
 			{
-				name: 'responsiblePerson',
-				type: 'text',
+				name: 'proposedSolution',
+				type: 'editor',
+				required: false
+			},
+			{
+				name: 'expectedBenefit',
+				type: 'editor',
 				required: false
 			},
 			{
@@ -400,16 +405,25 @@ export const collections = [
 				required: false,
 				options: {
 					maxSelect: 1,
-					values: ['Identified', 'In Progress', 'Implemented', 'Monitoring']
+					values: ['Identified', 'In Progress', 'Approved', 'Implemented', 'Monitoring', 'Under Review']
 				}
 			},
 			{
-				name: 'notes',
-				type: 'editor',
+				name: 'priority',
+				type: 'select',
+				required: false,
+				options: {
+					maxSelect: 1,
+					values: ['Low', 'Medium', 'High', 'Critical']
+				}
+			},
+			{
+				name: 'implementationDate',
+				type: 'date',
 				required: false
 			}
 		],
-		indexes: ['CREATE INDEX idx_continuous_improvements_status ON continuous_improvements (status)'],
+		indexes: ['CREATE INDEX idx_continuous_improvements_status ON continuous_improvements (status)', 'CREATE INDEX idx_continuous_improvements_priority ON continuous_improvements (priority)'],
 		listRule: '@request.auth.id != ""',
 		viewRule: '@request.auth.id != ""',
 		createRule: '@request.auth.id != ""',

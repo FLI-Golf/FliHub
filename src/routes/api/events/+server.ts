@@ -1,10 +1,12 @@
 import { json } from '@sveltejs/kit';
-import { getAdminPocketBase } from '$lib/infra/pocketbase/pbClient';
+import { requireAdminApi } from '$lib/infra/api-route-guards';
 import type { RequestHandler } from './$types';
 
-export const POST: RequestHandler = async ({ request }) => {
+export const POST: RequestHandler = async ({ locals, url, request }) => {
 	try {
-		const pb = await getAdminPocketBase();
+		const guard = await requireAdminApi(locals, url);
+		if (guard.error) return guard.error;
+		const pb = guard.ctx.pb;
 		const body = await request.json();
 		const record = await pb.collection('special_events').create(body);
 		return json(record, { status: 201 });

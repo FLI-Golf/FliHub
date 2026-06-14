@@ -1,4 +1,5 @@
 import { json } from '@sveltejs/kit';
+import { requireAdminNonProductionApi } from '$lib/infra/api-route-guards';
 import type { RequestHandler } from './$types';
 
 // Vendor data
@@ -37,27 +38,10 @@ function getRandomDate(): string {
 	return new Date(timestamp).toISOString();
 }
 
-export const POST: RequestHandler = async ({ locals }) => {
-	const pb = locals.pb;
-	
-	// Check if user is authenticated
-	if (!pb.authStore.isValid || !pb.authStore.model?.id) {
-		return json({ error: 'Unauthorized - Not logged in' }, { status: 403 });
-	}
-
-	// Fetch user profile to check role
-	try {
-		const profiles = await pb.collection('user_profiles').getFullList({
-			filter: `userId = "${pb.authStore.model.id}"`
-		});
-		const userProfile = profiles[0];
-
-		if (!userProfile || userProfile.role !== 'admin') {
-			return json({ error: 'Unauthorized - Admin access required' }, { status: 403 });
-		}
-	} catch (err) {
-		return json({ error: 'Failed to verify user permissions' }, { status: 403 });
-	}
+export const POST: RequestHandler = async ({ locals, url }) => {
+	const guard = await requireAdminNonProductionApi(locals, url);
+	if (guard.error) return guard.error;
+	const pb = guard.ctx.pb;
 
 	try {
 		console.log('Starting test data seed...');

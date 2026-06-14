@@ -20,10 +20,10 @@
 		}).format(value);
 	}
 	
-	const totalRevenue = sponsorCommitted + dealValue;
-	const totalCollected = sponsorPaid + dealReceived;
-	const collectionRate = totalRevenue > 0 ? (totalCollected / totalRevenue) * 100 : 0;
-	const outstanding = totalRevenue - totalCollected;
+	const totalRevenue = $derived(sponsorCommitted + dealValue);
+	const totalCollected = $derived(sponsorPaid + dealReceived);
+	const collectionRate = $derived(totalRevenue > 0 ? (totalCollected / totalRevenue) * 100 : 0);
+	const outstanding = $derived(totalRevenue - totalCollected);
 </script>
 
 <Card class="p-6 bg-gradient-to-br from-green-950 to-emerald-900 border-green-800">

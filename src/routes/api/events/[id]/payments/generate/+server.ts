@@ -15,7 +15,7 @@
  * or confirmed) and flags bonusEligible=true if count >= bonusThreshold.
  */
 import { json } from '@sveltejs/kit';
-import { getAdminPocketBase } from '$lib/infra/pocketbase/pbClient';
+import { requireAdminApi } from '$lib/infra/api-route-guards';
 import type { RequestHandler } from './$types';
 
 async function ensureEventPaymentApproval(pb: any, payment: any) {
@@ -36,9 +36,11 @@ async function ensureEventPaymentApproval(pb: any, payment: any) {
 	}).catch(() => null);
 }
 
-export const POST: RequestHandler = async ({ params }) => {
+export const POST: RequestHandler = async ({ locals, url, params }) => {
 	try {
-		const pb = await getAdminPocketBase();
+		const guard = await requireAdminApi(locals, url);
+		if (guard.error) return guard.error;
+		const pb = guard.ctx.pb;
 
 		const event = await pb.collection('special_events').getOne(params.id);
 		const confirmedTalent = await pb.collection('event_talent').getFullList({

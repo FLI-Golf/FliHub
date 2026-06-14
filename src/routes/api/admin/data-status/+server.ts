@@ -1,14 +1,12 @@
 import { json } from '@sveltejs/kit';
+import { requireAdminApi } from '$lib/infra/api-route-guards';
 import type { RequestHandler } from './$types';
 import type PocketBase from 'pocketbase';
 
-export const GET: RequestHandler = async ({ locals }) => {
-  const pb = locals.pb as PocketBase;
-
-  // Check if user is admin
-  if (!pb.authStore.isValid) {
-    return json({ error: 'Unauthorized' }, { status: 401 });
-  }
+export const GET: RequestHandler = async ({ locals, url }) => {
+  const guard = await requireAdminApi(locals, url);
+  if (guard.error) return guard.error;
+  const pb = guard.ctx.pb as PocketBase;
 
   try {
     // Get counts for all collections

@@ -20,7 +20,7 @@
 		notes: '',
 		paymentMethod: '',
 		reimbursementTo: '',
-		taskId: taskId
+		taskId: ''
 	});
 
 	// Update taskId in formData when prop changes

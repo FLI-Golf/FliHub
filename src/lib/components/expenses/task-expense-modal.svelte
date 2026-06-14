@@ -21,14 +21,16 @@
 		vendors?: any[];
 	} = $props();
 
+	const taskValue = (key: string, fallback: any = '') => (task as any)?.[key] ?? fallback;
+
 	// ── Steps ─────────────────────────────────────────────────────────────────
 	// 1 = Context review   2 = Expense details   3 = Submit & confirm
 	let step = $state(1);
 
 	// ── Form state ────────────────────────────────────────────────────────────
 	let form = $state({
-		description:     task?.title ?? '',
-		amount:          task?.task_budget ? String(task.task_budget) : '',
+		description:     taskValue('title', ''),
+		amount:          taskValue('task_budget') ? String(taskValue('task_budget')) : '',
 		billingType:     'fixed',   // 'fixed' | 'hourly'
 		hours:           '',
 		hourlyRate:      '',
@@ -55,8 +57,8 @@
 	let savedStatus = $state<'draft' | 'submitted'>('submitted');
 
 	// Budget context
-	const budget  = $derived(task?.task_budget    || 0);
-	const actual  = $derived(task?.task_actual_cost || 0);
+	const budget  = $derived(taskValue('task_budget', 0) || 0);
+	const actual  = $derived(taskValue('task_actual_cost', 0) || 0);
 	const remaining = $derived(budget - actual);
 	const newAmount = $derived(form.amount ? Number(form.amount) : 0);
 	const wouldExceed = $derived(budget > 0 && (actual + newAmount) > budget);
@@ -151,7 +153,7 @@
 	function reset() {
 		step = 1; success = false; err = ''; savedStatus = 'submitted';
 		form = {
-			description: task?.title ?? '', amount: task?.task_budget ? String(task.task_budget) : '', billingType: 'fixed', hours: '', hourlyRate: '',
+			description: taskValue('title', ''), amount: taskValue('task_budget') ? String(taskValue('task_budget')) : '', billingType: 'fixed', hours: '', hourlyRate: '',
 			category: 'Marketing', paymentMethod: '', vendor: '', reimbursementTo: '',
 			date: new Date().toISOString().slice(0, 10),
 			status: 'submitted', notes: ''
@@ -276,21 +278,23 @@
 			<!-- ── Step 2: Details ─────────────────────────────────────────── -->
 			{:else if step === 2}
 				<div>
-					<label class={LABEL}>Description *</label>
-					<input bind:value={form.description} class={INPUT} placeholder="What was this expense for?" />
+					<label class={LABEL} for="expense-description">Description *</label>
+					<input id="expense-description" bind:value={form.description} class={INPUT} placeholder="What was this expense for?" />
 				</div>
 
 				<!-- Billing type toggle -->
 				<div>
-					<label class={LABEL}>Billing Type</label>
+					<label class={LABEL} for="billing-fixed">Billing Type</label>
 					<div class="flex rounded-lg border border-slate-600 overflow-hidden">
 						<button type="button"
+							id="billing-fixed"
 							onclick={() => form.billingType = 'fixed'}
 							class="flex-1 py-2 text-sm font-medium transition-colors
 								{form.billingType === 'fixed' ? 'bg-emerald-700 text-white' : 'bg-slate-800 text-slate-400 hover:bg-slate-700'}">
 							Fixed Amount
 						</button>
 						<button type="button"
+							id="billing-hourly"
 							onclick={() => form.billingType = 'hourly'}
 							class="flex-1 py-2 text-sm font-medium transition-colors border-l border-slate-600
 								{form.billingType === 'hourly' ? 'bg-emerald-700 text-white' : 'bg-slate-800 text-slate-400 hover:bg-slate-700'}">
@@ -303,12 +307,12 @@
 				<!-- Hourly rate inputs — amount auto-calculates -->
 				<div class="grid grid-cols-2 gap-3">
 					<div>
-						<label class={LABEL}>Hours Worked *</label>
-						<input bind:value={form.hours} type="number" min="0.25" step="0.25" class={INPUT} placeholder="e.g. 8" />
+						<label class={LABEL} for="expense-hours">Hours Worked *</label>
+						<input id="expense-hours" bind:value={form.hours} type="number" min="0.25" step="0.25" class={INPUT} placeholder="e.g. 8" />
 					</div>
 					<div>
-						<label class={LABEL}>Hourly Rate ($/hr) *</label>
-						<input bind:value={form.hourlyRate} type="number" min="1" step="0.01" class={INPUT} placeholder="e.g. 150" />
+						<label class={LABEL} for="expense-hourly-rate">Hourly Rate ($/hr) *</label>
+						<input id="expense-hourly-rate" bind:value={form.hourlyRate} type="number" min="1" step="0.01" class={INPUT} placeholder="e.g. 150" />
 					</div>
 				</div>
 				{#if form.hours && form.hourlyRate}
@@ -321,8 +325,9 @@
 
 				<div class="grid grid-cols-2 gap-3">
 					<div>
-						<label class={LABEL}>{form.billingType === 'hourly' ? 'Total Amount (auto-calculated)' : 'Amount ($) *'}</label>
+						<label class={LABEL} for="expense-amount">{form.billingType === 'hourly' ? 'Total Amount (auto-calculated)' : 'Amount ($) *'}</label>
 						<input
+							id="expense-amount"
 							value={form.amount}
 							oninput={(e) => { form.amount = (e.currentTarget as HTMLInputElement).value; }}
 							type="number" min="0.01" step="0.01"
@@ -337,14 +342,14 @@
 						{/if}
 					</div>
 					<div>
-						<label class={LABEL}>Expense Date * <span class="font-normal text-slate-500">(incurred or invoiced)</span></label>
-						<input bind:value={form.date} type="date" class={INPUT} />
+						<label class={LABEL} for="expense-date">Expense Date * <span class="font-normal text-slate-500">(incurred or invoiced)</span></label>
+						<input id="expense-date" bind:value={form.date} type="date" class={INPUT} />
 					</div>
 				</div>
 
 				<div>
-					<label class={LABEL}>Category *</label>
-					<select bind:value={form.category} class={INPUT}>
+					<label class={LABEL} for="expense-category">Category *</label>
+					<select id="expense-category" bind:value={form.category} class={INPUT}>
 						{#each CATEGORIES as cat}
 							<option value={cat}>{cat}</option>
 						{/each}
@@ -353,8 +358,8 @@
 
 				<div class="grid grid-cols-2 gap-3">
 					<div>
-						<label class={LABEL}>Payment Method</label>
-						<select bind:value={form.paymentMethod} class={INPUT}>
+						<label class={LABEL} for="expense-payment-method">Payment Method</label>
+						<select id="expense-payment-method" bind:value={form.paymentMethod} class={INPUT}>
 							<option value="">— Select —</option>
 							{#each PAYMENT_METHODS as m}
 								<option value={m.value}>{m.label}</option>
@@ -362,8 +367,8 @@
 						</select>
 					</div>
 					<div>
-						<label class={LABEL}>Vendor</label>
-						<select bind:value={form.vendor} class={INPUT}>
+						<label class={LABEL} for="expense-vendor">Vendor</label>
+						<select id="expense-vendor" bind:value={form.vendor} class={INPUT}>
 							<option value="">— None —</option>
 							{#each vendors as v}
 								<option value={v.id}>{v.name}</option>
@@ -373,8 +378,8 @@
 				</div>
 
 				<div>
-					<label class={LABEL}>Reimbursement To</label>
-					<input bind:value={form.reimbursementTo} class={INPUT} placeholder="Name of person to reimburse (if any)" />
+					<label class={LABEL} for="expense-reimbursement-to">Reimbursement To</label>
+					<input id="expense-reimbursement-to" bind:value={form.reimbursementTo} class={INPUT} placeholder="Name of person to reimburse (if any)" />
 				</div>
 
 			<!-- ── Step 3: Submit ──────────────────────────────────────────── -->
@@ -443,8 +448,8 @@
 
 					<!-- Notes -->
 					<div>
-						<label class={LABEL}>Notes (optional)</label>
-						<textarea bind:value={form.notes} rows="3" class="{INPUT} resize-none" placeholder="Any additional context for approvers…"></textarea>
+						<label class={LABEL} for="expense-notes">Notes (optional)</label>
+						<textarea id="expense-notes" bind:value={form.notes} rows="3" class="{INPUT} resize-none" placeholder="Any additional context for approvers…"></textarea>
 					</div>
 
 					<!-- Submit as draft or submit for approval -->

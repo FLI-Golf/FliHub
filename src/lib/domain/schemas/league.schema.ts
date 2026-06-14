@@ -44,7 +44,7 @@ export const LeagueSchema = z.object({
 	
 	// Expense Tracking
 	totalExpenses: z.number().min(0).optional(),
-	expensesByCategory: z.record(z.number()).optional(),
+	expensesByCategory: z.record(z.string(), z.number()).optional(),
 	
 	// Profit & Loss
 	grossProfit: z.number().optional(),
@@ -83,8 +83,8 @@ export const LeagueSchema = z.object({
 			conversions: z.number(),
 			averageDiscount: z.number()
 		}).optional(),
-		incomeBreakdown: z.record(z.number()).optional(),
-		expenseBreakdown: z.record(z.number()).optional(),
+		incomeBreakdown: z.record(z.string(), z.number()).optional(),
+		expenseBreakdown: z.record(z.string(), z.number()).optional(),
 		profitLoss: z.object({
 			totalIncome: z.number(),
 			totalExpenses: z.number(),
@@ -100,7 +100,7 @@ export const LeagueSchema = z.object({
 	rules: z.string().optional(),
 	contactEmail: z.string().email().optional().or(z.literal('')),
 	contactPhone: z.string().optional(),
-	socialMedia: z.record(z.string()).optional(),
+	socialMedia: z.record(z.string(), z.string()).optional(),
 	notes: z.string().optional(),
 	leagueOwner: z.string().optional(),
 	

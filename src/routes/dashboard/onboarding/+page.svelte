@@ -215,31 +215,32 @@ Andrew@FLIGolf.com | fligolf.com`;
 		| 'player_contract'
 		| 'legal_documents';
 
-	const isSigned = (type: DocType) => !!data.signatures?.[type];
+	const signatureFor = (type: DocType) => (data.signatures as any)?.[type] ?? null;
+	const isSigned = (type: DocType) => !!signatureFor(type);
 
 	let sigStates = $state<Record<DocType, { initials: string; sig: string; signed: boolean }>>({
 		player_information_packet: {
-			initials: data.signatures?.player_information_packet?.initials ?? '',
+			initials: signatureFor('player_information_packet')?.initials ?? '',
 			sig: '',
 			signed: isSigned('player_information_packet')
 		},
 		player_opportunity_packet: {
-			initials: data.signatures?.player_opportunity_packet?.initials ?? '',
+			initials: signatureFor('player_opportunity_packet')?.initials ?? '',
 			sig: '',
 			signed: isSigned('player_opportunity_packet')
 		},
 		integrity_substance_policy: {
-			initials: data.signatures?.integrity_substance_policy?.initials ?? '',
+			initials: signatureFor('integrity_substance_policy')?.initials ?? '',
 			sig: '',
 			signed: isSigned('integrity_substance_policy')
 		},
 		player_contract: {
-			initials: data.signatures?.player_contract?.initials ?? '',
-			sig: data.signatures?.player_contract?.signatureDataUrl ?? '',
+			initials: signatureFor('player_contract')?.initials ?? '',
+			sig: signatureFor('player_contract')?.signatureDataUrl ?? '',
 			signed: isSigned('player_contract')
 		},
 		legal_documents: {
-			initials: data.signatures?.legal_documents?.initials ?? '',
+			initials: signatureFor('legal_documents')?.initials ?? '',
 			sig: '',
 			signed: isSigned('legal_documents')
 		}
@@ -279,7 +280,11 @@ Andrew@FLIGolf.com | fligolf.com`;
 
 	// ── Progress ────────────────────────────────────────────────────────────
 
-	const steps = [
+	const profileDone = $derived(
+		data.playerProfile?.status === 'submitted' || data.playerProfile?.status === 'approved'
+	);
+
+	const steps = $derived([
 		{ id: 'welcome', label: 'Welcome', done: true },
 		{
 			id: 'documents',
@@ -294,9 +299,9 @@ Andrew@FLIGolf.com | fligolf.com`;
 		{
 			id: 'profile',
 			label: 'Player Profile',
-			done: data.playerProfile?.status === 'submitted' || data.playerProfile?.status === 'approved'
+			done: profileDone
 		}
-	] as const;
+	] as const);
 
 	const completedCount = $derived(steps.filter((s) => s.done).length);
 	const progressPct = $derived(Math.round((completedCount / steps.length) * 100));

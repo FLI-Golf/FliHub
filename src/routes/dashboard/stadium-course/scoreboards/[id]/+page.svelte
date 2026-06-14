@@ -11,13 +11,19 @@
 	import { pipelineMove } from '$lib/pipeline';
 
 	let { data }: { data: PageData } = $props();
+	const getScoreboard = () => data.scoreboard;
+	const getQuotes = () => data.quotes ?? [];
+	const getChecklist = () => data.checklist ?? {};
+	const getApproval = () => data.approval;
+	const getExpense = () => data.expense;
+	const getWorkOrder = () => data.workOrder;
 
-	let sb        = $state(data.scoreboard);
-	let quotes    = $state<any[]>(data.quotes ?? []);
-	let checklist = $state<Record<string, { id: string; label: string; checked: boolean }[]>>(data.checklist ?? {});
-	let approval  = $state(data.approval);
-	let expense   = $state(data.expense);
-	let workOrder = $state(data.workOrder);
+	let sb        = $state(getScoreboard());
+	let quotes    = $state<any[]>(getQuotes());
+	let checklist = $state<Record<string, { id: string; label: string; checked: boolean }[]>>(getChecklist());
+	let approval  = $state(getApproval());
+	let expense   = $state(getExpense());
+	let workOrder = $state(getWorkOrder());
 
 	const fmt$ = (n: number) =>
 		new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 0 }).format(n ?? 0);

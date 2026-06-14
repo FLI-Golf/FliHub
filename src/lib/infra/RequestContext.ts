@@ -27,7 +27,7 @@ import { env } from '$env/dynamic/private';
 const VENDOR_ROLE = env.VENDOR_ROLE ?? 'vendor';
 import { getAdminPocketBase } from './pocketbase/pbClient';
 
-export type UserRole = 'admin' | 'sales' | 'leader' | 'vendor' | 'pro' | 'franchise_owner' | 'broadcaster' | 'manager' | 'league_owner';
+export type UserRole = 'admin' | 'sales' | 'leader' | 'vendor' | 'pro' | 'franchise_owner' | 'broadcaster' | 'manager' | 'league_owner' | 'marketing' | 'marketing_lead';
 
 export interface UserProfile {
 	id: string;

@@ -10,7 +10,7 @@
 
 	let { data }: { data: PageData } = $props();
 
-	const t = data.tournament;
+	const t = $derived(data.tournament);
 	const fmt$ = (n: number) =>
 		new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 0 }).format(n ?? 0);
 	const fmtDate = (d: string) =>
@@ -19,11 +19,12 @@
 	// ── Checklist ─────────────────────────────────────────────────────────────
 
 	type CheckItem = { id: string; label: string; checked: boolean; recordId: string | null };
+	const checklistPhase = (phase: 'pre' | 'during' | 'post') => (data.checklist as any)?.[phase] ?? [];
 
 	let checklist = $state<{ pre: CheckItem[]; during: CheckItem[]; post: CheckItem[] }>({
-		pre:    data.checklist.pre,
-		during: data.checklist.during,
-		post:   data.checklist.post
+		pre:    checklistPhase('pre'),
+		during: checklistPhase('during'),
+		post:   checklistPhase('post')
 	});
 
 	let checklistBusy = $state<Record<string, boolean>>({});
@@ -118,8 +119,8 @@
 	let csvErr     = $state('');
 
 	// Talent lookup by name (case-insensitive)
-	const talentByName = $derived(
-		Object.fromEntries((data.talent ?? []).map((t: any) => [t.name.toLowerCase(), t]))
+	const talentByName = $derived.by(() =>
+		Object.fromEntries((data.talent ?? []).map((talent: any) => [talent.name.toLowerCase(), talent]))
 	);
 
 	function parseCSV() {
@@ -304,11 +305,12 @@
 
 			<!-- CSV paste shortcut -->
 			<div class="mb-4">
-				<label class="block text-xs font-medium text-slate-400 mb-1">
+				<label for="ops-results-csv" class="block text-xs font-medium text-slate-400 mb-1">
 					Paste CSV (Name, Placement, Score, Rounds — one per line)
 				</label>
 				<div class="flex gap-2">
 					<textarea
+						id="ops-results-csv"
 						bind:value={csvText}
 						rows="3"
 						placeholder="Paul McBeth, 1, -22, 4&#10;Kona Panis, 2, -18, 4"

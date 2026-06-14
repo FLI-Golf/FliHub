@@ -141,8 +141,9 @@
 				<h3 class="text-sm font-semibold text-slate-200 uppercase tracking-wide">Account Information</h3>
 				
 				<div class="space-y-2">
-					<label class="text-sm font-medium text-slate-200">Email *</label>
+					<label for="person-email" class="text-sm font-medium text-slate-200">Email *</label>
 					<Input
+						id="person-email"
 						type="email"
 						bind:value={formData.email}
 						placeholder="email@example.com"
@@ -152,8 +153,9 @@
 				</div>
 
 				<div class="space-y-2">
-					<label class="text-sm font-medium text-slate-200">Password *</label>
+					<label for="person-password" class="text-sm font-medium text-slate-200">Password *</label>
 					<Input
+						id="person-password"
 						type="password"
 						bind:value={formData.password}
 						placeholder="Minimum 8 characters"
@@ -169,8 +171,9 @@
 				
 				<div class="grid grid-cols-2 gap-4">
 					<div class="space-y-2">
-						<label class="text-sm font-medium text-slate-200">First Name *</label>
+						<label for="person-first-name" class="text-sm font-medium text-slate-200">First Name *</label>
 						<Input
+							id="person-first-name"
 							type="text"
 							bind:value={formData.firstName}
 							placeholder="First name"
@@ -180,8 +183,9 @@
 					</div>
 					
 					<div class="space-y-2">
-						<label class="text-sm font-medium text-slate-200">Last Name *</label>
+						<label for="person-last-name" class="text-sm font-medium text-slate-200">Last Name *</label>
 						<Input
+							id="person-last-name"
 							type="text"
 							bind:value={formData.lastName}
 							placeholder="Last name"
@@ -192,8 +196,9 @@
 				</div>
 
 				<div class="space-y-2">
-					<label class="text-sm font-medium text-slate-200">Phone</label>
+					<label for="person-phone" class="text-sm font-medium text-slate-200">Phone</label>
 					<Input
+						id="person-phone"
 						type="tel"
 						bind:value={formData.phone}
 						placeholder="Phone number"
@@ -202,8 +207,9 @@
 				</div>
 
 				<div class="space-y-2">
-					<label class="text-sm font-medium text-slate-200">Organization</label>
+					<label for="person-organization" class="text-sm font-medium text-slate-200">Organization</label>
 					<Input
+						id="person-organization"
 						type="text"
 						bind:value={formData.organization}
 						placeholder="Organization name"
@@ -212,8 +218,9 @@
 				</div>
 
 				<div class="space-y-2">
-					<label class="text-sm font-medium text-slate-200">Role *</label>
+					<label for="person-role" class="text-sm font-medium text-slate-200">Role *</label>
 					<select
+						id="person-role"
 						bind:value={formData.role}
 						required
 						class="w-full px-3 py-2 rounded-md border bg-slate-800 border-slate-700 text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -225,8 +232,9 @@
 				</div>
 
 				<div class="space-y-2">
-					<label class="text-sm font-medium text-slate-200">Status *</label>
+					<label for="person-status" class="text-sm font-medium text-slate-200">Status *</label>
 					<select
+						id="person-status"
 						bind:value={formData.status}
 						required
 						class="w-full px-3 py-2 rounded-md border bg-slate-800 border-slate-700 text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -239,8 +247,9 @@
 				
 				{#if showVendorField}
 					<div class="space-y-2">
-						<label class="text-sm font-medium text-slate-200">Assign Vendor</label>
+						<label for="person-vendor" class="text-sm font-medium text-slate-200">Assign Vendor</label>
 						<select
+							id="person-vendor"
 							bind:value={formData.vendorId}
 							class="w-full px-3 py-2 rounded-md border bg-slate-800 border-slate-700 text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
 						>
@@ -255,8 +264,9 @@
 
 				{#if showDepartmentField}
 					<div class="space-y-2">
-						<label class="text-sm font-medium text-slate-200">Assign Department</label>
+						<label for="person-department" class="text-sm font-medium text-slate-200">Assign Department</label>
 						<select
+							id="person-department"
 							bind:value={formData.departmentId}
 							class="w-full px-3 py-2 rounded-md border bg-slate-800 border-slate-700 text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
 						>

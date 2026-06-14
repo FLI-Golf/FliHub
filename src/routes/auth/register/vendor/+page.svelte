@@ -3,24 +3,25 @@
 	import { ArrowRight, ArrowLeft, Building2, User, CheckCircle2, Package, Briefcase, Globe, Phone, MapPin, FileText } from 'lucide-svelte';
 
 	let { form }: { form: ActionData } = $props();
+	const formValue = (key: string, fallback: string = '') => ((form as any)?.[key] ?? fallback) as string;
 
 	// ── Multi-step state ──────────────────────────────────────────────────────
 	let step = $state(1);
 	const TOTAL_STEPS = 3;
 
 	// ── Form fields ───────────────────────────────────────────────────────────
-	let firstName   = $state((form as any)?.firstName   ?? '');
-	let lastName    = $state((form as any)?.lastName    ?? '');
-	let email       = $state((form as any)?.email       ?? '');
+	let firstName   = $state(formValue('firstName'));
+	let lastName    = $state(formValue('lastName'));
+	let email       = $state(formValue('email'));
 	let password    = $state('');
 	let confirmPwd  = $state('');
 
-	let companyName = $state((form as any)?.companyName ?? '');
-	let category    = $state((form as any)?.category    ?? '');
-	let website     = $state((form as any)?.website     ?? '');
-	let phone       = $state((form as any)?.phone       ?? '');
-	let about       = $state((form as any)?.about       ?? '');
-	let location    = $state((form as any)?.location    ?? '');
+	let companyName = $state(formValue('companyName'));
+	let category    = $state(formValue('category'));
+	let website     = $state(formValue('website'));
+	let phone       = $state(formValue('phone'));
+	let about       = $state(formValue('about'));
+	let location    = $state(formValue('location'));
 
 	let loading     = $state(false);
 	let step1Err    = $state('');
@@ -170,29 +171,29 @@
 
 						<div class="grid grid-cols-2 gap-3">
 							<div>
-								<label class={LABEL}>First Name <span class="text-red-400">*</span></label>
-								<input bind:value={firstName} type="text" placeholder="Jane" class={INPUT} />
+								<label class={LABEL} for="vendor-first-name">First Name <span class="text-red-400">*</span></label>
+								<input id="vendor-first-name" bind:value={firstName} type="text" placeholder="Jane" class={INPUT} />
 							</div>
 							<div>
-								<label class={LABEL}>Last Name <span class="text-red-400">*</span></label>
-								<input bind:value={lastName} type="text" placeholder="Smith" class={INPUT} />
+								<label class={LABEL} for="vendor-last-name">Last Name <span class="text-red-400">*</span></label>
+								<input id="vendor-last-name" bind:value={lastName} type="text" placeholder="Smith" class={INPUT} />
 							</div>
 						</div>
 
 						<div>
-							<label class={LABEL}>Email Address <span class="text-red-400">*</span></label>
-							<input bind:value={email} type="email" placeholder="jane@yourcompany.com" class={INPUT} />
+							<label class={LABEL} for="vendor-email">Email Address <span class="text-red-400">*</span></label>
+							<input id="vendor-email" bind:value={email} type="email" placeholder="jane@yourcompany.com" class={INPUT} />
 						</div>
 
 						<div class="grid grid-cols-2 gap-3">
 							<div>
-								<label class={LABEL}>Password <span class="text-red-400">*</span></label>
-								<input bind:value={password} type="password" placeholder="••••••••" class={INPUT} />
+								<label class={LABEL} for="vendor-password">Password <span class="text-red-400">*</span></label>
+								<input id="vendor-password" bind:value={password} type="password" placeholder="••••••••" class={INPUT} />
 								<p class="text-[10px] text-slate-500 mt-1">At least 8 characters</p>
 							</div>
 							<div>
-								<label class={LABEL}>Confirm Password <span class="text-red-400">*</span></label>
-								<input bind:value={confirmPwd} type="password" placeholder="••••••••" class={INPUT} />
+								<label class={LABEL} for="vendor-confirm-password">Confirm Password <span class="text-red-400">*</span></label>
+								<input id="vendor-confirm-password" bind:value={confirmPwd} type="password" placeholder="••••••••" class={INPUT} />
 							</div>
 						</div>
 					</div>
@@ -207,13 +208,13 @@
 						{/if}
 
 						<div>
-							<label class={LABEL}>Company / Business Name <span class="text-red-400">*</span></label>
-							<input bind:value={companyName} type="text" placeholder="Acme Productions LLC" class={INPUT} />
+							<label class={LABEL} for="vendor-company-name">Company / Business Name <span class="text-red-400">*</span></label>
+							<input id="vendor-company-name" bind:value={companyName} type="text" placeholder="Acme Productions LLC" class={INPUT} />
 						</div>
 
 						<div>
-							<label class={LABEL}>Service Category <span class="text-red-400">*</span></label>
-							<select bind:value={category} class="{INPUT} cursor-pointer">
+							<label class={LABEL} for="vendor-category">Service Category <span class="text-red-400">*</span></label>
+							<select id="vendor-category" bind:value={category} class="{INPUT} cursor-pointer">
 								<option value="">Select your primary service…</option>
 								{#each CATEGORIES as cat}
 									<option value={cat}>{cat}</option>
@@ -224,23 +225,23 @@
 
 						<div class="grid grid-cols-2 gap-3">
 							<div>
-								<label class={LABEL}>Phone</label>
-								<input bind:value={phone} type="tel" placeholder="+1 (555) 000-0000" class={INPUT} />
+								<label class={LABEL} for="vendor-phone">Phone</label>
+								<input id="vendor-phone" bind:value={phone} type="tel" placeholder="+1 (555) 000-0000" class={INPUT} />
 							</div>
 							<div>
-								<label class={LABEL}>Location</label>
-								<input bind:value={location} type="text" placeholder="Las Vegas, NV" class={INPUT} />
+								<label class={LABEL} for="vendor-location">Location</label>
+								<input id="vendor-location" bind:value={location} type="text" placeholder="Las Vegas, NV" class={INPUT} />
 							</div>
 						</div>
 
 						<div>
-							<label class={LABEL}>Website</label>
-							<input bind:value={website} type="url" placeholder="https://yourcompany.com" class={INPUT} />
+							<label class={LABEL} for="vendor-website">Website</label>
+							<input id="vendor-website" bind:value={website} type="url" placeholder="https://yourcompany.com" class={INPUT} />
 						</div>
 
 						<div>
-							<label class={LABEL}>About Your Business</label>
-							<textarea bind:value={about} rows="3" placeholder="Brief description of your services, experience, and what makes you a great fit for FLI Golf projects…"
+							<label class={LABEL} for="vendor-about">About Your Business</label>
+							<textarea id="vendor-about" bind:value={about} rows="3" placeholder="Brief description of your services, experience, and what makes you a great fit for FLI Golf projects…"
 								class="{INPUT} resize-none"></textarea>
 						</div>
 					</div>

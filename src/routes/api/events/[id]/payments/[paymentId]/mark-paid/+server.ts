@@ -1,5 +1,5 @@
 import { json } from '@sveltejs/kit';
-import { getAdminPocketBase } from '$lib/infra/pocketbase/pbClient';
+import { requireAdminApi } from '$lib/infra/api-route-guards';
 import type { RequestHandler } from './$types';
 
 function deriveCode(name: string): string {
@@ -14,7 +14,9 @@ function deriveCode(name: string): string {
 
 export const POST: RequestHandler = async ({ params, locals }) => {
 	try {
-		const pb = await getAdminPocketBase();
+		const guard = await requireAdminApi(locals);
+		if (guard.error) return guard.error;
+		const pb = guard.ctx.pb;
 		const paidBy = (locals as any)?.pb?.authStore?.model?.email ?? 'admin';
 
 		const payment = await pb.collection('event_payments').getOne(params.paymentId);
