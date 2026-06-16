@@ -72,7 +72,26 @@
 
 			if (!response.ok) {
 				const data = await response.json();
-				throw new Error(data.message || 'Failed to create project');
+				const fieldErrors = Array.isArray(data?.fieldErrors)
+					? data.fieldErrors.filter((item: unknown) => typeof item === 'string' && item.trim())
+					: [];
+
+				const detailData = data?.details?.data;
+				const detailMessage = detailData && typeof detailData === 'object'
+					? Object.entries(detailData)
+						.map(([field, issue]) => {
+							if (typeof issue === 'string' && issue.trim()) return `${field}: ${issue}`;
+							if (issue && typeof issue === 'object' && 'message' in issue && typeof issue.message === 'string') {
+								return `${field}: ${issue.message}`;
+							}
+							if (issue !== undefined) return `${field}: ${JSON.stringify(issue)}`;
+							return null;
+						})
+						.filter(Boolean)
+						.join('; ')
+					: '';
+
+				throw new Error(fieldErrors.join('; ') || detailMessage || data.message || 'Failed to create project');
 			}
 
 			// Reset form and close modal
