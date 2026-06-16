@@ -98,12 +98,12 @@
 				<div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
 					<div class="sm:col-span-2">
 						<label class="block text-sm font-semibold mb-1.5" for="fullName">Full Name</label>
-						<input id="fullName" name="fullName" type="text" value={p.fullName ?? ''} class="field" placeholder="Jane Doe" />
+						<input id="fullName" name="fullName" type="text" autocomplete="name" value={p.fullName ?? ''} class="field" placeholder="Jane Doe" />
 					</div>
 
 					<div>
 						<label class="block text-sm font-semibold mb-1.5" for="dateOfBirth">Date of Birth</label>
-						<input id="dateOfBirth" name="dateOfBirth" type="date" value={p.dateOfBirth ?? ''} class="field" />
+						<input id="dateOfBirth" name="dateOfBirth" type="date" autocomplete="bday" value={p.dateOfBirth ?? ''} class="field" />
 					</div>
 
 					<div>
@@ -123,17 +123,17 @@
 
 					<div>
 						<label class="block text-sm font-semibold mb-1.5" for="phone">Phone Number</label>
-						<input id="phone" name="phone" type="tel" value={p.phone ?? ''} class="field" placeholder="+1 555 000 0000" />
+						<input id="phone" name="phone" type="tel" autocomplete="tel" value={p.phone ?? ''} class="field" placeholder="+1 555 000 0000" />
 					</div>
 
 					<div>
 						<label class="block text-sm font-semibold mb-1.5" for="email">Email Address</label>
-						<input id="email" name="email" type="email" value={p.email ?? ''} class="field" placeholder="you@example.com" />
+						<input id="email" name="email" type="email" autocomplete="email" value={p.email ?? ''} class="field" placeholder="you@example.com" />
 					</div>
 
 					<div class="sm:col-span-2">
 						<label class="block text-sm font-semibold mb-1.5" for="mailingAddress">Mailing Address</label>
-						<textarea id="mailingAddress" name="mailingAddress" rows="2" class="field resize-none" placeholder="Street, City, State, ZIP, Country">{p.mailingAddress ?? ''}</textarea>
+						<textarea id="mailingAddress" name="mailingAddress" rows="2" autocomplete="street-address" class="field resize-none" placeholder="Street, City, State, ZIP, Country">{p.mailingAddress ?? ''}</textarea>
 					</div>
 				</div>
 
@@ -142,7 +142,7 @@
 					<div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
 						<div>
 							<label class="block text-sm font-semibold mb-1.5" for="emergencyContactName">Name</label>
-							<input id="emergencyContactName" name="emergencyContactName" type="text" value={p.emergencyContactName ?? ''} class="field" />
+							<input id="emergencyContactName" name="emergencyContactName" type="text" autocomplete="section-emergency name" value={p.emergencyContactName ?? ''} class="field" />
 						</div>
 						<div>
 							<label class="block text-sm font-semibold mb-1.5" for="emergencyContactRelationship">Relationship</label>
@@ -150,11 +150,11 @@
 						</div>
 						<div>
 							<label class="block text-sm font-semibold mb-1.5" for="emergencyContactPhone">Phone</label>
-							<input id="emergencyContactPhone" name="emergencyContactPhone" type="tel" value={p.emergencyContactPhone ?? ''} class="field" />
+							<input id="emergencyContactPhone" name="emergencyContactPhone" type="tel" autocomplete="section-emergency tel" value={p.emergencyContactPhone ?? ''} class="field" />
 						</div>
 						<div>
 							<label class="block text-sm font-semibold mb-1.5" for="emergencyContactEmail">Email</label>
-							<input id="emergencyContactEmail" name="emergencyContactEmail" type="email" value={p.emergencyContactEmail ?? ''} class="field" />
+							<input id="emergencyContactEmail" name="emergencyContactEmail" type="email" autocomplete="section-emergency email" value={p.emergencyContactEmail ?? ''} class="field" />
 						</div>
 					</div>
 				</div>
@@ -240,7 +240,7 @@
 
 					<div class="sm:col-span-2">
 						<label class="block text-sm font-semibold mb-1.5" for="personalWebsite">Personal Website or Media Links</label>
-						<input id="personalWebsite" name="personalWebsite" type="url" value={p.personalWebsite ?? ''} class="field" placeholder="https://yoursite.com" />
+						<input id="personalWebsite" name="personalWebsite" type="url" autocomplete="url" value={p.personalWebsite ?? ''} class="field" placeholder="https://yoursite.com" />
 					</div>
 
 					<div class="sm:col-span-2">
@@ -250,11 +250,11 @@
 
 					<div class="sm:col-span-2 space-y-3">
 						<label class="flex items-center gap-3 cursor-pointer group">
-							<input type="checkbox" name="comfortableWithInterviews" value="true" checked={p.comfortableWithInterviews ?? false} class="w-4 h-4 rounded border-2 border-input accent-black" />
+							<input id="comfortableWithInterviews" type="checkbox" name="comfortableWithInterviews" value="true" checked={p.comfortableWithInterviews ?? false} class="w-4 h-4 rounded border-2 border-input accent-black" />
 							<span class="text-sm font-medium group-hover:text-foreground transition-colors">I am comfortable participating in interviews & media appearances</span>
 						</label>
 						<label class="flex items-center gap-3 cursor-pointer group">
-							<input type="checkbox" name="openToBehindScenes" value="true" checked={p.openToBehindScenes ?? false} class="w-4 h-4 rounded border-2 border-input accent-black" />
+							<input id="openToBehindScenes" type="checkbox" name="openToBehindScenes" value="true" checked={p.openToBehindScenes ?? false} class="w-4 h-4 rounded border-2 border-input accent-black" />
 							<span class="text-sm font-medium group-hover:text-foreground transition-colors">I am open to behind-the-scenes content or mic'd up segments</span>
 						</label>
 					</div>
@@ -280,11 +280,11 @@
 
 					<div class="space-y-3">
 						<label class="flex items-center gap-3 cursor-pointer group">
-							<input type="checkbox" name="openToNewSponsors" value="true" checked={p.openToNewSponsors ?? false} class="w-4 h-4 rounded border-2 border-input accent-black" />
+							<input id="openToNewSponsors" type="checkbox" name="openToNewSponsors" value="true" checked={p.openToNewSponsors ?? false} class="w-4 h-4 rounded border-2 border-input accent-black" />
 							<span class="text-sm font-medium group-hover:text-foreground transition-colors">I am open to new sponsorship & endorsement deals</span>
 						</label>
 						<label class="flex items-center gap-3 cursor-pointer group">
-							<input type="checkbox" name="wantsLeagueSponsorHelp" value="true" checked={p.wantsLeagueSponsorHelp ?? false} class="w-4 h-4 rounded border-2 border-input accent-black" />
+							<input id="wantsLeagueSponsorHelp" type="checkbox" name="wantsLeagueSponsorHelp" value="true" checked={p.wantsLeagueSponsorHelp ?? false} class="w-4 h-4 rounded border-2 border-input accent-black" />
 							<span class="text-sm font-medium group-hover:text-foreground transition-colors">I would like assistance from FLI Golf in securing sponsorships</span>
 						</label>
 					</div>
@@ -298,18 +298,18 @@
 				<h2 class="text-lg font-bold border-b pb-2">5. Management / Representation Contact</h2>
 
 				<label class="flex items-center gap-3 cursor-pointer group mb-2">
-					<input type="checkbox" name="hasAgent" value="true" checked={p.hasAgent ?? false} class="w-4 h-4 rounded border-2 border-input accent-black" />
+					<input id="hasAgent" type="checkbox" name="hasAgent" value="true" checked={p.hasAgent ?? false} class="w-4 h-4 rounded border-2 border-input accent-black" />
 					<span class="text-sm font-semibold group-hover:text-foreground transition-colors">I have an agent or manager</span>
 				</label>
 
 				<div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
 					<div>
 						<label class="block text-sm font-semibold mb-1.5" for="repName">Representative Name</label>
-						<input id="repName" name="repName" type="text" value={p.repName ?? ''} class="field" />
+						<input id="repName" name="repName" type="text" autocomplete="section-rep name" value={p.repName ?? ''} class="field" />
 					</div>
 					<div>
 						<label class="block text-sm font-semibold mb-1.5" for="repAgency">Agency or Management Firm</label>
-						<input id="repAgency" name="repAgency" type="text" value={p.repAgency ?? ''} class="field" />
+						<input id="repAgency" name="repAgency" type="text" autocomplete="organization" value={p.repAgency ?? ''} class="field" />
 					</div>
 					<div>
 						<label class="block text-sm font-semibold mb-1.5" for="repPosition">Position</label>
@@ -317,11 +317,11 @@
 					</div>
 					<div>
 						<label class="block text-sm font-semibold mb-1.5" for="repPhone">Phone</label>
-						<input id="repPhone" name="repPhone" type="tel" value={p.repPhone ?? ''} class="field" />
+						<input id="repPhone" name="repPhone" type="tel" autocomplete="section-rep tel" value={p.repPhone ?? ''} class="field" />
 					</div>
 					<div class="sm:col-span-2">
 						<label class="block text-sm font-semibold mb-1.5" for="repEmail">Email</label>
-						<input id="repEmail" name="repEmail" type="email" value={p.repEmail ?? ''} class="field" />
+						<input id="repEmail" name="repEmail" type="email" autocomplete="section-rep email" value={p.repEmail ?? ''} class="field" />
 					</div>
 				</div>
 			</div>
@@ -339,15 +339,15 @@
 				<div class="space-y-4">
 					<div class="space-y-3">
 						<label class="flex items-center gap-3 cursor-pointer group">
-							<input type="checkbox" name="participatedInBetting" value="true" checked={p.participatedInBetting ?? false} class="w-4 h-4 rounded border-2 border-input accent-black" />
+							<input id="participatedInBetting" type="checkbox" name="participatedInBetting" value="true" checked={p.participatedInBetting ?? false} class="w-4 h-4 rounded border-2 border-input accent-black" />
 							<span class="text-sm font-medium group-hover:text-foreground transition-colors">I have participated in sports betting</span>
 						</label>
 						<label class="flex items-center gap-3 cursor-pointer group">
-							<input type="checkbox" name="understandsIntegrityPolicy" value="true" checked={p.understandsIntegrityPolicy ?? false} class="w-4 h-4 rounded border-2 border-input accent-black" />
+							<input id="understandsIntegrityPolicy" type="checkbox" name="understandsIntegrityPolicy" value="true" checked={p.understandsIntegrityPolicy ?? false} class="w-4 h-4 rounded border-2 border-input accent-black" />
 							<span class="text-sm font-medium group-hover:text-foreground transition-colors">I understand the FLI Golf Integrity & Substance Policy regarding gambling</span>
 						</label>
 						<label class="flex items-center gap-3 cursor-pointer group">
-							<input type="checkbox" name="priorIntegrityViolations" value="true" checked={p.priorIntegrityViolations ?? false} class="w-4 h-4 rounded border-2 border-input accent-black" />
+							<input id="priorIntegrityViolations" type="checkbox" name="priorIntegrityViolations" value="true" checked={p.priorIntegrityViolations ?? false} class="w-4 h-4 rounded border-2 border-input accent-black" />
 							<span class="text-sm font-medium group-hover:text-foreground transition-colors">I have been suspended or disciplined for integrity violations in any sport</span>
 						</label>
 					</div>

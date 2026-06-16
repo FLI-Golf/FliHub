@@ -64,9 +64,16 @@ export const actions: Actions = {
 };
 
 async function upsertProfile(ctx: any, data: FormData, status: 'draft' | 'submitted') {
-	const existing = await ctx.pb.collection('player_profiles').getFullList({
-		filter: `userId = "${ctx.userId}"`
-	});
+	let existing: any[] = [];
+	try {
+		existing = await ctx.pb.collection('player_profiles').getFullList({
+			filter: `userId = "${ctx.userId}"`
+		});
+	} catch (err: any) {
+		console.error('Player profile lookup error:', err);
+		const message = err?.message ?? 'Player profile collection unavailable';
+		return fail(err?.status ?? 500, { error: message });
+	}
 	const current = existing[0] ?? null;
 
 	const currentStep = String(data.get('currentStep') ?? '');
@@ -91,6 +98,10 @@ async function upsertProfile(ctx: any, data: FormData, status: 'draft' | 'submit
 	};
 
 	const text = (key: string) => (data.has(key) ? String(data.get(key) ?? '') : (current?.[key] ?? ''));
+	const optionalText = (key: string) => {
+		const value = text(key).trim();
+		return value === '' ? null : value;
+	};
 	const num = (key: string) => {
 		if (!data.has(key)) return current?.[key] ?? null;
 		const raw = String(data.get(key) ?? '').trim();
@@ -102,58 +113,58 @@ async function upsertProfile(ctx: any, data: FormData, status: 'draft' | 'submit
 	const payload = {
 		userId: ctx.userId,
 		// Personal
-		fullName: text('fullName'),
-		dateOfBirth: text('dateOfBirth'),
-		nationality: text('nationality'),
-		countryOfResidence: text('countryOfResidence'),
-		primaryLanguages: text('primaryLanguages'),
-		phone: text('phone'),
-		email: text('email'),
-		mailingAddress: text('mailingAddress'),
-		emergencyContactName: text('emergencyContactName'),
-		emergencyContactRelationship: text('emergencyContactRelationship'),
-		emergencyContactPhone: text('emergencyContactPhone'),
-		emergencyContactEmail: text('emergencyContactEmail'),
+		fullName: optionalText('fullName'),
+		dateOfBirth: optionalText('dateOfBirth'),
+		nationality: optionalText('nationality'),
+		countryOfResidence: optionalText('countryOfResidence'),
+		primaryLanguages: optionalText('primaryLanguages'),
+		phone: optionalText('phone'),
+		email: optionalText('email'),
+		mailingAddress: optionalText('mailingAddress'),
+		emergencyContactName: optionalText('emergencyContactName'),
+		emergencyContactRelationship: optionalText('emergencyContactRelationship'),
+		emergencyContactPhone: optionalText('emergencyContactPhone'),
+		emergencyContactEmail: optionalText('emergencyContactEmail'),
 		// Competitive
 		worldRanking: num('worldRanking'),
 		yearsCompeting: num('yearsCompeting'),
-		majorTournamentWins: text('majorTournamentWins'),
-		notableAchievements: text('notableAchievements'),
-		otherLeagues: text('otherLeagues'),
-		playingStyle: text('playingStyle'),
-		strongestSkills: text('strongestSkills'),
-		knownInjuries: text('knownInjuries'),
+		majorTournamentWins: optionalText('majorTournamentWins'),
+		notableAchievements: optionalText('notableAchievements'),
+		otherLeagues: optionalText('otherLeagues'),
+		playingStyle: optionalText('playingStyle'),
+		strongestSkills: optionalText('strongestSkills'),
+		knownInjuries: optionalText('knownInjuries'),
 		// Branding
-		broadcastNickname: text('broadcastNickname'),
-		instagram: text('instagram'),
-		twitter: text('twitter'),
-		youtube: text('youtube'),
-		otherSocialMedia: text('otherSocialMedia'),
-		personalWebsite: text('personalWebsite'),
-		mediaFeatures: text('mediaFeatures'),
+		broadcastNickname: optionalText('broadcastNickname'),
+		instagram: optionalText('instagram'),
+		twitter: optionalText('twitter'),
+		youtube: optionalText('youtube'),
+		otherSocialMedia: optionalText('otherSocialMedia'),
+		personalWebsite: optionalText('personalWebsite'),
+		mediaFeatures: optionalText('mediaFeatures'),
 		comfortableWithInterviews: bool('comfortableWithInterviews'),
 		openToBehindScenes: bool('openToBehindScenes'),
 		// Sponsorship
-		currentSponsorships: text('currentSponsorships'),
+		currentSponsorships: optionalText('currentSponsorships'),
 		openToNewSponsors: bool('openToNewSponsors'),
 		wantsLeagueSponsorHelp: bool('wantsLeagueSponsorHelp'),
-		personalBrandingGoals: text('personalBrandingGoals'),
+		personalBrandingGoals: optionalText('personalBrandingGoals'),
 		// Management
 		hasAgent: bool('hasAgent'),
-		repName: text('repName'),
-		repAgency: text('repAgency'),
-		repPosition: text('repPosition'),
-		repPhone: text('repPhone'),
-		repEmail: text('repEmail'),
+		repName: optionalText('repName'),
+		repAgency: optionalText('repAgency'),
+		repPosition: optionalText('repPosition'),
+		repPhone: optionalText('repPhone'),
+		repEmail: optionalText('repEmail'),
 		// Integrity
 		participatedInBetting: bool('participatedInBetting'),
 		understandsIntegrityPolicy: bool('understandsIntegrityPolicy'),
 		priorIntegrityViolations: bool('priorIntegrityViolations'),
-		integrityViolationDetails: text('integrityViolationDetails'),
+		integrityViolationDetails: optionalText('integrityViolationDetails'),
 		// Additional
-		excitementAboutLeague: text('excitementAboutLeague'),
-		careerGoals: text('careerGoals'),
-		additionalInfo: text('additionalInfo'),
+		excitementAboutLeague: optionalText('excitementAboutLeague'),
+		careerGoals: optionalText('careerGoals'),
+		additionalInfo: optionalText('additionalInfo'),
 		status,
 		submittedAt:
 			status === 'submitted'
@@ -171,6 +182,7 @@ async function upsertProfile(ctx: any, data: FormData, status: 'draft' | 'submit
 		return { success: true, status };
 	} catch (err: any) {
 		console.error('Player profile save error:', err);
-		return fail(500, { error: err.message });
+		const message = err?.response?.message ?? err?.message ?? 'Failed to save player profile';
+		return fail(err?.status ?? 500, { error: message });
 	}
 }
