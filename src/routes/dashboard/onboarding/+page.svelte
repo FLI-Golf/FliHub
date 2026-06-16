@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
+	import { onMount } from 'svelte';
 	import type { PageData } from './$types';
 	import DocumentSigner from '$lib/components/onboarding/DocumentSigner.svelte';
 	import { CheckCircle, Circle, ChevronRight, User, FileText, PenLine, Shield } from 'lucide-svelte';
@@ -249,6 +250,10 @@ Andrew@FLIGolf.com | fligolf.com`;
 	let saving = $state<DocType | null>(null);
 	let saveError = $state('');
 
+	onMount(() => {
+		void invalidateAll();
+	});
+
 	async function handleSign(
 		type: DocType,
 		payload: { initials: string; signatureDataUrl: string; agreed: boolean }
@@ -281,7 +286,8 @@ Andrew@FLIGolf.com | fligolf.com`;
 	// ── Progress ────────────────────────────────────────────────────────────
 
 	const profileDone = $derived(
-		data.playerProfile?.status === 'submitted' || data.playerProfile?.status === 'approved'
+		Boolean(data.progress?.profileCompleted) ||
+		(data.playerProfile?.status === 'submitted' || data.playerProfile?.status === 'approved')
 	);
 
 	const steps = $derived([
@@ -290,12 +296,19 @@ Andrew@FLIGolf.com | fligolf.com`;
 			id: 'documents',
 			label: 'Documents',
 			done:
-				sigStates.player_information_packet.signed &&
-				sigStates.player_opportunity_packet.signed &&
-				sigStates.integrity_substance_policy.signed &&
-				sigStates.legal_documents.signed
+				Boolean(data.progress?.documentsInitialed) ||
+				(
+					sigStates.player_information_packet.signed &&
+					sigStates.player_opportunity_packet.signed &&
+					sigStates.integrity_substance_policy.signed &&
+					sigStates.legal_documents.signed
+				)
 		},
-		{ id: 'contract', label: 'Contract', done: sigStates.player_contract.signed },
+		{
+			id: 'contract',
+			label: 'Contract',
+			done: Boolean(data.progress?.contractSigned) || sigStates.player_contract.signed
+		},
 		{
 			id: 'profile',
 			label: 'Player Profile',
@@ -305,6 +318,13 @@ Andrew@FLIGolf.com | fligolf.com`;
 
 	const completedCount = $derived(steps.filter((s) => s.done).length);
 	const progressPct = $derived(Math.round((completedCount / steps.length) * 100));
+
+	const debugSteps = $derived(
+		steps.map((s) => ({
+			id: s.id,
+			done: s.done
+		}))
+	);
 </script>
 
 <svelte:head>
@@ -346,6 +366,19 @@ Andrew@FLIGolf.com | fligolf.com`;
 			{/each}
 		</div>
 	</div>
+
+	{#if data.debugOnboarding}
+		<div class="bg-amber-50 border border-amber-300 rounded-xl p-4 text-xs space-y-2">
+			<p class="font-bold text-amber-900">Onboarding Debug Mode</p>
+			<p class="text-amber-800">Disable by removing <code>debugOnboarding=1</code> from the URL.</p>
+			<pre class="whitespace-pre-wrap break-words text-amber-900">{JSON.stringify({
+				completedCount,
+				steps: debugSteps,
+				progress: data.progress,
+				debugData: data.debugData
+			}, null, 2)}</pre>
+		</div>
+	{/if}
 
 	{#if saveError}
 		<div class="bg-rose-50 dark:bg-rose-950/30 border border-rose-200 dark:border-rose-800 rounded-lg p-4 text-sm text-rose-700 dark:text-rose-300 font-medium">

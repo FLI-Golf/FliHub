@@ -4,7 +4,13 @@ import type { PageServerLoad, Actions } from './$types';
 
 const ONBOARDING_ROLES = ['pro', 'manager', 'broadcaster'];
 
-export const load: PageServerLoad = async ({ locals, url }) => {
+export const load: PageServerLoad = async ({ locals, url, setHeaders }) => {
+	const debugOnboarding = url.searchParams.get('debugOnboarding') === '1';
+
+	setHeaders({
+		'cache-control': 'no-store, max-age=0'
+	});
+
 	const ctx = await RequestContext.from(locals, url);
 
 	if (!ONBOARDING_ROLES.includes(ctx.role) && ctx.role !== 'admin') {
@@ -22,10 +28,12 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 
 	// Load existing signatures
 	let signatures: Record<string, any> = {};
+	let signatureList: any[] = [];
 	try {
 		const sigs = await ctx.pb.collection('document_signatures').getFullList({
 			filter: `userId = "${ctx.userId}"`
 		});
+		signatureList = sigs;
 		for (const sig of sigs) {
 			signatures[sig.documentType] = sig;
 		}
@@ -40,13 +48,82 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 		playerProfile = profiles[0] ?? null;
 	} catch { /* collection may not exist yet */ }
 
+	const documentsInitialedByType =
+		!!signatures['player_information_packet'] &&
+		!!signatures['player_opportunity_packet'] &&
+		!!signatures['integrity_substance_policy'] &&
+		!!signatures['legal_documents'];
+
+	// Fallback for legacy/malformed records where documentType may be blank.
+	const nonContractSignatureCount = signatureList.filter((sig) => sig.documentType !== 'player_contract').length;
+	const documentsInitialed = documentsInitialedByType || nonContractSignatureCount >= 4;
+
+	const contractSigned = !!signatures['player_contract'];
+	const profileCompleted =
+		playerProfile?.status === 'submitted' || playerProfile?.status === 'approved';
+
+	// Keep onboarding_status aligned with the true completion state so users don't get stuck.
+	try {
+		if (onboardingStatus) {
+			const needsUpdate =
+				(onboardingStatus.documentsInitialed ?? false) !== documentsInitialed ||
+				(onboardingStatus.contractSigned ?? false) !== contractSigned ||
+				(onboardingStatus.profileCompleted ?? false) !== profileCompleted;
+
+			if (needsUpdate) {
+				await ctx.pb.collection('onboarding_status').update(onboardingStatus.id, {
+					documentsInitialed,
+					contractSigned,
+					profileCompleted
+				});
+				onboardingStatus = {
+					...onboardingStatus,
+					documentsInitialed,
+					contractSigned,
+					profileCompleted
+				};
+			}
+		} else if (documentsInitialed || contractSigned || profileCompleted) {
+			const created = await ctx.pb.collection('onboarding_status').create({
+				userId: ctx.userId,
+				welcomeSeen: true,
+				documentsInitialed,
+				contractSigned,
+				profileCompleted
+			});
+			onboardingStatus = created;
+		}
+	} catch {
+		// Non-blocking. UI still uses computed progress below.
+	}
+
 	return {
 		profile: ctx.profile,
 		role: ctx.role,
 		userId: ctx.userId,
 		onboardingStatus,
 		signatures,
-		playerProfile
+		playerProfile,
+		progress: {
+			documentsInitialed,
+			contractSigned,
+			profileCompleted
+		},
+		debugOnboarding,
+		debugData: debugOnboarding
+			? {
+				userId: ctx.userId,
+				signatureCount: signatureList.length,
+				signatureTypes: signatureList.map((sig) => sig.documentType || '(blank)'),
+				documentsInitialedByType,
+				nonContractSignatureCount,
+				documentsInitialed,
+				contractSigned,
+				profileStatus: playerProfile?.status ?? null,
+				profileCompleted,
+				onboardingStatus: onboardingStatus
+			}
+			: null
 	};
 };
 
@@ -90,11 +167,13 @@ export const actions: Actions = {
 			});
 			const signedTypes = new Set(allSigs.map((s: any) => s.documentType));
 			const contractSigned = signedTypes.has('player_contract');
-			const documentsInitialed =
+			const documentsInitialedByType =
 				signedTypes.has('player_information_packet') &&
 				signedTypes.has('player_opportunity_packet') &&
 				signedTypes.has('integrity_substance_policy') &&
 				signedTypes.has('legal_documents');
+			const nonContractSignatureCount = allSigs.filter((s: any) => s.documentType !== 'player_contract').length;
+			const documentsInitialed = documentsInitialedByType || nonContractSignatureCount >= 4;
 
 			const existing = await ctx.pb.collection('onboarding_status').getFullList({
 				filter: `userId = "${ctx.userId}"`
