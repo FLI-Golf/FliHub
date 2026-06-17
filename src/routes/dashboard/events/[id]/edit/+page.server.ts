@@ -9,7 +9,10 @@ export const load: PageServerLoad = async ({ locals, url, params }) => {
 	try {
 		const [event, tournaments, seasons] = await Promise.all([
 			pb.collection('special_events').getOne(params.id, { expand: 'tournament,season' }),
-			pb.collection('tournaments').getFullList({ sort: '-created', fields: 'id,name,season' }).catch(() => []),
+			pb.collection('tournaments').getFullList({ sort: 'startDate' }).catch((err) => {
+				console.error('Failed loading tournaments for event edit:', err);
+				return [];
+			}),
 			pb.collection('seasons').getFullList({ sort: '-year', fields: 'id,name,year,status' }).catch(() => [])
 		]);
 		return { event, tournaments, seasons };

@@ -41,6 +41,17 @@ const T = {
 
 const SEASON_ID = 't9yegq2db2sml8j'; // Season 2027
 
+type TournamentRef = { id: string; name: string };
+
+async function getTournamentRef(season: number, tournamentNumber: number): Promise<TournamentRef | null> {
+	try {
+		const t = await pb.collection('tournaments').getFirstListItem(`season = ${season} && tournamentNumber = ${tournamentNumber}`);
+		return t ? { id: t.id, name: t.name } : null;
+	} catch {
+		return null;
+	}
+}
+
 // ── Auth ─────────────────────────────────────────────────────────────────────
 async function auth() {
 	await pb.collection('_superusers').authWithPassword(
@@ -192,10 +203,20 @@ async function generatePayments(eventId: string) {
 async function seed() {
 	console.log('Seeding event pipeline test data...\n');
 
+	const t1 = await getTournamentRef(2027, 1);
+	const t2 = await getTournamentRef(2027, 2);
+	const t3 = await getTournamentRef(2027, 3);
+	const t4 = await getTournamentRef(2027, 4);
+	const t5 = await getTournamentRef(2027, 5);
+	const t6 = await getTournamentRef(2027, 6);
+
+	const tn = (t: TournamentRef | null, fallback: string) => t?.name ?? fallback;
+
 	// ── 1. APPEARANCE — Children's Hospital (2 players, below threshold → direct) ──
 	console.log('1. Appearance — Children\'s Hospital');
 	const appearance = await createEvent({
-		name: "Children's Hospital Appearance",
+		name: `${tn(t1, 'FLI Golf Season Opener')} — Community Appearance`,
+		...(t1 && { tournament: t1.id }),
 		eventType: 'appearance',
 		eventDate: '2027-03-15 00:00:00.000Z',
 		location: 'Phoenix Children\'s Hospital, Phoenix AZ',
@@ -215,12 +236,13 @@ async function seed() {
 	console.log(`   ✓ Created — ${ap} payments (direct, below $500 threshold)\n`);
 
 	// ── 2. CLINIC — Disc Golf Clinic (single player, above threshold → approval) ──
-	console.log('2. Clinic — Youth Disc Golf Clinic');
+	console.log('2. Clinic — Youth Disc Golf Clinic — San Pedro');
 	const clinic = await createEvent({
-		name: 'Youth Disc Golf Clinic — Scottsdale',
+		name: `${tn(t2, 'Spring Championship')} — Youth Disc Golf Clinic`,
+		...(t2 && { tournament: t2.id }),
 		eventType: 'clinic',
 		eventDate: '2027-04-05 00:00:00.000Z',
-		location: 'Chaparral Park, Scottsdale AZ',
+		location: 'San Pedro, CA',
 		status: 'scheduled',
 		defaultRate: 750,
 		budget: 1000,
@@ -238,7 +260,8 @@ async function seed() {
 	// ── 3. MEDIA — Interview / Photo Shoot (requiresApproval forced) ──
 	console.log('3. Media — Magazine Photo Shoot');
 	const media = await createEvent({
-		name: 'Disc Golf World Magazine Shoot',
+		name: `${tn(t3, 'Mid-Season Classic')} — Media Day`,
+		...(t3 && { tournament: t3.id }),
 		eventType: 'media',
 		eventDate: '2027-04-20 00:00:00.000Z',
 		location: 'Sedona, AZ',
@@ -262,7 +285,8 @@ async function seed() {
 	// Temporarily set a manager cut on Gannon for this test
 	await pb.collection('talent').update(T.gannon, { managerCutPercentage: 15, managerName: 'Scott Buhr', managerEmail: 'scott.buhr@test.com' });
 	const promo = await createEvent({
-		name: 'FLI Golf Expo Booth — Las Vegas',
+		name: `${tn(t4, 'Summer Showdown')} — Fan Promo Booth`,
+		...(t4 && { tournament: t4.id }),
 		eventType: 'promotional',
 		eventDate: '2027-05-10 00:00:00.000Z',
 		location: 'Las Vegas Convention Center, NV',
@@ -284,11 +308,12 @@ async function seed() {
 	// ── 5. CONTENT CREATION — YouTube Series Episode ──
 	console.log('5. Content Creation — YouTube Episode');
 	const content = await createEvent({
-		name: 'FLI Golf YouTube Series — Episode 3',
+		name: `${tn(t5, 'Fall Invitational')} — Content Shoot`,
+		...(t5 && { tournament: t5.id }),
 		eventType: 'content_creation',
 		eventDate: '2027-05-25 00:00:00.000Z',
 		location: 'Fountain Hills, AZ',
-		status: 'draft',
+		status: 'scheduled',
 		defaultRate: 200,
 		budget: 500,
 		approvalThreshold: 500,
@@ -300,8 +325,8 @@ async function seed() {
 	await addTask(content.id, { title: 'Scout filming locations', priority: 'medium' });
 	await addTask(content.id, { title: 'Arrange drone operator', priority: 'high', hasCost: true, estimatedCost: 300, requiresApproval: true });
 	await addTask(content.id, { title: 'Edit and upload video', priority: 'high' });
-	// No payments generated yet — event is still draft
-	console.log(`   ✓ Created — no payments (event is draft)\n`);
+	const ctp = await generatePayments(content.id);
+	console.log(`   ✓ Created — ${ctp} payments (event is scheduled)\n`);
 
 	// ── 6. TOURNAMENT BROADCAST — 3 events in season, bonus at 3 ──
 	console.log('6. Tournament Broadcast — Season series (3 events, bonus at 3)');
@@ -318,18 +343,19 @@ async function seed() {
 		description: '<p>Live broadcast coverage. Broadcasters cover commentary, analysis, and social media.</p>'
 	};
 
-	const bc1 = await createEvent({ ...broadcastBase, name: 'FLI Open Broadcast — Round 1', eventDate: '2027-06-01 00:00:00.000Z', location: 'Phoenix, AZ', status: 'completed' });
-	const bc2 = await createEvent({ ...broadcastBase, name: 'FLI Open Broadcast — Round 2', eventDate: '2027-06-02 00:00:00.000Z', location: 'Phoenix, AZ', status: 'completed' });
-	const bc3 = await createEvent({ ...broadcastBase, name: 'FLI Open Broadcast — Finals', eventDate: '2027-06-03 00:00:00.000Z', location: 'Phoenix, AZ', status: 'scheduled' });
+	const broadcastTitle = tn(t6, 'FLI Golf Championship Finals');
+	const bc1 = await createEvent({ ...broadcastBase, ...(t6 && { tournament: t6.id }), name: `${broadcastTitle} — Broadcast Round 1`, eventDate: '2027-06-01 00:00:00.000Z', location: 'Phoenix, AZ', status: 'scheduled' });
+	const bc2 = await createEvent({ ...broadcastBase, ...(t6 && { tournament: t6.id }), name: `${broadcastTitle} — Broadcast Round 2`, eventDate: '2027-06-02 00:00:00.000Z', location: 'Phoenix, AZ', status: 'scheduled' });
+	const bc3 = await createEvent({ ...broadcastBase, ...(t6 && { tournament: t6.id }), name: `${broadcastTitle} — Broadcast Finals`, eventDate: '2027-06-03 00:00:00.000Z', location: 'Phoenix, AZ', status: 'scheduled' });
 
 	// Paul and Kona do all 3 → bonus eligible. Brad only does 2 → not eligible.
 	for (const bcId of [bc1.id, bc2.id, bc3.id]) {
-		await assignTalent(bcId, T.paul_u, 'broadcaster', null, bcId === bc3.id ? 'confirmed' : 'completed');
-		await assignTalent(bcId, T.kona, 'broadcaster', null, bcId === bc3.id ? 'confirmed' : 'completed');
+		await assignTalent(bcId, T.paul_u, 'broadcaster', null, 'confirmed');
+		await assignTalent(bcId, T.kona, 'broadcaster', null, 'confirmed');
 	}
 	// Brad only on first two
-	await assignTalent(bc1.id, T.brad, 'broadcaster', null, 'completed');
-	await assignTalent(bc2.id, T.brad, 'broadcaster', null, 'completed');
+	await assignTalent(bc1.id, T.brad, 'broadcaster', null, 'confirmed');
+	await assignTalent(bc2.id, T.brad, 'broadcaster', null, 'confirmed');
 
 	// Tasks on the finals event
 	await addTask(bc3.id, { title: 'Set up broadcast equipment', priority: 'urgent', dueDate: '2027-06-03 00:00:00.000Z' });

@@ -80,8 +80,7 @@
 		if (!confirm('Clear all seed data and re-seed? This cannot be undone.')) return;
 		seedBusy = true; seedMsg = '';
 		try {
-			await fetch('/api/events/seed', { method: 'DELETE' });
-			const res = await fetch('/api/events/seed', { method: 'POST' });
+			const res = await fetch('/api/events/seed', { method: 'PATCH' });
 			const d = await res.json();
 			seedMsg = d.message;
 			if (res.ok) { await invalidateAll(); }
