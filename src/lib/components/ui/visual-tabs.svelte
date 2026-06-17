@@ -4,6 +4,10 @@
 		label: string;
 		count?: number;
 		icon?: any;
+		activeClass?: string;
+		inactiveClass?: string;
+		countActiveClass?: string;
+		countInactiveClass?: string;
 	}
 	
 	interface Props {
@@ -43,7 +47,7 @@
 	{#each tabs as tab}
 		<button
 			type="button"
-			class="{classes.tab} {activeTab === tab.value ? classes.active : classes.inactive}"
+			class="{classes.tab} {activeTab === tab.value ? `${classes.active} ${tab.activeClass ?? ''}` : `${classes.inactive} ${tab.inactiveClass ?? ''}`}"
 			onclick={() => onTabChange(tab.value)}
 		>
 			<div class="flex items-center gap-2">
@@ -52,7 +56,7 @@
 				{/if}
 				<span>{tab.label}</span>
 				{#if tab.count !== undefined}
-					<span class="px-1.5 py-0 rounded-full text-[10px] font-semibold leading-5 {activeTab === tab.value ? 'bg-primary-foreground/20' : 'bg-muted-foreground/20'}">
+					<span class="px-1.5 py-0 rounded-full text-[10px] font-semibold leading-5 {activeTab === tab.value ? (tab.countActiveClass ?? 'bg-primary-foreground/20') : (tab.countInactiveClass ?? 'bg-muted-foreground/20')}">
 						{tab.count}
 					</span>
 				{/if}

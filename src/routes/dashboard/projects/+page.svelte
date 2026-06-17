@@ -3,7 +3,6 @@
 	import Card from '$lib/components/ui/card.svelte';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import VisualTabs from '$lib/components/ui/visual-tabs.svelte';
-	import MetricCard from '$lib/components/metrics/metric-card.svelte';
 	import ProgressBar from '$lib/components/metrics/progress-bar.svelte';
 	import StatusBadge from '$lib/components/metrics/status-badge.svelte';
 	import AddProjectModal from '$lib/components/projects/add-project-modal.svelte';
@@ -24,7 +23,10 @@
 		Trophy,
 		Zap,
 		PartyPopper,
-		Megaphone
+		Megaphone,
+		ChevronUp,
+		ChevronDown,
+		ChevronsUpDown
 	} from 'lucide-svelte';
 	
 	let { data }: { data: PageData } = $props();
@@ -43,6 +45,10 @@
 	let statusFilter = $state<string>('all');
 	let typeFilter = $state<string>('all');
 	let searchQuery = $state('');
+	let budgetStatusFilter = $state<string>('in_progress');
+	type SortKey = 'name' | 'type' | 'status' | 'budget' | 'description' | 'vendors' | 'startDate' | 'endDate';
+	let sortKey = $state<SortKey>('name');
+	let sortDirection = $state<'asc' | 'desc'>('asc');
 	
 	// Filter projects based on selected tabs and search
 	let filteredProjects = $derived(projects.filter(project => {
@@ -69,24 +75,110 @@
 		const pct = getBudgetPercentage(p);
 		return pct >= 80 && pct < 100;
 	}).length);
+
+	let budgetStatusProjects = $derived(projects.filter((project) => {
+		return budgetStatusFilter === 'all' || project.status === budgetStatusFilter;
+	}));
+
+	let scopedBudget = $derived({
+		total: budgetStatusProjects.reduce((sum, p) => sum + (p.project_budget || 0), 0),
+		forecasted: budgetStatusProjects.reduce((sum, p) => sum + (p.project_forecasted_expenses || 0), 0),
+		actual: budgetStatusProjects.reduce((sum, p) => sum + (p.project_actual_expenses || 0), 0)
+	});
+
+	let scopedVariance = $derived(scopedBudget.total - scopedBudget.actual);
+	let scopedUsagePct = $derived(scopedBudget.total > 0 ? (scopedBudget.actual / scopedBudget.total) * 100 : 0);
+
+	let activeProjects = $derived(projects.filter((p) => p.status === 'in_progress'));
+	let activeBudgetTotal = $derived(activeProjects.reduce((sum, p) => sum + (p.project_budget || 0), 0));
+	let activeBudgetSpent = $derived(activeProjects.reduce((sum, p) => sum + (p.project_actual_expenses || 0), 0));
+	let activeBudgetRemaining = $derived(activeBudgetTotal - activeBudgetSpent);
+
+	let sortedProjects = $derived([...filteredProjects].sort((a, b) => compareProjects(a, b, sortKey, sortDirection)));
 	
 	// Build status tabs
 	let statusTabs = $derived([
-		{ value: 'all', label: 'All', count: projects.length },
-		{ value: 'draft', label: 'Draft', count: stats.byStatus.draft, icon: FileText },
-		{ value: 'planned', label: 'Planned', count: stats.byStatus.planned, icon: ClipboardList },
-		{ value: 'in_progress', label: 'In Progress', count: stats.byStatus.in_progress, icon: PlayCircle },
-		{ value: 'completed', label: 'Completed', count: stats.byStatus.completed, icon: CheckCircle2 },
-		{ value: 'cancelled', label: 'Cancelled', count: stats.byStatus.cancelled, icon: XCircle }
+		{
+			value: 'all', label: 'All', count: projects.length,
+			activeClass: '!bg-slate-700 !border-slate-500 !text-slate-100',
+			inactiveClass: 'border-slate-700/70 bg-slate-900/40 text-slate-300 hover:border-slate-500 hover:bg-slate-800/60',
+			countActiveClass: 'bg-slate-500/40',
+			countInactiveClass: 'bg-slate-500/20'
+		},
+		{
+			value: 'draft', label: 'Draft', count: stats.byStatus.draft, icon: FileText,
+			activeClass: '!bg-zinc-700 !border-zinc-500 !text-zinc-100',
+			inactiveClass: 'border-zinc-700/70 bg-zinc-900/30 text-zinc-300 hover:border-zinc-500 hover:bg-zinc-800/50',
+			countActiveClass: 'bg-zinc-500/35',
+			countInactiveClass: 'bg-zinc-500/20'
+		},
+		{
+			value: 'planned', label: 'Planned', count: stats.byStatus.planned, icon: ClipboardList,
+			activeClass: '!bg-blue-700 !border-blue-500 !text-blue-100',
+			inactiveClass: 'border-blue-700/70 bg-blue-900/30 text-blue-300 hover:border-blue-500 hover:bg-blue-800/50',
+			countActiveClass: 'bg-blue-500/35',
+			countInactiveClass: 'bg-blue-500/20'
+		},
+		{
+			value: 'in_progress', label: 'In Progress', count: stats.byStatus.in_progress, icon: PlayCircle,
+			activeClass: '!bg-amber-700 !border-amber-500 !text-amber-100',
+			inactiveClass: 'border-amber-700/70 bg-amber-900/30 text-amber-300 hover:border-amber-500 hover:bg-amber-800/50',
+			countActiveClass: 'bg-amber-500/35',
+			countInactiveClass: 'bg-amber-500/20'
+		},
+		{
+			value: 'completed', label: 'Completed', count: stats.byStatus.completed, icon: CheckCircle2,
+			activeClass: '!bg-emerald-700 !border-emerald-500 !text-emerald-100',
+			inactiveClass: 'border-emerald-700/70 bg-emerald-900/30 text-emerald-300 hover:border-emerald-500 hover:bg-emerald-800/50',
+			countActiveClass: 'bg-emerald-500/35',
+			countInactiveClass: 'bg-emerald-500/20'
+		},
+		{
+			value: 'cancelled', label: 'Cancelled', count: stats.byStatus.cancelled, icon: XCircle,
+			activeClass: '!bg-rose-700 !border-rose-500 !text-rose-100',
+			inactiveClass: 'border-rose-700/70 bg-rose-900/30 text-rose-300 hover:border-rose-500 hover:bg-rose-800/50',
+			countActiveClass: 'bg-rose-500/35',
+			countInactiveClass: 'bg-rose-500/20'
+		}
 	]);
 	
 	// Build type tabs
 	let typeTabs = $derived([
-		{ value: 'all', label: 'All Types', count: projects.length },
-		{ value: 'tournament', label: 'Tournament', count: stats.byType.tournament, icon: Trophy },
-		{ value: 'activation', label: 'Activation', count: stats.byType.activation, icon: Zap },
-		{ value: 'event', label: 'Event', count: stats.byType.event, icon: PartyPopper },
-		{ value: 'campaign', label: 'Campaign', count: stats.byType.campaign, icon: Megaphone }
+		{
+			value: 'all', label: 'All Types', count: projects.length,
+			activeClass: '!bg-slate-700 !text-slate-100',
+			inactiveClass: 'bg-slate-800 text-slate-300 hover:bg-slate-700/70',
+			countActiveClass: 'bg-slate-500/35',
+			countInactiveClass: 'bg-slate-500/20'
+		},
+		{
+			value: 'tournament', label: 'Tournament', count: stats.byType.tournament, icon: Trophy,
+			activeClass: '!bg-indigo-700 !text-indigo-100',
+			inactiveClass: 'bg-indigo-900/30 text-indigo-300 hover:bg-indigo-800/50',
+			countActiveClass: 'bg-indigo-500/35',
+			countInactiveClass: 'bg-indigo-500/20'
+		},
+		{
+			value: 'activation', label: 'Activation', count: stats.byType.activation, icon: Zap,
+			activeClass: '!bg-orange-700 !text-orange-100',
+			inactiveClass: 'bg-orange-900/30 text-orange-300 hover:bg-orange-800/50',
+			countActiveClass: 'bg-orange-500/35',
+			countInactiveClass: 'bg-orange-500/20'
+		},
+		{
+			value: 'event', label: 'Event', count: stats.byType.event, icon: PartyPopper,
+			activeClass: '!bg-fuchsia-700 !text-fuchsia-100',
+			inactiveClass: 'bg-fuchsia-900/30 text-fuchsia-300 hover:bg-fuchsia-800/50',
+			countActiveClass: 'bg-fuchsia-500/35',
+			countInactiveClass: 'bg-fuchsia-500/20'
+		},
+		{
+			value: 'campaign', label: 'Campaign', count: stats.byType.campaign, icon: Megaphone,
+			activeClass: '!bg-cyan-700 !text-cyan-100',
+			inactiveClass: 'bg-cyan-900/30 text-cyan-300 hover:bg-cyan-800/50',
+			countActiveClass: 'bg-cyan-500/35',
+			countInactiveClass: 'bg-cyan-500/20'
+		}
 	]);
 	
 	function formatCurrency(amount: number): string {
@@ -124,10 +216,79 @@
 		return html.replace(/<[^>]*>/g, '').replace(/&nbsp;/g, ' ').trim();
 	}
 
+	function excerpt(text: string, max = 180): string {
+		if (!text) return '-';
+		return text.length > max ? `${text.slice(0, max)}...` : text;
+	}
+
+	function getVendorNames(project: any): string[] {
+		const vendorRecords = project?.expand?.vendors;
+		if (!Array.isArray(vendorRecords)) return [];
+		return vendorRecords.map((v: any) => v?.name).filter(Boolean);
+	}
+
+	function getVendorIds(project: any): string[] {
+		return Array.isArray(project?.vendors) ? project.vendors : [];
+	}
+
 	function clearFilters() {
 		statusFilter = 'all';
 		typeFilter = 'all';
 		searchQuery = '';
+	}
+
+	function toggleSort(key: SortKey) {
+		if (sortKey === key) {
+			sortDirection = sortDirection === 'asc' ? 'desc' : 'asc';
+			return;
+		}
+
+		sortKey = key;
+		sortDirection = 'asc';
+	}
+
+	function sortState(key: SortKey): 'asc' | 'desc' | 'none' {
+		if (sortKey !== key) return 'none';
+		return sortDirection;
+	}
+
+	function compareProjects(a: any, b: any, key: SortKey, direction: 'asc' | 'desc'): number {
+		const multiplier = direction === 'asc' ? 1 : -1;
+		const aValue = getSortValue(a, key);
+		const bValue = getSortValue(b, key);
+
+		if (typeof aValue === 'number' && typeof bValue === 'number') {
+			return (aValue - bValue) * multiplier;
+		}
+
+		return String(aValue).localeCompare(String(bValue), undefined, { sensitivity: 'base' }) * multiplier;
+	}
+
+	function getSortValue(project: any, key: SortKey): string | number {
+		switch (key) {
+			case 'name':
+				return project.name || '';
+			case 'type':
+				return project.type || '';
+			case 'status':
+				return project.status || '';
+			case 'budget':
+				return project.project_budget || 0;
+			case 'description':
+				return stripHtml(project.description || '');
+			case 'vendors': {
+				const names = getVendorNames(project);
+				if (names.length > 0) return names.join(', ');
+				const ids = getVendorIds(project);
+				return ids.length;
+			}
+			case 'startDate':
+				return project.startDate ? new Date(project.startDate).getTime() : 0;
+			case 'endDate':
+				return project.endDate ? new Date(project.endDate).getTime() : 0;
+			default:
+				return '';
+		}
 	}
 
 	function statusToneClass(status: string): string {
@@ -138,6 +299,16 @@
 			case 'completed': return 'border-l-emerald-500';
 			case 'cancelled': return 'border-l-rose-500';
 			default: return 'border-l-slate-600';
+		}
+	}
+
+	function typeToneClass(type: string): string {
+		switch (type) {
+			case 'tournament': return 'border-indigo-700/50 bg-indigo-900/30 text-indigo-300';
+			case 'activation': return 'border-orange-700/50 bg-orange-900/30 text-orange-300';
+			case 'event': return 'border-fuchsia-700/50 bg-fuchsia-900/30 text-fuchsia-300';
+			case 'campaign': return 'border-cyan-700/50 bg-cyan-900/30 text-cyan-300';
+			default: return 'border-slate-700/50 bg-slate-900/30 text-slate-300';
 		}
 	}
 
@@ -211,35 +382,51 @@
 	<!-- Statistics -->
 	<div>
 		<h2 class="text-xl font-semibold mb-4">Overview</h2>
-		<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-			<MetricCard
-				title="Total Projects"
-				value={stats.total}
-				subtitle="{stats.byStatus.in_progress} active"
-				icon={FolderKanban}
-			/>
-			
-			<MetricCard
-				title="Total Budget"
-				value={formatCurrency(stats.budget.total)}
-				subtitle="Allocated across all projects"
-				icon={DollarSign}
-			/>
-			
-			<MetricCard
-				title="Actual Spent"
-				value={formatCurrency(stats.budget.actual)}
-				subtitle={stats.budget.total > 0 ? `${((stats.budget.actual / stats.budget.total) * 100).toFixed(0)}% of total budget` : 'No budget set'}
-				icon={TrendingUp}
-			/>
-			
-			<MetricCard
-				title="Remaining Budget"
-				value={formatCurrency(stats.budget.remaining)}
-				subtitle="Available to spend"
-				icon={DollarSign}
-				variant={stats.budget.remaining > 0 ? 'success' : 'danger'}
-			/>
+		<div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-4">
+			<Card class="p-5 border-indigo-700/50 bg-gradient-to-br from-indigo-950/50 to-slate-900/50">
+				<div class="flex items-center justify-between mb-3">
+					<p class="text-sm font-medium text-indigo-200">Total Projects</p>
+					<FolderKanban class="size-5 text-indigo-300" />
+				</div>
+				<p class="text-2xl font-bold text-indigo-50">{stats.total}</p>
+				<p class="text-xs text-indigo-200/80 mt-1">{stats.byStatus.in_progress} active</p>
+			</Card>
+
+			<Card class="p-5 border-emerald-700/50 bg-gradient-to-br from-emerald-950/50 to-slate-900/50">
+				<div class="flex items-center justify-between mb-3">
+					<p class="text-sm font-medium text-emerald-200">Total Budget</p>
+					<DollarSign class="size-5 text-emerald-300" />
+				</div>
+				<p class="text-2xl font-bold text-emerald-50">{formatCurrency(stats.budget.total)}</p>
+				<p class="text-xs text-emerald-200/80 mt-1">Allocated across all projects</p>
+			</Card>
+
+			<Card class="p-5 border-amber-700/50 bg-gradient-to-br from-amber-950/50 to-slate-900/50">
+				<div class="flex items-center justify-between mb-3">
+					<p class="text-sm font-medium text-amber-200">Actual Spent</p>
+					<TrendingUp class="size-5 text-amber-300" />
+				</div>
+				<p class="text-2xl font-bold text-amber-50">{formatCurrency(stats.budget.actual)}</p>
+				<p class="text-xs text-amber-200/80 mt-1">{stats.budget.total > 0 ? `${((stats.budget.actual / stats.budget.total) * 100).toFixed(0)}% of total budget` : 'No budget set'}</p>
+			</Card>
+
+			<Card class="p-5 border-violet-700/50 bg-gradient-to-br from-violet-950/50 to-slate-900/50">
+				<div class="flex items-center justify-between mb-3">
+					<p class="text-sm font-medium text-violet-200">Active Budget</p>
+					<PlayCircle class="size-5 text-violet-300" />
+				</div>
+				<p class="text-2xl font-bold text-violet-50">{formatCurrency(activeBudgetTotal)}</p>
+				<p class="text-xs text-violet-200/80 mt-1">{formatCurrency(activeBudgetRemaining)} remaining in active projects</p>
+			</Card>
+
+			<Card class="p-5 border-cyan-700/50 bg-gradient-to-br from-cyan-950/50 to-slate-900/50">
+				<div class="flex items-center justify-between mb-3">
+					<p class="text-sm font-medium text-cyan-200">Remaining Budget</p>
+					<DollarSign class="size-5 text-cyan-300" />
+				</div>
+				<p class="text-2xl font-bold text-cyan-50">{formatCurrency(stats.budget.remaining)}</p>
+				<p class="text-xs text-cyan-200/80 mt-1">Available to spend</p>
+			</Card>
 		</div>
 	</div>
 
@@ -264,38 +451,66 @@
 		</div>
 	</Card>
 
-	<!-- Budget Overview -->
-	<div>
-		<h2 class="text-xl font-semibold mb-4">Budget Utilization</h2>
-		<Card class="p-6">
-			<div class="space-y-4">
-				<div class="flex justify-between text-sm">
-					<span class="text-muted-foreground">Total Budget</span>
-					<span class="font-semibold">{formatCurrency(stats.budget.total)}</span>
+	<!-- Budget Overview (Collapsible) -->
+	<details class="group" aria-label="Budget Utilization">
+		<summary class="list-none cursor-pointer">
+			<Card class="p-4 border-slate-700 bg-slate-900/30 hover:bg-slate-900/50 transition-colors">
+				<div class="flex items-center justify-between gap-3">
+					<div>
+						<h2 class="text-xl font-semibold">Budget Utilization</h2>
+						<p class="text-xs text-slate-400 mt-1">Collapsed by default. Expand for budget breakdown and status filter.</p>
+					</div>
+					<div class="text-slate-400 text-xs group-open:hidden">Show</div>
+					<div class="text-slate-400 text-xs hidden group-open:block">Hide</div>
 				</div>
-				<div class="flex justify-between text-sm">
-					<span class="text-muted-foreground">Forecasted</span>
-					<span class="font-semibold">{formatCurrency(stats.budget.forecasted)}</span>
+			</Card>
+		</summary>
+		<div class="pt-3">
+			<Card class="p-6">
+				<div class="flex flex-wrap items-center justify-between gap-3 mb-4">
+					<p class="text-sm text-slate-400">Status scope</p>
+					<select
+						bind:value={budgetStatusFilter}
+						class="h-9 rounded-md border border-slate-600 bg-slate-900 px-3 text-sm text-slate-200"
+					>
+						<option value="all">All ({projects.length})</option>
+						<option value="draft">Draft ({stats.byStatus.draft})</option>
+						<option value="planned">Planned ({stats.byStatus.planned})</option>
+						<option value="in_progress">In Progress ({stats.byStatus.in_progress})</option>
+						<option value="completed">Completed ({stats.byStatus.completed})</option>
+						<option value="cancelled">Cancelled ({stats.byStatus.cancelled})</option>
+					</select>
 				</div>
-				<div class="flex justify-between text-sm">
-					<span class="text-muted-foreground">Actual Spent</span>
-					<span class="font-semibold">{formatCurrency(stats.budget.actual)}</span>
+
+				<div class="space-y-4">
+					<div class="flex justify-between text-sm">
+						<span class="text-muted-foreground">Total Budget</span>
+						<span class="font-semibold">{formatCurrency(scopedBudget.total)}</span>
+					</div>
+					<div class="flex justify-between text-sm">
+						<span class="text-muted-foreground">Forecasted</span>
+						<span class="font-semibold">{formatCurrency(scopedBudget.forecasted)}</span>
+					</div>
+					<div class="flex justify-between text-sm">
+						<span class="text-muted-foreground">Actual Spent</span>
+						<span class="font-semibold">{formatCurrency(scopedBudget.actual)}</span>
+					</div>
+					<div class="flex justify-between text-sm">
+						<span class="text-muted-foreground">Variance</span>
+						<span class="font-semibold" class:text-green-600={scopedVariance > 0} class:text-red-600={scopedVariance < 0}>
+							{scopedVariance > 0 ? '+' : ''}{formatCurrency(scopedVariance)}
+						</span>
+					</div>
+					<ProgressBar
+						value={scopedBudget.actual}
+						max={scopedBudget.total}
+						label={`Budget Used ${scopedUsagePct.toFixed(0)}%`}
+						size="lg"
+					/>
 				</div>
-				<div class="flex justify-between text-sm">
-					<span class="text-muted-foreground">Variance</span>
-					<span class="font-semibold" class:text-green-600={stats.budget.variance > 0} class:text-red-600={stats.budget.variance < 0}>
-						{stats.budget.variance > 0 ? '+' : ''}{formatCurrency(stats.budget.variance)}
-					</span>
-				</div>
-				<ProgressBar
-					value={stats.budget.actual}
-					max={stats.budget.total}
-					label="Budget Used"
-					size="lg"
-				/>
-			</div>
-		</Card>
-	</div>
+			</Card>
+		</div>
+	</details>
 
 
 
@@ -328,43 +543,27 @@
 			</div>
 		</div>
 		
-		<!-- Status Filter Tabs -->
-		<div class="mb-4">
-			<h3 class="text-sm font-medium text-muted-foreground mb-3">Filter by Status</h3>
-			<VisualTabs
-				tabs={statusTabs}
-				activeTab={statusFilter}
-				onTabChange={(v) => statusFilter = v}
-				variant="button"
-			/>
-		</div>
-
-		<!-- Type Filter Tabs -->
-		<div class="mb-4">
-			<h3 class="text-sm font-medium text-muted-foreground mb-3">Filter by Type</h3>
-			<VisualTabs
-				tabs={typeTabs}
-				activeTab={typeFilter}
-				onTabChange={(v) => typeFilter = v}
-				variant="pill"
-			/>
-		</div>
-
-		<!-- Legends -->
-		<div class="mb-4 flex flex-wrap items-center gap-4 rounded-xl border border-slate-700 bg-slate-900/30 px-4 py-3">
-			<div class="flex flex-wrap items-center gap-2">
-				<span class="text-[11px] uppercase tracking-wide text-slate-400 font-semibold">Status</span>
-				<span class="inline-flex items-center gap-1.5 text-[11px] px-2 py-0.5 rounded-full border border-slate-600 text-slate-300 bg-slate-800/70"><span class="size-2 rounded-full bg-slate-400"></span>Draft</span>
-				<span class="inline-flex items-center gap-1.5 text-[11px] px-2 py-0.5 rounded-full border border-blue-700/50 text-blue-300 bg-blue-900/30"><span class="size-2 rounded-full bg-blue-400"></span>Planned</span>
-				<span class="inline-flex items-center gap-1.5 text-[11px] px-2 py-0.5 rounded-full border border-amber-700/50 text-amber-300 bg-amber-900/30"><span class="size-2 rounded-full bg-amber-400"></span>In Progress</span>
-				<span class="inline-flex items-center gap-1.5 text-[11px] px-2 py-0.5 rounded-full border border-emerald-700/50 text-emerald-300 bg-emerald-900/30"><span class="size-2 rounded-full bg-emerald-400"></span>Completed</span>
-				<span class="inline-flex items-center gap-1.5 text-[11px] px-2 py-0.5 rounded-full border border-rose-700/50 text-rose-300 bg-rose-900/30"><span class="size-2 rounded-full bg-rose-400"></span>Cancelled</span>
-			</div>
-			<div class="flex flex-wrap items-center gap-2">
-				<span class="text-[11px] uppercase tracking-wide text-slate-400 font-semibold">Budget Risk</span>
-				<span class="inline-flex items-center gap-1.5 text-[11px] px-2 py-0.5 rounded-full border border-emerald-700/50 text-emerald-300 bg-emerald-900/30"><span class="size-2 rounded-full bg-emerald-400"></span>Healthy (&lt;80%)</span>
-				<span class="inline-flex items-center gap-1.5 text-[11px] px-2 py-0.5 rounded-full border border-amber-700/50 text-amber-300 bg-amber-900/30"><span class="size-2 rounded-full bg-amber-400"></span>Nearing Limit (80-99%)</span>
-				<span class="inline-flex items-center gap-1.5 text-[11px] px-2 py-0.5 rounded-full border border-red-700/50 text-red-300 bg-red-900/30"><span class="size-2 rounded-full bg-red-400"></span>Over Budget (100%+)</span>
+		<!-- Compact Filters Row -->
+		<div class="mb-4 rounded-xl border border-slate-700 bg-slate-900/30 p-4">
+			<div class="flex flex-wrap items-start gap-4">
+				<div class="min-w-[280px] flex-1">
+					<h3 class="text-xs font-semibold uppercase tracking-wide text-slate-400 mb-2">Filters · Status</h3>
+					<VisualTabs
+						tabs={statusTabs}
+						activeTab={statusFilter}
+						onTabChange={(v) => statusFilter = v}
+						variant="button"
+					/>
+				</div>
+				<div class="min-w-[280px] flex-1">
+					<h3 class="text-xs font-semibold uppercase tracking-wide text-slate-400 mb-2">Filters · Type</h3>
+					<VisualTabs
+						tabs={typeTabs}
+						activeTab={typeFilter}
+						onTabChange={(v) => typeFilter = v}
+						variant="pill"
+					/>
+				</div>
 			</div>
 		</div>
 
@@ -374,32 +573,107 @@
 					<thead class="bg-slate-900 border-b border-slate-700">
 						<tr>
 							<th class="px-6 py-3 text-left text-xs font-semibold text-slate-200 uppercase tracking-wider">
-								Project Name
+								<button type="button" class="inline-flex items-center gap-1 hover:text-white" onclick={() => toggleSort('name')}>
+									Project Name
+									{#if sortState('name') === 'asc'}
+										<ChevronUp class="size-3.5" />
+									{:else if sortState('name') === 'desc'}
+										<ChevronDown class="size-3.5" />
+									{:else}
+										<ChevronsUpDown class="size-3.5 text-slate-500" />
+									{/if}
+								</button>
 							</th>
 							<th class="px-6 py-3 text-left text-xs font-semibold text-slate-200 uppercase tracking-wider">
-								Type
+								<button type="button" class="inline-flex items-center gap-1 hover:text-white" onclick={() => toggleSort('type')}>
+									Type
+									{#if sortState('type') === 'asc'}
+										<ChevronUp class="size-3.5" />
+									{:else if sortState('type') === 'desc'}
+										<ChevronDown class="size-3.5" />
+									{:else}
+										<ChevronsUpDown class="size-3.5 text-slate-500" />
+									{/if}
+								</button>
 							</th>
 							<th class="px-6 py-3 text-left text-xs font-semibold text-slate-200 uppercase tracking-wider">
-								Status
+								<button type="button" class="inline-flex items-center gap-1 hover:text-white" onclick={() => toggleSort('status')}>
+									Status
+									{#if sortState('status') === 'asc'}
+										<ChevronUp class="size-3.5" />
+									{:else if sortState('status') === 'desc'}
+										<ChevronDown class="size-3.5" />
+									{:else}
+										<ChevronsUpDown class="size-3.5 text-slate-500" />
+									{/if}
+								</button>
 							</th>
 							<th class="px-6 py-3 text-left text-xs font-semibold text-slate-200 uppercase tracking-wider">
-								Budget
+								<button type="button" class="inline-flex items-center gap-1 hover:text-white" onclick={() => toggleSort('budget')}>
+									Budget
+									{#if sortState('budget') === 'asc'}
+										<ChevronUp class="size-3.5" />
+									{:else if sortState('budget') === 'desc'}
+										<ChevronDown class="size-3.5" />
+									{:else}
+										<ChevronsUpDown class="size-3.5 text-slate-500" />
+									{/if}
+								</button>
 							</th>
 							<th class="px-6 py-3 text-left text-xs font-semibold text-slate-200 uppercase tracking-wider">
-								Spent
+								<button type="button" class="inline-flex items-center gap-1 hover:text-white" onclick={() => toggleSort('description')}>
+									Description
+									{#if sortState('description') === 'asc'}
+										<ChevronUp class="size-3.5" />
+									{:else if sortState('description') === 'desc'}
+										<ChevronDown class="size-3.5" />
+									{:else}
+										<ChevronsUpDown class="size-3.5 text-slate-500" />
+									{/if}
+								</button>
 							</th>
 							<th class="px-6 py-3 text-left text-xs font-semibold text-slate-200 uppercase tracking-wider">
-								Progress
+								<button type="button" class="inline-flex items-center gap-1 hover:text-white" onclick={() => toggleSort('vendors')}>
+									Vendors
+									{#if sortState('vendors') === 'asc'}
+										<ChevronUp class="size-3.5" />
+									{:else if sortState('vendors') === 'desc'}
+										<ChevronDown class="size-3.5" />
+									{:else}
+										<ChevronsUpDown class="size-3.5 text-slate-500" />
+									{/if}
+								</button>
 							</th>
 							<th class="px-6 py-3 text-left text-xs font-semibold text-slate-200 uppercase tracking-wider">
-								Dates
+								<button type="button" class="inline-flex items-center gap-1 hover:text-white" onclick={() => toggleSort('startDate')}>
+									Start Date
+									{#if sortState('startDate') === 'asc'}
+										<ChevronUp class="size-3.5" />
+									{:else if sortState('startDate') === 'desc'}
+										<ChevronDown class="size-3.5" />
+									{:else}
+										<ChevronsUpDown class="size-3.5 text-slate-500" />
+									{/if}
+								</button>
+							</th>
+							<th class="px-6 py-3 text-left text-xs font-semibold text-slate-200 uppercase tracking-wider">
+								<button type="button" class="inline-flex items-center gap-1 hover:text-white" onclick={() => toggleSort('endDate')}>
+									End Date
+									{#if sortState('endDate') === 'asc'}
+										<ChevronUp class="size-3.5" />
+									{:else if sortState('endDate') === 'desc'}
+										<ChevronDown class="size-3.5" />
+									{:else}
+										<ChevronsUpDown class="size-3.5 text-slate-500" />
+									{/if}
+								</button>
 							</th>
 						</tr>
 					</thead>
 					<tbody class="divide-y divide-slate-200 dark:divide-slate-800">
-						{#if filteredProjects.length === 0}
+						{#if sortedProjects.length === 0}
 							<tr>
-								<td colspan="7" class="px-6 py-8 text-center text-foreground">
+								<td colspan="8" class="px-6 py-8 text-center text-foreground">
 									{#if projects.length === 0}
 										No projects found. Create your first project to get started.
 									{:else}
@@ -408,25 +682,24 @@
 								</td>
 							</tr>
 						{:else}
-							{#each filteredProjects as project, i}
+							{#each sortedProjects as project, i}
 								{@const pct = getBudgetPercentage(project)}
+								{@const vendorNames = getVendorNames(project)}
+								{@const vendorIds = getVendorIds(project)}
 								<tr 
 									class="border-l-4 {statusToneClass(project.status)} hover:bg-slate-800/60 transition-colors cursor-pointer {i % 2 === 1 ? 'bg-slate-900/40' : ''}"
 									onclick={() => window.location.href = `/dashboard/projects/${project.id}`}
 								>
 									<td class="px-6 py-4">
 										<div class="font-medium">{project.name}</div>
-										{#if project.description}
-											<div class="text-sm text-muted-foreground truncate max-w-xs">
-												{stripHtml(project.description)}
-											</div>
-										{/if}
 										<p class="text-[11px] mt-1 {pct >= 100 ? 'text-red-400' : pct >= 80 ? 'text-amber-400' : 'text-emerald-400'}">
 											Next: {nextAction(project)}
 										</p>
 									</td>
 									<td class="px-6 py-4 text-sm capitalize">
-										{project.type.replace('_', ' ')}
+										<span class="inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-semibold {typeToneClass(project.type)}">
+											{project.type.replace('_', ' ')}
+										</span>
 									</td>
 									<td class="px-6 py-4">
 										<StatusBadge status={project.status} />
@@ -434,23 +707,23 @@
 									<td class="px-6 py-4 text-sm font-medium">
 										{project.project_budget ? formatCurrency(project.project_budget) : '-'}
 									</td>
-									<td class="px-6 py-4 text-sm font-medium">
-										{project.project_actual_expenses ? formatCurrency(project.project_actual_expenses) : '-'}
+									<td class="px-6 py-4 text-sm text-slate-300 max-w-md">
+										{excerpt(stripHtml(project.description || ''))}
 									</td>
 									<td class="px-6 py-4">
-										{#if project.project_budget && project.project_actual_expenses}
-											<div class="w-32">
-												<ProgressBar
-													value={project.project_actual_expenses}
-													max={project.project_budget}
-													showPercentage={false}
-													variant={getBudgetVariant(pct)}
-													size="sm"
-												/>
-												<p class="text-xs mt-1 {pct >= 100 ? 'text-red-400' : pct >= 80 ? 'text-amber-400' : 'text-emerald-400'}">
-													{pct.toFixed(0)}%
-												</p>
+										{#if vendorNames.length > 0}
+											<div class="flex flex-wrap gap-1.5 max-w-xs">
+												{#each vendorNames.slice(0, 3) as vendorName}
+													<span class="inline-flex items-center rounded-full border border-cyan-700/40 bg-cyan-900/30 px-2 py-0.5 text-[11px] text-cyan-200">
+														{vendorName}
+													</span>
+												{/each}
+												{#if vendorNames.length > 3}
+													<span class="text-[11px] text-slate-400">+{vendorNames.length - 3} more</span>
+												{/if}
 											</div>
+										{:else if vendorIds.length > 0}
+											<span class="text-sm text-slate-300">{vendorIds.length} linked</span>
 										{:else}
 											<span class="text-sm text-muted-foreground">-</span>
 										{/if}
@@ -458,7 +731,13 @@
 									<td class="px-6 py-4 text-sm text-muted-foreground">
 										<div class="flex items-center gap-1">
 											<Calendar class="size-3" />
-											{formatDate(project.startDate)} - {formatDate(project.endDate)}
+											{formatDate(project.startDate)}
+										</div>
+									</td>
+									<td class="px-6 py-4 text-sm text-muted-foreground">
+										<div class="flex items-center gap-1">
+											<Calendar class="size-3" />
+											{formatDate(project.endDate)}
 										</div>
 									</td>
 								</tr>
