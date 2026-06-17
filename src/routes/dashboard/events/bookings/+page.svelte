@@ -25,10 +25,14 @@
 	};
 
 	const ROLE_LABELS: Record<string, string> = {
+		player: 'Celebrity',
+		other: 'Music Act',
 		celebrity_appearance: 'Celebrity',
 		music_act: 'Music Act'
 	};
 	const ROLE_COLORS: Record<string, string> = {
+		player: 'bg-amber-900/50 text-amber-300 border-amber-700',
+		other: 'bg-violet-900/50 text-violet-300 border-violet-700',
 		celebrity_appearance: 'bg-amber-900/50 text-amber-300 border-amber-700',
 		music_act: 'bg-violet-900/50 text-violet-300 border-violet-700'
 	};
@@ -62,7 +66,7 @@
 		primaryContactName: '',
 		primaryContactEmail: '',
 		memberCount: '',
-		role: 'celebrity_appearance',
+		role: 'player',
 		fee: '',
 		status: 'invited'
 	});
@@ -246,7 +250,7 @@
 				primaryContactName: '',
 				primaryContactEmail: '',
 				memberCount: '',
-				role: 'celebrity_appearance',
+				role: 'player',
 				fee: '',
 				status: 'invited'
 			};
@@ -678,8 +682,8 @@
 					<div>
 						<label for="booking-role" class={LABEL}>Booking Type</label>
 						<select id="booking-role" bind:value={bookingForm.role} class={INPUT}>
-							<option value="celebrity_appearance">Celebrity Appearance</option>
-							<option value="music_act">Music Act</option>
+							<option value="player">Celebrity Appearance</option>
+							<option value="other">Music Act</option>
 						</select>
 					</div>
 					<div>

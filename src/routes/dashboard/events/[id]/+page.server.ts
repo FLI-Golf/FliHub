@@ -1,29 +1,82 @@
 import { RequestContext } from '$lib/infra/RequestContext';
+import { adminFetch } from '$lib/infra/pocketbase/pbClient';
 import type { PageServerLoad } from './$types';
 import { error } from '@sveltejs/kit';
 
 export const load: PageServerLoad = async ({ locals, url, params }) => {
 	const ctx = await RequestContext.from(locals, url);
 	const { pb } = ctx;
-	const loadEventTalent = () => pb.collection('event_talent').getFullList({
-		filter: `event = '${params.id}'`,
-		expand: 'talent,talentGroup',
-		sort: 'created'
-	}).catch(() => pb.collection('event_talent').getFullList({
-		filter: `event = '${params.id}'`,
-		expand: 'talent',
-		sort: 'created'
-	}).catch(() => []));
+	const belongsToEvent = (record: any) => {
+		const direct = record?.event;
+		const expandedId = record?.expand?.event?.id;
+		return direct === params.id
+			|| (Array.isArray(direct) && direct.includes(params.id))
+			|| expandedId === params.id;
+	};
 
-	const loadEventPayments = () => pb.collection('event_payments').getFullList({
-		filter: `event = '${params.id}'`,
-		expand: 'talent,talentGroup,eventTalent',
-		sort: '-created'
-	}).catch(() => pb.collection('event_payments').getFullList({
-		filter: `event = '${params.id}'`,
-		expand: 'talent,eventTalent',
-		sort: '-created'
-	}).catch(() => []));
+	const loadEventTalent = async () => {
+		const withExpand = await adminFetch('event_talent', {
+			filter: `event = '${params.id}'`,
+			expand: 'event,talent,talentGroup',
+			sort: 'created',
+			perPage: 500
+		}).catch(() => null);
+		if (withExpand && withExpand.length > 0) return withExpand;
+
+		const withTalentExpand = await adminFetch('event_talent', {
+			filter: `event = '${params.id}'`,
+			expand: 'event,talent',
+			sort: 'created',
+			perPage: 500
+		}).catch(() => null);
+		if (withTalentExpand && withTalentExpand.length > 0) return withTalentExpand;
+
+		const filtered = await adminFetch('event_talent', {
+			filter: `event = '${params.id}'`,
+			sort: 'created',
+			perPage: 500
+		}).catch(() => null);
+		if (filtered && filtered.length > 0) return filtered;
+
+		const all = await adminFetch('event_talent', {
+			expand: 'event,talent,talentGroup',
+			sort: 'created',
+			perPage: 500
+		}).catch(() => []);
+		return (all as any[]).filter((row: any) => belongsToEvent(row));
+	};
+
+	const loadEventPayments = async () => {
+		const withExpand = await adminFetch('event_payments', {
+			filter: `event = '${params.id}'`,
+			expand: 'event,talent,talentGroup,eventTalent',
+			sort: '-created',
+			perPage: 500
+		}).catch(() => null);
+		if (withExpand && withExpand.length > 0) return withExpand;
+
+		const withLegacyExpand = await adminFetch('event_payments', {
+			filter: `event = '${params.id}'`,
+			expand: 'event,talent,eventTalent',
+			sort: '-created',
+			perPage: 500
+		}).catch(() => null);
+		if (withLegacyExpand && withLegacyExpand.length > 0) return withLegacyExpand;
+
+		const filtered = await adminFetch('event_payments', {
+			filter: `event = '${params.id}'`,
+			sort: '-created',
+			perPage: 500
+		}).catch(() => null);
+		if (filtered && filtered.length > 0) return filtered;
+
+		const all = await adminFetch('event_payments', {
+			expand: 'event,talent,talentGroup,eventTalent',
+			sort: '-created',
+			perPage: 500
+		}).catch(() => []);
+		return (all as any[]).filter((row: any) => belongsToEvent(row));
+	};
 
 	try {
 		const [event, eventTalent, eventPayments, eventTasks, allTalent] = await Promise.all([
