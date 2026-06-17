@@ -120,6 +120,12 @@
 		if (res.ok) await invalidateAll();
 	}
 
+	// Approve payment (approval_required → approved)
+	async function approvPayment(paymentId: string) {
+		const res = await fetch(`/api/events/${event.id}/payments/${paymentId}/approve`, { method: 'POST' });
+		if (res.ok) await invalidateAll();
+	}
+
 	async function removeBooking(eventTalentId: string, name: string) {
 		assignError = '';
 		if (!confirm(`Remove booking for ${name}?`)) return;
@@ -353,7 +359,9 @@
 							{#if p.managerAmount}<div class="text-xs text-gray-400">+{fmt$(p.managerAmount)} mgr</div>{/if}
 						</div>
 						<Badge class={PAY_STATUS_COLORS[p.status] ?? 'bg-gray-700 text-gray-300'}>{p.status}</Badge>
-						{#if p.status === 'approved'}
+						{#if p.status === 'approval_required'}
+						<button onclick={() => approvPayment(p.id)} class="text-xs bg-orange-700 hover:bg-orange-600 text-white px-2 py-1 rounded">Approve</button>
+						{:else if p.status === 'approved'}
 						<button onclick={() => markPaid(p.id)} class="text-xs bg-green-700 hover:bg-green-600 text-white px-2 py-1 rounded">Mark Paid</button>
 						{/if}
 					</div>

@@ -74,6 +74,38 @@ async function clearSeedData() {
 		console.log(`  Deleted ${records.length} ${col} records`);
 	}
 
+	// Remove seed-created approval expenses + linked approvals.
+	const seedApprovalExpenses = await pb.collection('expenses').getFullList({
+		filter: `notes ~ "[EP:"`,
+		fields: 'id'
+	}).catch(() => []);
+	let removedApprovals = 0;
+	for (const expense of seedApprovalExpenses as any[]) {
+		const approvals = await pb.collection('approvals').getFullList({
+			filter: `entityType = "expense" && entityId = "${expense.id}"`,
+			fields: 'id'
+		}).catch(() => []);
+		for (const a of approvals as any[]) {
+			await pb.collection('approvals').delete(a.id).catch(() => {});
+			removedApprovals++;
+		}
+		await pb.collection('expenses').delete(expense.id).catch(() => {});
+	}
+	console.log(`  Deleted ${seedApprovalExpenses.length} seed approval expenses`);
+	console.log(`  Deleted ${removedApprovals} linked approvals`);
+
+	// Remove any leftover legacy event_payment approvals from prior test runs.
+	const legacyApprovals = await pb.collection('approvals').getFullList({
+		filter: `entityType = "event_payment"`,
+		fields: 'id'
+	}).catch(() => []);
+	for (const a of legacyApprovals as any[]) {
+		await pb.collection('approvals').delete(a.id).catch(() => {});
+	}
+	if (legacyApprovals.length > 0) {
+		console.log(`  Deleted ${legacyApprovals.length} legacy event_payment approvals`);
+	}
+
 	// Only delete events created by this seed (tagged with notes containing [seed])
 	const events = await pb.collection('special_events').getFullList({
 		filter: 'notes ~ "[seed]"',
@@ -124,6 +156,9 @@ async function generatePayments(eventId: string) {
 	const isBroadcast = event.eventType === 'tournament_broadcast';
 
 	let created = 0;
+	const requestedBy = await pb.collection('user_profiles').getFirstListItem('id != ""', { fields: 'id' })
+		.then((p: any) => p.id)
+		.catch(() => null);
 	for (const et of confirmedTalent) {
 		if (alreadyPaid.has(et.talent)) continue;
 		const amount = et.confirmedRate ?? event.defaultRate ?? 0;
@@ -152,24 +187,73 @@ async function generatePayments(eventId: string) {
 			}
 		}
 
-		await pb.collection('event_payments').create({
+		const talentPayment = await pb.collection('event_payments').create({
 			event: eventId, eventTalent: et.id, talent: et.talent,
 			paymentType: isBroadcast ? 'broadcast_fee' : 'appearance_fee',
 			amount, status, approvalRoute, recipient: 'talent',
 			managerCutPercentage: managerCut, managerAmount, isBonus: false
 		});
+		if (status === 'approval_required') {
+			const marker = `[EP:${talentPayment.id}]`;
+			const expense = await pb.collection('expenses').create({
+				description: `Event payment approval (${isBroadcast ? 'broadcast_fee' : 'appearance_fee'})`,
+				amount: Number(amount) || 0,
+				status: 'submitted',
+				date: new Date().toISOString().slice(0, 10),
+				category: 'Executive/Management Staff',
+				notes: `${marker} Auto-created from seed payment requiring approval.`,
+				...(requestedBy ? { submittedBy: requestedBy } : {})
+			}).catch(() => null);
+			if (expense) {
+				await pb.collection('approvals').create({
+				entityType: 'expense',
+				entityId: expense.id,
+				expenseId: expense.id,
+				status: 'pending',
+				requestedBy,
+				requestedDate: new Date().toISOString(),
+				amount: Number(amount) || 0,
+				comments: '<p>Event payment requires approval before payout.</p>'
+				}).catch(() => null);
+			}
+		}
 
 		if (managerAmount > 0) {
-			await pb.collection('event_payments').create({
+			const managerNeedsApproval = event.requiresApproval || managerAmount > approvalThreshold;
+			const managerPayment = await pb.collection('event_payments').create({
 				event: eventId, eventTalent: et.id, talent: et.talent,
 				paymentType: isBroadcast ? 'broadcast_fee' : 'appearance_fee',
 				amount: managerAmount,
-				status: event.requiresApproval || managerAmount > approvalThreshold ? 'approval_required' : 'pending',
-				approvalRoute: event.requiresApproval || managerAmount > approvalThreshold ? 'approval_pipeline' : 'direct',
+				status: managerNeedsApproval ? 'approval_required' : 'pending',
+				approvalRoute: managerNeedsApproval ? 'approval_pipeline' : 'direct',
 				recipient: 'manager',
 				description: `Manager cut for ${talent?.name ?? et.talent}`,
 				isBonus: false
 			});
+			if (managerNeedsApproval) {
+				const marker = `[EP:${managerPayment.id}]`;
+				const expense = await pb.collection('expenses').create({
+					description: `Manager split approval (${isBroadcast ? 'broadcast_fee' : 'appearance_fee'})`,
+					amount: Number(managerAmount) || 0,
+					status: 'submitted',
+					date: new Date().toISOString().slice(0, 10),
+					category: 'Executive/Management Staff',
+					notes: `${marker} Auto-created from seed manager payment requiring approval.`,
+					...(requestedBy ? { submittedBy: requestedBy } : {})
+				}).catch(() => null);
+				if (expense) {
+					await pb.collection('approvals').create({
+					entityType: 'expense',
+					entityId: expense.id,
+					expenseId: expense.id,
+					status: 'pending',
+					requestedBy,
+					requestedDate: new Date().toISOString(),
+					amount: Number(managerAmount) || 0,
+					comments: '<p>Manager split payment requires approval before payout.</p>'
+					}).catch(() => null);
+				}
+			}
 		}
 
 		if (bonusEligible && !et.bonusEarned && event.bonusAmount) {
@@ -184,7 +268,7 @@ async function generatePayments(eventId: string) {
 				: { totalItems: 0 };
 
 			if (existingBonus.totalItems === 0) {
-				await pb.collection('event_payments').create({
+				const bonusPayment = await pb.collection('event_payments').create({
 					event: eventId, eventTalent: et.id, talent: et.talent,
 					paymentType: 'bonus', amount: event.bonusAmount,
 					status: 'approval_required', approvalRoute: 'approval_pipeline',
@@ -192,6 +276,28 @@ async function generatePayments(eventId: string) {
 					description: `Attendance bonus — completed ${event.bonusThreshold} events`,
 					isBonus: true
 				});
+				const marker = `[EP:${bonusPayment.id}]`;
+				const expense = await pb.collection('expenses').create({
+					description: 'Bonus payment approval',
+					amount: Number(event.bonusAmount) || 0,
+					status: 'submitted',
+					date: new Date().toISOString().slice(0, 10),
+					category: 'Executive/Management Staff',
+					notes: `${marker} Auto-created from seed bonus payment requiring approval.`,
+					...(requestedBy ? { submittedBy: requestedBy } : {})
+				}).catch(() => null);
+				if (expense) {
+					await pb.collection('approvals').create({
+					entityType: 'expense',
+					entityId: expense.id,
+					expenseId: expense.id,
+					status: 'pending',
+					requestedBy,
+					requestedDate: new Date().toISOString(),
+					amount: Number(event.bonusAmount) || 0,
+					comments: '<p>Bonus payment requires approval before payout.</p>'
+					}).catch(() => null);
+				}
 			}
 		}
 		created++;
@@ -328,8 +434,8 @@ async function seed() {
 	const ctp = await generatePayments(content.id);
 	console.log(`   ✓ Created — ${ctp} payments (event is scheduled)\n`);
 
-	// ── 6. TOURNAMENT BROADCAST — 3 events in season, bonus at 3 ──
-	console.log('6. Tournament Broadcast — Season series (3 events, bonus at 3)');
+	// ── 6. TOURNAMENT BROADCASTS — One event per tournament ──
+	console.log('6. Tournament Broadcasts — One broadcast per tournament\n');
 
 	const broadcastBase = {
 		eventType: 'tournament_broadcast',
@@ -338,41 +444,67 @@ async function seed() {
 		budget: 2500,
 		approvalThreshold: 500,
 		requiresApproval: false,
-		bonusAmount: 500,
-		bonusThreshold: 3,
-		description: '<p>Live broadcast coverage. Broadcasters cover commentary, analysis, and social media.</p>'
+		description: '<p>Live tournament broadcast coverage. Broadcasters handle commentary, analysis, and social media.</p>'
 	};
 
-	const broadcastTitle = tn(t6, 'FLI Golf Championship Finals');
-	const bc1 = await createEvent({ ...broadcastBase, ...(t6 && { tournament: t6.id }), name: `${broadcastTitle} — Broadcast Round 1`, eventDate: '2027-06-01 00:00:00.000Z', location: 'Phoenix, AZ', status: 'scheduled' });
-	const bc2 = await createEvent({ ...broadcastBase, ...(t6 && { tournament: t6.id }), name: `${broadcastTitle} — Broadcast Round 2`, eventDate: '2027-06-02 00:00:00.000Z', location: 'Phoenix, AZ', status: 'scheduled' });
-	const bc3 = await createEvent({ ...broadcastBase, ...(t6 && { tournament: t6.id }), name: `${broadcastTitle} — Broadcast Finals`, eventDate: '2027-06-03 00:00:00.000Z', location: 'Phoenix, AZ', status: 'scheduled' });
+	// Create one broadcast event per tournament, using tournament dates & names
+	const broadcastEvents: Array<{ id: string; title: string }> = [];
 
-	// Paul and Kona do all 3 → bonus eligible. Brad only does 2 → not eligible.
-	for (const bcId of [bc1.id, bc2.id, bc3.id]) {
+	const createBroadcast = async (tRef: TournamentRef | null, idx: number) => {
+		if (!tRef) return null;
+		const t = await pb.collection('tournaments').getOne(tRef.id, { fields: 'name,startDate,location,venue' });
+		const eventDate = t.startDate || `2027-0${4 + idx}-01 00:00:00.000Z`;
+		const bcEvent = await createEvent({
+			...broadcastBase,
+			tournament: t.id,
+			name: `${t.name} — Broadcast`,
+			eventDate,
+			location: t.location || 'TBD',
+			status: 'scheduled'
+		});
+		broadcastEvents.push({ id: bcEvent.id, title: t.name });
+		return bcEvent.id;
+	};
+
+	const bc1 = await createBroadcast(t1, 1);
+	const bc2 = await createBroadcast(t2, 2);
+	const bc3 = await createBroadcast(t3, 3);
+	const bc4 = await createBroadcast(t4, 4);
+	const bc5 = await createBroadcast(t5, 5);
+	const bc6 = await createBroadcast(t6, 6);
+
+	const allBroadcasts = [bc1, bc2, bc3, bc4, bc5, bc6].filter((id) => id !== null) as string[];
+
+	// Assign broadcasters to all events
+	for (const bcId of allBroadcasts) {
 		await assignTalent(bcId, T.paul_u, 'broadcaster', null, 'confirmed');
 		await assignTalent(bcId, T.kona, 'broadcaster', null, 'confirmed');
+		await assignTalent(bcId, T.brodie, 'broadcaster', null, 'confirmed');
 	}
-	// Brad only on first two
-	await assignTalent(bc1.id, T.brad, 'broadcaster', null, 'confirmed');
-	await assignTalent(bc2.id, T.brad, 'broadcaster', null, 'confirmed');
 
-	// Tasks on the finals event
-	await addTask(bc3.id, { title: 'Set up broadcast equipment', priority: 'urgent', dueDate: '2027-06-03 00:00:00.000Z' });
-	await addTask(bc3.id, { title: 'Coordinate with tournament director', priority: 'high' });
-	await addTask(bc3.id, { title: 'Prepare graphics package', priority: 'medium', hasCost: true, estimatedCost: 400, requiresApproval: true });
+	// Add tasks to first and last broadcast
+	if (allBroadcasts[0]) {
+		await addTask(allBroadcasts[0], { title: 'Test broadcast equipment', priority: 'urgent' });
+	}
+	if (allBroadcasts[allBroadcasts.length - 1]) {
+		await addTask(allBroadcasts[allBroadcasts.length - 1], { title: 'Prepare graphics package', priority: 'medium', hasCost: true, estimatedCost: 400, requiresApproval: true });
+	}
 
-	// Generate payments for all 3 broadcast events
-	const bp1 = await generatePayments(bc1.id);
-	const bp2 = await generatePayments(bc2.id);
-	const bp3 = await generatePayments(bc3.id);
-	console.log(`   ✓ Created 3 broadcast events`);
-	console.log(`     Round 1: ${bp1} payments`);
-	console.log(`     Round 2: ${bp2} payments`);
-	console.log(`     Finals:  ${bp3} payments (Paul & Kona should be bonus eligible)\n`);
+	// Generate payments for all broadcasts
+	for (const bcId of allBroadcasts) {
+		await generatePayments(bcId);
+	}
+	console.log(`   ✓ Created ${allBroadcasts.length} tournament broadcast events\n`);
+
+	const pendingEventPaymentExpenses = await pb.collection('expenses').getFullList({
+		filter: `status = 'submitted' && notes ~ '[EP:'`,
+		fields: 'id'
+	}).catch(() => []);
+	console.log(`   ✓ Created ${pendingEventPaymentExpenses.length} pending payment approvals\n`);
 
 	console.log('── Seed complete ──────────────────────────────────────────────');
 	console.log('Events created: 8 (1 appearance, 1 clinic, 1 media, 1 promo, 1 content, 3 broadcast)');
+	console.log(`Payments pending approval: ${pendingEventPaymentExpenses.length}`);
 	console.log('To clear: npx tsx scripts/seed-events.ts --clear');
 }
 

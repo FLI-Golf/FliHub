@@ -44,11 +44,20 @@ export const POST: RequestHandler = async ({ locals, request }) => {
 		try {
 			if (approval.entityType === 'expense') {
 				// Update expense status to rejected, with reimbursement fallback.
+				const expense = await pb.collection('expenses').getOne(approval.entityId).catch(() => null) as any;
 				const updatedExpense = await pb.collection('expenses').update(approval.entityId, {
 					status: 'rejected'
 				}).catch(() => null);
 				if (updatedExpense) {
 					console.log(`✅ Updated expense ${approval.entityId} to rejected`);
+					const eventPaymentMatch = String(expense?.notes ?? '').match(/\[EP:([^\]]+)\]/);
+					const linkedEventPaymentId = eventPaymentMatch?.[1] ?? null;
+					if (linkedEventPaymentId) {
+						await pb.collection('event_payments').update(linkedEventPaymentId, {
+							status: 'rejected'
+						}).catch(() => null);
+						console.log(`✅ Updated event payment ${linkedEventPaymentId} to rejected`);
+					}
 				} else {
 					await pb.collection('reimbursement_claims').update(approval.entityId, {
 						status: 'rejected',
@@ -62,6 +71,11 @@ export const POST: RequestHandler = async ({ locals, request }) => {
 					status: 'cancelled'
 				});
 				console.log(`✅ Updated project ${approval.entityId} to cancelled`);
+			} else if (approval.entityType === 'event_payment') {
+				await pb.collection('event_payments').update(approval.entityId, {
+					status: 'rejected'
+				});
+				console.log(`✅ Updated event payment ${approval.entityId} to rejected`);
 			}
 			// Budget approvals don't have a direct entity to update
 		} catch (entityError: any) {

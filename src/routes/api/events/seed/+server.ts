@@ -28,13 +28,82 @@ const T = {
 async function clearSeed(pb: any) {
 	const cols = ['event_payments', 'event_tasks', 'event_talent'];
 	let deleted = 0;
+	const deletedPaymentIds: string[] = [];
+	const summary = {
+		eventPayments: 0,
+		eventTasks: 0,
+		eventTalent: 0,
+		seedEvents: 0,
+		approvalExpenses: 0,
+		linkedApprovals: 0,
+		legacyApprovals: 0
+	};
 	for (const col of cols) {
 		const records = await pb.collection(col).getFullList({ fields: 'id' }).catch(() => []);
-		for (const r of records) { await pb.collection(col).delete(r.id).catch(() => {}); deleted++; }
+		for (const r of records) {
+			if (col === 'event_payments') deletedPaymentIds.push(r.id);
+			await pb.collection(col).delete(r.id).catch(() => {});
+			if (col === 'event_payments') summary.eventPayments++;
+			if (col === 'event_tasks') summary.eventTasks++;
+			if (col === 'event_talent') summary.eventTalent++;
+			deleted++;
+		}
 	}
+	if (deletedPaymentIds.length > 0) {
+		for (const paymentId of deletedPaymentIds) {
+			const marker = `[EP:${paymentId}]`;
+			const expense = await pb.collection('expenses').getFirstListItem(
+				`notes ~ "${marker}"`
+			).catch(() => null as any);
+			if (!expense) continue;
+			const linkedApprovals = await pb.collection('approvals').getFullList({
+				filter: `entityType = "expense" && entityId = "${expense.id}"`,
+				fields: 'id'
+			}).catch(() => []);
+			for (const a of linkedApprovals as any[]) {
+				await pb.collection('approvals').delete(a.id).catch(() => null);
+				summary.linkedApprovals++;
+			}
+			await pb.collection('expenses').delete(expense.id).catch(() => null);
+			summary.approvalExpenses++;
+		}
+	}
+
+	// Safety sweep for any lingering event-payment approval records created during testing.
+	const seedApprovalExpenses = await pb.collection('expenses').getFullList({
+		filter: `notes ~ "[EP:"`,
+		fields: 'id'
+	}).catch(() => []);
+	for (const expense of seedApprovalExpenses as any[]) {
+		const approvals = await pb.collection('approvals').getFullList({
+			filter: `entityType = "expense" && entityId = "${expense.id}"`,
+			fields: 'id'
+		}).catch(() => []);
+		for (const a of approvals as any[]) {
+			await pb.collection('approvals').delete(a.id).catch(() => null);
+			summary.linkedApprovals++;
+		}
+		await pb.collection('expenses').delete(expense.id).catch(() => null);
+		summary.approvalExpenses++;
+	}
+
+	// Cleanup legacy records from earlier event_payment approval experiments.
+	const legacyApprovals = await pb.collection('approvals').getFullList({
+		filter: `entityType = "event_payment"`,
+		fields: 'id'
+	}).catch(() => []);
+	for (const a of legacyApprovals as any[]) {
+		await pb.collection('approvals').delete(a.id).catch(() => null);
+		summary.legacyApprovals++;
+	}
+
 	const events = await pb.collection('special_events').getFullList({ filter: 'notes ~ "[seed]"', fields: 'id' }).catch(() => []);
-	for (const e of events) { await pb.collection('special_events').delete(e.id).catch(() => {}); deleted++; }
-	return { deleted, events: events.length };
+	for (const e of events) {
+		await pb.collection('special_events').delete(e.id).catch(() => {});
+		summary.seedEvents++;
+		deleted++;
+	}
+	return { deleted, events: summary.seedEvents, summary };
 }
 
 async function createEvent(pb: any, data: Record<string, unknown>) {
@@ -72,6 +141,9 @@ async function generatePayments(pb: any, eventId: string) {
 	}
 
 	let created = 0;
+	const requestedBy = await pb.collection('user_profiles').getFirstListItem('id != ""', { fields: 'id' })
+		.then((p: any) => p.id)
+		.catch(() => null);
 	for (const et of confirmedTalent) {
 		if (alreadyPaid.has(et.talent)) continue;
 		const amount = et.confirmedRate ?? event.defaultRate ?? 0;
@@ -91,16 +163,87 @@ async function generatePayments(pb: any, eventId: string) {
 			if (bonusEligible !== et.bonusEligible) await pb.collection('event_talent').update(et.id, { bonusEligible });
 		}
 
-		await pb.collection('event_payments').create({ event: eventId, eventTalent: et.id, talent: et.talent, paymentType: isBroadcast ? 'broadcast_fee' : 'appearance_fee', amount, status, approvalRoute: route, recipient: 'talent', managerCutPercentage: cut, managerAmount: mgAmt, isBonus: false });
+		const talentPayment = await pb.collection('event_payments').create({ event: eventId, eventTalent: et.id, talent: et.talent, paymentType: isBroadcast ? 'broadcast_fee' : 'appearance_fee', amount, status, approvalRoute: route, recipient: 'talent', managerCutPercentage: cut, managerAmount: mgAmt, isBonus: false });
+		if (status === 'approval_required') {
+			const marker = `[EP:${talentPayment.id}]`;
+			const expense = await pb.collection('expenses').create({
+				description: `Event payment approval (${isBroadcast ? 'broadcast_fee' : 'appearance_fee'})`,
+				amount: Number(amount) || 0,
+				status: 'submitted',
+				date: new Date().toISOString().slice(0, 10),
+				category: 'Executive/Management Staff',
+				notes: `${marker} Auto-created from seed payment requiring approval.`,
+				...(requestedBy ? { submittedBy: requestedBy } : {})
+			}).catch(() => null);
+			if (expense) {
+				await pb.collection('approvals').create({
+				entityType: 'expense',
+				entityId: expense.id,
+				expenseId: expense.id,
+				status: 'pending',
+				requestedBy,
+				requestedDate: new Date().toISOString(),
+				amount: Number(amount) || 0,
+				comments: '<p>Event payment requires approval before payout.</p>'
+				}).catch(() => null);
+			}
+		}
 
 		if (mgAmt > 0) {
-			await pb.collection('event_payments').create({ event: eventId, eventTalent: et.id, talent: et.talent, paymentType: isBroadcast ? 'broadcast_fee' : 'appearance_fee', amount: mgAmt, status: event.requiresApproval || mgAmt > threshold ? 'approval_required' : 'pending', approvalRoute: event.requiresApproval || mgAmt > threshold ? 'approval_pipeline' : 'direct', recipient: 'manager', description: `Manager cut for ${talent?.name ?? et.talent}`, isBonus: false });
+			const managerNeedsApproval = event.requiresApproval || mgAmt > threshold;
+			const managerPayment = await pb.collection('event_payments').create({ event: eventId, eventTalent: et.id, talent: et.talent, paymentType: isBroadcast ? 'broadcast_fee' : 'appearance_fee', amount: mgAmt, status: managerNeedsApproval ? 'approval_required' : 'pending', approvalRoute: managerNeedsApproval ? 'approval_pipeline' : 'direct', recipient: 'manager', description: `Manager cut for ${talent?.name ?? et.talent}`, isBonus: false });
+			if (managerNeedsApproval) {
+				const marker = `[EP:${managerPayment.id}]`;
+				const expense = await pb.collection('expenses').create({
+					description: `Manager split approval (${isBroadcast ? 'broadcast_fee' : 'appearance_fee'})`,
+					amount: Number(mgAmt) || 0,
+					status: 'submitted',
+					date: new Date().toISOString().slice(0, 10),
+					category: 'Executive/Management Staff',
+					notes: `${marker} Auto-created from seed manager payment requiring approval.`,
+					...(requestedBy ? { submittedBy: requestedBy } : {})
+				}).catch(() => null);
+				if (expense) {
+					await pb.collection('approvals').create({
+					entityType: 'expense',
+					entityId: expense.id,
+					expenseId: expense.id,
+					status: 'pending',
+					requestedBy,
+					requestedDate: new Date().toISOString(),
+					amount: Number(mgAmt) || 0,
+					comments: '<p>Manager split payment requires approval before payout.</p>'
+					}).catch(() => null);
+				}
+			}
 		}
 
 		if (bonusEligible && !et.bonusEarned && event.bonusAmount && seasonEventIds.length > 0) {
 			const existingBonus = await pb.collection('event_payments').getList(1, 1, { filter: `talent = '${et.talent}' && isBonus = true && status != 'cancelled' && (${seasonEventIds.map((id: string) => `event = '${id}'`).join(' || ')})` }).catch(() => ({ totalItems: 0 }));
 			if (existingBonus.totalItems === 0) {
-				await pb.collection('event_payments').create({ event: eventId, eventTalent: et.id, talent: et.talent, paymentType: 'bonus', amount: event.bonusAmount, status: 'approval_required', approvalRoute: 'approval_pipeline', recipient: 'talent', description: `Attendance bonus — completed ${event.bonusThreshold} events`, isBonus: true });
+				const bonusPayment = await pb.collection('event_payments').create({ event: eventId, eventTalent: et.id, talent: et.talent, paymentType: 'bonus', amount: event.bonusAmount, status: 'approval_required', approvalRoute: 'approval_pipeline', recipient: 'talent', description: `Attendance bonus — completed ${event.bonusThreshold} events`, isBonus: true });
+				const marker = `[EP:${bonusPayment.id}]`;
+				const expense = await pb.collection('expenses').create({
+					description: 'Bonus payment approval',
+					amount: Number(event.bonusAmount) || 0,
+					status: 'submitted',
+					date: new Date().toISOString().slice(0, 10),
+					category: 'Executive/Management Staff',
+					notes: `${marker} Auto-created from seed bonus payment requiring approval.`,
+					...(requestedBy ? { submittedBy: requestedBy } : {})
+				}).catch(() => null);
+				if (expense) {
+					await pb.collection('approvals').create({
+					entityType: 'expense',
+					entityId: expense.id,
+					expenseId: expense.id,
+					status: 'pending',
+					requestedBy,
+					requestedDate: new Date().toISOString(),
+					amount: Number(event.bonusAmount) || 0,
+					comments: '<p>Bonus payment requires approval before payout.</p>'
+					}).catch(() => null);
+				}
 			}
 		}
 		created++;
@@ -167,65 +310,59 @@ async function runSeed(pb: any) {
 	await addTask(pb, content.id, { title: 'Scout filming locations', priority: 'medium' });
 	await addTask(pb, content.id, { title: 'Arrange drone operator', priority: 'high', hasCost: true, estimatedCost: 300, requiresApproval: true });
 
-	// Tournament broadcast events with proper tournament references
-	const broadcastBase = { eventType: 'tournament_broadcast', season: SEASON_ID, defaultRate: 600, budget: 2500, approvalThreshold: 500, requiresApproval: false, bonusAmount: 500, bonusThreshold: 3, description: '<p>Live broadcast coverage.</p>' };
-	const broadcastTitle = tn(t6, 'FLI Golf Championship Finals');
-	const bc1 = await createEvent(pb, { ...broadcastBase, name: `${broadcastTitle} — Broadcast Round 1`, eventDate: '2027-06-01 00:00:00.000Z', location: 'Phoenix, AZ', status: 'scheduled', ...(t6 && { tournament: t6.id }) });
-	const bc2 = await createEvent(pb, { ...broadcastBase, name: `${broadcastTitle} — Broadcast Round 2`, eventDate: '2027-06-02 00:00:00.000Z', location: 'Phoenix, AZ', status: 'scheduled', ...(t6 && { tournament: t6.id }) });
-	const bc3 = await createEvent(pb, { ...broadcastBase, name: `${broadcastTitle} — Broadcast Finals`, eventDate: '2027-06-03 00:00:00.000Z', location: 'Phoenix, AZ', status: 'scheduled', ...(t6 && { tournament: t6.id }) });
+	// Tournament broadcast events — one per tournament using actual dates & locations
+	const broadcastBase = { eventType: 'tournament_broadcast', season: SEASON_ID, defaultRate: 600, budget: 2500, approvalThreshold: 500, requiresApproval: false, description: '<p>Live tournament broadcast coverage. Broadcasters handle commentary, analysis, and social media.</p>' };
 
-	for (const bcId of [bc1.id, bc2.id, bc3.id]) {
+	const broadcastEvents: string[] = [];
+
+	const createBroadcast = async (tRef: TournamentRef | null) => {
+		if (!tRef) return null;
+		const t = await pb.collection('tournaments').getOne(tRef.id, { fields: 'name,startDate,location,venue' });
+		const bcEvent = await createEvent(pb, {
+			...broadcastBase,
+			tournament: t.id,
+			name: `${t.name} — Broadcast`,
+			eventDate: t.startDate || '2027-06-01 00:00:00.000Z',
+			location: t.location || 'TBD',
+			status: 'scheduled'
+		});
+		broadcastEvents.push(bcEvent.id);
+		return bcEvent.id;
+	};
+
+	await createBroadcast(t1);
+	await createBroadcast(t2);
+	await createBroadcast(t3);
+	await createBroadcast(t4);
+	await createBroadcast(t5);
+	await createBroadcast(t6);
+
+	// Assign broadcasters to all tournament events
+	for (const bcId of broadcastEvents) {
 		await assignTalent(pb, bcId, T.paul_u, 'broadcaster', null, 'confirmed');
 		await assignTalent(pb, bcId, T.kona, 'broadcaster', null, 'confirmed');
+		await assignTalent(pb, bcId, T.brodie, 'broadcaster', null, 'confirmed');
 	}
-	await assignTalent(pb, bc1.id, T.brad, 'broadcaster', null, 'confirmed');
-	await assignTalent(pb, bc2.id, T.brad, 'broadcaster', null, 'confirmed');
-	await addTask(pb, bc3.id, { title: 'Set up broadcast equipment', priority: 'urgent' });
-	await addTask(pb, bc3.id, { title: 'Prepare graphics package', priority: 'medium', hasCost: true, estimatedCost: 400, requiresApproval: true });
 
-	await generatePayments(pb, bc1.id);
-	await generatePayments(pb, bc2.id);
-	await generatePayments(pb, bc3.id);
+	// Add tasks to first and last broadcasts
+	if (broadcastEvents[0]) {
+		await addTask(pb, broadcastEvents[0], { title: 'Test broadcast equipment', priority: 'urgent' });
+	}
+	if (broadcastEvents[broadcastEvents.length - 1]) {
+		await addTask(pb, broadcastEvents[broadcastEvents.length - 1], { title: 'Prepare graphics package', priority: 'medium', hasCost: true, estimatedCost: 400, requiresApproval: true });
+	}
 
-	// Additional broadcaster events (scheduled & draft)
-	const bcAdditional1 = await createEvent(pb, {
-		...base,
-		name: `${tn(t2, 'Spring Championship')} — Pre-Event Broadcast`,
-		eventType: 'tournament_broadcast',
-		season: SEASON_ID,
-		...(t2 && { tournament: t2.id }),
-		eventDate: '2027-05-22 00:00:00.000Z',
-		location: 'Charlotte, NC',
-		status: 'scheduled',
-		defaultRate: 550,
-		budget: 2200,
-		description: '<p>Pre-tournament broadcast covering practice rounds and player interviews.</p>'
-	});
-	await assignTalent(pb, bcAdditional1.id, T.kevin, 'broadcaster', null, 'confirmed');
-	await assignTalent(pb, bcAdditional1.id, T.paul_u, 'broadcaster', 600, 'confirmed');
-	await addTask(pb, bcAdditional1.id, { title: 'Scout broadcast locations', priority: 'high' });
-	await generatePayments(pb, bcAdditional1.id);
+	// Generate payments for all broadcasts
+	for (const bcId of broadcastEvents) {
+		await generatePayments(pb, bcId);
+	}
 
-	const bcAdditional2 = await createEvent(pb, {
-		...base,
-		name: `${tn(t4, 'Summer Showdown')} — Live Commentary`,
-		eventType: 'tournament_broadcast',
-		season: SEASON_ID,
-		...(t4 && { tournament: t4.id }),
-		eventDate: '2027-07-24 00:00:00.000Z',
-		location: 'Denver, CO',
-		status: 'scheduled',
-		defaultRate: 650,
-		budget: 2600,
-		description: '<p>Full tournament broadcast with multiple commentary teams and social media coverage.</p>'
-	});
-	await assignTalent(pb, bcAdditional2.id, T.brad, 'broadcaster', null, 'confirmed');
-	await assignTalent(pb, bcAdditional2.id, T.brodie, 'broadcaster', null, 'confirmed');
-	await assignTalent(pb, bcAdditional2.id, T.kona, 'broadcaster', 700, 'confirmed');
-	await addTask(pb, bcAdditional2.id, { title: 'Confirm broadcast team', priority: 'high' });
-	await addTask(pb, bcAdditional2.id, { title: 'Order broadcast equipment', priority: 'high', hasCost: true, estimatedCost: 5000, requiresApproval: true });
+	const pendingApprovals = await pb.collection('expenses').getFullList({
+		filter: `status = 'submitted' && notes ~ '[EP:'`,
+		fields: 'id'
+	}).catch(() => []);
 
-	return { events: 11 };
+	return { events: 6 + broadcastEvents.length, pendingApprovals: pendingApprovals.length };
 }
 
 export const POST: RequestHandler = async ({ locals, url }) => {
@@ -234,7 +371,12 @@ export const POST: RequestHandler = async ({ locals, url }) => {
 		if (guard.error) return guard.error;
 		const pb = guard.ctx.pb;
 		const result = await runSeed(pb);
-		return json({ ok: true, message: `Seeded ${result.events} test events` });
+		return json({
+			ok: true,
+			message: `Seeded ${result.events} test events with ${result.pendingApprovals} payments awaiting approval`,
+			events: result.events,
+			pendingApprovals: result.pendingApprovals
+		});
 	} catch (err: any) {
 		return json({ ok: false, message: err.message ?? 'Seed failed' }, { status: 500 });
 	}
@@ -246,7 +388,11 @@ export const DELETE: RequestHandler = async ({ locals, url }) => {
 		if (guard.error) return guard.error;
 		const pb = guard.ctx.pb;
 		const result = await clearSeed(pb);
-		return json({ ok: true, message: `Cleared ${result.events} seed events and related records` });
+		return json({
+			ok: true,
+			message: `Cleared ${result.events} seed events and related records`,
+			summary: result.summary
+		});
 	} catch (err: any) {
 		return json({ ok: false, message: err.message ?? 'Clear failed' }, { status: 500 });
 	}
@@ -259,7 +405,12 @@ export const PATCH: RequestHandler = async ({ locals, url }) => {
 		const pb = guard.ctx.pb;
 		await clearSeed(pb);
 		const result = await runSeed(pb);
-		return json({ ok: true, message: `Reset complete: cleared old data and seeded ${result.events} test events` });
+		return json({
+			ok: true,
+			message: `Reset complete: seeded ${result.events} test events with ${result.pendingApprovals} payments awaiting approval`,
+			events: result.events,
+			pendingApprovals: result.pendingApprovals
+		});
 	} catch (err: any) {
 		return json({ ok: false, message: err.message ?? 'Reset failed' }, { status: 500 });
 	}

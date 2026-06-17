@@ -19,18 +19,39 @@ import { requireAdminApi } from '$lib/infra/api-route-guards';
 import { autoAssignDirectPaymentsToDraftBundles } from '$lib/server/event-payment-bundles';
 import type { RequestHandler } from './$types';
 
-async function ensureEventPaymentApproval(pb: any, payment: any) {
+async function ensureEventPaymentApproval(pb: any, payment: any, requestedBy: string | null) {
 	if (!payment?.id || payment.status !== 'approval_required') return;
-	const existing = await pb.collection('approvals').getFirstListItem(
-		`entityType = \"event_payment\" && entityId = \"${payment.id}\" && status = \"pending\"`
+	const marker = `[EP:${payment.id}]`;
+
+	const existingExpense = await pb.collection('expenses').getFirstListItem(
+		`notes ~ "${marker}"`
+	).catch(() => null as any);
+
+	const expense = existingExpense ?? await pb.collection('expenses').create({
+		description: payment.description || `Event payment approval (${payment.paymentType || 'payment'})`,
+		amount: Number(payment.amount) || 0,
+		status: 'submitted',
+		date: new Date().toISOString().slice(0, 10),
+		category: 'Executive/Management Staff',
+		notes: `${marker} Auto-created from event payment approval requirement.`,
+		...(requestedBy ? { submittedBy: requestedBy } : {})
+	}).catch((e: any) => {
+		console.warn('Failed creating event payment expense:', e?.message);
+		return null;
+	});
+	if (!expense) return;
+
+	const existingApproval = await pb.collection('approvals').getFirstListItem(
+		`entityType = "expense" && entityId = "${expense.id}" && status = "pending"`
 	).catch(() => null);
-	if (existing) return;
+	if (existingApproval) return;
 
 	await pb.collection('approvals').create({
-		entityType: 'event_payment',
-		entityId: payment.id,
+		entityType: 'expense',
+		entityId: expense.id,
+		expenseId: expense.id,
 		status: 'pending',
-		requestedBy: null,
+		requestedBy,
 		requestedDate: new Date().toISOString(),
 		amount: Number(payment.amount) || 0,
 		comments: '<p>Event payment requires approval before payout.</p>'
@@ -42,6 +63,10 @@ export const POST: RequestHandler = async ({ locals, url, params }) => {
 		const guard = await requireAdminApi(locals, url);
 		if (guard.error) return guard.error;
 		const pb = guard.ctx.pb;
+		const requestedBy = guard.ctx.profile?.id
+			?? await pb.collection('user_profiles').getFirstListItem('id != ""', { fields: 'id' })
+				.then((p: any) => p.id)
+				.catch(() => null);
 
 		const event = await pb.collection('special_events').getOne(params.id);
 		const confirmedTalent = await pb.collection('event_talent').getFullList({
@@ -131,7 +156,7 @@ export const POST: RequestHandler = async ({ locals, url, params }) => {
 				description: isGroupBooking ? `Group booking fee for ${talentGroup?.name ?? talentGroupId}` : undefined,
 				isBonus: false
 			});
-			await ensureEventPaymentApproval(pb, talentPayment);
+			await ensureEventPaymentApproval(pb, talentPayment, requestedBy);
 			if (approvalRoute === 'direct') directPaymentIds.push(String(talentPayment.id));
 
 			// Create manager split payment if applicable
@@ -149,7 +174,7 @@ export const POST: RequestHandler = async ({ locals, url, params }) => {
 					description: `Manager cut for ${talent?.name ?? talentId}`,
 					isBonus: false
 				});
-				await ensureEventPaymentApproval(pb, managerPayment);
+				await ensureEventPaymentApproval(pb, managerPayment, requestedBy);
 				if ((mgNeedsApproval ? 'approval_pipeline' : 'direct') === 'direct') {
 					directPaymentIds.push(String(managerPayment.id));
 				}
@@ -175,7 +200,7 @@ export const POST: RequestHandler = async ({ locals, url, params }) => {
 						description: `Attendance bonus — completed ${event.bonusThreshold} events`,
 						isBonus: true
 					});
-					await ensureEventPaymentApproval(pb, bonusPayment);
+					await ensureEventPaymentApproval(pb, bonusPayment, requestedBy);
 				}
 			}
 
