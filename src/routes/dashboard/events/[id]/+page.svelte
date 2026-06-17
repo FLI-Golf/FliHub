@@ -41,7 +41,7 @@
 	// Assign talent panel
 	let showAssign = $state(false);
 	let assignTalentId = $state('');
-	let assignRole = $state('celebrity_appearance');
+	let assignRole = $state('player');
 	let assignRateOverride = $state('');
 	let assignStatus = $state('confirmed');
 	let assignSaving = $state(false);
@@ -55,13 +55,23 @@
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
 				body: JSON.stringify({
+					entityType: 'individual',
 					talentId: assignTalentId,
 					role: assignRole,
 					rateOverride: assignRateOverride ? Number(assignRateOverride) : null,
 					status: assignStatus
 				})
 			});
-			if (!res.ok) { const d = await res.json().catch(() => ({})); throw new Error(d.message ?? `Error ${res.status}`); }
+			if (!res.ok) {
+				const d = await res.json().catch(() => ({}));
+				if (res.status === 409 && d?.existing) {
+					await invalidateAll();
+				}
+				const detail = d?.existing
+					? ` Existing booking status: ${d.existing.status ?? 'unknown'}${d.existing.role ? `, role: ${d.existing.role}` : ''}.`
+					: '';
+				throw new Error((d.message ?? `Error ${res.status}`) + detail);
+			}
 			showAssign = false; assignTalentId = ''; assignRateOverride = '';
 			await invalidateAll();
 		} catch (err: any) { assignError = err.message; }
@@ -110,6 +120,33 @@
 		if (res.ok) await invalidateAll();
 	}
 
+	async function removeBooking(eventTalentId: string, name: string) {
+		assignError = '';
+		if (!confirm(`Remove booking for ${name}?`)) return;
+		const res = await fetch(`/api/events/${event.id}/talent/${eventTalentId}`, { method: 'DELETE' });
+		if (!res.ok) {
+			const body = await res.json().catch(() => ({}));
+			assignError = body?.message ?? `Failed to remove booking (${res.status})`;
+			return;
+		}
+		await invalidateAll();
+	}
+
+	async function confirmBooking(eventTalentId: string, name: string) {
+		assignError = '';
+		const res = await fetch(`/api/events/${event.id}/talent/${eventTalentId}`, {
+			method: 'PATCH',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({ status: 'confirmed' })
+		});
+		if (!res.ok) {
+			const body = await res.json().catch(() => ({}));
+			assignError = body?.message ?? `Failed to confirm ${name} (${res.status})`;
+			return;
+		}
+		await invalidateAll();
+	}
+
 	// Update task status
 	async function updateTaskStatus(taskId: string, status: string) {
 		await fetch(`/api/events/${event.id}/tasks/${taskId}`, {
@@ -133,6 +170,11 @@
 
 	function bookingInitial(record: any) {
 		return bookingName(record).charAt(0) || '?';
+	}
+
+	function canRemoveBooking(record: any) {
+		const pay = (data.eventPayments ?? []).find((p: any) => p.eventTalent === record.id && p.status !== 'cancelled');
+		return !pay;
 	}
 </script>
 
@@ -208,6 +250,24 @@
 					<div class="flex items-center gap-2">
 						{#if et.bonusEligible}<Star class="w-4 h-4 text-yellow-400" aria-label="Bonus eligible" />{/if}
 						<Badge class={TALENT_STATUS_COLORS[et.status] ?? 'bg-gray-700 text-gray-300'}>{et.status}</Badge>
+						{#if et.status === 'invited'}
+							<button
+								type="button"
+								onclick={() => confirmBooking(et.id, bookingName(et))}
+								class="text-xs bg-green-900/60 hover:bg-green-800 text-green-200 px-2 py-1 rounded border border-green-800"
+							>
+								Confirm
+							</button>
+						{/if}
+						{#if canRemoveBooking(et)}
+							<button
+								type="button"
+								onclick={() => removeBooking(et.id, bookingName(et))}
+								class="text-xs bg-red-900/60 hover:bg-red-800 text-red-200 px-2 py-1 rounded border border-red-800"
+							>
+								<X class="w-3 h-3 inline mr-1" />Remove
+							</button>
+						{/if}
 					</div>
 				</div>
 				{/each}
@@ -230,9 +290,8 @@
 						<div>
 							<label class={LABEL}>Role</label>
 							<select bind:value={assignRole} class={INPUT}>
-								<option value="celebrity_appearance">Celebrity Appearance</option>
-								<option value="music_act">Music Act</option>
-								<option value="player">Player</option>
+								<option value="player">Celebrity Appearance</option>
+								<option value="other">Music Act</option>
 								<option value="broadcaster">Broadcaster</option>
 								<option value="commentator">Commentator</option>
 								<option value="analyst">Analyst</option>

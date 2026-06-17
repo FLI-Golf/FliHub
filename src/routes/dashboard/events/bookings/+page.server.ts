@@ -7,7 +7,7 @@ import {
 	detectDuplicateGroups
 } from '$lib/server/interestReview';
 
-const BOOKING_ROLES = ['celebrity_appearance', 'music_act'];
+const BOOKING_ROLES = ['player', 'other', 'celebrity_appearance', 'music_act'];
 const ADMIN_REVIEW_ROLES = new Set(['admin', 'leader']);
 
 export const load: PageServerLoad = async ({ locals, url }) => {
@@ -111,8 +111,8 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 			cleanupHistory,
 			stats: {
 				totalBookings: (eventTalent as any[]).length,
-				celebrityBookings: (eventTalent as any[]).filter((booking) => booking.role === 'celebrity_appearance').length,
-				musicBookings: (eventTalent as any[]).filter((booking) => booking.role === 'music_act').length,
+				celebrityBookings: (eventTalent as any[]).filter((booking) => ['celebrity_appearance', 'player'].includes(booking.role)).length,
+				musicBookings: (eventTalent as any[]).filter((booking) => ['music_act', 'other'].includes(booking.role)).length,
 				totalFees,
 				paidFees,
 				pendingFees,

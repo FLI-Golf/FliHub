@@ -3,6 +3,13 @@ import { requireAdminApi } from '$lib/infra/api-route-guards';
 import type PocketBase from 'pocketbase';
 import type { RequestHandler } from './$types';
 
+function normalizeBookingRole(role: unknown): string | undefined {
+	if (typeof role !== 'string' || !role.trim()) return undefined;
+	if (role === 'celebrity_appearance') return 'player';
+	if (role === 'music_act') return 'other';
+	return role;
+}
+
 type FinancePayload = {
 	downPaymentAmount?: number;
 	travelAmount?: number;
@@ -76,7 +83,7 @@ export const PATCH: RequestHandler = async ({ locals, url, request, params }) =>
 		}
 
 		if (body.status) payload.status = body.status;
-		if (body.role) payload.role = body.role;
+		if (body.role) payload.role = normalizeBookingRole(body.role);
 		if (body.rateOverride !== undefined) {
 			payload.rateOverride = body.rateOverride;
 			payload.confirmedRate = body.rateOverride;
@@ -132,5 +139,29 @@ export const PATCH: RequestHandler = async ({ locals, url, request, params }) =>
 		return json(updated);
 	} catch (err: any) {
 		return json({ message: err.message ?? 'Failed to update booking' }, { status: 400 });
+	}
+};
+
+export const DELETE: RequestHandler = async ({ locals, url, params }) => {
+	try {
+		const guard = await requireAdminApi(locals, url);
+		if (guard.error) return guard.error;
+		const pb = guard.ctx.pb;
+
+		const existing = await pb.collection('event_talent').getOne(params.eventTalentId, {
+			fields: 'id,event'
+		}).catch(() => null);
+		if (!existing) {
+			return json({ message: 'Booking not found' }, { status: 404 });
+		}
+		if (existing.event !== params.id) {
+			return json({ message: 'Booking does not belong to this event' }, { status: 400 });
+		}
+
+		await pb.collection('event_talent').delete(params.eventTalentId);
+		return json({ ok: true, id: params.eventTalentId });
+	} catch (err: any) {
+		const message = err?.response?.message ?? err?.message ?? 'Failed to delete booking';
+		return json({ message }, { status: 400 });
 	}
 };
