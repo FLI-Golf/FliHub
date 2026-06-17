@@ -7,7 +7,7 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 	try {
 		
 		const [projects, departments, tasks] = await Promise.all([
-			pb.collection('projects').getFullList({ sort: '-id', expand: 'campaignId' }).catch(() => []),
+			pb.collection('projects').getFullList({ sort: '-id', expand: 'campaignId,vendors' }).catch(() => []),
 			pb.collection('departments').getFullList({ sort: 'name' }).catch(() => []),
 			pb.collection('tasks').getFullList({ fields: 'projectId,task_actual_cost,task_budget' }).catch(() => [])
 		]);

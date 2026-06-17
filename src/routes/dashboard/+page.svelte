@@ -98,6 +98,23 @@
 		{/each}
 	</div>
 
+	<div class="grid grid-cols-1 sm:grid-cols-3 gap-2">
+		{#each [
+			{ label: 'Start Project', href: '/dashboard/projects', icon: FolderKanban, color: 'text-cyan-300', bg: 'bg-cyan-950/40 border-cyan-800/60' },
+			{ label: 'Start Campain', href: '/dashboard/marketing/campaigns/new', icon: Megaphone, color: 'text-fuchsia-300', bg: 'bg-fuchsia-950/40 border-fuchsia-800/60' },
+			{ label: 'Start Event', href: '/dashboard/events/new', icon: Flag, color: 'text-lime-300', bg: 'bg-lime-950/40 border-lime-800/60' },
+		] as action}
+			<a href={action.href}
+				class="group flex items-center justify-between gap-3 rounded-xl border {action.bg} px-4 py-3 text-left hover:brightness-125 transition-all duration-150">
+				<div class="flex items-center gap-2 min-w-0">
+					<action.icon class="size-4 {action.color} transition-transform group-hover:scale-110" />
+					<span class="text-sm font-semibold text-slate-200 truncate">{action.label}</span>
+				</div>
+				<ArrowRight class="size-4 text-slate-400 group-hover:text-slate-200 transition-colors" />
+			</a>
+		{/each}
+	</div>
+
 	<!-- Phase context banner — 2 phases -->
 	<div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
 		<!-- Phase 1: Pre-Tournaments -->

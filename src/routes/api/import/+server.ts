@@ -1,18 +1,6 @@
 import { json } from '@sveltejs/kit';
 import { RequestContext } from '$lib/infra/RequestContext';
-import {
-	DEFAULT_REIMBURSEMENT_MAX_CLAIM_TOTAL,
-	REIMBURSEMENT_MAX_TOTAL_SETTING_KEY
-} from '$lib/domain/schemas/reimbursement.schema';
 import type { RequestHandler } from './$types';
-
-async function getMaxClaimTotal(pb: any): Promise<number> {
-	const setting = await pb.collection('settings')
-		.getFirstListItem(`key = "${REIMBURSEMENT_MAX_TOTAL_SETTING_KEY}"`, { fields: 'value' })
-		.catch(() => null);
-	const parsed = Number(setting?.value);
-	return Number.isFinite(parsed) && parsed > 0 ? parsed : DEFAULT_REIMBURSEMENT_MAX_CLAIM_TOTAL;
-}
 
 // POST /api/import
 // Body: { type: 'vendors' | 'sponsors' | 'pros', rows: Record<string, string>[] }
@@ -31,10 +19,29 @@ export const POST: RequestHandler = async ({ locals, url, request }) => {
 	let created = 0;
 	let failed = 0;
 	const errors: string[] = [];
-	const allowedClaimStatuses = new Set(['draft', 'submitted', 'under_review', 'approved', 'paid', 'rejected']);
-	const maxClaimTotal = type === 'reimbursements'
-		? await getMaxClaimTotal(pb)
-		: DEFAULT_REIMBURSEMENT_MAX_CLAIM_TOTAL;
+
+	function formatCreateError(err: any): string {
+		console.error('IMPORT CREATE ERROR', JSON.stringify(err, null, 2));
+
+		const fieldIssues = err?.data?.data || err?.response?.data?.data || err?.response?.data;
+		if (fieldIssues && typeof fieldIssues === 'object' && !Array.isArray(fieldIssues)) {
+			const message = Object.entries(fieldIssues)
+				.map(([field, issue]: any) => {
+					if (issue?.message) return `${field}: ${issue.message}`;
+					if (typeof issue === 'string') return `${field}: ${issue}`;
+					return `${field}: ${JSON.stringify(issue)}`;
+				})
+				.join('; ');
+
+			if (message) return message;
+		}
+
+		return err?.data?.message
+			|| err?.response?.data?.message
+			|| err?.response?.message
+			|| err?.message
+			|| 'Failed to create record.';
+	}
 
 	// Cache for grouping multi-item reimbursement rows into one claim per title+claimant
 	const claimCache = new Map<string, string>();
@@ -100,20 +107,20 @@ export const POST: RequestHandler = async ({ locals, url, request }) => {
 					notes:       row.notes?.trim() || ''
 				});
 			} else if (type === 'reimbursements') {
-				// Resolve claimant by email
+				// Resolve claimant profile by email (reimbursement_claims.claimant -> user_profiles)
 				const email = row.claimantEmail?.trim();
 				if (!email) throw new Error('claimantEmail is required');
 
 				let claimantId: string;
 				try {
-					const user = await pb.collection('users').getFirstListItem(`email="${email}"`);
-					claimantId = user.id;
+					const profile = await pb.collection('user_profiles').getFirstListItem(`email="${email}"`, { fields: 'id' });
+					claimantId = profile.id;
 				} catch {
-					throw new Error(`No user found with email: ${email}`);
+					throw new Error(`No user profile found with email: ${email}`);
 				}
 
 				// Resolve optional vendor by name
-				let vendorId: string | undefined;
+				let vendorId: string | null = null;
 				const vendorName = row.vendorName?.trim();
 				if (vendorName) {
 					try {
@@ -125,7 +132,7 @@ export const POST: RequestHandler = async ({ locals, url, request }) => {
 				}
 
 				// Resolve optional department by name
-				let departmentId: string | undefined;
+				let departmentId: string | null = null;
 				const deptName = row.departmentName?.trim();
 				if (deptName) {
 					try {
@@ -139,9 +146,7 @@ export const POST: RequestHandler = async ({ locals, url, request }) => {
 				const isHistorical = row.isHistorical?.trim().toLowerCase() === 'true';
 				const itemAmount   = row.itemAmount ? Number(row.itemAmount.replace(/[^0-9.]/g, '')) : 0;
 				const claimTitle   = row.claimTitle?.trim() || '';
-				const rawStatus = (row.claimStatus?.trim().toLowerCase() || 'draft');
-				const normalizedStatus = allowedClaimStatuses.has(rawStatus) ? rawStatus : 'draft';
-				const claimStatus = normalizedStatus === 'paid' ? 'under_review' : normalizedStatus;
+				const claimStatus  = row.claimStatus?.trim() || 'draft';
 
 				// Group multi-item rows: reuse an existing claim created in this import
 				// batch if claimTitle + claimantEmail match a previously created claim.
@@ -152,48 +157,45 @@ export const POST: RequestHandler = async ({ locals, url, request }) => {
 					claimId = claimCache.get(cacheKey)!;
 					// Update totalAmount on the existing claim
 					const existing = await pb.collection('reimbursement_claims').getOne(claimId, { fields: 'id,totalAmount' });
-					const nextTotal = (existing.totalAmount || 0) + itemAmount;
-					if (nextTotal > maxClaimTotal) {
-						throw new Error(`Claim total cannot exceed $${maxClaimTotal.toFixed(2)} (claim: ${claimTitle})`);
-					}
 					await pb.collection('reimbursement_claims').update(claimId, {
-						totalAmount: nextTotal
+						totalAmount: (existing.totalAmount || 0) + itemAmount
 					});
 				} else {
-					if (itemAmount > maxClaimTotal) {
-						throw new Error(`Claim total cannot exceed $${maxClaimTotal.toFixed(2)} (claim: ${claimTitle})`);
-					}
-					const claim = await pb.collection('reimbursement_claims').create({
-						title:        claimTitle,
-						claimant:     claimantId,
-						status:       claimStatus,
-						totalAmount:  itemAmount,
-						notes:        row.claimNotes?.trim() || '',
-						department:   departmentId ?? '',
+					const claimPayload = {
+						title:         claimTitle,
+						claimant:      claimantId,
+						status:        claimStatus,
+						totalAmount:   itemAmount,
+						notes:         row.claimNotes?.trim() || '',
+						department:    departmentId,
 						is_historical: isHistorical,
-					});
+					};
+					console.log('CREATE PAYLOAD', claimPayload);
+					const claim = await pb.collection('reimbursement_claims').create(claimPayload);
 					claimId = claim.id;
 					claimCache.set(cacheKey, claimId);
 				}
 
 				// Create the line item
-				await pb.collection('reimbursement_items').create({
+				const itemPayload = {
 					claim:       claimId,
 					description: row.itemDescription?.trim() || '',
 					amount:      itemAmount,
-					date:        row.itemDate?.trim() || '',
+					date:        row.itemDate?.trim() || null,
 					category:    row.itemCategory?.trim() || 'other',
-					vendorId:    vendorId ?? '',
+					vendor:      vendorName || '',
+					vendorId:    vendorId,
 					notes:       row.itemNotes?.trim() || ''
-				});
+				};
+				console.log('CREATE PAYLOAD', itemPayload);
+				await pb.collection('reimbursement_items').create(itemPayload);
 			} else {
 				return json({ message: `Unknown import type: ${type}` }, { status: 400 });
 			}
 			created++;
 		} catch (err: any) {
 			failed++;
-			const msg = err?.response?.message ?? err?.message ?? 'Unknown error';
-			errors.push(`Row ${i + 2}: ${msg}`);
+			errors.push(`Row ${i + 2}: ${formatCreateError(err)}`);
 		}
 	}
 
