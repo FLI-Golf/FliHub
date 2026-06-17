@@ -468,6 +468,12 @@
 		return Math.max(0, Math.min(100, Math.round((amount / departmentBudget.annualBudget) * 100)));
 	}
 
+	function utilizationDisplayPct() {
+		if (departmentBudget.annualBudget <= 0) return '0.0';
+		const rawPct = (departmentBudget.actualExpenses / departmentBudget.annualBudget) * 100;
+		return rawPct.toFixed(1);
+	}
+
 	function typeLabel(value: string) {
 		if (!value) return 'Other';
 		return value
@@ -615,14 +621,21 @@
 
 				<div class="flex items-center justify-between text-xs">
 					<span class="text-slate-400">Budget utilization</span>
-					<span class="text-slate-200 font-semibold">{departmentBudget.utilizationPct}%</span>
+					<span class="text-slate-200 font-semibold">{utilizationDisplayPct()}%</span>
 				</div>
 				<div class={`h-4 rounded-full border overflow-hidden shadow-inner ${budgetWarningStyles(departmentBudget.warningLevel).track}`}>
 					<div class={`h-full ${budgetWarningStyles(departmentBudget.warningLevel).fill} transition-all duration-300`} style={`width: ${departmentBudget.utilizationPct}%`}></div>
 				</div>
 				<div class="flex items-center justify-between text-[11px] text-slate-400">
-					<span>{fmt(departmentBudget.actualExpenses)} allocated to event operations</span>
+					<span>{fmt(departmentBudget.actualExpenses)} actual spend posted</span>
 					<span>{fmt(departmentBudget.availableBalance)} remaining</span>
+				</div>
+				<div class="h-3 rounded-full border border-slate-500/90 overflow-hidden bg-slate-950">
+					<div class="h-full bg-gradient-to-r from-cyan-300 via-sky-400 to-blue-500 transition-all duration-300" style={`width: ${budgetPercent(departmentBudget.actualExpenses)}%`}></div>
+				</div>
+				<div class="flex items-center justify-between text-[11px] text-slate-500">
+					<span>{fmt(totals.totalBudget)} planned event allocations</span>
+					<span>{filteredCards.length} visible events</span>
 				</div>
 				{#if filteredCards.length !== cards.length}
 					{@const filteredProjectedSpend = filteredTotals.totalPaid + filteredTotals.totalPending}
@@ -631,20 +644,34 @@
 							<span>Filtered preview</span>
 							<span>{fmt(filteredProjectedSpend)} / {fmt(departmentBudget.annualBudget)}</span>
 						</div>
-						<div class="h-2 rounded-full border border-slate-700 overflow-hidden bg-slate-800/80">
-							<div class="h-full bg-slate-400/80 transition-all duration-300" style={`width: ${budgetPercent(filteredProjectedSpend)}%`}></div>
+						<div class="h-3 rounded-full border border-slate-500/90 overflow-hidden bg-slate-950">
+							<div class="h-full bg-gradient-to-r from-amber-200 via-orange-300 to-rose-400 transition-all duration-300" style={`width: ${budgetPercent(filteredProjectedSpend)}%`}></div>
 						</div>
 						<p class="text-[11px] text-slate-500">Preview only. Filters can show probable spend, but the Operations budget is not reduced until payment records post.</p>
 					</div>
 				{/if}
-				<div class="grid grid-cols-3 gap-2 text-xs">
+				<div class="flex flex-wrap items-center gap-3 text-[11px] text-slate-400">
+					<div class="inline-flex items-center gap-1.5">
+						<span class="size-2.5 rounded-full bg-sky-400"></span>
+						<span>Actual posted spend</span>
+					</div>
+					<div class="inline-flex items-center gap-1.5">
+						<span class="size-2.5 rounded-full bg-orange-300"></span>
+						<span>Filtered preview spend</span>
+					</div>
+				</div>
+				<div class="grid grid-cols-2 md:grid-cols-4 gap-2 text-xs">
 					<div class="rounded-lg border border-slate-700 bg-slate-800/70 p-2">
 						<p class="text-slate-400">Annual</p>
 						<p class="text-slate-100 font-semibold">{fmt(departmentBudget.annualBudget)}</p>
 					</div>
 					<div class="rounded-lg border border-slate-700 bg-slate-800/70 p-2">
-						<p class="text-slate-400">Allocated</p>
+						<p class="text-slate-400">Actual Spend</p>
 						<p class="text-slate-100 font-semibold">{fmt(departmentBudget.actualExpenses)}</p>
+					</div>
+					<div class="rounded-lg border border-slate-700 bg-slate-800/70 p-2">
+						<p class="text-slate-400">Planned</p>
+						<p class="text-slate-100 font-semibold">{fmt(totals.totalBudget)}</p>
 					</div>
 					<div class="rounded-lg border border-slate-700 bg-slate-800/70 p-2">
 						<p class="text-slate-400">Remaining</p>
@@ -654,6 +681,25 @@
 			</div>
 		</div>
 	</Card>
+
+	<div class="grid grid-cols-1 md:grid-cols-4 gap-3">
+		<Card class="p-4 border border-blue-700/40 bg-blue-950/25">
+			<p class="text-xs text-blue-300/80">Filtered Pending</p>
+			<p class="text-lg font-semibold mt-1">{fmt(filteredTotals.totalPending)}</p>
+		</Card>
+		<Card class="p-4 border border-emerald-700/40 bg-emerald-950/25">
+			<p class="text-xs text-emerald-300/80">Filtered Paid</p>
+			<p class="text-lg font-semibold mt-1">{fmt(filteredTotals.totalPaid)}</p>
+		</Card>
+		<Card class="p-4 border border-amber-700/40 bg-amber-950/25">
+			<p class="text-xs text-amber-300/80">Task Est. Cost</p>
+			<p class="text-lg font-semibold mt-1">{fmt(filteredTotals.estimatedTaskCost)}</p>
+		</Card>
+		<Card class="p-4 border border-teal-700/40 bg-teal-950/25">
+			<p class="text-xs text-teal-300/80">Task Actual Cost</p>
+			<p class="text-lg font-semibold mt-1">{fmt(filteredTotals.actualTaskCost)}</p>
+		</Card>
+	</div>
 
 	<div class="rounded-xl border border-slate-700/60 bg-slate-900/60 p-4">
 		<div class="flex items-center justify-between gap-3 mb-3">
@@ -948,23 +994,5 @@
 			{/each}
 		</div>
 
-		<div class="grid grid-cols-1 md:grid-cols-4 gap-3">
-			<Card class="p-4 border border-blue-700/40 bg-blue-950/25">
-				<p class="text-xs text-blue-300/80">Filtered Pending</p>
-				<p class="text-lg font-semibold mt-1">{fmt(filteredTotals.totalPending)}</p>
-			</Card>
-			<Card class="p-4 border border-emerald-700/40 bg-emerald-950/25">
-				<p class="text-xs text-emerald-300/80">Filtered Paid</p>
-				<p class="text-lg font-semibold mt-1">{fmt(filteredTotals.totalPaid)}</p>
-			</Card>
-			<Card class="p-4 border border-amber-700/40 bg-amber-950/25">
-				<p class="text-xs text-amber-300/80">Task Est. Cost</p>
-				<p class="text-lg font-semibold mt-1">{fmt(filteredTotals.estimatedTaskCost)}</p>
-			</Card>
-			<Card class="p-4 border border-teal-700/40 bg-teal-950/25">
-				<p class="text-xs text-teal-300/80">Task Actual Cost</p>
-				<p class="text-lg font-semibold mt-1">{fmt(filteredTotals.actualTaskCost)}</p>
-			</Card>
-		</div>
 	{/if}
 </div>

@@ -33,6 +33,15 @@
 
 	const isBroadcast = $derived(form.eventType === 'tournament_broadcast');
 
+	$effect(() => {
+		console.log('[events/edit] reference options', {
+			eventId: e?.id,
+			tournaments: data.tournaments?.length ?? 0,
+			seasons: data.seasons?.length ?? 0,
+			tournamentIds: (data.tournaments ?? []).map((t: any) => t.id)
+		});
+	});
+
 	async function submit(ev: SubmitEvent) {
 		ev.preventDefault();
 		saving = true; error = '';
@@ -120,11 +129,11 @@
 			</div>
 		</div>
 
-		{#if isBroadcast}
 		<div class="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2 border-t border-gray-700">
-			<h3 class="sm:col-span-2 text-sm font-semibold text-yellow-400">Broadcast Details</h3>
+			<h3 class="sm:col-span-2 text-sm font-semibold text-blue-300">Tournament Reference</h3>
+			<p class="sm:col-span-2 text-xs text-gray-400">Use these links to reference and target tournaments/seasons in queries and reporting; event budget remains independent.</p>
 			<div>
-				<label class={LABEL}>Linked Tournament</label>
+				<label class={LABEL}>Reference Tournament</label>
 				<select bind:value={form.tournament} class={INPUT}>
 					<option value="">— None —</option>
 					{#each data.tournaments as t}
@@ -133,7 +142,7 @@
 				</select>
 			</div>
 			<div>
-				<label class={LABEL}>Season</label>
+				<label class={LABEL}>Reference Season</label>
 				<select bind:value={form.season} class={INPUT}>
 					<option value="">— None —</option>
 					{#each data.seasons as s}
@@ -141,16 +150,18 @@
 					{/each}
 				</select>
 			</div>
-			<div>
-				<label class={LABEL}>Bonus Amount ($)</label>
-				<input type="number" bind:value={form.bonusAmount} min="0" step="0.01" class={INPUT} />
-			</div>
-			<div>
-				<label class={LABEL}>Bonus Threshold (# events)</label>
-				<input type="number" bind:value={form.bonusThreshold} min="1" step="1" class={INPUT} />
-			</div>
+			{#if isBroadcast}
+				<h3 class="sm:col-span-2 text-sm font-semibold text-yellow-400">Broadcast Details</h3>
+				<div>
+					<label class={LABEL}>Bonus Amount ($)</label>
+					<input type="number" bind:value={form.bonusAmount} min="0" step="0.01" class={INPUT} />
+				</div>
+				<div>
+					<label class={LABEL}>Bonus Threshold (# events)</label>
+					<input type="number" bind:value={form.bonusThreshold} min="1" step="1" class={INPUT} />
+				</div>
+			{/if}
 		</div>
-		{/if}
 
 		<div class="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-2 border-t border-gray-700">
 			<h3 class="sm:col-span-3 text-sm font-semibold text-white">Payment Settings</h3>

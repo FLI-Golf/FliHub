@@ -81,6 +81,24 @@ export const POST: RequestHandler = async ({ locals, request }) => {
 			// ── Side effects on quorum ────────────────────────────────────────
 			if (approval.entityType === 'expense') {
 				const expense = await pb.collection('expenses').getOne(approval.entityId).catch(() => null) as any;
+				const eventPaymentMatch = String(expense?.notes ?? '').match(/\[EP:([^\]]+)\]/);
+				const linkedEventPaymentId = eventPaymentMatch?.[1] ?? null;
+
+				if (linkedEventPaymentId) {
+					await pb.collection('event_payments').update(linkedEventPaymentId, {
+						status: 'approved',
+						approvedAt: new Date().toISOString().slice(0, 10),
+						approvedBy: userProfile.id,
+					}).catch((e: any) => console.warn('event_payment update failed:', e.message));
+
+					await pb.collection('expenses').update(expense.id, {
+						status: 'approved',
+						approvedBy: userProfile.id,
+						approvedDate: new Date().toISOString(),
+					}).catch((e: any) => console.warn('event payment expense update failed:', e.message));
+
+					updatePayload.comments = `<p>Quorum reached — approved by ${voteCount} ${voteCount === 1 ? 'approver' : 'approvers'}. Event payment is ready for payout.</p>`;
+				} else {
 
 				// Reimbursements use approval.entityType='expense' with entityId = reimbursement_claims.id.
 				if (!expense) {
@@ -317,6 +335,7 @@ export const POST: RequestHandler = async ({ locals, request }) => {
 				}
 				}
 				}
+				}
 
 			} else if (approval.entityType === 'tournament_payout') {
 				const tournamentId = String(approval.entityId || '');
@@ -444,6 +463,15 @@ export const POST: RequestHandler = async ({ locals, request }) => {
 					status: 'in_progress',
 					approvedBy: userProfile.id,
 				}).catch((e: any) => console.warn('project update failed:', e.message));
+
+			} else if (approval.entityType === 'event_payment') {
+				const approvedAt = new Date().toISOString().slice(0, 10);
+				await pb.collection('event_payments').update(approval.entityId, {
+					status: 'approved',
+					approvedAt,
+					approvedBy: userProfile.id,
+				}).catch((e: any) => console.warn('event payment update failed:', e.message));
+				updatePayload.comments = `<p>Quorum reached — approved by ${voteCount} ${voteCount === 1 ? 'approver' : 'approvers'}. Event payment is ready for payout.</p>`;
 
 			} else if (approval.entityType === 'bid') {
 				// Quorum reached: approve the linked expense, generate a Work Order number,

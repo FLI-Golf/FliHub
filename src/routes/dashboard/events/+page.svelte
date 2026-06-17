@@ -54,38 +54,58 @@
 	// Seed controls
 	let seedBusy = $state(false);
 	let seedMsg = $state('');
+	let seedMsgKind = $state<'success' | 'error' | 'info'>('info');
+	let cleanupSummary = $state('');
+
+	function formatCleanupSummary(summary: any) {
+		if (!summary) return '';
+		const parts = [
+			`${summary.seedEvents ?? 0} seed events`,
+			`${summary.eventPayments ?? 0} event payments`,
+			`${summary.eventTasks ?? 0} tasks`,
+			`${summary.eventTalent ?? 0} talent bookings`,
+			`${summary.approvalExpenses ?? 0} approval expenses`,
+			`${summary.linkedApprovals ?? 0} linked approvals`,
+			`${summary.legacyApprovals ?? 0} legacy approvals`
+		];
+		return parts.join(' • ');
+	}
+
 	async function runSeed() {
 		if (!confirm('Seed test events? This will add sample data.')) return;
-		seedBusy = true; seedMsg = '';
+		seedBusy = true; seedMsg = ''; cleanupSummary = '';
 		try {
 			const res = await fetch('/api/events/seed', { method: 'POST' });
 			const d = await res.json();
 			seedMsg = d.message;
+			seedMsgKind = res.ok ? 'success' : 'error';
 			if (res.ok) { await invalidateAll(); }
-		} catch { seedMsg = 'Seed failed'; }
+		} catch { seedMsg = 'Seed failed'; seedMsgKind = 'error'; }
 		finally { seedBusy = false; }
 	}
 	async function clearSeed() {
 		if (!confirm('Clear all seed test events? This cannot be undone.')) return;
-		seedBusy = true; seedMsg = '';
+		seedBusy = true; seedMsg = ''; cleanupSummary = '';
 		try {
 			const res = await fetch('/api/events/seed', { method: 'DELETE' });
 			const d = await res.json();
 			seedMsg = d.message;
+			seedMsgKind = res.ok ? 'success' : 'error';
+			cleanupSummary = res.ok ? formatCleanupSummary(d.summary) : '';
 			if (res.ok) { await invalidateAll(); }
-		} catch { seedMsg = 'Clear failed'; }
+		} catch { seedMsg = 'Clear failed'; seedMsgKind = 'error'; }
 		finally { seedBusy = false; }
 	}
 	async function resetSeed() {
 		if (!confirm('Clear all seed data and re-seed? This cannot be undone.')) return;
-		seedBusy = true; seedMsg = '';
+		seedBusy = true; seedMsg = ''; cleanupSummary = '';
 		try {
-			await fetch('/api/events/seed', { method: 'DELETE' });
-			const res = await fetch('/api/events/seed', { method: 'POST' });
+			const res = await fetch('/api/events/seed', { method: 'PATCH' });
 			const d = await res.json();
 			seedMsg = d.message;
+			seedMsgKind = res.ok ? 'success' : 'error';
 			if (res.ok) { await invalidateAll(); }
-		} catch { seedMsg = 'Reset failed'; }
+		} catch { seedMsg = 'Reset failed'; seedMsgKind = 'error'; }
 		finally { seedBusy = false; }
 	}
 
@@ -213,7 +233,18 @@
 		<button onclick={resetSeed} disabled={seedBusy} class="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded bg-yellow-900/60 hover:bg-yellow-800 text-yellow-300 border border-yellow-700 disabled:opacity-50">
 			<RotateCcw class="w-3 h-3" />{seedBusy ? 'Working...' : 'Reset (Clear + Re-seed)'}
 		</button>
-		{#if seedMsg}<span class="text-xs text-gray-400 ml-1">{seedMsg}</span>{/if}
+		{#if seedMsg}
+			<div class={`ml-1 rounded-md border px-3 py-2 text-xs ${seedMsgKind === 'success'
+				? 'border-emerald-700 bg-emerald-950/40 text-emerald-300'
+				: seedMsgKind === 'error'
+				? 'border-red-700 bg-red-950/40 text-red-300'
+				: 'border-gray-600 bg-gray-800 text-gray-300'}`}>
+				<div>{seedMsg}</div>
+				{#if cleanupSummary}
+					<div class="mt-1 text-[11px] text-emerald-200/90">Cleanup summary: {cleanupSummary}</div>
+				{/if}
+			</div>
+		{/if}
 	</div>
 	{/if}
 

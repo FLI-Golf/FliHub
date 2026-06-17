@@ -18,6 +18,7 @@
 	let searchTerm = $state('');
 	let selectedStatuses = $state<string[]>([]);
 	let selectedTypes = $state<string[]>([]);
+	let eventPaymentsOnly = $state(false);
 	let minAmountFilter = $state('');
 	let maxAmountFilter = $state('');
 	let requestedFrom = $state('');
@@ -161,11 +162,17 @@
 		searchTerm = '';
 		selectedStatuses = [...statusOptions];
 		selectedTypes = [...typeOptions];
+		eventPaymentsOnly = false;
 		minAmountFilter = '';
 		maxAmountFilter = '';
 		requestedFrom = '';
 		requestedTo = '';
 		sortBy = 'requested_desc';
+	}
+
+	function isEventPaymentApproval(approval: any) {
+		const expenseNotes = String(approval?.expand?.expenseId?.notes ?? '');
+		return expenseNotes.includes('[EP:');
 	}
 
 	let filtered = $derived.by(() => {
@@ -178,6 +185,7 @@
 		let list = (data.approvals as any[]).filter((a: any) => {
 			if (selectedStatuses.length > 0 && !selectedStatuses.includes(a.status)) return false;
 			if (selectedTypes.length > 0 && !selectedTypes.includes(a.entityType)) return false;
+			if (eventPaymentsOnly && !isEventPaymentApproval(a)) return false;
 
 			const amount = Number(a.amount ?? 0);
 			if (minAmount !== null && !Number.isNaN(minAmount) && amount < minAmount) return false;
@@ -593,6 +601,19 @@
 						{type}
 					</button>
 				{/each}
+			</div>
+
+			<div class="flex flex-wrap items-center gap-2">
+				<span class="text-xs text-slate-400 uppercase tracking-wide mr-1">Quick Filter</span>
+				<button
+					type="button"
+					onclick={() => eventPaymentsOnly = !eventPaymentsOnly}
+					class={`text-xs px-2.5 py-1 rounded-full border transition-colors ${eventPaymentsOnly
+						? 'bg-emerald-900/40 text-emerald-300 border-emerald-700/50'
+						: 'bg-slate-900 text-slate-500 border-slate-700 hover:border-slate-500 hover:text-slate-300'}`}
+				>
+					Event Payments
+				</button>
 			</div>
 
 			<p class="text-sm text-slate-500">Showing {filtered.length} of {data.approvals.length}</p>
