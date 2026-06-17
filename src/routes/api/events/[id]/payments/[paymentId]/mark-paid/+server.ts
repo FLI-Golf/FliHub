@@ -1,5 +1,6 @@
 import { json } from '@sveltejs/kit';
 import { requireAdminApi } from '$lib/infra/api-route-guards';
+import { checkEventFundingCapacity } from '$lib/server/event-funding';
 import type { RequestHandler } from './$types';
 
 function deriveCode(name: string): string {
@@ -28,6 +29,20 @@ export const POST: RequestHandler = async ({ params, locals }) => {
 		}
 		if (payment.status === 'approval_required') {
 			return json({ message: 'Payment requires approval before payout' }, { status: 409 });
+		}
+
+		const fundingCheck = await checkEventFundingCapacity(pb, {
+			eventId: payment.event,
+			paymentAmount: Number(payment.amount) || 0,
+			excludePaymentId: payment.id,
+			mode: 'pay'
+		});
+
+		if (!fundingCheck.ok) {
+			return json({
+				message: 'Insufficient budget capacity for payout',
+				budgetCheck: fundingCheck
+			}, { status: 409 });
 		}
 
 		if (payment.status === 'approved') {
@@ -67,12 +82,21 @@ export const POST: RequestHandler = async ({ params, locals }) => {
 			paidBy
 		});
 
+		if (fundingCheck.departmentId) {
+			await pb.collection('departments').update(fundingCheck.departmentId, {
+				department_actual_expenses: fundingCheck.departmentActualExpenses + (Number(payment.amount) || 0)
+			}).catch((e: any) => console.warn('Failed to roll event payment into department actuals:', e?.message ?? e));
+		}
+
 		// If this was a bonus payment, mark bonusEarned on the event_talent record
 		if (payment.isBonus && payment.eventTalent) {
 			await pb.collection('event_talent').update(payment.eventTalent, { bonusEarned: true }).catch(() => {});
 		}
 
-		return json(updated);
+		return json({
+			...updated,
+			budgetWarningLevel: fundingCheck.warningLevel
+		});
 	} catch (err: any) {
 		return json({ message: err.message ?? 'Failed to mark payment as paid' }, { status: 400 });
 	}

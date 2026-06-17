@@ -2114,6 +2114,44 @@ export const collections = [
 
 	// ─── Bank statement archive ───────────────────────────────────────────────
 	{
+		name: 'event_payment_bundles',
+		type: 'base',
+		schema: [
+			{ name: 'bundleNumber', type: 'text', required: true, options: { min: 1, max: 80 } },
+			{ name: 'name', type: 'text', required: false, options: { max: 255 } },
+			{
+				name: 'status',
+				type: 'select',
+				required: true,
+				options: { maxSelect: 1, values: ['draft', 'ready', 'posted', 'paid', 'cancelled'] }
+			},
+			{ name: 'department', type: 'relation', required: false, options: { collectionId: 'departments', maxSelect: 1 } },
+			{ name: 'departmentName', type: 'text', required: false, options: { max: 255 } },
+			{ name: 'accountLabel', type: 'text', required: false, options: { max: 255 } },
+			{ name: 'paymentIds', type: 'relation', required: false, options: { collectionId: 'event_payments', maxSelect: 500 } },
+			{ name: 'itemCount', type: 'number', required: false, options: { min: 0 } },
+			{ name: 'totalAmount', type: 'number', required: false, options: { min: 0 } },
+			{ name: 'maxItemCount', type: 'number', required: false, options: { min: 1 } },
+			{ name: 'maxAmountThreshold', type: 'number', required: false, options: { min: 1 } },
+			{ name: 'snapshotJson', type: 'json', required: false },
+			{ name: 'snapshotChecksum', type: 'text', required: false, options: { max: 128 } },
+			{ name: 'postedAt', type: 'date', required: false },
+			{ name: 'paidAt', type: 'date', required: false },
+			{ name: 'notes', type: 'editor', required: false }
+		],
+		indexes: [
+			'CREATE UNIQUE INDEX idx_event_payment_bundles_number ON event_payment_bundles (bundleNumber)',
+			'CREATE INDEX idx_event_payment_bundles_status ON event_payment_bundles (status)'
+		],
+		listRule: '@request.auth.id != ""',
+		viewRule: '@request.auth.id != ""',
+		createRule: '@request.auth.id != ""',
+		updateRule: '@request.auth.id != ""',
+		deleteRule: '@request.auth.id != ""'
+	},
+
+	// ─── Bank statement archive ───────────────────────────────────────────────
+	{
 		name: 'bank_statements',
 		type: 'base',
 		schema: [

@@ -1,6 +1,7 @@
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { getAdminPocketBase } from '$lib/infra/pocketbase/pbClient';
+import { checkEventFundingCapacity } from '$lib/server/event-funding';
 
 /** Derive a short project code from the project name — first letter of each word, max 6 chars, uppercase. */
 function deriveProjectCode(name: string): string {
@@ -598,6 +599,20 @@ export const POST: RequestHandler = async ({ locals, request }) => {
 					return json({ error: 'Linked event payment not found' }, { status: 404 });
 				}
 
+				const fundingCheck = await checkEventFundingCapacity(pb, {
+					eventId: payment.event,
+					paymentAmount: Number(payment.amount) || 0,
+					excludePaymentId: payment.id,
+					mode: 'approval'
+				});
+
+				if (!fundingCheck.ok) {
+					return json({
+						error: 'Insufficient budget capacity for event payment approval',
+						budgetCheck: fundingCheck
+					}, { status: 409 });
+				}
+
 				const eventName = payment.expand?.event?.name || 'Event Payment';
 				const payeeName = payment.recipient === 'manager'
 					? (payment.expand?.talent?.name || 'Manager')
@@ -635,7 +650,11 @@ export const POST: RequestHandler = async ({ locals, request }) => {
 					status: 'approved'
 				}).catch((e: any) => console.warn('event_payment update failed:', e.message));
 
-				updatePayload.comments = `<p>Quorum reached — approved by ${voteCount} ${voteCount === 1 ? 'approver' : 'approvers'}. Event Payment Work Order: ${workOrderNumber}</p>`;
+				const warningNote = fundingCheck.warningLevel !== 'normal'
+					? ` Budget warning level: ${fundingCheck.warningLevel.toUpperCase()} (${fundingCheck.departmentProjectedUtilizationPct}% utilized).`
+					: '';
+
+				updatePayload.comments = `<p>Quorum reached — approved by ${voteCount} ${voteCount === 1 ? 'approver' : 'approvers'}. Event Payment Work Order: ${workOrderNumber}.${warningNote}</p>`;
 
 			} else {
 				updatePayload.comments = `<p>Quorum reached — approved by ${voteCount} ${voteCount === 1 ? 'approver' : 'approvers'}.</p>`;
