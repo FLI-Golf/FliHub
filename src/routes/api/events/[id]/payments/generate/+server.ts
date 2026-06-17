@@ -16,6 +16,7 @@
  */
 import { json } from '@sveltejs/kit';
 import { requireAdminApi } from '$lib/infra/api-route-guards';
+import { autoAssignDirectPaymentsToDraftBundles } from '$lib/server/event-payment-bundles';
 import type { RequestHandler } from './$types';
 
 async function ensureEventPaymentApproval(pb: any, payment: any) {
@@ -81,6 +82,7 @@ export const POST: RequestHandler = async ({ locals, url, params }) => {
 
 		let created = 0;
 		let skipped = 0;
+		const directPaymentIds: string[] = [];
 
 		for (const et of confirmedTalent) {
 			const talentId = et.talent;
@@ -130,6 +132,7 @@ export const POST: RequestHandler = async ({ locals, url, params }) => {
 				isBonus: false
 			});
 			await ensureEventPaymentApproval(pb, talentPayment);
+			if (approvalRoute === 'direct') directPaymentIds.push(String(talentPayment.id));
 
 			// Create manager split payment if applicable
 			if (managerAmount > 0 && talent?.managerEmail) {
@@ -147,6 +150,9 @@ export const POST: RequestHandler = async ({ locals, url, params }) => {
 					isBonus: false
 				});
 				await ensureEventPaymentApproval(pb, managerPayment);
+				if ((mgNeedsApproval ? 'approval_pipeline' : 'direct') === 'direct') {
+					directPaymentIds.push(String(managerPayment.id));
+				}
 			}
 
 			// Create bonus payment if eligible and not yet earned.
@@ -176,7 +182,17 @@ export const POST: RequestHandler = async ({ locals, url, params }) => {
 			created++;
 		}
 
-		return json({ message: `Generated payments for ${created} talent member${created !== 1 ? 's' : ''}${skipped > 0 ? ` (${skipped} skipped — already have payments)` : ''}`, created, skipped });
+		let bundleAssignment = { assigned: 0, createdBundles: 0, skipped: 0, bundleIds: [] as string[] };
+		if (directPaymentIds.length > 0) {
+			bundleAssignment = await autoAssignDirectPaymentsToDraftBundles(pb, directPaymentIds);
+		}
+
+		return json({
+			message: `Generated payments for ${created} talent member${created !== 1 ? 's' : ''}${skipped > 0 ? ` (${skipped} skipped — already have payments)` : ''}`,
+			created,
+			skipped,
+			bundleAssignment
+		});
 	} catch (err: any) {
 		return json({ message: err.message ?? 'Failed to generate payments' }, { status: 500 });
 	}
