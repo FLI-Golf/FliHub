@@ -167,7 +167,7 @@ async function generatePayments(pb: any, eventId: string) {
 		if (status === 'approval_required') {
 			const marker = `[EP:${talentPayment.id}]`;
 			const expense = await pb.collection('expenses').create({
-				description: `Event payment approval (${isBroadcast ? 'broadcast_fee' : 'appearance_fee'})`,
+				description: `Event payment approval (${isBroadcast ? 'broadcast_fee' : 'appearance_fee'}) - Payee: ${talent?.name ?? et.talent}`,
 				amount: Number(amount) || 0,
 				status: 'submitted',
 				date: new Date().toISOString().slice(0, 10),
@@ -224,7 +224,7 @@ async function generatePayments(pb: any, eventId: string) {
 				const bonusPayment = await pb.collection('event_payments').create({ event: eventId, eventTalent: et.id, talent: et.talent, paymentType: 'bonus', amount: event.bonusAmount, status: 'approval_required', approvalRoute: 'approval_pipeline', recipient: 'talent', description: `Attendance bonus — completed ${event.bonusThreshold} events`, isBonus: true });
 				const marker = `[EP:${bonusPayment.id}]`;
 				const expense = await pb.collection('expenses').create({
-					description: 'Bonus payment approval',
+					description: `Bonus payment approval - Payee: ${talent?.name ?? et.talent}`,
 					amount: Number(event.bonusAmount) || 0,
 					status: 'submitted',
 					date: new Date().toISOString().slice(0, 10),

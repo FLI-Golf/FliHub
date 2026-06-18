@@ -1,6 +1,17 @@
 import { RequestContext } from '$lib/infra/RequestContext';
 import type { PageServerLoad } from './$types';
 
+const EVENT_PAYMENT_MARKER = /\[EP:([^\]]+)\]/;
+
+function formatPaymentTypeLabel(paymentType: string | undefined | null): string {
+	switch (paymentType) {
+		case 'broadcast_fee': return 'Broadcast fee';
+		case 'appearance_fee': return 'Appearance fee';
+		case 'bonus': return 'Attendance bonus';
+		default: return paymentType ? paymentType.replace(/_/g, ' ') : 'Event payment';
+	}
+}
+
 export const load: PageServerLoad = async ({ locals, url }) => {
 	const ctx = await RequestContext.from(locals, url);
 	const { pb, userId } = ctx;
@@ -23,6 +34,18 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 			filter: `userId = "${userId}"`
 		}).catch(() => []);
 		const userProfile = (userProfiles as any[])[0] ?? null;
+
+		const approvalLinkedPayments = new Map<string, any>();
+		const eventPaymentIds = Array.from(new Set((approvals as any[])
+			.map((approval: any) => String(approval?.expand?.expenseId?.notes ?? '').match(EVENT_PAYMENT_MARKER)?.[1])
+			.filter(Boolean) as string[]));
+
+		await Promise.all(eventPaymentIds.map(async (paymentId) => {
+			const payment = await pb.collection('event_payments').getOne(paymentId, {
+				expand: 'event,eventTalent,eventTalent.talent,eventTalent.talentGroup,talent,talentGroup'
+			}).catch(() => null) as any;
+			if (payment) approvalLinkedPayments.set(paymentId, payment);
+		}));
 
 		const quorumSetting = (settings as any[]).find((s: any) => s.key === 'approval_quorum');
 		const quorum = quorumSetting ? Math.max(1, Number(quorumSetting.value)) : 2;
@@ -70,11 +93,31 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 				if (Array.isArray(raw)) voters = raw;
 				else if (typeof raw === 'string' && raw.trim().startsWith('[')) voters = JSON.parse(raw);
 			} catch { /* empty */ }
+
+			const eventPaymentId = String(a?.expand?.expenseId?.notes ?? '').match(EVENT_PAYMENT_MARKER)?.[1] ?? null;
+			const linkedPayment = eventPaymentId ? approvalLinkedPayments.get(eventPaymentId) ?? null : null;
+			const linkedTalent = linkedPayment?.expand?.eventTalent?.expand?.talentGroup?.name
+				?? linkedPayment?.expand?.talentGroup?.name
+				?? linkedPayment?.expand?.eventTalent?.expand?.talent?.name
+				?? linkedPayment?.expand?.talent?.name
+				?? null;
 			return {
 				...a,
 				voters,
 				voteCount: voters.length,
 				hasVoted: userProfile ? voters.includes(userProfile.id) : false,
+				eventPayment: linkedPayment ? {
+					id: linkedPayment.id,
+					paymentType: linkedPayment.paymentType,
+					paymentTypeLabel: formatPaymentTypeLabel(linkedPayment.paymentType),
+					recipient: linkedPayment.recipient,
+					amount: linkedPayment.amount,
+					description: linkedPayment.description,
+					eventName: linkedPayment.expand?.event?.name ?? null,
+					talentName: linkedTalent,
+					approvalRoute: linkedPayment.approvalRoute,
+					isBonus: !!linkedPayment.isBonus,
+				} : null,
 			};
 		});
 

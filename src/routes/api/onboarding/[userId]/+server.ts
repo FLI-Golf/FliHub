@@ -14,7 +14,8 @@ export const PATCH: RequestHandler = async ({ params, request, locals, url }) =>
 	ctx.requireRole('admin', 'leader');
 
 	const body = await request.json().catch(() => ({}));
-	const { stage, notes } = body;
+	const stage = body.stage ?? body.status;
+	const { notes } = body;
 
 	if (!stage) return json({ message: 'stage is required' }, { status: 400 });
 

@@ -117,6 +117,13 @@
 		}
 	}
 
+	function paymentRecipientLabel(payment: any) {
+		if (!payment) return '';
+		if (payment.recipient === 'manager') return 'Manager';
+		if (payment.isBonus) return 'Talent bonus';
+		return 'Talent';
+	}
+
 	const statusOptions = $derived.by(() => {
 		const fromData = Array.from(new Set((data.approvals as any[]).map(a => String(a.status ?? '')))).filter(Boolean);
 		const ordered = APPROVAL_STATUS_ORDER.filter(s => fromData.includes(s));
@@ -201,6 +208,7 @@
 				const expense = a.expand?.expenseId;
 				const bid = a.expand?.bidId;
 				const requestedBy = `${a.expand?.requestedBy?.firstName ?? ''} ${a.expand?.requestedBy?.lastName ?? ''}`.trim();
+				const eventPayment = a.eventPayment;
 				const haystack = [
 					String(a.id ?? ''),
 					String(a.entityType ?? ''),
@@ -210,6 +218,9 @@
 					String(expense?.work_order_number ?? ''),
 					String(expense?.category ?? ''),
 					String(bid?.expand?.vendorId?.name ?? ''),
+					String(eventPayment?.eventName ?? ''),
+					String(eventPayment?.paymentTypeLabel ?? ''),
+					String(eventPayment?.talentName ?? ''),
 					requestedBy
 				].join(' ').toLowerCase();
 				if (!haystack.includes(q)) return false;
@@ -710,8 +721,11 @@
 				{@const msg       = actionMessages[approval.id]}
 				{@const expense   = approval.expand?.expenseId}
 				{@const bid       = approval.expand?.bidId}
+				{@const eventPayment = approval.eventPayment}
 				{@const isMgrCut  = expense?.description?.startsWith('Manager cut')}
-				{@const cardTitle = approval.entityType === 'bid'
+				{@const cardTitle = eventPayment
+					? `${eventPayment.eventName ?? 'Event'} — ${eventPayment.paymentTypeLabel}${eventPayment.talentName ? ` · ${paymentRecipientLabel(eventPayment)}: ${eventPayment.talentName}` : ''}`
+					: approval.entityType === 'bid'
 					? `Vendor Bid — ${bid?.expand?.vendorId?.name ?? expense?.description ?? 'Bid Approval'}`
 					: expense?.description ?? `${approval.entityType} Approval`}
 				<div class="p-5 hover:bg-slate-800/40 transition-colors">
@@ -731,6 +745,22 @@
 										{approval.status.replace('_', ' ')}
 									</span>
 								</div>
+
+								{#if eventPayment}
+									<div class="flex flex-wrap gap-x-3 gap-y-1 text-xs text-slate-500 mb-3">
+										<span class="text-cyan-400 font-medium">Event payment</span>
+										{#if eventPayment.eventName}
+											<span>· {eventPayment.eventName}</span>
+										{/if}
+										<span>· {eventPayment.paymentTypeLabel}</span>
+										{#if eventPayment.talentName}
+											<span>· {paymentRecipientLabel(eventPayment)}: {eventPayment.talentName}</span>
+										{/if}
+										{#if eventPayment.recipient === 'manager'}
+											<span>· Manager payout</span>
+										{/if}
+									</div>
+								{/if}
 
 								{#if approval.entityType === 'bid'}
 									<div class="flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-slate-500 mb-3">

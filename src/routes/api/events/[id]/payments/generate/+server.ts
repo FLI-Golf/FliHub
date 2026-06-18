@@ -19,16 +19,34 @@ import { requireAdminApi } from '$lib/infra/api-route-guards';
 import { autoAssignDirectPaymentsToDraftBundles } from '$lib/server/event-payment-bundles';
 import type { RequestHandler } from './$types';
 
-async function ensureEventPaymentApproval(pb: any, payment: any, requestedBy: string | null) {
+function formatPaymentTypeLabel(paymentType: string | undefined | null): string {
+	switch (paymentType) {
+		case 'broadcast_fee': return 'Broadcast fee';
+		case 'appearance_fee': return 'Appearance fee';
+		case 'bonus': return 'Attendance bonus';
+		default: return paymentType ? paymentType.replace(/_/g, ' ') : 'Event payment';
+	}
+}
+
+async function ensureEventPaymentApproval(
+	pb: any,
+	payment: any,
+	requestedBy: string | null,
+	details?: { eventName?: string | null; payeeName?: string | null; paymentTypeLabel?: string | null; recipientLabel?: string | null }
+) {
 	if (!payment?.id || payment.status !== 'approval_required') return;
 	const marker = `[EP:${payment.id}]`;
+	const eventName = details?.eventName ?? payment.expand?.event?.name ?? 'Event';
+	const payeeName = details?.payeeName ?? payment.expand?.talentGroup?.name ?? payment.expand?.talent?.name ?? 'Talent';
+	const paymentTypeLabel = details?.paymentTypeLabel ?? formatPaymentTypeLabel(payment.paymentType);
+	const recipientLabel = details?.recipientLabel ?? (payment.recipient === 'manager' ? 'Manager' : 'Talent');
 
 	const existingExpense = await pb.collection('expenses').getFirstListItem(
 		`notes ~ "${marker}"`
 	).catch(() => null as any);
 
 	const expense = existingExpense ?? await pb.collection('expenses').create({
-		description: payment.description || `Event payment approval (${payment.paymentType || 'payment'})`,
+		description: `${eventName} - ${recipientLabel}: ${payeeName} (${paymentTypeLabel})`,
 		amount: Number(payment.amount) || 0,
 		status: 'submitted',
 		date: new Date().toISOString().slice(0, 10),
@@ -156,7 +174,12 @@ export const POST: RequestHandler = async ({ locals, url, params }) => {
 				description: isGroupBooking ? `Group booking fee for ${talentGroup?.name ?? talentGroupId}` : undefined,
 				isBonus: false
 			});
-			await ensureEventPaymentApproval(pb, talentPayment, requestedBy);
+			await ensureEventPaymentApproval(pb, talentPayment, requestedBy, {
+				eventName: event.name,
+				payeeName: isGroupBooking ? talentGroup?.name ?? talentGroupId : talent?.name ?? talentId,
+				paymentTypeLabel: formatPaymentTypeLabel(talentPayment.paymentType),
+				recipientLabel: 'Talent'
+			});
 			if (approvalRoute === 'direct') directPaymentIds.push(String(talentPayment.id));
 
 			// Create manager split payment if applicable
@@ -174,7 +197,12 @@ export const POST: RequestHandler = async ({ locals, url, params }) => {
 					description: `Manager cut for ${talent?.name ?? talentId}`,
 					isBonus: false
 				});
-				await ensureEventPaymentApproval(pb, managerPayment, requestedBy);
+				await ensureEventPaymentApproval(pb, managerPayment, requestedBy, {
+					eventName: event.name,
+					payeeName: talent?.managerName ?? talent?.name ?? talentId,
+					paymentTypeLabel: formatPaymentTypeLabel(managerPayment.paymentType),
+					recipientLabel: 'Manager'
+				});
 				if ((mgNeedsApproval ? 'approval_pipeline' : 'direct') === 'direct') {
 					directPaymentIds.push(String(managerPayment.id));
 				}
@@ -200,7 +228,12 @@ export const POST: RequestHandler = async ({ locals, url, params }) => {
 						description: `Attendance bonus — completed ${event.bonusThreshold} events`,
 						isBonus: true
 					});
-					await ensureEventPaymentApproval(pb, bonusPayment, requestedBy);
+					await ensureEventPaymentApproval(pb, bonusPayment, requestedBy, {
+						eventName: event.name,
+						payeeName: talent?.name ?? talentId,
+						paymentTypeLabel: formatPaymentTypeLabel(bonusPayment.paymentType),
+						recipientLabel: 'Talent'
+					});
 				}
 			}
 
