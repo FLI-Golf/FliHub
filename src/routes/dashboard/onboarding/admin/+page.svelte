@@ -15,6 +15,8 @@
 
 	// ── Pipeline config ───────────────────────────────────────────────────────
 
+	let stageFilter = $state<'invited' | 'all'>('invited');
+
 	const BOARD_CONFIG: PipelineBoardConfig = {
 		columnWidth: 'w-52',
 		stages: [
@@ -72,8 +74,13 @@
 
 	// ── Map candidates → PipelineCardItem ─────────────────────────────────────
 
+	const visibleCandidates = $derived.by(() => {
+		if (stageFilter === 'all') return data.candidates;
+		return data.candidates.filter((candidate: any) => candidate.pipelineStage === 'invited');
+	});
+
 	const items = $derived<PipelineCardItem[]>(
-		data.candidates.map((c: any) => {
+		visibleCandidates.map((c: any) => {
 			const checks = [
 				c.welcomeSeen,
 				c.documentsInitialed,
@@ -98,6 +105,16 @@
 			};
 		})
 	);
+
+	const filteredStats = $derived.by(() => ({
+		total: visibleCandidates.length,
+		invited: visibleCandidates.filter((c: any) => c.pipelineStage === 'invited').length,
+		documentsSent: visibleCandidates.filter((c: any) => c.pipelineStage === 'documents_sent').length,
+		documentsSigned: visibleCandidates.filter((c: any) => c.pipelineStage === 'documents_signed').length,
+		profileComplete: visibleCandidates.filter((c: any) => c.pipelineStage === 'profile_complete').length,
+		approved: visibleCandidates.filter((c: any) => c.pipelineStage === 'approved').length,
+		rejected: visibleCandidates.filter((c: any) => c.pipelineStage === 'rejected').length
+	}));
 
 	// ── Move handler ──────────────────────────────────────────────────────────
 
@@ -161,6 +178,25 @@
 		<div>
 			<h1 class="text-3xl font-bold tracking-tight">Onboarding Pipeline</h1>
 			<p class="text-muted-foreground mt-1">Track every talent member from invite to approval</p>
+			<div class="mt-3 flex items-center gap-2">
+				<span class="text-xs uppercase tracking-wide text-slate-500">Filter</span>
+				<button
+					onclick={() => stageFilter = 'invited'}
+					class={`text-xs px-2.5 py-1 rounded-full border transition-colors ${stageFilter === 'invited'
+						? 'bg-slate-700 text-slate-200 border-slate-500'
+						: 'bg-slate-900 text-slate-500 border-slate-700 hover:border-slate-500 hover:text-slate-300'}`}
+				>
+					Invited only
+				</button>
+				<button
+					onclick={() => stageFilter = 'all'}
+					class={`text-xs px-2.5 py-1 rounded-full border transition-colors ${stageFilter === 'all'
+						? 'bg-slate-700 text-slate-200 border-slate-500'
+						: 'bg-slate-900 text-slate-500 border-slate-700 hover:border-slate-500 hover:text-slate-300'}`}
+				>
+					All stages
+				</button>
+			</div>
 		</div>
 	</div>
 
@@ -168,27 +204,27 @@
 	<div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
 		<Card class="p-4 bg-slate-800/40 border-slate-700">
 			<p class="text-xs text-slate-400 uppercase tracking-wide mb-1">Total</p>
-			<p class="text-2xl font-bold text-slate-100">{s.total}</p>
+			<p class="text-2xl font-bold text-slate-100">{filteredStats.total}</p>
 		</Card>
 		<Card class="p-4 bg-slate-800/40 border-slate-700">
 			<p class="text-xs text-slate-400 uppercase tracking-wide mb-1">Invited</p>
-			<p class="text-2xl font-bold text-slate-300">{s.invited}</p>
+			<p class="text-2xl font-bold text-slate-300">{filteredStats.invited}</p>
 		</Card>
 		<Card class="p-4 bg-blue-950/40 border-blue-800/50">
 			<p class="text-xs text-blue-400 uppercase tracking-wide mb-1">Docs Sent</p>
-			<p class="text-2xl font-bold text-blue-300">{s.documentsSent}</p>
+			<p class="text-2xl font-bold text-blue-300">{filteredStats.documentsSent}</p>
 		</Card>
 		<Card class="p-4 bg-yellow-950/40 border-yellow-800/50">
 			<p class="text-xs text-yellow-400 uppercase tracking-wide mb-1">Docs Signed</p>
-			<p class="text-2xl font-bold text-yellow-300">{s.documentsSigned}</p>
+			<p class="text-2xl font-bold text-yellow-300">{filteredStats.documentsSigned}</p>
 		</Card>
 		<Card class="p-4 bg-emerald-950/40 border-emerald-800/50">
 			<p class="text-xs text-emerald-400 uppercase tracking-wide mb-1">Approved</p>
-			<p class="text-2xl font-bold text-emerald-300">{s.approved}</p>
+			<p class="text-2xl font-bold text-emerald-300">{filteredStats.approved}</p>
 		</Card>
-		<Card class="p-4 {s.rejected > 0 ? 'bg-red-950/40 border-red-800/50' : 'bg-slate-800/40 border-slate-700'}">
-			<p class="text-xs {s.rejected > 0 ? 'text-red-400' : 'text-slate-400'} uppercase tracking-wide mb-1">Rejected</p>
-			<p class="text-2xl font-bold {s.rejected > 0 ? 'text-red-300' : 'text-slate-400'}">{s.rejected}</p>
+		<Card class="p-4 {filteredStats.rejected > 0 ? 'bg-red-950/40 border-red-800/50' : 'bg-slate-800/40 border-slate-700'}">
+			<p class="text-xs {filteredStats.rejected > 0 ? 'text-red-400' : 'text-slate-400'} uppercase tracking-wide mb-1">Rejected</p>
+			<p class="text-2xl font-bold {filteredStats.rejected > 0 ? 'text-red-300' : 'text-slate-400'}">{filteredStats.rejected}</p>
 		</Card>
 	</div>
 
