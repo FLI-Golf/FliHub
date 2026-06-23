@@ -102,13 +102,26 @@
 	// Generate payments for all confirmed talent
 	let genSaving = $state(false);
 	let genMsg = $state('');
-	async function generatePayments() {
+	async function generatePayments(mode: 'with_quorum' | 'without_quorum') {
+		if (mode === 'without_quorum' && event?.requiresApproval) {
+			genMsg = 'This event is set to require approval for all payments. Disable that setting in Event Edit to generate without quorum.';
+			return;
+		}
 		genSaving = true; genMsg = '';
 		try {
-			const res = await fetch(`/api/events/${event.id}/payments/generate`, { method: 'POST' });
+			const res = await fetch(`/api/events/${event.id}/payments/generate`, {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ mode })
+			});
 			const d = await res.json().catch(() => ({}));
 			if (!res.ok) throw new Error(d.message ?? `Error ${res.status}`);
-			genMsg = d.message ?? 'Payments generated';
+			const modeLabel = mode === 'with_quorum' ? 'with quorum' : 'without quorum';
+			const backfilled = Number(d?.backfilledWorkOrders ?? 0);
+			const backfillMsg = backfilled > 0
+				? ` · Backfilled ${backfilled} work order${backfilled === 1 ? '' : 's'}`
+				: '';
+			genMsg = `${d.message ?? 'Payments generated'} (${modeLabel})${backfillMsg}`;
 			await invalidateAll();
 		} catch (err: any) { genMsg = `Error: ${err.message}`; }
 		finally { genSaving = false; }
@@ -391,10 +404,30 @@
 				{/each}
 			</div>
 			{/if}
-			<div class="p-4 border-t border-gray-700 flex items-center gap-3">
-				<Button onclick={generatePayments} disabled={genSaving} variant="outline" class="text-sm">
-					{genSaving ? 'Generating...' : 'Generate Payments for Confirmed Talent'}
-				</Button>
+			<div class="p-4 border-t border-gray-700 space-y-2">
+				<div class="flex flex-wrap items-center gap-3">
+					<Button onclick={() => generatePayments('without_quorum')} disabled={genSaving || Boolean(event?.requiresApproval)} variant="outline" class="text-sm disabled:opacity-50">
+						{genSaving ? 'Generating...' : 'Generate Payments Without Quorum'}
+					</Button>
+					{#if event?.requiresApproval}
+						<span
+							class="inline-flex items-center justify-center w-5 h-5 rounded-full border border-orange-700/70 bg-orange-950/40 text-orange-300 cursor-help"
+							title="Disabled because this event has 'All payments require approval' enabled. Uncheck that setting in Event Edit to allow direct generation."
+							aria-label="Why direct generation is disabled"
+						>
+							<AlertCircle class="w-3.5 h-3.5" />
+						</span>
+					{/if}
+					<Button onclick={() => generatePayments('with_quorum')} disabled={genSaving} variant="outline" class="text-sm">
+						{genSaving ? 'Generating...' : 'Generate Payments With Quorum'}
+					</Button>
+				</div>
+				<div class="text-xs text-gray-400">
+					Without quorum creates direct-approval payments. With quorum creates approval-pipeline payments.
+					{#if event?.requiresApproval}
+						<span class="text-orange-400"> Direct mode is disabled because this event has "All payments require approval" enabled. To allow direct mode, uncheck it in Event Edit.</span>
+					{/if}
+				</div>
 				{#if genMsg}<span class="text-sm text-gray-400">{genMsg}</span>{/if}
 			</div>
 		</div>

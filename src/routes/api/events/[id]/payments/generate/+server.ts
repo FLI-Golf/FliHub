@@ -16,8 +16,11 @@
  */
 import { json } from '@sveltejs/kit';
 import { requireAdminApi } from '$lib/infra/api-route-guards';
+import { getAdminPocketBase } from '$lib/infra/pocketbase/pbClient';
 import { autoAssignDirectPaymentsToDraftBundles } from '$lib/server/event-payment-bundles';
 import type { RequestHandler } from './$types';
+
+type GenerateMode = 'event_rules' | 'with_quorum' | 'without_quorum';
 
 function formatPaymentTypeLabel(paymentType: string | undefined | null): string {
 	switch (paymentType) {
@@ -26,6 +29,16 @@ function formatPaymentTypeLabel(paymentType: string | undefined | null): string 
 		case 'bonus': return 'Attendance bonus';
 		default: return paymentType ? paymentType.replace(/_/g, ' ') : 'Event payment';
 	}
+}
+
+function deriveCode(name: string): string {
+	return String(name || 'EVENT')
+		.replace(/[^a-zA-Z\s]/g, '')
+		.split(/\s+/)
+		.filter(Boolean)
+		.map((w) => w[0].toUpperCase())
+		.join('')
+		.slice(0, 6) || 'EVENT';
 }
 
 async function ensureEventPaymentApproval(
@@ -76,11 +89,50 @@ async function ensureEventPaymentApproval(
 	}).catch(() => null);
 }
 
-export const POST: RequestHandler = async ({ locals, url, params }) => {
+async function ensureEventPaymentWorkOrder(
+	pb: any,
+	payment: any,
+	eventName: string,
+	payeeName: string,
+	noteSuffix: string
+) {
+	if (!payment?.id) return false;
+	const marker = `[EP:${payment.id}]`;
+
+	const existingWO = await pb.collection('work_orders').getFirstListItem(
+		`notes ~ '${marker}'`
+	).catch(() => null as any);
+	if (existingWO) return false;
+
+	const allWOs = await pb.collection('work_orders').getFullList({
+		fields: 'work_order_number', sort: '-created'
+	}).catch(() => []) as any[];
+	const seq = allWOs.length + 1;
+	const woNumber = `WO-${deriveCode(eventName)}-${String(seq).padStart(4, '0')}`;
+
+	await pb.collection('work_orders').create({
+		work_order_number: woNumber,
+		source: 'expense',
+		status: 'open',
+		description: `${eventName} — ${formatPaymentTypeLabel(payment.paymentType)} to ${payeeName}`.slice(0, 500),
+		amount: Number(payment.amount) || 0,
+		approvedDate: new Date().toISOString(),
+		notes: `${marker} ${noteSuffix}`,
+	}).catch(() => null);
+
+	return true;
+}
+
+export const POST: RequestHandler = async ({ locals, url, params, request }) => {
 	try {
 		const guard = await requireAdminApi(locals, url);
 		if (guard.error) return guard.error;
-		const pb = guard.ctx.pb;
+		const pb = await getAdminPocketBase();
+		const body = await request.json().catch(() => ({} as any));
+		const requestedMode = String(body?.mode ?? 'event_rules') as GenerateMode;
+		const mode: GenerateMode = ['event_rules', 'with_quorum', 'without_quorum'].includes(requestedMode)
+			? requestedMode
+			: 'event_rules';
 		const requestedBy = guard.ctx.profile?.id
 			?? await pb.collection('user_profiles').getFirstListItem('id != ""', { fields: 'id' })
 				.then((p: any) => p.id)
@@ -102,9 +154,16 @@ export const POST: RequestHandler = async ({ locals, url, params }) => {
 		// Existing non-cancelled payments for this event (to avoid duplicates)
 		const existingPayments = await pb.collection('event_payments').getFullList({
 			filter: `event = '${params.id}' && status != 'cancelled'`,
-			fields: 'eventTalent'
+			fields: 'id,eventTalent,status,approvalRoute,recipient,paymentType,amount,talent,talentGroup,description'
 		});
 		const alreadyPaid = new Set(existingPayments.map(p => p.eventTalent));
+		const existingByEventTalent = new Map<string, any[]>();
+		for (const p of existingPayments as any[]) {
+			const key = String(p.eventTalent ?? '');
+			if (!key) continue;
+			if (!existingByEventTalent.has(key)) existingByEventTalent.set(key, []);
+			existingByEventTalent.get(key)!.push(p);
+		}
 
 		const approvalThreshold = event.approvalThreshold ?? 500;
 		const isBroadcast = event.eventType === 'tournament_broadcast';
@@ -125,12 +184,84 @@ export const POST: RequestHandler = async ({ locals, url, params }) => {
 
 		let created = 0;
 		let skipped = 0;
+		let reclassified = 0;
+		let reclassifiedTalents = 0;
+		let backfilledWorkOrders = 0;
 		const directPaymentIds: string[] = [];
 
 		for (const et of confirmedTalent) {
 			const talentId = et.talent;
 			const talentGroupId = et.talentGroup;
-			if (alreadyPaid.has(et.id)) { skipped++; continue; }
+			if (alreadyPaid.has(et.id)) {
+				// If caller explicitly chose a mode, retag existing unpaid payments
+				// for this talent instead of doing nothing.
+				if (mode === 'with_quorum' || mode === 'without_quorum') {
+					const current = existingByEventTalent.get(et.id) ?? [];
+					let changedForTalent = false;
+					const talent = et.expand?.talent;
+					const talentGroup = et.expand?.talentGroup;
+					const isGroupBooking = et.bookingEntityType === 'group' || !!et.talentGroup;
+					for (const payment of current) {
+						const paymentStatus = String(payment.status ?? '');
+						if (paymentStatus === 'approved') {
+							const approvedPayeeName = payment.recipient === 'manager'
+								? (talent?.managerName ?? talent?.name ?? String(et.talent ?? 'Manager'))
+								: (isGroupBooking
+									? (talentGroup?.name ?? String(et.talentGroup ?? 'Talent Group'))
+									: (talent?.name ?? String(et.talent ?? 'Talent')));
+							const createdWO = await ensureEventPaymentWorkOrder(
+								pb,
+								payment,
+								event.name,
+								approvedPayeeName,
+								'Backfilled from payment generation mode action.'
+							);
+							if (createdWO) backfilledWorkOrders++;
+							continue;
+						}
+
+						if (!['pending', 'approval_required'].includes(paymentStatus)) continue;
+
+						const shouldNeedApproval = mode === 'with_quorum';
+						const nextStatus = shouldNeedApproval ? 'approval_required' : 'pending';
+						const nextRoute = shouldNeedApproval ? 'approval_pipeline' : 'direct';
+
+						if (payment.status === nextStatus && payment.approvalRoute === nextRoute) continue;
+
+						const updatedPayment = await pb.collection('event_payments').update(payment.id, {
+							status: nextStatus,
+							approvalRoute: nextRoute
+						});
+						reclassified++;
+						changedForTalent = true;
+
+						if (nextRoute === 'direct') {
+							directPaymentIds.push(String(updatedPayment.id));
+						}
+
+						if (nextStatus === 'approval_required') {
+							const payeeName = payment.recipient === 'manager'
+								? (talent?.managerName ?? talent?.name ?? String(et.talent ?? 'Manager'))
+								: (isGroupBooking
+									? (talentGroup?.name ?? String(et.talentGroup ?? 'Talent Group'))
+									: (talent?.name ?? String(et.talent ?? 'Talent')));
+
+							await ensureEventPaymentApproval(pb, updatedPayment, requestedBy, {
+								eventName: event.name,
+								payeeName,
+								paymentTypeLabel: formatPaymentTypeLabel(updatedPayment.paymentType),
+								recipientLabel: payment.recipient === 'manager' ? 'Manager' : 'Talent'
+							});
+						}
+					}
+
+					if (changedForTalent) reclassifiedTalents++;
+				}
+
+				skipped++;
+				continue;
+			}
+
 
 			const amount = et.confirmedRate ?? event.defaultRate ?? 0;
 			const talent = et.expand?.talent;
@@ -139,8 +270,12 @@ export const POST: RequestHandler = async ({ locals, url, params }) => {
 			const managerCut = isGroupBooking ? 0 : talent?.managerCutPercentage ?? 0;
 			const managerAmount = managerCut > 0 ? Math.round(amount * (managerCut / 100) * 100) / 100 : 0;
 
-			// Event override: only under-threshold payments can use direct path
-			const needsApproval = event.requiresApproval || amount > approvalThreshold;
+			// Generation mode can explicitly force with/without quorum.
+			const needsApproval = mode === 'with_quorum'
+				? true
+				: mode === 'without_quorum'
+				? false
+				: (event.requiresApproval || amount > approvalThreshold);
 			const status = needsApproval ? 'approval_required' : 'pending';
 			const approvalRoute = needsApproval ? 'approval_pipeline' : 'direct';
 
@@ -184,7 +319,11 @@ export const POST: RequestHandler = async ({ locals, url, params }) => {
 
 			// Create manager split payment if applicable
 			if (managerAmount > 0 && talent?.managerEmail) {
-				const mgNeedsApproval = event.requiresApproval || managerAmount > approvalThreshold;
+				const mgNeedsApproval = mode === 'with_quorum'
+					? true
+					: mode === 'without_quorum'
+					? false
+					: (event.requiresApproval || managerAmount > approvalThreshold);
 				const managerPayment = await pb.collection('event_payments').create({
 					event: params.id,
 					eventTalent: et.id,
@@ -216,14 +355,19 @@ export const POST: RequestHandler = async ({ locals, url, params }) => {
 				}).catch(() => ({ totalItems: 0 }));
 
 				if (existingBonus.totalItems === 0) {
+					const bonusNeedsApproval = mode === 'with_quorum'
+						? true
+						: mode === 'without_quorum'
+						? false
+						: true;
 					const bonusPayment = await pb.collection('event_payments').create({
 						event: params.id,
 						eventTalent: et.id,
 						talent: talentId,
 						paymentType: 'bonus',
 						amount: event.bonusAmount,
-						status: 'approval_required',
-						approvalRoute: 'approval_pipeline',
+						status: bonusNeedsApproval ? 'approval_required' : 'pending',
+						approvalRoute: bonusNeedsApproval ? 'approval_pipeline' : 'direct',
 						recipient: 'talent',
 						description: `Attendance bonus — completed ${event.bonusThreshold} events`,
 						isBonus: true
@@ -246,9 +390,13 @@ export const POST: RequestHandler = async ({ locals, url, params }) => {
 		}
 
 		return json({
-			message: `Generated payments for ${created} talent member${created !== 1 ? 's' : ''}${skipped > 0 ? ` (${skipped} skipped — already have payments)` : ''}`,
+			message: `Generated payments for ${created} talent member${created !== 1 ? 's' : ''}${skipped > 0 ? ` (${skipped} skipped — already have payments)` : ''}${reclassified > 0 ? ` · Reclassified ${reclassified} existing payment${reclassified !== 1 ? 's' : ''} across ${reclassifiedTalents} talent booking${reclassifiedTalents !== 1 ? 's' : ''}` : ''}`,
 			created,
 			skipped,
+			reclassified,
+			reclassifiedTalents,
+			backfilledWorkOrders,
+			mode,
 			bundleAssignment
 		});
 	} catch (err: any) {
