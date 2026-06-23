@@ -139,7 +139,7 @@ export const POST: RequestHandler = async ({ locals, url, params }) => {
 			const managerCut = isGroupBooking ? 0 : talent?.managerCutPercentage ?? 0;
 			const managerAmount = managerCut > 0 ? Math.round(amount * (managerCut / 100) * 100) / 100 : 0;
 
-			// Determine approval routing
+			// Event override: only under-threshold payments can use direct path
 			const needsApproval = event.requiresApproval || amount > approvalThreshold;
 			const status = needsApproval ? 'approval_required' : 'pending';
 			const approvalRoute = needsApproval ? 'approval_pipeline' : 'direct';

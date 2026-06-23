@@ -11,13 +11,14 @@ const normalize = (value: unknown): string =>
 export const load: PageServerLoad = async ({ locals, url }) => {
 	const ctx = await RequestContext.from(locals, url);
 	const { pb, profile } = ctx;
+	const role = String(ctx.role ?? '');
 
-	if (ctx.role === 'manager') {
+	if (role === 'manager') {
 		if (profile?.id) throw redirect(303, `/dashboard/my-payments/${profile.id}`);
 		throw redirect(303, '/dashboard');
 	}
 
-	if (ctx.role === 'pro' || ctx.role === 'broadcaster') {
+	if (role === 'pro' || role === 'broadcaster') {
 		let proReference = ((profile as any)?.proReference || (profile as any)?.talentReference || '') as string;
 		if (!proReference) {
 			const userEmail = (locals.pb?.authStore?.model?.email ?? '') as string;
@@ -41,7 +42,7 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 	}
 
 	// Only managers (and admins previewing) can access this page
-	if (ctx.role !== 'manager' && ctx.role !== 'admin') {
+	if (role !== 'manager' && role !== 'admin') {
 		throw redirect(303, '/dashboard');
 	}
 
@@ -49,7 +50,7 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 	const userEmail = (locals.pb?.authStore?.model?.email ?? '') as string;
 
 	// Admins can preview a specific manager's view via ?email=
-	const targetEmail = ctx.role === 'admin'
+	const targetEmail = role === 'admin'
 		? (url.searchParams.get('email') ?? userEmail)
 		: userEmail;
 

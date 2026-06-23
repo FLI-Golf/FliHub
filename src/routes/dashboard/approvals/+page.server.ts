@@ -35,6 +35,103 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 		}).catch(() => []);
 		const userProfile = (userProfiles as any[])[0] ?? null;
 
+		// Backfill legacy direct-override event approvals that may have approved expenses
+		// and work orders but no approvals row (needed for accurate dashboard counts).
+		const approvedEventExpenses = await pb.collection('expenses').getFullList({
+			filter: 'status = "approved" && notes ~ "[EP:"',
+			fields: 'id,amount,approvedDate,created,submittedBy,notes'
+		}).catch(() => [] as any[]);
+
+		const fallbackRequesterId = userProfile?.id
+			?? await pb.collection('user_profiles').getFirstListItem('id != ""', { fields: 'id' })
+				.then((p: any) => p.id)
+				.catch(() => null);
+
+		// Reconcile approved direct event payments that might have been approved without
+		// creating their audit artifacts (expense + approval row).
+		const approvedDirectPayments = await pb.collection('event_payments').getFullList({
+			filter: 'status = "approved" && approvalRoute = "direct"',
+			expand: 'event,eventTalent,eventTalent.talent,eventTalent.talentGroup,talent,talentGroup',
+			fields: 'id,amount,paymentType,recipient,description,expand.event.name,expand.eventTalent.expand.talent.name,expand.eventTalent.expand.talentGroup.name,expand.talent.name,expand.talentGroup.name'
+		}).catch(() => [] as any[]);
+
+		const approvalByExpenseId = new Set((approvals as any[])
+			.filter((a: any) => a.entityType === 'expense' && a.entityId)
+			.map((a: any) => String(a.entityId)));
+
+		for (const payment of approvedDirectPayments as any[]) {
+			const marker = `[EP:${payment.id}]`;
+			let expense = await pb.collection('expenses').getFirstListItem(
+				`notes ~ "${marker}"`,
+				{ fields: 'id,amount,status,submittedBy,created,approvedDate' }
+			).catch(() => null as any);
+
+			if (!expense) {
+				const eventName = payment?.expand?.event?.name ?? 'Event Payment';
+				const payeeName = payment.recipient === 'manager'
+					? (payment?.expand?.eventTalent?.expand?.talent?.name
+						?? payment?.expand?.talent?.name
+						?? 'Manager')
+					: (payment?.expand?.eventTalent?.expand?.talentGroup?.name
+						?? payment?.expand?.talentGroup?.name
+						?? payment?.expand?.eventTalent?.expand?.talent?.name
+						?? payment?.expand?.talent?.name
+						?? 'Talent');
+				const recipientLabel = payment.recipient === 'manager' ? 'Manager' : 'Talent';
+				const paymentTypeLabel = formatPaymentTypeLabel(payment.paymentType);
+
+				expense = await pb.collection('expenses').create({
+					description: `${eventName} - ${recipientLabel}: ${payeeName} (${paymentTypeLabel})`,
+					amount: Number(payment.amount) || 0,
+					status: 'approved',
+					date: new Date().toISOString().slice(0, 10),
+					category: 'Executive/Management Staff',
+					notes: `${marker} Auto-reconciled from approved direct event payment.`,
+					approvedDate: new Date().toISOString(),
+					...(fallbackRequesterId ? { submittedBy: fallbackRequesterId } : {})
+				}).catch(() => null as any);
+			}
+
+			if (!expense) continue;
+			if (approvalByExpenseId.has(String(expense.id))) continue;
+
+			const createdApproval = await pb.collection('approvals').create({
+				entityType: 'expense',
+				entityId: expense.id,
+				expenseId: expense.id,
+				status: 'approved',
+				amount: Number(expense.amount ?? payment.amount) || 0,
+				requestedBy: expense.submittedBy || fallbackRequesterId || null,
+				requestedDate: expense.created || new Date().toISOString(),
+				reviewedDate: expense.approvedDate || new Date().toISOString(),
+				comments: '<p>Reconciled approved event payment audit record.</p>'
+			}).catch(() => null as any);
+
+			if (createdApproval) {
+				(approvals as any[]).push(createdApproval);
+				approvalByExpenseId.add(String(expense.id));
+			}
+		}
+
+		for (const expense of approvedEventExpenses as any[]) {
+			if (approvalByExpenseId.has(String(expense.id))) continue;
+			const createdApproval = await pb.collection('approvals').create({
+				entityType: 'expense',
+				entityId: expense.id,
+				expenseId: expense.id,
+				status: 'approved',
+				amount: Number(expense.amount) || 0,
+				requestedBy: expense.submittedBy || fallbackRequesterId || null,
+				requestedDate: expense.created || new Date().toISOString(),
+				reviewedDate: expense.approvedDate || new Date().toISOString(),
+				comments: '<p>Backfilled approved event payment audit record.</p>'
+			}).catch(() => null as any);
+			if (createdApproval) {
+				(approvals as any[]).push(createdApproval);
+				approvalByExpenseId.add(String(expense.id));
+			}
+		}
+
 		const approvalLinkedPayments = new Map<string, any>();
 		const eventPaymentIds = Array.from(new Set((approvals as any[])
 			.map((approval: any) => String(approval?.expand?.expenseId?.notes ?? '').match(EVENT_PAYMENT_MARKER)?.[1])

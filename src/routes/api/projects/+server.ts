@@ -75,7 +75,9 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 		const approvedBy = typeof data.approvedBy === 'string' && data.approvedBy.trim()
 			? data.approvedBy.trim()
 			: undefined;
-		const vendors = Array.isArray(data.vendors) ? data.vendors.filter((v) => typeof v === 'string' && v.trim()) : undefined;
+		const vendors = Array.isArray(data.vendors)
+			? data.vendors.filter((v: unknown): v is string => typeof v === 'string' && v.trim().length > 0)
+			: undefined;
 
 		if (!name) {
 			return json({ message: 'Project name is required' }, { status: 400 });
