@@ -648,7 +648,7 @@ export const POST: RequestHandler = async ({ locals, request }) => {
 				const marker = `[EP:${payment.id}]`;
 
 				const existingWO = await pb.collection('work_orders').getFirstListItem(
-					`source = 'event_payment' && notes ~ '${marker}'`
+					`notes ~ '${marker}'`
 				).catch(() => null) as any;
 
 				if (existingWO?.work_order_number) {
@@ -663,7 +663,7 @@ export const POST: RequestHandler = async ({ locals, request }) => {
 
 					await pb.collection('work_orders').create({
 						work_order_number: workOrderNumber,
-						source:            'event_payment',
+						source:            'expense',
 						status:            'open',
 						approver:          userProfile.id,
 						submittedBy:       userProfile.id,

@@ -1,5 +1,6 @@
 import { json } from '@sveltejs/kit';
 import { requireAdminApi } from '$lib/infra/api-route-guards';
+import { getAdminPocketBase } from '$lib/infra/pocketbase/pbClient';
 import type { RequestHandler } from './$types';
 
 function deriveCode(name: string): string {
@@ -30,7 +31,7 @@ export const POST: RequestHandler = async ({ params, locals }) => {
 	try {
 		const guard = await requireAdminApi(locals);
 		if (guard.error) return guard.error;
-		const pb = guard.ctx.pb;
+		const pb = await getAdminPocketBase();
 		const approvedBy = (locals as any)?.pb?.authStore?.model?.email ?? 'admin';
 		const approverId = guard.ctx.profile?.id ?? null;
 		const fallbackRequesterId = approverId
@@ -161,7 +162,7 @@ export const POST: RequestHandler = async ({ params, locals }) => {
 		}
 
 		const existingWO = await pb.collection('work_orders').getFirstListItem(
-			`source = 'event_payment' && notes ~ '${marker}'`
+			`notes ~ '${marker}'`
 		).catch(() => null as any);
 
 		if (!existingWO) {
@@ -174,7 +175,7 @@ export const POST: RequestHandler = async ({ params, locals }) => {
 
 			await pb.collection('work_orders').create({
 				work_order_number: woNumber,
-				source: 'event_payment',
+				source: 'expense',
 				status: 'open',
 				approver: approverId,
 				submittedBy: approverId,
