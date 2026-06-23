@@ -126,6 +126,10 @@
 		if (res.ok) await invalidateAll();
 	}
 
+	function openApprovalsDashboard() {
+		window.location.href = '/dashboard/approvals';
+	}
+
 	async function removeBooking(eventTalentId: string, name: string) {
 		assignError = '';
 		if (!confirm(`Remove booking for ${name}?`)) return;
@@ -181,6 +185,19 @@
 	function canRemoveBooking(record: any) {
 		const pay = (data.eventPayments ?? []).find((p: any) => p.eventTalent === record.id && p.status !== 'cancelled');
 		return !pay;
+	}
+
+	function paymentApprovalPathLabel(payment: any) {
+		if (payment?.approvalRoute === 'direct') return 'Direct Override Eligible';
+		if (payment?.approvalRoute === 'approval_pipeline') return 'Quorum Required';
+		if (payment?.status === 'pending') return 'Direct Override Eligible';
+		return 'Quorum Required';
+	}
+
+	function paymentApprovalPathClass(payment: any) {
+		return paymentApprovalPathLabel(payment) === 'Direct Override Eligible'
+			? 'text-emerald-300 border-emerald-800 bg-emerald-900/30'
+			: 'text-orange-300 border-orange-800 bg-orange-900/30';
 	}
 </script>
 
@@ -349,6 +366,9 @@
 					<div>
 						<div class="font-medium text-white text-sm">{bookingName(p)}</div>
 						<div class="text-xs text-gray-400">{p.paymentType}{#if p.isBonus} · ⭐ Bonus{/if}{#if p.description} · {p.description}{/if}</div>
+						<div class={`inline-flex items-center text-[10px] mt-1 px-2 py-0.5 rounded border ${paymentApprovalPathClass(p)}`}>
+							{paymentApprovalPathLabel(p)}
+						</div>
 						{#if p.status === 'approval_required'}
 						<div class="flex items-center gap-1 text-xs text-orange-400 mt-0.5"><AlertCircle class="w-3 h-3" />Awaiting approval</div>
 						{/if}
@@ -360,6 +380,8 @@
 						</div>
 						<Badge class={PAY_STATUS_COLORS[p.status] ?? 'bg-gray-700 text-gray-300'}>{p.status}</Badge>
 						{#if p.status === 'approval_required'}
+						<button onclick={openApprovalsDashboard} class="text-xs bg-orange-700 hover:bg-orange-600 text-white px-2 py-1 rounded">Approval Quorum</button>
+						{:else if p.status === 'pending'}
 						<button onclick={() => approvPayment(p.id)} class="text-xs bg-orange-700 hover:bg-orange-600 text-white px-2 py-1 rounded">Approve</button>
 						{:else if p.status === 'approved'}
 						<button onclick={() => markPaid(p.id)} class="text-xs bg-green-700 hover:bg-green-600 text-white px-2 py-1 rounded">Mark Paid</button>

@@ -6,7 +6,7 @@
 		CheckCircle2, XCircle, Clock, AlertCircle,
 		DollarSign, Receipt, FolderKanban, Wallet,
 		MessageSquare, User, Calendar, Users, Settings2, Loader2,
-		FileEdit, ArrowRight, FlaskConical, RefreshCw, Plus, ChevronDown, Send
+		FileEdit, ArrowRight, Send
 	} from 'lucide-svelte';
 	import { invalidateAll } from '$app/navigation';
 
@@ -33,62 +33,6 @@
 	let quorumInput    = $state('2');
 	let savingQuorum   = $state(false);
 	let quorumError    = $state('');
-
-	// ── Test data panel ───────────────────────────────────────────────────────
-	let showTestPanel  = $state(false);
-	let seedCount      = $state(20);
-	let seedStatuses   = $state({ pending: true, approved: true, rejected: true, revision_requested: false });
-	let testBusy       = $state<'seed'|'reset'|'reset-seed'|null>(null);
-	let testMsg        = $state('');
-
-	async function seedData() {
-		testBusy = 'seed'; testMsg = '';
-		const statuses = Object.entries(seedStatuses).filter(([,v]) => v).map(([k]) => k);
-		if (!statuses.length) { testMsg = 'Select at least one status.'; testBusy = null; return; }
-		const r = await fetch('/api/approvals/test-data', {
-			method: 'POST', headers: { 'Content-Type': 'application/json' },
-			body: JSON.stringify({ count: seedCount, statuses })
-		});
-		const d = await r.json();
-		testMsg = r.ok ? `✅ Created ${d.created} approvals.` : `❌ ${d.message}`;
-		testBusy = null;
-		await invalidateAll();
-	}
-
-	async function resetData() {
-		if (!confirm(`Delete ALL expenses, approvals, and work orders? This cannot be undone.`)) return;
-		testBusy = 'reset'; testMsg = '';
-		const r = await fetch('/api/approvals/test-data', { method: 'DELETE' });
-		const d = await r.json();
-		if (r.ok) {
-			const res = d.deleted;
-			testMsg = `✅ Deleted ${res.expenses} expenses, ${res.approvals} approvals, ${res.work_orders} work orders.`;
-		} else {
-			testMsg = `❌ ${d.message}`;
-		}
-		testBusy = null;
-		await invalidateAll();
-	}
-
-	async function resetAndSeed() {
-		if (!confirm(`Delete ALL test data then seed ${seedCount} fresh approvals?`)) return;
-		testBusy = 'reset-seed'; testMsg = '';
-		const del = await fetch('/api/approvals/test-data', { method: 'DELETE' });
-		if (!del.ok) { testMsg = '❌ Reset failed.'; testBusy = null; return; }
-		const statuses = Object.entries(seedStatuses).filter(([,v]) => v).map(([k]) => k);
-		const seed = await fetch('/api/approvals/test-data', {
-			method: 'POST', headers: { 'Content-Type': 'application/json' },
-			body: JSON.stringify({ count: seedCount, statuses })
-		});
-		const d = await seed.json();
-		testMsg = seed.ok ? `✅ Reset & seeded ${d.created} approvals.` : `❌ ${d.message}`;
-		testBusy = null;
-		await invalidateAll();
-	}
-
-	// keep old name so nothing else breaks
-	const resetting = $derived(testBusy === 'reset');
-	const resetMessage = $derived(testMsg);
 
 	const fmt = (n: number) =>
 		new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(n ?? 0);
@@ -357,8 +301,6 @@
 			<p class="text-muted-foreground">Review and manage approval requests</p>
 		</div>
 
-		<!-- Test data panel (admin only) — moved below header -->
-
 	</div>
 
 	<!-- Quorum setting banner — always visible, edit restricted to admins -->
@@ -401,96 +343,6 @@
 
 			{/if}
 		</div>
-	{/if}
-
-	<!-- Test data panel -->
-	{#if isAdmin}
-	<div class="rounded-xl border border-amber-700/40 bg-amber-950/20 overflow-hidden">
-		<button onclick={() => showTestPanel = !showTestPanel}
-			class="w-full flex items-center justify-between px-5 py-3 hover:bg-amber-900/20 transition-colors text-left">
-			<div class="flex items-center gap-2.5">
-				<FlaskConical class="size-4 text-amber-400 shrink-0" />
-				<span class="text-sm font-medium text-amber-300">Test Data Tools</span>
-				<span class="text-xs text-amber-600 bg-amber-900/40 border border-amber-700/40 px-2 py-0.5 rounded">dev only</span>
-			</div>
-			<ChevronDown class="size-4 text-amber-600 transition-transform {showTestPanel ? 'rotate-180' : ''}" />
-		</button>
-
-		{#if showTestPanel}
-		<div class="border-t border-amber-700/30 px-5 py-4 space-y-4">
-			<div class="grid grid-cols-1 sm:grid-cols-2 gap-5">
-
-				<!-- Seed controls -->
-				<div class="space-y-3">
-					<p class="text-xs font-semibold text-amber-400 uppercase tracking-wide">Seed Approvals</p>
-
-					<div class="flex items-center gap-3">
-						<label for="approvals-seed-count" class="text-xs text-slate-400 whitespace-nowrap">Count</label>
-						<input id="approvals-seed-count" type="number" bind:value={seedCount} min="1" max="200"
-							class="w-24 rounded-md border border-slate-600 bg-slate-900 text-slate-100 px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-amber-500 [color-scheme:dark]" />
-					</div>
-
-					<div>
-						<p class="text-xs text-slate-400 mb-2">Include statuses</p>
-						<div class="flex flex-wrap gap-2">
-							{#each [
-								['pending',            'Pending',            'bg-amber-900/60 text-amber-300'],
-								['approved',           'Approved',           'bg-emerald-900/60 text-emerald-300'],
-								['rejected',           'Rejected',           'bg-red-900/60 text-red-300'],
-								['revision_requested', 'Revision Requested', 'bg-blue-900/60 text-blue-300'],
-							] as [key, label, cls]}
-								<label class="flex items-center gap-1.5 cursor-pointer">
-									<input type="checkbox" bind:checked={seedStatuses[key as keyof typeof seedStatuses]}
-										class="rounded border-slate-600 accent-amber-500" />
-									<span class="text-xs px-2 py-0.5 rounded {cls}">{label}</span>
-								</label>
-							{/each}
-						</div>
-					</div>
-
-					<button onclick={seedData} disabled={!!testBusy}
-						class="flex items-center gap-2 text-sm px-4 py-2 rounded-lg bg-amber-700/50 border border-amber-600/50 text-amber-200 hover:bg-amber-700/70 transition-colors disabled:opacity-50">
-						{#if testBusy === 'seed'}
-							<RefreshCw class="size-4 animate-spin" /> Seeding…
-						{:else}
-							<Plus class="size-4" /> Seed {seedCount} Approvals
-						{/if}
-					</button>
-				</div>
-
-				<!-- Danger zone -->
-				<div class="space-y-3">
-					<p class="text-xs font-semibold text-red-400 uppercase tracking-wide">Danger Zone</p>
-					<p class="text-xs text-slate-400">Currently <strong class="text-slate-200">{data.stats.total}</strong> approvals · <strong class="text-slate-200">{data.stats.total}</strong> expenses in the database.</p>
-
-					<div class="flex flex-col gap-2">
-						<button onclick={resetAndSeed} disabled={!!testBusy}
-							class="flex items-center gap-2 text-sm px-4 py-2 rounded-lg bg-amber-900/40 border border-amber-700/40 text-amber-300 hover:bg-amber-900/60 transition-colors disabled:opacity-50">
-							{#if testBusy === 'reset-seed'}
-								<RefreshCw class="size-4 animate-spin" /> Working…
-							{:else}
-								<RefreshCw class="size-4" /> Reset & Seed {seedCount} Fresh
-							{/if}
-						</button>
-
-						<button onclick={resetData} disabled={!!testBusy}
-							class="flex items-center gap-2 text-sm px-4 py-2 rounded-lg bg-red-950/40 border border-red-800/40 text-red-400 hover:bg-red-900/40 transition-colors disabled:opacity-50">
-							{#if testBusy === 'reset'}
-								<RefreshCw class="size-4 animate-spin" /> Deleting…
-							{:else}
-								<XCircle class="size-4" /> Delete All Test Data
-							{/if}
-						</button>
-					</div>
-				</div>
-			</div>
-
-			{#if testMsg}
-				<p class="text-sm {testMsg.startsWith('✅') ? 'text-emerald-400' : 'text-red-400'}">{testMsg}</p>
-			{/if}
-		</div>
-		{/if}
-	</div>
 	{/if}
 
 	<!-- Stat cards -->

@@ -342,13 +342,32 @@
 	}
 
 	const visibleGroups = $derived(navGroups.filter(canSeeGroup));
+
+	function handleSidebarNavigation(event: MouseEvent, href: string) {
+		if (event.defaultPrevented) return;
+		if (event.button !== 0) return;
+		if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+
+		const anchor = event.currentTarget as HTMLAnchorElement | null;
+		if (anchor?.target && anchor.target !== '_self') return;
+
+		event.preventDefault();
+		if (sidebar.isMobile) {
+			sidebar.setOpenMobile(false);
+		}
+		window.location.assign(href);
+	}
 </script>
 
 <Sidebar.Root {...restProps} bind:ref class="bg-sidebar">
 	<!-- Brand header -->
 	<Sidebar.Header class="shrink-0">
 		<div class="flex items-center justify-between px-4 py-4 border-b border-sidebar-border">
-			<a href="/dashboard" class="flex items-center gap-3 hover:opacity-80 transition-opacity min-w-0">
+			<a
+				href="/dashboard"
+				onclick={(event) => handleSidebarNavigation(event, '/dashboard')}
+				class="flex items-center gap-3 hover:opacity-80 transition-opacity min-w-0"
+			>
 				<div class="flex size-10 items-center justify-center rounded-xl bg-gradient-to-br from-emerald-500 to-blue-600 text-white shadow-lg shrink-0">
 					<span class="text-lg font-black tracking-tighter">F</span>
 				</div>
@@ -396,8 +415,10 @@
 							{#each visibleItems as item (item.title)}
 								{@const active = isActive(item.url)}
 								{@const Icon = item.icon}
+								{@const itemHref = resolveItemUrl(item)}
 								<a
-									href={resolveItemUrl(item)}
+									href={itemHref}
+									onclick={(event) => handleSidebarNavigation(event, itemHref)}
 									class="
 										group/item relative flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium
 										transition-all duration-150 border-l-2
