@@ -17,6 +17,7 @@ export const PATCH: RequestHandler = async ({ request, locals, params }) => {
 		if (data.description !== undefined) updateData.description = data.description || '';
 		if (data.type !== undefined) updateData.type = data.type;
 		if (data.status !== undefined) updateData.status = data.status;
+		if (data.department !== undefined) updateData.department = data.department || null;
 		if (data.startDate !== undefined) updateData.startDate = data.startDate || null;
 		if (data.endDate !== undefined) updateData.endDate = data.endDate || null;
 		if (data.project_budget !== undefined) updateData.project_budget = data.project_budget ?? null;
@@ -27,7 +28,7 @@ export const PATCH: RequestHandler = async ({ request, locals, params }) => {
 
 		// Update the project in PocketBase
 		const project = await pb.collection('projects').update(params.id, updateData, {
-			expand: 'vendors'
+			expand: 'department,vendors'
 		});
 
 		return json(project, { status: 200 });

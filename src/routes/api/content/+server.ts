@@ -4,7 +4,18 @@
  */
 import { json } from '@sveltejs/kit';
 import { RequestContext } from '$lib/infra/RequestContext';
+import { adminFetch } from '$lib/infra/pocketbase/pbClient';
 import type { RequestHandler } from './$types';
+
+function pbErrorDetails(error: any): string {
+	const responseMessage = error?.response?.message;
+	const responseData = error?.response?.data;
+	if (responseMessage || responseData) {
+		const dataText = responseData ? ` data=${JSON.stringify(responseData)}` : '';
+		return `${responseMessage ?? 'PocketBase response error'}${dataText}`;
+	}
+	return error?.message ?? String(error);
+}
 
 export const GET: RequestHandler = async ({ locals, url }) => {
 	const ctx = await RequestContext.fromApi(locals, url);
@@ -13,9 +24,18 @@ export const GET: RequestHandler = async ({ locals, url }) => {
 		const items = await ctx.pb.collection('content_production').getFullList({
 			sort: '-created',
 			expand: 'assignedTo,talent,department,project'
+		}).catch(async (error: any) => {
+			console.error('api/content GET: expanded query failed, retrying without expand', pbErrorDetails(error));
+			return ctx.pb.collection('content_production').getFullList({
+				sort: '-created'
+			}).catch((fallbackError: any) => {
+				console.error('api/content GET: fallback query failed, trying raw fetch', pbErrorDetails(fallbackError));
+				return adminFetch('content_production', { sort: '-created' });
+			});
 		});
 		return json(items);
-	} catch {
+	} catch (error: any) {
+		console.error('api/content GET failed', pbErrorDetails(error));
 		return json([]);
 	}
 };

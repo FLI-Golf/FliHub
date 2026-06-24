@@ -16,20 +16,28 @@
 		role: 'leader',
 		status: 'active',
 		vendorId: '',
-		departmentId: ''
+		departmentId: '',
+		talentReference: '',
+		broadcasterReference: ''
 	});
 
 	let isSubmitting = $state(false);
 	let error = $state('');
 	let showVendorField = $derived(formData.role === 'vendor');
 	let showDepartmentField = $derived(formData.role === 'leader');
+	let showTalentField = $derived(formData.role === 'pro');
+	let showBroadcasterField = $derived(formData.role === 'broadcaster');
 
 	const roleOptions = [
 		{ value: 'leader', label: 'Leader' },
 		{ value: 'admin', label: 'Admin' },
+		{ value: 'sales', label: 'Sales' },
 		{ value: 'vendor', label: 'Vendor' },
 		{ value: 'pro', label: 'Pro' },
-		{ value: 'franchise_owner', label: 'Franchise Owner' }
+		{ value: 'franchise_owner', label: 'Franchise Owner' },
+		{ value: 'league_owner', label: 'League Owner' },
+		{ value: 'broadcaster', label: 'Broadcaster' },
+		{ value: 'manager', label: 'Manager' }
 	];
 
 	const statusOptions = [
@@ -79,8 +87,11 @@
 					organization: formData.organization,
 					role: formData.role,
 					status: formData.status,
-					vendorId: formData.vendorId || null,
-					departmentId: formData.departmentId || null
+					availableRoles: [formData.role],
+					vendorId: formData.role === 'vendor' ? (formData.vendorId || null) : null,
+					departmentId: formData.role === 'leader' ? (formData.departmentId || null) : null,
+					talentReference: formData.role === 'pro' ? (formData.talentReference || null) : null,
+					broadcasterReference: formData.role === 'broadcaster' ? (formData.broadcasterReference || null) : null
 				})
 			});
 
@@ -112,7 +123,10 @@
 				organization: '',
 				role: 'leader',
 				status: 'active',
-				vendorId: ''
+				vendorId: '',
+				departmentId: '',
+				talentReference: '',
+				broadcasterReference: ''
 			};
 		}
 	}
@@ -276,6 +290,32 @@
 							{/each}
 						</select>
 						<p class="text-xs text-slate-400">Required for leader role users</p>
+					</div>
+				{/if}
+
+				{#if showTalentField}
+					<div class="space-y-2">
+						<label for="person-talent-ref" class="text-sm font-medium text-slate-200">Talent Reference</label>
+						<Input
+							id="person-talent-ref"
+							bind:value={formData.talentReference}
+							class="bg-slate-800 border-slate-700 text-white"
+							placeholder="Talent/Pro record ID"
+						/>
+						<p class="text-xs text-slate-400">Optional link for pro users</p>
+					</div>
+				{/if}
+
+				{#if showBroadcasterField}
+					<div class="space-y-2">
+						<label for="person-broadcaster-ref" class="text-sm font-medium text-slate-200">Broadcaster Reference</label>
+						<Input
+							id="person-broadcaster-ref"
+							bind:value={formData.broadcasterReference}
+							class="bg-slate-800 border-slate-700 text-white"
+							placeholder="Broadcaster record ID"
+						/>
+						<p class="text-xs text-slate-400">Optional link for broadcaster users</p>
 					</div>
 				{/if}
 			</div>

@@ -15,8 +15,6 @@
 
 	// ── Pipeline config ───────────────────────────────────────────────────────
 
-	let stageFilter = $state<'invited' | 'all'>('invited');
-
 	const BOARD_CONFIG: PipelineBoardConfig = {
 		columnWidth: 'w-52',
 		stages: [
@@ -57,7 +55,7 @@
 	};
 
 	const ROLE_COLORS: Record<string, string> = {
-		player:      'bg-violet-900/50 text-violet-300 border-violet-700',
+		pro:         'bg-violet-900/50 text-violet-300 border-violet-700',
 		broadcaster: 'bg-blue-900/50 text-blue-300 border-blue-700',
 		commentator: 'bg-cyan-900/50 text-cyan-300 border-cyan-700',
 		analyst:     'bg-orange-900/50 text-orange-300 border-orange-700',
@@ -65,22 +63,41 @@
 	};
 
 	const ROLE_LABELS: Record<string, string> = {
-		player:      'Player',
+		pro:         'Pro',
 		broadcaster: 'Broadcaster',
 		commentator: 'Commentator',
 		analyst:     'Analyst',
 		manager:     'Manager'
 	};
 
+	function normalizeRole(role: string): string {
+		return role === 'player' ? 'pro' : role;
+	}
+
+	function normalizePlayerTerminology(text: string): string {
+		return text
+			.replace(/\bPlayers\b/g, 'Pros')
+			.replace(/\bplayers\b/g, 'pros')
+			.replace(/\bPlayer\b/g, 'Pro')
+			.replace(/\bplayer\b/g, 'pro');
+	}
+
+	function formatRoleLabel(role: string): string {
+		const normalizedRole = normalizeRole(role);
+		const mapped = ROLE_LABELS[normalizedRole]
+			?? normalizedRole.replace(/_/g, ' ').replace(/\b\w/g, (ch) => ch.toUpperCase());
+		return normalizePlayerTerminology(mapped);
+	}
+
 	// ── Map candidates → PipelineCardItem ─────────────────────────────────────
 
 	const visibleCandidates = $derived.by(() => {
-		if (stageFilter === 'all') return data.candidates;
-		return data.candidates.filter((candidate: any) => candidate.pipelineStage === 'invited');
+		return data.candidates;
 	});
 
 	const items = $derived<PipelineCardItem[]>(
 		visibleCandidates.map((c: any) => {
+			const normalizedRole = normalizeRole(c.role);
 			const checks = [
 				c.welcomeSeen,
 				c.documentsInitialed,
@@ -94,8 +111,8 @@
 				title: c.name,
 				subtitle: c.email || undefined,
 				badge: {
-					label: ROLE_LABELS[c.role] ?? c.role,
-					colorClass: ROLE_COLORS[c.role] ?? 'bg-slate-700 text-slate-300 border-slate-600'
+					label: formatRoleLabel(normalizedRole),
+					colorClass: ROLE_COLORS[normalizedRole] ?? 'bg-slate-700 text-slate-300 border-slate-600'
 				},
 				tags: c.signatureCount > 0
 					? [{ label: `${c.signatureCount} sig${c.signatureCount !== 1 ? 's' : ''}`, colorClass: 'bg-emerald-900/40 text-emerald-400 border-emerald-700' }]
@@ -178,25 +195,6 @@
 		<div>
 			<h1 class="text-3xl font-bold tracking-tight">Onboarding Pipeline</h1>
 			<p class="text-muted-foreground mt-1">Track every talent member from invite to approval</p>
-			<div class="mt-3 flex items-center gap-2">
-				<span class="text-xs uppercase tracking-wide text-slate-500">Filter</span>
-				<button
-					onclick={() => stageFilter = 'invited'}
-					class={`text-xs px-2.5 py-1 rounded-full border transition-colors ${stageFilter === 'invited'
-						? 'bg-slate-700 text-slate-200 border-slate-500'
-						: 'bg-slate-900 text-slate-500 border-slate-700 hover:border-slate-500 hover:text-slate-300'}`}
-				>
-					Invited only
-				</button>
-				<button
-					onclick={() => stageFilter = 'all'}
-					class={`text-xs px-2.5 py-1 rounded-full border transition-colors ${stageFilter === 'all'
-						? 'bg-slate-700 text-slate-200 border-slate-500'
-						: 'bg-slate-900 text-slate-500 border-slate-700 hover:border-slate-500 hover:text-slate-300'}`}
-				>
-					All stages
-				</button>
-			</div>
 		</div>
 	</div>
 

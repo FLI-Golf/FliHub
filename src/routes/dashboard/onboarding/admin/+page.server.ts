@@ -31,7 +31,10 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 			id: t.id,
 			userId: t.id, // talent records use their own id as userId in onboarding
 			name: t.name,
-			role: Array.isArray(t.talentType) ? t.talentType[0] : (t.talentType ?? 'player'),
+			role: (() => {
+				const rawRole = Array.isArray(t.talentType) ? t.talentType[0] : (t.talentType ?? 'pro');
+				return rawRole === 'player' ? 'pro' : rawRole;
+			})(),
 			email: t.email ?? '',
 			avatar: t.avatar ?? null,
 			collectionId: t.collectionId

@@ -3,7 +3,6 @@
 	import Card from '$lib/components/ui/card.svelte';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import { Input } from '$lib/components/ui/input/index.js';
-	import VisualTabs from '$lib/components/ui/visual-tabs.svelte';
 	import * as Sheet from '$lib/components/ui/sheet/index.js';
 	import AddPersonModal from '$lib/components/people/add-person-modal.svelte';
 	import { 
@@ -50,6 +49,26 @@
 		{ value: 'inactive', label: 'Inactive' },
 		{ value: 'pending', label: 'Pending' }
 	];
+
+	const roleFilterStyles: Record<string, string> = {
+		all: 'bg-slate-100 text-slate-700 border-slate-300 dark:bg-slate-800 dark:text-slate-100 dark:border-slate-700',
+		leader: 'bg-blue-100 text-blue-700 border-blue-300 dark:bg-blue-900/30 dark:text-blue-300 dark:border-blue-700',
+		admin: 'bg-rose-100 text-rose-700 border-rose-300 dark:bg-rose-900/30 dark:text-rose-300 dark:border-rose-700',
+		sales: 'bg-amber-100 text-amber-700 border-amber-300 dark:bg-amber-900/30 dark:text-amber-300 dark:border-amber-700',
+		vendor: 'bg-emerald-100 text-emerald-700 border-emerald-300 dark:bg-emerald-900/30 dark:text-emerald-300 dark:border-emerald-700',
+		pro: 'bg-violet-100 text-violet-700 border-violet-300 dark:bg-violet-900/30 dark:text-violet-300 dark:border-violet-700',
+		franchise_owner: 'bg-orange-100 text-orange-700 border-orange-300 dark:bg-orange-900/30 dark:text-orange-300 dark:border-orange-700',
+		league_owner: 'bg-cyan-100 text-cyan-700 border-cyan-300 dark:bg-cyan-900/30 dark:text-cyan-300 dark:border-cyan-700',
+		broadcaster: 'bg-fuchsia-100 text-fuchsia-700 border-fuchsia-300 dark:bg-fuchsia-900/30 dark:text-fuchsia-300 dark:border-fuchsia-700',
+		manager: 'bg-lime-100 text-lime-700 border-lime-300 dark:bg-lime-900/30 dark:text-lime-300 dark:border-lime-700'
+	};
+
+	const statusFilterStyles: Record<string, string> = {
+		all: 'bg-slate-100 text-slate-700 border-slate-300 dark:bg-slate-800 dark:text-slate-100 dark:border-slate-700',
+		active: 'bg-emerald-100 text-emerald-700 border-emerald-300 dark:bg-emerald-900/30 dark:text-emerald-300 dark:border-emerald-700',
+		inactive: 'bg-red-100 text-red-700 border-red-300 dark:bg-red-900/30 dark:text-red-300 dark:border-red-700',
+		pending: 'bg-amber-100 text-amber-700 border-amber-300 dark:bg-amber-900/30 dark:text-amber-300 dark:border-amber-700'
+	};
 	
 	let searchQuery = $state('');
 	let roleFilter = $state<string>('all');
@@ -72,11 +91,15 @@
 		role: '',
 		status: '',
 		vendorId: '',
-		departmentId: ''
+		departmentId: '',
+		talentReference: '',
+		broadcasterReference: ''
 	});
 	
 	let showVendorField = $derived(editForm.role === 'vendor');
 	let showDepartmentField = $derived(editForm.role === 'leader');
+	let showTalentField = $derived(editForm.role === 'pro');
+	let showBroadcasterField = $derived(editForm.role === 'broadcaster');
 	
 	// Get counts for each role
 	function getRoleCount(role: string): number {
@@ -121,22 +144,22 @@
 		})
 	);
 	
-	// Build role tabs
-	let roleTabs = $derived([
+	let roleFilters = $derived([
 		{ value: 'all', label: 'All Roles', count: data.people.length },
-		{ value: 'admin', label: 'Admin', count: getRoleCount('admin'), icon: ShieldCheck },
-		{ value: 'leader', label: 'Leader', count: getRoleCount('leader'), icon: Users },
-		{ value: 'vendor', label: 'Vendor', count: getRoleCount('vendor'), icon: Store },
-		{ value: 'pro', label: 'Pro', count: getRoleCount('pro'), icon: Award },
-		{ value: 'franchise_owner', label: 'Franchise Owner', count: getRoleCount('franchise_owner'), icon: Home }
+		...roleOptions.map((role) => ({
+			value: role.value,
+			label: role.label,
+			count: getRoleCount(role.value)
+		}))
 	]);
-	
-	// Build status tabs
-	let statusTabs = $derived([
+
+	let statusFilters = $derived([
 		{ value: 'all', label: 'All Status', count: data.people.length },
-		{ value: 'active', label: 'Active', count: getStatusCount('active'), icon: CheckCircle2 },
-		{ value: 'inactive', label: 'Inactive', count: getStatusCount('inactive'), icon: XCircle },
-		{ value: 'pending', label: 'Pending', count: getStatusCount('pending'), icon: Clock }
+		...statusOptions.map((status) => ({
+			value: status.value,
+			label: status.label,
+			count: getStatusCount(status.value)
+		}))
 	]);
 	
 	function openEditSheet(person: any) {
@@ -150,7 +173,9 @@
 			role: person.role || '',
 			status: person.status || '',
 			vendorId: person.vendorId || '',
-			departmentId: person.departmentId || ''
+			departmentId: person.departmentId || '',
+			talentReference: person.talentReference || person.proReference || '',
+			broadcasterReference: person.broadcasterReference || ''
 		};
 		sheetOpen = true;
 	}
@@ -165,16 +190,22 @@
 		updating[selectedPerson.id] = true;
 		
 		try {
-			// Update user profile with role and assignments
-			const response = await fetch('/api/user-profiles/update-role', {
-				method: 'POST',
+			const role = editForm.role;
+			const payload: Record<string, unknown> = {
+				role,
+				availableRoles: [role],
+				vendorId: role === 'vendor' ? (editForm.vendorId || null) : null,
+				departmentId: role === 'leader' ? (editForm.departmentId || null) : null,
+				talentReference: role === 'pro' ? (editForm.talentReference || null) : null,
+				proReference: role === 'pro' ? (editForm.talentReference || null) : null,
+				broadcasterReference: role === 'broadcaster' ? (editForm.broadcasterReference || null) : null
+			};
+
+			// Update user profile directly
+			const response = await fetch(`/api/user-profiles/${selectedPerson.id}`, {
+				method: 'PATCH',
 				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({
-					profileId: selectedPerson.id,
-					role: editForm.role,
-					vendorId: editForm.vendorId || null,
-					departmentId: editForm.departmentId || null
-				})
+				body: JSON.stringify(payload)
 			});
 			
 			if (response.ok) {
@@ -238,6 +269,31 @@
 			case 'pro': return 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400';
 			case 'franchise_owner': return 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400';
 			default: return 'bg-gray-100 text-gray-700 dark:bg-gray-900/30 dark:text-gray-400';
+		}
+	}
+
+	function getRoleCardBackground(role: string) {
+		switch (role) {
+			case 'admin':
+				return 'bg-rose-900/55 border-rose-700/70';
+			case 'leader':
+				return 'bg-blue-900/55 border-blue-700/70';
+			case 'sales':
+				return 'bg-amber-900/55 border-amber-700/70';
+			case 'vendor':
+				return 'bg-emerald-900/55 border-emerald-700/70';
+			case 'pro':
+				return 'bg-violet-900/55 border-violet-700/70';
+			case 'franchise_owner':
+				return 'bg-orange-900/55 border-orange-700/70';
+			case 'league_owner':
+				return 'bg-cyan-900/55 border-cyan-700/70';
+			case 'broadcaster':
+				return 'bg-fuchsia-900/55 border-fuchsia-700/70';
+			case 'manager':
+				return 'bg-lime-900/55 border-lime-700/70';
+			default:
+				return 'bg-slate-800 border-slate-700';
 		}
 	}
 	
@@ -329,23 +385,35 @@
 		<!-- Role Filter Tabs -->
 		<div>
 			<h3 class="text-sm font-medium text-muted-foreground mb-3">Filter by Role</h3>
-			<VisualTabs
-				tabs={roleTabs}
-				activeTab={roleFilter}
-				onTabChange={(v) => roleFilter = v}
-				variant="button"
-			/>
+			<div class="flex flex-wrap gap-2">
+				{#each roleFilters as role}
+					<button
+						type="button"
+						onclick={() => roleFilter = role.value}
+						class="inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-semibold transition-all hover:scale-[1.02] {roleFilterStyles[role.value] || roleFilterStyles.all} {roleFilter === role.value ? 'ring-2 ring-offset-2 ring-primary dark:ring-offset-slate-900' : 'opacity-85 hover:opacity-100'}"
+					>
+						<span>{role.label}</span>
+						<span class="rounded-full bg-black/10 dark:bg-white/10 px-1.5 py-0.5 text-[10px] font-bold">{role.count}</span>
+					</button>
+				{/each}
+			</div>
 		</div>
 		
 		<!-- Status Filter Tabs -->
 		<div>
 			<h3 class="text-sm font-medium text-muted-foreground mb-3">Filter by Status</h3>
-			<VisualTabs
-				tabs={statusTabs}
-				activeTab={statusFilter}
-				onTabChange={(v) => statusFilter = v}
-				variant="pill"
-			/>
+			<div class="flex flex-wrap gap-2">
+				{#each statusFilters as status}
+					<button
+						type="button"
+						onclick={() => statusFilter = status.value}
+						class="inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-semibold transition-all hover:scale-[1.02] {statusFilterStyles[status.value] || statusFilterStyles.all} {statusFilter === status.value ? 'ring-2 ring-offset-2 ring-primary dark:ring-offset-slate-900' : 'opacity-85 hover:opacity-100'}"
+					>
+						<span>{status.label}</span>
+						<span class="rounded-full bg-black/10 dark:bg-white/10 px-1.5 py-0.5 text-[10px] font-bold">{status.count}</span>
+					</button>
+				{/each}
+			</div>
 		</div>
 	</div>
 
@@ -363,9 +431,9 @@
 		</Card>
 	{:else}
 		<div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-			{#each filteredPersons as person, index}
+			{#each filteredPersons as person}
 			<Card class="overflow-hidden transition-all duration-200 hover:shadow-xl hover:-translate-y-0.5">
-				<div class="p-6 h-full {index % 2 === 0 ? 'bg-slate-800' : 'bg-slate-700/60'}">
+				<div class="p-6 h-full border {getRoleCardBackground(person.role)}">
 				<div class="flex items-start justify-between mb-4">
 					<button 
 						type="button"
@@ -585,19 +653,13 @@
 									<span class="text-xs text-muted-foreground">Profile ID</span>
 									<p class="font-mono text-xs mt-1 truncate">{person.id}</p>
 								</div>
-								
+
 								<div class="col-span-2">
-									<span class="text-xs text-muted-foreground">Available Roles</span>
-									<div class="flex flex-wrap gap-1 mt-1">
-										{#if person.availableRoles && person.availableRoles.length > 0}
-											{#each person.availableRoles as role}
-												<span class="px-2 py-0.5 rounded text-xs {getRoleColor(role)}">
-													{roleOptions.find(r => r.value === role)?.label || role}
-												</span>
-											{/each}
-										{:else}
-											<span class="text-xs text-muted-foreground">None</span>
-										{/if}
+									<span class="text-xs text-muted-foreground">Current Role</span>
+									<div class="mt-1">
+										<span class="px-2 py-0.5 rounded text-xs {getRoleColor(person.role)}">
+											{roleOptions.find(r => r.value === person.role)?.label || person.role}
+										</span>
 									</div>
 								</div>
 								
@@ -769,6 +831,30 @@
 							{/each}
 						</select>
 						<p class="text-xs text-slate-400">Link this user to a department</p>
+					</div>
+				{/if}
+
+				{#if showTalentField}
+					<div class="space-y-2">
+						<label class="text-sm font-medium text-slate-200">Talent Reference</label>
+						<Input
+							bind:value={editForm.talentReference}
+							placeholder="Talent/Pro record ID"
+							class="bg-slate-800 border-slate-700 text-white"
+						/>
+						<p class="text-xs text-slate-400">Optional link used for pro payment/profile workflows</p>
+					</div>
+				{/if}
+
+				{#if showBroadcasterField}
+					<div class="space-y-2">
+						<label class="text-sm font-medium text-slate-200">Broadcaster Reference</label>
+						<Input
+							bind:value={editForm.broadcasterReference}
+							placeholder="Broadcaster record ID"
+							class="bg-slate-800 border-slate-700 text-white"
+						/>
+						<p class="text-xs text-slate-400">Optional broadcaster profile link</p>
 					</div>
 				{/if}
 				

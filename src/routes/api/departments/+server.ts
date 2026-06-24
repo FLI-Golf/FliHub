@@ -1,6 +1,42 @@
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 
+export const GET: RequestHandler = async ({ url, locals }) => {
+	try {
+		const pageParam = Number(url.searchParams.get('page') ?? '1');
+		const perPageParam = Number(url.searchParams.get('perPage') ?? '50');
+		const sort = url.searchParams.get('sort') ?? 'name';
+		const baseFilter = (url.searchParams.get('filter') ?? '').trim();
+		const search = (url.searchParams.get('search') ?? '').trim();
+
+		const page = Number.isFinite(pageParam) && pageParam > 0 ? Math.floor(pageParam) : 1;
+		const perPage = Number.isFinite(perPageParam)
+			? Math.min(200, Math.max(1, Math.floor(perPageParam)))
+			: 50;
+
+		const escapedSearch = search.replace(/"/g, '\\"');
+		const searchFilter = escapedSearch
+			? `(name ~ "${escapedSearch}" || code ~ "${escapedSearch}" || description ~ "${escapedSearch}")`
+			: '';
+
+		const filter = [baseFilter, searchFilter].filter(Boolean).join(' && ');
+
+		const result = await locals.pb.collection('departments').getList(page, perPage, {
+			sort,
+			filter,
+			expand: 'headOfDepartment'
+		});
+
+		return json(result);
+	} catch (error: any) {
+		console.error('Error listing departments:', error);
+		return json(
+			{ message: error?.message || 'Failed to list departments' },
+			{ status: error?.status || 500 }
+		);
+	}
+};
+
 export const POST: RequestHandler = async ({ request, locals }) => {
 	try {
 		const data = await request.json();

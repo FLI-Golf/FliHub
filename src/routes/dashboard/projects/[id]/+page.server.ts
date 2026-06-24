@@ -71,14 +71,28 @@ export const load: PageServerLoad = async ({ locals, url, params }) => {
 			}, {} as Record<string, number>) : {}
 		};
 
-		// Fetch all vendors for selection
+		// Fetch all vendors and departments for selection.
+		// Use independent requests so one failure doesn't wipe out both lists.
 		let allVendors: any[] = [];
-		try {
-			allVendors = await pb.collection('vendors').getFullList({
-				sort: 'name'
-			});
-		} catch (vendorErr: any) {
-			console.error('Error fetching vendors:', vendorErr);
+		let departments: any[] = [];
+		const [vendorsResult, departmentsResult] = await Promise.allSettled([
+			pb.collection('vendors').getFullList({ sort: 'name' }),
+			pb.collection('departments').getList(1, 200, {
+				sort: 'name',
+				filter: 'status != "archived"'
+			})
+		]);
+
+		if (vendorsResult.status === 'fulfilled') {
+			allVendors = vendorsResult.value;
+		} else {
+			console.error('Error fetching vendors:', vendorsResult.reason);
+		}
+
+		if (departmentsResult.status === 'fulfilled') {
+			departments = departmentsResult.value.items ?? [];
+		} else {
+			console.error('Error fetching departments:', departmentsResult.reason);
 		}
 
 		console.log('✅ Successfully loaded all project data');
@@ -104,7 +118,8 @@ export const load: PageServerLoad = async ({ locals, url, params }) => {
 			expenses,
 			expenseStats,
 			tasks,
-			allVendors
+			allVendors,
+			departments
 		};
 	} catch (err: any) {
 		console.error('=== PROJECT LOAD ERROR ===');
