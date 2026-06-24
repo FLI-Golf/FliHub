@@ -289,7 +289,7 @@
 	</div>
 
 	<!-- Edit Project Modal -->
-	<EditProjectModal bind:open={showEditModal} {project} />
+	<EditProjectModal bind:open={showEditModal} {project} departments={data.departments || []} />
 	
 	<!-- Add Task Modal -->
 	<AddTaskModal bind:open={showAddTaskModal} projectId={project.id} />

@@ -8,6 +8,14 @@
 
 	let { data }: { data: PageData } = $props();
 
+	function normalizePlayerTerminology(text: string): string {
+		return text
+			.replace(/\bPlayers\b/g, 'Pros')
+			.replace(/\bplayers\b/g, 'pros')
+			.replace(/\bPlayer\b/g, 'Pro')
+			.replace(/\bplayer\b/g, 'pro');
+	}
+
 	// ── Document content ────────────────────────────────────────────────────
 
 	const PLAYER_INFO_PACKET = `FLI GOLF LEAGUE — PLAYER INFORMATION PACKET
@@ -311,7 +319,7 @@ Andrew@FLIGolf.com | fligolf.com`;
 		},
 		{
 			id: 'profile',
-			label: 'Player Profile',
+			label: normalizePlayerTerminology('Player Profile'),
 			done: profileDone
 		}
 	] as const);
@@ -468,15 +476,15 @@ Andrew@FLIGolf.com | fligolf.com`;
 		/>
 	</section>
 
-	<!-- ── SECTION 3: Player Profile ───────────────────────────────────── -->
+	<!-- ── SECTION 3: Pro Profile ───────────────────────────────────── -->
 	<section class="space-y-4">
 		<div class="flex items-center gap-3">
 			<div class="flex items-center justify-center w-8 h-8 rounded-lg bg-blue-100 dark:bg-blue-900">
 				<User class="w-4 h-4 text-blue-600 dark:text-blue-400" />
 			</div>
 			<div>
-				<h2 class="font-bold text-lg">Player Profile</h2>
-				<p class="text-sm text-muted-foreground">Fill out your full player profile for broadcast, media, and league records.</p>
+				<h2 class="font-bold text-lg">{normalizePlayerTerminology('Player Profile')}</h2>
+				<p class="text-sm text-muted-foreground">{normalizePlayerTerminology('Fill out your full player profile for broadcast, media, and league records.')}</p>
 			</div>
 		</div>
 
@@ -490,7 +498,7 @@ Andrew@FLIGolf.com | fligolf.com`;
 					{/if}
 				</div>
 				<div class="flex-1">
-					<h3 class="font-bold text-base">FLI Golf Player Profile Form</h3>
+					<h3 class="font-bold text-base">{normalizePlayerTerminology('FLI Golf Player Profile Form')}</h3>
 					{#if data.playerProfile?.status === 'submitted'}
 						<p class="text-sm text-emerald-600 dark:text-emerald-400 font-medium">Submitted — under review</p>
 					{:else if data.playerProfile?.status === 'approved'}
@@ -505,7 +513,7 @@ Andrew@FLIGolf.com | fligolf.com`;
 					href="/dashboard/player-profile"
 					class="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg {data.playerProfile ? 'bg-muted hover:bg-muted/80 text-foreground' : 'bg-black text-white hover:bg-gray-800'} font-semibold text-sm transition-all duration-150"
 				>
-					{data.playerProfile ? 'Edit Profile' : 'Fill Out Profile'}
+					{data.playerProfile ? normalizePlayerTerminology('Edit Player Profile') : normalizePlayerTerminology('Fill Out Player Profile')}
 					<ChevronRight class="w-4 h-4" />
 				</a>
 			</div>

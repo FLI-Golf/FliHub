@@ -34,7 +34,7 @@ let _adminToken: string | null = null;
 let _adminTokenExpiry = 0;
 
 async function getAdminToken(): Promise<string> {
-	// Reuse token for up to 10 minutes
+	// Reuse token briefly to limit auth requests while avoiding stale-token issues.
 	if (_adminToken && Date.now() < _adminTokenExpiry) return _adminToken;
 
 	const baseUrl = requireEnv('POCKETBASE_URL').replace(/\/$/, '');
@@ -45,9 +45,14 @@ async function getAdminToken(): Promise<string> {
 		headers: { 'Content-Type': 'application/json' },
 		body:    JSON.stringify({ identity, password }),
 	});
-	const data = await res.json();
+	const data = await res.json().catch(() => ({} as any));
+	if (!res.ok || typeof data?.token !== 'string' || !data.token) {
+		throw new Error(
+			`Failed superuser auth (${res.status}): ${data?.message ?? 'Unknown PocketBase auth error'}`
+		);
+	}
 	_adminToken = data.token;
-	_adminTokenExpiry = Date.now() + 10 * 60 * 1000;
+	_adminTokenExpiry = Date.now() + 2 * 60 * 1000;
 	return _adminToken as string;
 }
 
@@ -57,12 +62,7 @@ export async function getAdminPocketBase(): Promise<PocketBase> {
 	pb.autoCancellation(false);
 
 	const token = await getAdminToken();
-
-	// Inject the token via beforeSend so the SDK never tries to re-auth
-	pb.beforeSend = (url, options) => {
-		options.headers = { ...(options.headers ?? {}), Authorization: token };
-		return { url, options };
-	};
+	pb.authStore.save(token, null);
 
 	return pb;
 }

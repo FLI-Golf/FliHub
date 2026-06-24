@@ -26,6 +26,7 @@
 		'/dashboard/people': 'People',
 		'/dashboard/projects': 'Projects',
 		'/dashboard/tasks': 'Tasks',
+		'/dashboard/manage-media-content': 'Manage Media Content',
 		'/dashboard/expenses': 'Expenses',
 		'/dashboard/vendors': 'Vendors',
 		'/dashboard/approvals': 'Approvals',
@@ -69,6 +70,7 @@
 		'/dashboard/income':           'Income Pipeline',
 		'/dashboard/bank-accounts':    'Manage Bank Accounts',
 		'/dashboard/active-goals':     'Active Goals',
+		'/dashboard/manage-media-content': 'Manage Media Content',
 		'/dashboard/bids':             'Bid Pipeline',
 		'/dashboard/purchase-orders':  'Purchase Orders',
 		'/dashboard/continuous-improvements': 'Continuous Improvements'

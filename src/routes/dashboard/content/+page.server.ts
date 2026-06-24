@@ -1,14 +1,37 @@
 import { RequestContext } from '$lib/infra/RequestContext';
+import { adminFetch } from '$lib/infra/pocketbase/pbClient';
 import type { PageServerLoad } from './$types';
+
+function pbErrorDetails(error: any): string {
+	const responseMessage = error?.response?.message;
+	const responseData = error?.response?.data;
+	if (responseMessage || responseData) {
+		const dataText = responseData ? ` data=${JSON.stringify(responseData)}` : '';
+		return `${responseMessage ?? 'PocketBase response error'}${dataText}`;
+	}
+	return error?.message ?? String(error);
+}
 
 export const load: PageServerLoad = async ({ locals, url }) => {
 	const ctx = await RequestContext.from(locals, url);
 
-	const [items, talent, userProfiles, departments, projects, tasks] = await Promise.all([
-		ctx.pb.collection('content_production').getFullList({
-			sort: '-created',
-			expand: 'assignedTo,talent,department,project'
-		}).catch(() => []),
+	const items = await ctx.pb.collection('content_production').getFullList({
+		sort: '-created',
+		expand: 'assignedTo,talent,department,project'
+	}).catch(async (error: any) => {
+		console.error('content load: expanded query failed, retrying without expand', pbErrorDetails(error));
+		return ctx.pb.collection('content_production').getFullList({
+			sort: '-created'
+		}).catch((fallbackError: any) => {
+			console.error('content load: fallback query failed, trying raw fetch', pbErrorDetails(fallbackError));
+			return adminFetch('content_production', { sort: '-created' }).catch((rawError: any) => {
+				console.error('content load: raw fetch failed', pbErrorDetails(rawError));
+				return [];
+			});
+		});
+	});
+
+	const [talent, userProfiles, departments, projects, tasks] = await Promise.all([
 		ctx.pb.collection('talent').getFullList({
 			sort: 'name',
 			fields: 'id,name,talentType'
@@ -30,8 +53,18 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 			filter: 'contentProductionId != ""',
 			sort: 'status,dueDate',
 			expand: 'assignedTo,contentProductionId'
-		}).catch(() => [])
+		}).catch(async (error: any) => {
+			console.error('content load: tasks expanded query failed, retrying without expand', pbErrorDetails(error));
+			return ctx.pb.collection('tasks').getFullList({
+				filter: 'contentProductionId != ""',
+				sort: 'status,dueDate'
+			}).catch(() => []);
+		})
 	]);
+
+	const defaultDepartment = departments.find((department: any) =>
+		String(department?.name ?? '').toLowerCase() === 'media & content buildout'
+	) ?? null;
 
 	const stats = {
 		total:      items.length,
@@ -45,5 +78,14 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 		pendingApproval: items.filter((i: any) => i.requiresApproval && i.approvalStatus === 'pending').length
 	};
 
-	return { items, talent, userProfiles, departments, projects, tasks, stats };
+	return {
+		items,
+		talent,
+		userProfiles,
+		departments,
+		projects,
+		tasks,
+		stats,
+		defaultDepartmentId: defaultDepartment?.id ?? ''
+	};
 };

@@ -118,6 +118,7 @@
 				{ title: 'Active Projects', url: '/dashboard/active-projects', icon: Zap,             roles: ['admin', 'leader', 'marketing', 'marketing_lead'] },
 				{ title: 'Active Goals',    url: '/dashboard/active-goals',    icon: Target,          roles: ['admin', 'leader', 'marketing', 'marketing_lead'] },
 				{ title: 'Manage Events',  url: '/dashboard/manage-events',    icon: PartyPopper,     roles: ['admin', 'leader', 'marketing', 'marketing_lead'] },
+				{ title: 'Manage Media Content', url: '/dashboard/manage-media-content', icon: Images, roles: ['admin', 'leader', 'marketing', 'marketing_lead'] },
 				{ title: 'Manage Bank Accounts', url: '/dashboard/bank-accounts', icon: Landmark, roles: ['admin', 'leader'] },
 				{ title: 'Active Income',   url: '/dashboard/active-income',   icon: TrendingUp,      roles: ['admin', 'leader'] }
 			]

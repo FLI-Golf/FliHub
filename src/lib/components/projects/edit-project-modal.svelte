@@ -7,7 +7,7 @@
 	import { goto } from '$app/navigation';
 	import { page } from '$app/stores';
 
-	let { open = $bindable(false), project } = $props();
+	let { open = $bindable(false), project, departments = [] } = $props();
 
 	// Form state - initialize with project data
 	let formData = $state({
@@ -15,11 +15,25 @@
 		description: '',
 		type: 'tournament',
 		status: 'draft',
+		department: '',
 		startDate: '',
 		endDate: '',
 		project_budget: '',
 		fiscalYear: '',
 		notes: ''
+	});
+	let departmentSearch = $state('');
+
+	let filteredDepartments = $derived.by(() => {
+		const term = departmentSearch.trim().toLowerCase();
+		if (!term) return departments;
+
+		return departments.filter((dept: any) => {
+			const name = String(dept?.name ?? '').toLowerCase();
+			const code = String(dept?.code ?? '').toLowerCase();
+			const description = String(dept?.description ?? '').toLowerCase();
+			return name.includes(term) || code.includes(term) || description.includes(term);
+		});
 	});
 
 	// Update formData when modal opens or project changes
@@ -35,6 +49,7 @@
 				description: project.description || '',
 				type: project.type || 'tournament',
 				status: project.status || 'draft',
+				department: project.department || project.expand?.department?.id || '',
 				startDate: project.startDate ? project.startDate.split('T')[0] : fmt(today),
 				endDate: project.endDate ? project.endDate.split('T')[0] : fmt(plus60),
 				project_budget: project.project_budget?.toString() || '',
@@ -75,6 +90,7 @@
 				},
 				body: JSON.stringify({
 					...formData,
+					department: formData.department || null,
 					project_budget: formData.project_budget ? parseFloat(formData.project_budget) : undefined
 				})
 			});
@@ -98,6 +114,7 @@
 		open = newOpen;
 		if (!newOpen) {
 			error = '';
+			departmentSearch = '';
 		}
 	}
 </script>
@@ -147,6 +164,29 @@
 
 			<!-- Type and Status -->
 			<div class="grid grid-cols-2 gap-4">
+				<div class="space-y-2">
+					<Label for="edit-department" class="text-slate-200">Department</Label>
+					<Input
+						id="edit-department-search"
+						bind:value={departmentSearch}
+						placeholder="Search departments..."
+						class="bg-slate-900 border-slate-700 text-white placeholder:text-slate-500"
+					/>
+					<select
+						id="edit-department"
+						bind:value={formData.department}
+						class="flex h-10 w-full rounded-md border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-500 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-900 disabled:cursor-not-allowed disabled:opacity-50"
+					>
+						<option value="">Unassigned</option>
+						{#each filteredDepartments as dept}
+							<option value={dept.id}>{dept.name}</option>
+						{/each}
+					</select>
+					{#if departmentSearch.trim() && filteredDepartments.length === 0}
+						<p class="text-xs text-slate-400">No matching departments</p>
+					{/if}
+				</div>
+
 				<div class="space-y-2">
 					<Label for="edit-type" class="text-slate-200">Type *</Label>
 					<select

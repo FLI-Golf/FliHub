@@ -9,7 +9,7 @@
 	import {
 		Plus, AlertCircle, X, FileText, Camera, Scissors,
 		CheckCircle2, Globe, DollarSign, Ban, Clock,
-		Building2, FolderOpen, ListChecks
+		Building2, FolderOpen, ListChecks, FlaskConical, Trash2, RotateCcw
 	} from 'lucide-svelte';
 	import type { PageData } from './$types';
 
@@ -54,11 +54,89 @@
 		new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 0 }).format(n ?? 0);
 	const fmtDate = (d: string) =>
 		d ? new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '';
+	const SEED_MARKER = '[SEED:CONTENT_PIPELINE]';
+
+	function isSeededContent(item: any): boolean {
+		const title = String(item?.title ?? '');
+		const notes = String(item?.notes ?? '');
+		return title.includes(SEED_MARKER) || notes.includes(SEED_MARKER);
+	}
+
+	let seedBusy = $state(false);
+	let seedMsg = $state('');
+	let seedMsgKind = $state<'success' | 'error' | 'info'>('info');
+
+	const seededCount = $derived((data.items ?? []).filter((item: any) => isSeededContent(item)).length);
+	const visibleItems = $derived(data.items ?? []);
+
+	async function runSeed() {
+		if (!confirm('Seed test content items? This will add sample data.')) return;
+		seedBusy = true;
+		seedMsg = '';
+		try {
+			const res = await fetch('/api/content/seed', { method: 'POST' });
+			const body = await res.json().catch(() => ({}));
+			seedMsg = body?.message ?? (res.ok ? 'Seeded content test data.' : 'Seed failed');
+			seedMsgKind = res.ok ? 'success' : 'error';
+			if (res.ok) {
+				await invalidateAll();
+			}
+		} catch {
+			seedMsg = 'Seed failed';
+			seedMsgKind = 'error';
+		} finally {
+			seedBusy = false;
+		}
+	}
+
+	async function clearSeededContent() {
+		if (!seededCount) return;
+		if (!confirm(`Delete ${seededCount} seeded content item(s) and linked tasks?`)) return;
+
+		seedBusy = true;
+		seedMsg = '';
+		try {
+			const res = await fetch('/api/content/seed', { method: 'DELETE' });
+			const body = await res.json().catch(() => ({}));
+			if (!res.ok) throw new Error(body?.message ?? 'Failed to clear seeded content');
+
+			selectedId = null;
+			seedMsg = body?.message ?? 'Seeded content cleared';
+			seedMsgKind = 'success';
+			await invalidateAll();
+		} catch (err: any) {
+			seedMsg = err?.message ?? 'Failed to clear seeded content';
+			seedMsgKind = 'error';
+		} finally {
+			seedBusy = false;
+		}
+	}
+
+	async function resetSeededContent() {
+		if (!confirm('Clear all seeded content and re-seed? This cannot be undone.')) return;
+		seedBusy = true;
+		seedMsg = '';
+		try {
+			const res = await fetch('/api/content/seed', { method: 'PATCH' });
+			const body = await res.json().catch(() => ({}));
+			seedMsg = body?.message ?? (res.ok ? 'Reset complete.' : 'Reset failed');
+			seedMsgKind = res.ok ? 'success' : 'error';
+			if (res.ok) {
+				selectedId = null;
+				await invalidateAll();
+			}
+		} catch {
+			seedMsg = 'Reset failed';
+			seedMsgKind = 'error';
+		} finally {
+			seedBusy = false;
+		}
+	}
 
 	// ── Map items → PipelineCardItem ──────────────────────────────────────────
 
 	const items = $derived<PipelineCardItem[]>(
-		(data.items ?? []).map((item: any) => {
+		visibleItems.map((item: any) => {
 			const tags: { label: string; colorClass: string }[] = [];
 			if (item.requiresApproval && item.approvalStatus === 'pending') {
 				tags.push({ label: 'Needs Approval', colorClass: 'bg-yellow-900/50 text-yellow-300 border-yellow-700' });
@@ -117,7 +195,7 @@
 	let showTaskModal = $state(false);
 
 	const selected = $derived(
-		selectedId ? (data.items ?? []).find((i: any) => i.id === selectedId) ?? null : null
+		selectedId ? visibleItems.find((i: any) => i.id === selectedId) ?? null : null
 	);
 	const selectedTasks = $derived(
 		selectedId
@@ -174,7 +252,7 @@
 	let newErr   = $state('');
 	let newForm  = $state({
 		title: '', contentType: 'youtube', description: '',
-		department: '', project: '', dueDate: '', budget: '', requiresApproval: false, notes: ''
+		department: data.defaultDepartmentId || '', project: '', dueDate: '', budget: '', requiresApproval: false, notes: ''
 	});
 	const availableProjects = $derived(
 		(data.projects ?? []).filter((project: any) =>
@@ -204,7 +282,17 @@
 			});
 			if (!res.ok) { const d = await res.json().catch(() => ({})); throw new Error(d.message ?? 'Failed'); }
 			showNew = false;
-			newForm = { title: '', contentType: 'youtube', description: '', department: '', project: '', dueDate: '', budget: '', requiresApproval: false, notes: '' };
+			newForm = {
+				title: '',
+				contentType: 'youtube',
+				description: '',
+				department: data.defaultDepartmentId || '',
+				project: '',
+				dueDate: '',
+				budget: '',
+				requiresApproval: false,
+				notes: ''
+			};
 			await invalidateAll();
 		} catch (err: any) {
 			newErr = err.message ?? 'Failed';
@@ -230,7 +318,17 @@
 		cancelled: 'Cancelled'
 	};
 
-	const s = $derived(data.stats);
+	const s = $derived.by(() => ({
+		total:      visibleItems.length,
+		brief:      visibleItems.filter((i: any) => i.stage === 'brief').length,
+		shoot:      visibleItems.filter((i: any) => i.stage === 'shoot').length,
+		edit:       visibleItems.filter((i: any) => i.stage === 'edit').length,
+		approval:   visibleItems.filter((i: any) => i.stage === 'approval').length,
+		published:  visibleItems.filter((i: any) => i.stage === 'published').length,
+		paid:       visibleItems.filter((i: any) => i.stage === 'paid').length,
+		cancelled:  visibleItems.filter((i: any) => i.stage === 'cancelled').length,
+		pendingApproval: visibleItems.filter((i: any) => i.requiresApproval && i.approvalStatus === 'pending').length
+	}));
 </script>
 
 <svelte:head><title>Content Pipeline — FliHub</title></svelte:head>
@@ -243,9 +341,36 @@
 			<h1 class="text-3xl font-bold tracking-tight">Content Pipeline</h1>
 			<p class="text-muted-foreground mt-1">Track every piece of content from brief to payment</p>
 		</div>
-		<Button onclick={() => showNew = true} class="gap-2 bg-emerald-600 hover:bg-emerald-700 text-white shrink-0">
-			<Plus class="size-4" /> New Content
-		</Button>
+		<div class="flex items-center gap-2 shrink-0">
+			<Button onclick={() => showNew = true} class="gap-2 bg-emerald-600 hover:bg-emerald-700 text-white">
+				<Plus class="size-4" /> New Content
+			</Button>
+		</div>
+	</div>
+
+	{#if seedMsg}
+		<div class="flex items-center gap-2 p-3 rounded-lg border text-sm {seedMsgKind === 'success' ? 'bg-emerald-950/30 border-emerald-700/50 text-emerald-300' : seedMsgKind === 'error' ? 'bg-red-950/30 border-red-700/50 text-red-300' : 'bg-slate-900 border-slate-700 text-slate-300'}">
+			<AlertCircle class="size-4 shrink-0" />
+			{seedMsg}
+		</div>
+	{/if}
+
+	<div class="flex flex-wrap items-center gap-3 p-4 bg-slate-900 border border-dashed border-slate-600 rounded-lg">
+		<div class="flex items-center gap-2 text-xs text-slate-500 font-medium">
+			<FlaskConical class="size-4" />TEST DATA
+		</div>
+		<button onclick={runSeed} disabled={seedBusy}
+			class="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded bg-blue-900/60 hover:bg-blue-800 text-blue-300 border border-blue-700 disabled:opacity-50">
+			<Plus class="size-3" />{seedBusy ? 'Working...' : 'Seed Test Content'}
+		</button>
+		<button onclick={clearSeededContent} disabled={seedBusy || seededCount === 0}
+			class="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded bg-red-900/60 hover:bg-red-800 text-red-300 border border-red-700 disabled:opacity-50">
+			<Trash2 class="size-3" />{seedBusy ? 'Working...' : 'Clear Seed Data'}
+		</button>
+		<button onclick={resetSeededContent} disabled={seedBusy}
+			class="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded bg-yellow-900/60 hover:bg-yellow-800 text-yellow-300 border border-yellow-700 disabled:opacity-50">
+			<RotateCcw class="size-3" />{seedBusy ? 'Working...' : 'Reset (Clear + Re-seed)'}
+		</button>
 	</div>
 
 	<!-- Stats -->
