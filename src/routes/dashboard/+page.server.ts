@@ -8,16 +8,18 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 	
 	
 		// Fetch all core data in parallel — each wrapped so one failure doesn't kill the page
-		const [projects, departments, expenses, approvals, sponsors, franchiseLeads, franchiseOpps, ticketSales, brandingPlacements] = await Promise.all([
+		const [projects, departments, expenses, approvals, workOrders, sponsors, franchiseLeads, franchiseOpps, ticketSales, brandingPlacements, bankAccounts] = await Promise.all([
 			pb.collection('projects').getFullList({ fields: 'id,name,status,department,project_budget,project_actual_expenses,project_forecasted_expenses,fiscalYear' }).catch(() => []),
 			pb.collection('departments').getFullList({ fields: 'id,name,description,status,department_annual_budget,department_actual_expenses' }).catch(() => []),
 			pb.collection('expenses').getFullList({ fields: 'id,amount,status,project' }).catch(() => []),
 			pb.collection('approvals').getFullList({ fields: 'id,status' }).catch(() => []),
+			pb.collection('work_orders').getFullList({ fields: 'id,amount,status' }).catch(() => []),
 			pb.collection('sponsors').getFullList({ fields: 'id,status,tier,type,committed_amount,paid_amount' }).catch(() => []),
 			pb.collection('franchise_leads').getFullList({ fields: 'id,status' }).catch(() => []),
 			pb.collection('franchise_opportunities').getFullList({ fields: 'id,status' }).catch(() => []),
 			pb.collection('ticket_sales').getFullList({ fields: 'id,status,grossRevenue,netRevenue,quantity,pricePerTicket,platformFees' }).catch(() => []),
 			pb.collection('branding_placements').getFullList({ fields: 'id,status,grossRevenue,quantity,ratePerPlacement' }).catch(() => []),
+			pb.collection('bank_accounts').getFullList({ fields: 'id,allocation,status' }).catch(() => []),
 		]);
 	
 		// Budget rollup. The seed raise is the cash ceiling; department budgets can
@@ -39,6 +41,13 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 		const expByStatus = { total: expenses.length, totalAmount: expTotal, approvedAmount: expApproved, submitted: 0, approved: 0, paid: 0, draft: 0 };
 		for (const e of expenses as any[]) {
 			if (e.status in expByStatus) (expByStatus as any)[e.status]++;
+		}
+
+		// Work orders rollup
+		const woTotalAmount = (workOrders as any[]).reduce((s, wo) => s + (wo.amount ?? 0), 0);
+		const woByStatus = { total: workOrders.length, totalAmount: woTotalAmount, open: 0, paid: 0, cancelled: 0 };
+		for (const wo of workOrders as any[]) {
+			if (wo.status in woByStatus) (woByStatus as any)[wo.status]++;
 		}
 	
 		// Approvals
@@ -119,6 +128,14 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 			count:          ts.length,
 		};
 
+		const activeBankAccounts = (bankAccounts as any[]).filter((acc: any) => !acc.status || acc.status === 'active');
+		const totalBankBalance = activeBankAccounts.reduce((sum: number, acc: any) => sum + (Number(acc.allocation ?? 0) || 0), 0);
+		const projectedRevenue =
+			ticketMetrics.totalProjected +
+			sponsorMetrics.totalCommitted +
+			brandingMetrics.totalContracted +
+			brandingMetrics.totalProposed;
+
 		return {
 			user: locals.pb.authStore.model,
 			userProfile,
@@ -133,10 +150,21 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 				},
 				projects: pByStatus,
 				expenses: expByStatus,
+				workOrders: woByStatus,
 				approvals: appByStatus,
 				sponsors: sponsorMetrics,
 				tickets: ticketMetrics,
 				branding: brandingMetrics,
+				cashflow: {
+					totalBankBalance,
+					projectedRevenue,
+					revenueBreakdown: {
+						ticketsProjected: ticketMetrics.totalProjected,
+						sponsorsCommitted: sponsorMetrics.totalCommitted,
+						brandingContracted: brandingMetrics.totalContracted,
+						brandingProposed: brandingMetrics.totalProposed,
+					}
+				},
 				franchise: {
 					pipeline: {
 						leads: franchiseLeads.length,

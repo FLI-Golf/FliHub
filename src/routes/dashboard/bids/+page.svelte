@@ -61,6 +61,8 @@
 			const matchSearch = !q ||
 				(b.expand?.vendorId?.name  ?? '').toLowerCase().includes(q) ||
 				(b.expand?.projectId?.name ?? '').toLowerCase().includes(q) ||
+				(b.expand?.taskId?.title   ?? '').toLowerCase().includes(q) ||
+				String(b.referenceNumber ?? '').toLowerCase().includes(q) ||
 				String(b.scope ?? '').toLowerCase().includes(q) ||
 				String(b.notes ?? '').toLowerCase().includes(q);
 
@@ -134,9 +136,20 @@
 		filtered.map((b: any) => {
 			const po             = (data.poByBid       as Record<string, string>)?.[b.id];
 			const approvalStatus = (data.approvalByBid as Record<string, string>)?.[b.id];
-			const amountStr      = b.amount   ? fmt(b.amount)       : '';
+			const amountStr      = b.amount ? `Total ${fmt(b.amount)}` : '';
+			const materialsStr   = b.materialsAmount ? `M ${fmt(b.materialsAmount)}` : '';
+			const laborStr       = b.laborAmount ? `L ${fmt(b.laborAmount)}` : '';
+			const logisticsStr   = b.logisticsAmount ? `G ${fmt(b.logisticsAmount)}` : '';
+			const otherStr       = b.otherAmount ? `O ${fmt(b.otherAmount)}` : '';
 			const timelineStr    = b.timeline ? `· ${b.timeline}`   : '';
 			const poStr          = po         ? `· ${po}`           : '';
+			const tags: Array<{ label: string; colorClass: string }> = [];
+			if (b.expand?.taskId?.title) {
+				tags.push({ label: `Task: ${b.expand.taskId.title}`, colorClass: 'bg-blue-900/30 text-blue-300 border-blue-700/50' });
+			}
+			if (b.referenceNumber) {
+				tags.push({ label: `Ref: ${b.referenceNumber}`, colorClass: 'bg-slate-700/50 text-slate-200 border-slate-600/60' });
+			}
 
 			// For awarded bids show approval state; otherwise show vendor category
 			const badge = b.status === 'awarded' && approvalStatus
@@ -151,7 +164,8 @@
 				subtitle: b.expand?.projectId?.name ?? 'Unknown Project',
 				status:   b.status,
 				badge,
-				meta:     [amountStr, timelineStr, poStr].filter(Boolean).join(' ') || undefined,
+				tags: tags.length ? tags : undefined,
+				meta:     [amountStr, materialsStr, laborStr, logisticsStr, otherStr, timelineStr, poStr].filter(Boolean).join(' · ') || undefined,
 			};
 		})
 	);
@@ -369,6 +383,18 @@
 		<form onsubmit={submitNote} class="p-6 space-y-4">
 			<div class="bg-emerald-900/20 border border-emerald-700/40 rounded-xl p-4 text-sm text-emerald-300">
 				Awarding this bid will link <strong>{noteModal.bid.expand?.vendorId?.name}</strong> to the project and raise a pending approval. Once approved, a Work Order is created to track the vendor spend.
+			</div>
+			<div class="rounded-xl border border-slate-700 bg-slate-800/50 p-4 space-y-2 text-xs">
+				<div class="flex justify-between gap-3"><span class="text-slate-400">Project</span><span class="text-slate-200 text-right">{noteModal.bid.expand?.projectId?.name ?? '—'}</span></div>
+				<div class="flex justify-between gap-3"><span class="text-slate-400">Task</span><span class="text-blue-300 text-right">{noteModal.bid.expand?.taskId?.title ?? '—'}</span></div>
+				<div class="flex justify-between gap-3"><span class="text-slate-400">Reference</span><span class="text-slate-200 text-right">{noteModal.bid.referenceNumber || '—'}</span></div>
+				<div class="h-px bg-slate-700 my-1"></div>
+				<div class="flex justify-between gap-3"><span class="text-slate-400">Materials</span><span class="text-slate-200">{fmt(noteModal.bid.materialsAmount ?? 0)}</span></div>
+				<div class="flex justify-between gap-3"><span class="text-slate-400">Labor</span><span class="text-slate-200">{fmt(noteModal.bid.laborAmount ?? 0)}</span></div>
+				<div class="flex justify-between gap-3"><span class="text-slate-400">Logistics</span><span class="text-slate-200">{fmt(noteModal.bid.logisticsAmount ?? 0)}</span></div>
+				<div class="flex justify-between gap-3"><span class="text-slate-400">Other</span><span class="text-slate-200">{fmt(noteModal.bid.otherAmount ?? 0)}</span></div>
+				<div class="h-px bg-slate-700 my-1"></div>
+				<div class="flex justify-between gap-3"><span class="text-slate-300 font-semibold">Bid Total</span><span class="text-emerald-300 font-semibold">{fmt(noteModal.bid.amount ?? 0)}</span></div>
 			</div>
 			<div>
 				<label class="block text-xs font-semibold text-slate-400 uppercase tracking-wide mb-1.5">Notes (optional)</label>

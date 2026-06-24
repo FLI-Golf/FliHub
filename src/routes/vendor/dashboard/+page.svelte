@@ -10,10 +10,6 @@
 	const bids    = $derived((data as any).bids ?? []);
 	const openProjects = $derived((data as any).openProjects ?? []);
 
-	function fmt(n: number) {
-		return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(n ?? 0);
-	}
-
 	const STATUS_CONFIG: Record<string, { label: string; color: string }> = {
 		submitted:    { label: 'Submitted',    color: 'bg-blue-900/40 text-blue-300 border-blue-700/50' },
 		under_review: { label: 'Under Review', color: 'bg-yellow-900/40 text-yellow-300 border-yellow-700/50' },
@@ -124,7 +120,7 @@
 							class="px-5 py-3 flex items-center justify-between gap-3 hover:bg-slate-800/50 transition-colors group">
 							<div class="min-w-0">
 								<p class="text-sm font-medium text-white truncate group-hover:text-orange-300 transition-colors">{project.name}</p>
-								<p class="text-xs text-slate-500 capitalize">{project.type?.replace('_',' ')} · {project.project_budget ? fmt(project.project_budget) + ' budget' : 'Budget TBD'}</p>
+								<p class="text-xs text-slate-500 capitalize">{project.type?.replace('_',' ')} · accepting bids</p>
 							</div>
 							<ArrowRight class="size-3.5 text-slate-600 group-hover:text-orange-400 shrink-0 transition-colors" />
 						</a>

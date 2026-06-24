@@ -30,6 +30,9 @@ jobs:
       - name: Auth guard regression checks
         run: pnpm run test:auth-guards
 
+      - name: Work order numbering coverage
+        run: pnpm run test:wo-numbering:coverage
+
       - name: Type and Svelte checks
         continue-on-error: true
         run: pnpm run check

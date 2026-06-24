@@ -41,6 +41,10 @@ function deriveCode(name: string): string {
 		.slice(0, 6) || 'EVENT';
 }
 
+function workOrderFromRecordId(prefix: string, recordId: string): string {
+	return `WO-${prefix}-${String(recordId || '').slice(-4).toLowerCase()}`;
+}
+
 async function ensureEventPaymentApproval(
 	pb: any,
 	payment: any,
@@ -102,23 +106,33 @@ async function ensureEventPaymentWorkOrder(
 	const existingWO = await pb.collection('work_orders').getFirstListItem(
 		`notes ~ '${marker}'`
 	).catch(() => null as any);
-	if (existingWO) return false;
+	const eventCode = deriveCode(eventName);
+	if (existingWO) {
+		const canonical = workOrderFromRecordId(eventCode, existingWO.id);
+		if (existingWO.work_order_number !== canonical) {
+			await pb.collection('work_orders').update(existingWO.id, {
+				work_order_number: canonical,
+			}).catch(() => null);
+		}
+		return false;
+	}
 
-	const allWOs = await pb.collection('work_orders').getFullList({
-		fields: 'work_order_number', sort: '-created'
-	}).catch(() => []) as any[];
-	const seq = allWOs.length + 1;
-	const woNumber = `WO-${deriveCode(eventName)}-${String(seq).padStart(4, '0')}`;
-
-	await pb.collection('work_orders').create({
-		work_order_number: woNumber,
+	const createdWO = await pb.collection('work_orders').create({
+		work_order_number: `WO-${eventCode}-PENDING-${Date.now()}`,
 		source: 'expense',
 		status: 'open',
 		description: `${eventName} — ${formatPaymentTypeLabel(payment.paymentType)} to ${payeeName}`.slice(0, 500),
 		amount: Number(payment.amount) || 0,
 		approvedDate: new Date().toISOString(),
 		notes: `${marker} ${noteSuffix}`,
-	}).catch(() => null);
+	}).catch(() => null as any);
+
+	if (createdWO?.id) {
+		const woNumber = workOrderFromRecordId(eventCode, createdWO.id);
+		await pb.collection('work_orders').update(createdWO.id, {
+			work_order_number: woNumber,
+		}).catch(() => null);
+	}
 
 	return true;
 }

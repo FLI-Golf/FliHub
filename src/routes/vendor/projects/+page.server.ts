@@ -8,21 +8,44 @@ export const load: PageServerLoad = async ({ locals, parent }) => {
 		adminFetch('projects', {
 			filter: 'biddingOpen=true',
 			sort:   '-created',
+			fields: 'id,name,type,description,startDate,endDate,status,biddingOpen',
 		}),
 
 		vendor
 			? adminFetch('bids', {
 				filter: `vendorId="${vendor.id}"`,
-				fields: 'id,projectId,status,amount',
+				fields: 'id,projectId,taskId,status,amount,created',
 			})
 			: Promise.resolve([]),
 	]);
 
-	// Map projectId → my bid so the UI can show "Already bid" state
-	const myBidByProject: Record<string, any> = {};
-	for (const b of myBids as any[]) {
-		myBidByProject[b.projectId] = b;
+	const projectIds = (projects as any[]).map((p: any) => p.id);
+	let tasksByProject: Record<string, any[]> = {};
+
+	if (projectIds.length > 0) {
+		const projectFilter = projectIds.map((id: string) => `projectId="${id}"`).join(' || ');
+		const tasks = await adminFetch('tasks', {
+			filter: `(${projectFilter}) && status!="completed" && status!="cancelled"`,
+			fields: 'id,title,description,projectId,status,startDate,dueDate,tags',
+			sort: 'created',
+		});
+
+		tasksByProject = (tasks as any[]).reduce((acc: Record<string, any[]>, task: any) => {
+			const key = task.projectId;
+			if (!acc[key]) acc[key] = [];
+			acc[key].push(task);
+			return acc;
+		}, {});
 	}
 
-	return { projects, myBidByProject };
+	// Maps for vendor bidding UX
+	const myBidsByProject: Record<string, any[]> = {};
+	const myBidByProjectTask: Record<string, any> = {};
+	for (const b of myBids as any[]) {
+		if (!myBidsByProject[b.projectId]) myBidsByProject[b.projectId] = [];
+		myBidsByProject[b.projectId].push(b);
+		if (b.taskId) myBidByProjectTask[`${b.projectId}:${b.taskId}`] = b;
+	}
+
+	return { projects, myBidsByProject, myBidByProjectTask, tasksByProject };
 };

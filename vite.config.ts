@@ -15,6 +15,6 @@ export default defineConfig({
 	ssr: {
 		// d3 is ESM-only; externalizing it in SSR context causes intermittent
 		// module evaluation errors on HMR reloads — bundle it instead.
-		noExternal: ['d3', /^d3-/]
+		noExternal: ['@sveltejs/kit', 'esm-env', 'd3', /^d3-/]
 	}
 });
