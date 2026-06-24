@@ -1,7 +1,7 @@
 <script lang="ts">
 	import type { PageData } from './$types';
 	import { invalidateAll } from '$app/navigation';
-	import { FolderOpen, DollarSign, Calendar, CheckCircle2, Clock, Trophy, X, Send, Paperclip, ChevronDown, ChevronUp, Trash2 } from 'lucide-svelte';
+	import { FolderOpen, Calendar, CheckCircle2, Clock, Trophy, X, Send, Paperclip, ChevronDown, ChevronUp, Trash2, Target } from 'lucide-svelte';
 
 	// Per-status display config for existing bids
 	const BID_STATUS: Record<string, { label: string; color: string; bg: string; border: string; icon: any }> = {
@@ -16,7 +16,9 @@
 	let { data }: { data: PageData } = $props();
 
 	const projects      = $derived((data as any).projects ?? []);
-	const myBidByProject = $derived((data as any).myBidByProject ?? {});
+	const myBidsByProject = $derived((data as any).myBidsByProject ?? {});
+	const myBidByProjectTask = $derived((data as any).myBidByProjectTask ?? {});
+	const tasksByProject = $derived((data as any).tasksByProject ?? {});
 	const vendor        = $derived((data as any).vendor);
 
 	function fmt(n: number) {
@@ -29,6 +31,12 @@
 	// ── Bid modal ─────────────────────────────────────────────────────────────
 	let bidProject      = $state<any>(null);
 	let bidAmount       = $state('');
+	let bidTaskId       = $state('');
+	let bidReferenceNumber = $state('');
+	let bidMaterialsAmount = $state('');
+	let bidLaborAmount = $state('');
+	let bidLogisticsAmount = $state('');
+	let bidOtherAmount = $state('');
 	let bidTimeline     = $state('');
 	let bidScope        = $state('');
 	let bidSaving       = $state(false);
@@ -40,12 +48,36 @@
 	function openBid(project: any) {
 		bidProject      = project;
 		bidAmount       = '';
+		bidTaskId       = '';
+		bidReferenceNumber = '';
+		bidMaterialsAmount = '';
+		bidLaborAmount = '';
+		bidLogisticsAmount = '';
+		bidOtherAmount = '';
 		bidTimeline     = '';
 		bidScope        = '';
 		bidErr          = '';
 		attachmentsOpen = false;
 		attachedFiles   = [];
 	}
+
+	const tasksForBidProject = $derived(bidProject ? (tasksByProject[bidProject.id] ?? []) : []);
+
+	function num(v: string): number {
+		const n = Number(v);
+		return Number.isFinite(n) && n > 0 ? n : 0;
+	}
+
+	const breakdownTotal = $derived(
+		num(bidMaterialsAmount) +
+		num(bidLaborAmount) +
+		num(bidLogisticsAmount) +
+		num(bidOtherAmount)
+	);
+
+	const selectedTaskAlreadyBid = $derived(
+		bidProject && bidTaskId ? myBidByProjectTask[`${bidProject.id}:${bidTaskId}`] : null
+	);
 
 	function onFileChange(e: Event) {
 		const input = e.target as HTMLInputElement;
@@ -75,14 +107,26 @@
 		e.preventDefault();
 		if (!bidProject) { bidErr = 'No project selected.'; return; }
 		if (!vendor)     { bidErr = 'Your account is not linked to a vendor. Contact support.'; return; }
+		if (!bidTaskId)  { bidErr = 'Please choose the task you are bidding for.'; return; }
+		if (selectedTaskAlreadyBid) { bidErr = 'You already submitted a bid for this task.'; return; }
 		if (!bidScope.trim()) { bidErr = 'Scope of work is required.'; return; }
+		if (breakdownTotal <= 0 && !bidAmount.trim()) {
+			bidErr = 'Enter at least one amount value in the breakdown.';
+			return;
+		}
 		bidSaving = true;
 		bidErr    = '';
 		try {
 			const fd = new FormData();
 			fd.append('projectId', bidProject.id);
 			fd.append('vendorId',  vendor.id);
-			fd.append('amount',    bidAmount);
+			fd.append('taskId',    bidTaskId);
+			fd.append('referenceNumber', bidReferenceNumber.trim());
+			fd.append('materialsAmount', String(num(bidMaterialsAmount)));
+			fd.append('laborAmount', String(num(bidLaborAmount)));
+			fd.append('logisticsAmount', String(num(bidLogisticsAmount)));
+			fd.append('otherAmount', String(num(bidOtherAmount)));
+			fd.append('amount',    String(breakdownTotal > 0 ? breakdownTotal : num(bidAmount)));
 			fd.append('timeline',  bidTimeline);
 			fd.append('scope',     bidScope);
 			for (const file of attachedFiles) {
@@ -132,7 +176,9 @@
 	{:else}
 		<div class="grid grid-cols-1 gap-4">
 			{#each projects as project}
-				{@const myBid = myBidByProject[project.id]}
+				{@const projectBids = myBidsByProject[project.id] ?? []}
+				{@const myBid = projectBids[0]}
+				{@const taskCount = (tasksByProject[project.id] ?? []).length}
 				<div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 hover:border-slate-700 transition-colors">
 					<div class="flex items-start justify-between gap-4">
 						<div class="flex-1 min-w-0">
@@ -155,12 +201,10 @@
 							{/if}
 
 							<div class="flex flex-wrap gap-4 text-xs text-slate-500">
-								{#if project.project_budget}
-									<span class="flex items-center gap-1.5">
-										<DollarSign class="size-3.5 text-emerald-400" />
-										<span class="text-emerald-300 font-semibold">{fmt(project.project_budget)}</span> budget
-									</span>
-								{/if}
+								<span class="flex items-center gap-1.5">
+									<Target class="size-3.5 text-blue-400" />
+									<span class="text-blue-300 font-semibold">{taskCount}</span> task{taskCount === 1 ? '' : 's'} open for bid
+								</span>
 								{#if project.startDate}
 									<span class="flex items-center gap-1.5">
 										<Calendar class="size-3.5" />
@@ -179,9 +223,13 @@
 										<svelte:component this={bs.icon} class="size-3.5 {bs.color} shrink-0" />
 										<span class="text-xs font-semibold {bs.color}">{bs.label}</span>
 									</div>
-									{#if myBid.amount}
-										<p class="text-[11px] text-slate-500">Your bid: <span class="text-slate-300 font-medium">{fmt(myBid.amount)}</span></p>
-									{/if}
+									<p class="text-[11px] text-slate-500">{projectBids.length} bid{projectBids.length === 1 ? '' : 's'} submitted</p>
+									<button
+										onclick={() => openBid(project)}
+										class="flex items-center gap-2 px-4 py-2 rounded-xl bg-orange-600 hover:bg-orange-500 text-white text-xs font-semibold transition-colors"
+									>
+										<Send class="size-3.5" /> Submit Another Bid
+									</button>
 								</div>
 							{:else}
 								<button
@@ -219,17 +267,41 @@
 				<div class="bg-red-900/30 border border-red-700/50 text-red-300 text-sm px-4 py-3 rounded-xl">{bidErr}</div>
 			{/if}
 
+			<div class="space-y-2">
+				<label class={LABEL}>Target Task <span class="text-red-400">*</span></label>
+				<select bind:value={bidTaskId} class={INPUT} required>
+					<option value="">Select a task</option>
+					{#each tasksForBidProject as task}
+						<option value={task.id}>{task.title}</option>
+					{/each}
+				</select>
+				{#if selectedTaskAlreadyBid}
+					<p class="text-[11px] text-amber-400">You already bid on this task.</p>
+				{/if}
+			</div>
+
 			<div class="grid grid-cols-2 gap-4">
 				<div>
-					<label class={LABEL}>Bid Amount ($)</label>
-					<input bind:value={bidAmount} type="number" min="0" placeholder="0" class={INPUT} />
-					{#if bidProject.project_budget}
-						<p class="text-[10px] text-slate-500 mt-1">Project budget: {fmt(bidProject.project_budget)}</p>
-					{/if}
+					<label class={LABEL}>Reference / Quote #</label>
+					<input bind:value={bidReferenceNumber} type="text" placeholder="e.g. BBT-Q-2026-041" class={INPUT} />
 				</div>
 				<div>
 					<label class={LABEL}>Timeline</label>
 					<input bind:value={bidTimeline} type="text" placeholder="e.g. 6 weeks" class={INPUT} />
+				</div>
+			</div>
+
+			<div>
+				<label class={LABEL}>Bid Amount Breakdown</label>
+				<div class="grid grid-cols-2 gap-3">
+					<input bind:value={bidMaterialsAmount} type="number" min="0" step="0.01" placeholder="Materials" class={INPUT} />
+					<input bind:value={bidLaborAmount} type="number" min="0" step="0.01" placeholder="Labor" class={INPUT} />
+					<input bind:value={bidLogisticsAmount} type="number" min="0" step="0.01" placeholder="Logistics" class={INPUT} />
+					<input bind:value={bidOtherAmount} type="number" min="0" step="0.01" placeholder="Other" class={INPUT} />
+				</div>
+				<div class="mt-2 text-xs text-slate-400 flex items-center justify-between">
+					<span>Calculated total</span>
+					<span class="text-emerald-300 font-semibold">{fmt(breakdownTotal)}</span>
 				</div>
 			</div>
 

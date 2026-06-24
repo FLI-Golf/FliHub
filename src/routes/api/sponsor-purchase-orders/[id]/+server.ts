@@ -124,30 +124,45 @@ export const PATCH: RequestHandler = async ({ locals, url, params, request }) =>
 			await adminPb.collection('sponsors').getOne(po.sponsorId).catch(() => null);
 		const code = sponsorCode(sponsor?.companyName ?? '');
 
-		const existing = await adminPb.collection('work_orders').getList(1, 1, {
-			filter: `work_order_number ~ "WO-SP${code}-"`,
-			sort:   '-work_order_number',
-			fields: 'work_order_number',
-		}).catch(() => ({ items: [] }));
-		const lastNum  = existing.items[0]?.work_order_number?.match(/(\d+)$/)?.[1];
-		const seq      = lastNum ? parseInt(lastNum) + 1 : 1;
-		const woNumber = `WO-SP${code}-${String(seq).padStart(4, '0')}`;
+		const projectCode = `SP${code}`;
+		const existingWO = await adminPb.collection('work_orders').getFirstListItem(
+			`source = "sponsor" && poId = "${po.id}"`
+		).catch(() => null) as any;
 
-		wo = await adminPb.collection('work_orders').create({
-			work_order_number: woNumber,
-			source:            'sponsor',
-			sponsorId:         po.sponsorId,
-			poId:              po.id,
-			amount:            body.amount ?? po.amount,
-			description:       po.description || `Sponsorship payment — ${sponsor?.companyName ?? ''} (${po.year ?? ''})`,
-			status:            'open',
-			notes:             `PO: ${po.po_number}${body.notes ? ' — ' + body.notes : ''}`,
-			submittedBy:       ctx.profile?.id ?? null,
-			approvedBy:        ctx.profile?.id ?? null,
-			approvedDate:      new Date().toISOString().slice(0, 10),
-			projectCode:       `SP${code}`,
-			projectName:       sponsor?.companyName ?? '',
-		}).catch((e: any) => { console.warn('WO create failed:', e.message); return null; });
+		if (existingWO) {
+			const derivedFromId = `WO-${projectCode}-${String(existingWO.id || '').slice(-4).toLowerCase()}`;
+			const woNumber = existingWO.work_order_number || derivedFromId;
+			if (existingWO.work_order_number !== woNumber) {
+				await adminPb.collection('work_orders').update(existingWO.id, {
+					work_order_number: woNumber,
+				}).catch((e: any) => console.warn('sponsor WO number backfill failed:', e.message));
+			}
+			wo = { ...existingWO, work_order_number: woNumber };
+		} else {
+			const createdWO = await adminPb.collection('work_orders').create({
+				work_order_number: `WO-${projectCode}-PENDING-${Date.now()}`,
+				source:            'sponsor',
+				sponsorId:         po.sponsorId,
+				poId:              po.id,
+				amount:            body.amount ?? po.amount,
+				description:       po.description || `Sponsorship payment — ${sponsor?.companyName ?? ''} (${po.year ?? ''})`,
+				status:            'open',
+				notes:             `PO: ${po.po_number}${body.notes ? ' — ' + body.notes : ''}`,
+				submittedBy:       ctx.profile?.id ?? null,
+				approvedBy:        ctx.profile?.id ?? null,
+				approvedDate:      new Date().toISOString().slice(0, 10),
+				projectCode,
+				projectName:       sponsor?.companyName ?? '',
+			}).catch((e: any) => { console.warn('WO create failed:', e.message); return null; });
+
+			if (createdWO?.id) {
+				const woNumber = `WO-${projectCode}-${String(createdWO.id || '').slice(-4).toLowerCase()}`;
+				await adminPb.collection('work_orders').update(createdWO.id, {
+					work_order_number: woNumber,
+				}).catch((e: any) => console.warn('sponsor WO renumber failed:', e.message));
+				wo = { ...createdWO, work_order_number: woNumber };
+			}
+		}
 
 		const pmts = await adminPb.collection('sponsor_payments').getList(1, 50, {
 			filter: `poId = "${po.id}"`,

@@ -17,10 +17,21 @@
 	const franchise = $derived(data.metrics?.franchise ?? { pipeline: { leads: 0, opportunities: 0, deals: 0 } });
 	const tickets  = $derived(data.metrics?.tickets  ?? { totalGross: 0, totalNet: 0, totalReceived: 0, totalProjected: 0, count: 0 });
 	const branding = $derived(data.metrics?.branding ?? { totalContracted: 0, totalPaid: 0, totalProposed: 0, count: 0 });
+	const cashflow = $derived(data.metrics?.cashflow ?? {
+		totalBankBalance: 0,
+		projectedRevenue: 0,
+		revenueBreakdown: {
+			ticketsProjected: 0,
+			sponsorsCommitted: 0,
+			brandingContracted: 0,
+			brandingProposed: 0,
+		}
+	});
 	const deptBudgets = $derived(data.metrics?.departmentBudgets ?? []);
 	const budget = $derived(data.metrics?.budget ?? { total: 0, actual: 0, forecasted: 0, remaining: 0, seedRaise: 0, operatingPlanTotal: 0 });
 	const projects = $derived(data.metrics?.projects ?? { total: 0, in_progress: 0, planned: 0, completed: 0 });
 	const expenses = $derived(data.metrics?.expenses ?? { total: 0, totalAmount: 0, approvedAmount: 0, submitted: 0, approved: 0, paid: 0, draft: 0 });
+	const workOrders = $derived(data.metrics?.workOrders ?? { total: 0, totalAmount: 0, open: 0, paid: 0, cancelled: 0 });
 	const approvals = $derived(data.metrics?.approvals ?? { pending: 0, approved: 0, rejected: 0 });
 
 	function fmt(n: number) {
@@ -79,42 +90,6 @@
 		</a>
 	</div>
 
-	<!-- Quick Access -->
-	<div class="grid grid-cols-4 sm:grid-cols-7 gap-2">
-		{#each [
-			{ label: 'Departments',  href: '/dashboard/departments',         icon: Building2,    color: 'text-blue-400',   bg: 'bg-blue-950/50 border-blue-800/50' },
-			{ label: 'Projects',     href: '/dashboard/projects',          icon: FolderKanban, color: 'text-emerald-400', bg: 'bg-emerald-950/50 border-emerald-800/50' },
-			{ label: 'Expenses',     href: '/dashboard/expenses',          icon: Receipt,      color: 'text-orange-400', bg: 'bg-orange-950/50 border-orange-800/50' },
-			{ label: 'People',       href: '/dashboard/people',            icon: Users,        color: 'text-violet-400', bg: 'bg-violet-950/50 border-violet-800/50' },
-			{ label: 'Sponsors',     href: '/dashboard/sponsors',          icon: Star,         color: 'text-yellow-400', bg: 'bg-yellow-950/50 border-yellow-800/50' },
-			{ label: 'Franchises',   href: '/dashboard/franchises',        icon: Trophy,       color: 'text-rose-400',   bg: 'bg-rose-950/50 border-rose-800/50' },
-			{ label: 'Collections',  href: '/dashboard/active-collections', icon: DollarSign,   color: 'text-teal-400',   bg: 'bg-teal-950/50 border-teal-800/50' },
-		] as link}
-			<a href={link.href}
-				class="group flex flex-col items-center gap-2 rounded-xl border {link.bg} px-2 py-3 text-center hover:brightness-125 transition-all duration-150">
-				<link.icon class="size-5 {link.color} transition-transform group-hover:scale-110" />
-				<span class="text-[11px] font-medium text-slate-300">{link.label}</span>
-			</a>
-		{/each}
-	</div>
-
-	<div class="grid grid-cols-1 sm:grid-cols-3 gap-2">
-		{#each [
-			{ label: 'Start Project', href: '/dashboard/projects', icon: FolderKanban, color: 'text-cyan-300', bg: 'bg-cyan-950/40 border-cyan-800/60' },
-			{ label: 'Start Campain', href: '/dashboard/marketing/campaigns/new', icon: Megaphone, color: 'text-fuchsia-300', bg: 'bg-fuchsia-950/40 border-fuchsia-800/60' },
-			{ label: 'Start Event', href: '/dashboard/events/new', icon: Flag, color: 'text-lime-300', bg: 'bg-lime-950/40 border-lime-800/60' },
-		] as action}
-			<a href={action.href}
-				class="group flex items-center justify-between gap-3 rounded-xl border {action.bg} px-4 py-3 text-left hover:brightness-125 transition-all duration-150">
-				<div class="flex items-center gap-2 min-w-0">
-					<action.icon class="size-4 {action.color} transition-transform group-hover:scale-110" />
-					<span class="text-sm font-semibold text-slate-200 truncate">{action.label}</span>
-				</div>
-				<ArrowRight class="size-4 text-slate-400 group-hover:text-slate-200 transition-colors" />
-			</a>
-		{/each}
-	</div>
-
 	<!-- Phase context banner — 2 phases -->
 	<div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
 		<!-- Phase 1: Pre-Tournaments -->
@@ -143,12 +118,52 @@
 		</div>
 	</div>
 
+	<!-- Quick Access -->
+	<div class="grid grid-cols-5 sm:grid-cols-10 gap-2">
+		{#each [
+			{ label: 'Departments',  href: '/dashboard/departments',         icon: Building2,    color: 'text-blue-400',   bg: 'bg-blue-950/50 border-blue-800/50' },
+			{ label: 'Projects',     href: '/dashboard/projects',          icon: FolderKanban, color: 'text-emerald-400', bg: 'bg-emerald-950/50 border-emerald-800/50' },
+			{ label: 'Expenses',     href: '/dashboard/expenses',          icon: Receipt,      color: 'text-orange-400', bg: 'bg-orange-950/50 border-orange-800/50' },
+			{ label: 'People',       href: '/dashboard/people',            icon: Users,        color: 'text-violet-400', bg: 'bg-violet-950/50 border-violet-800/50' },
+			{ label: 'Reimbursements', href: '/dashboard/reimbursements',  icon: Wallet,       color: 'text-fuchsia-400', bg: 'bg-fuchsia-950/50 border-fuchsia-800/50' },
+			{ label: 'Vendors',      href: '/dashboard/vendors',           icon: Briefcase,    color: 'text-sky-400',    bg: 'bg-sky-950/50 border-sky-800/50' },
+			{ label: 'Sponsors',     href: '/dashboard/sponsors',          icon: Star,         color: 'text-yellow-400', bg: 'bg-yellow-950/50 border-yellow-800/50' },
+			{ label: 'Franchises',   href: '/dashboard/franchises',        icon: Trophy,       color: 'text-rose-400',   bg: 'bg-rose-950/50 border-rose-800/50' },
+			{ label: 'Collections',  href: '/dashboard/active-collections', icon: DollarSign,   color: 'text-teal-400',   bg: 'bg-teal-950/50 border-teal-800/50' },
+			{ label: 'Import CSV Data', href: '/dashboard/import',         icon: Cpu,          color: 'text-cyan-400',   bg: 'bg-cyan-950/50 border-cyan-800/50' },
+		] as link}
+			<a href={link.href}
+				class="group flex flex-col items-center gap-2 rounded-xl border {link.bg} px-2 py-3 text-center hover:brightness-125 transition-all duration-150">
+				<link.icon class="size-5 {link.color} transition-transform group-hover:scale-110" />
+				<span class="text-[11px] font-medium text-slate-300">{link.label}</span>
+			</a>
+		{/each}
+	</div>
+
+	<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2">
+		{#each [
+			{ label: 'Start Project', href: '/dashboard/projects', icon: FolderKanban, color: 'text-cyan-300', bg: 'bg-cyan-950/40 border-cyan-800/60' },
+			{ label: 'Start Campain', href: '/dashboard/marketing/campaigns/new', icon: Megaphone, color: 'text-fuchsia-300', bg: 'bg-fuchsia-950/40 border-fuchsia-800/60' },
+			{ label: 'Start Event', href: '/dashboard/events/new', icon: Flag, color: 'text-lime-300', bg: 'bg-lime-950/40 border-lime-800/60' },
+			{ label: 'Start Media Content', href: '/dashboard/content', icon: Film, color: 'text-rose-300', bg: 'bg-rose-950/40 border-rose-800/60' },
+		] as action}
+			<a href={action.href}
+				class="group flex items-center justify-between gap-3 rounded-xl border {action.bg} px-4 py-3 text-left hover:brightness-125 transition-all duration-150">
+				<div class="flex items-center gap-2 min-w-0">
+					<action.icon class="size-4 {action.color} transition-transform group-hover:scale-110" />
+					<span class="text-sm font-semibold text-slate-200 truncate">{action.label}</span>
+				</div>
+				<ArrowRight class="size-4 text-slate-400 group-hover:text-slate-200 transition-colors" />
+			</a>
+		{/each}
+	</div>
+
 	<!-- Top KPI row -->
-	<div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
+	<div class="grid grid-cols-2 lg:grid-cols-4 gap-4 order-last">
 
 		<!-- Budget -->
 		<div class="group/card relative">
-			<Card class="p-5 border-l-4 border-l-blue-500 transition-all duration-150 hover:shadow-lg hover:-translate-y-0.5 cursor-default">
+			<Card class="p-5 border-l-4 border-l-blue-500 bg-slate-950 border-slate-800 text-slate-100 [&_.text-muted-foreground]:text-slate-400 transition-all duration-150 hover:shadow-lg hover:-translate-y-0.5 cursor-default">
 				<div class="flex items-center justify-between mb-3">
 					<p class="text-sm font-medium text-muted-foreground">Seed Raise Budget</p>
 					<div class="size-9 rounded-lg bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center transition-transform group-hover/card:scale-110">
@@ -176,7 +191,7 @@
 
 		<!-- Projects -->
 		<div class="group/card relative">
-			<Card class="p-5 border-l-4 border-l-emerald-500 transition-all duration-150 hover:shadow-lg hover:-translate-y-0.5 cursor-default">
+			<Card class="p-5 border-l-4 border-l-emerald-500 bg-slate-950 border-slate-800 text-slate-100 [&_.text-muted-foreground]:text-slate-400 transition-all duration-150 hover:shadow-lg hover:-translate-y-0.5 cursor-default">
 				<div class="flex items-center justify-between mb-3">
 					<p class="text-sm font-medium text-muted-foreground">Projects</p>
 					<div class="size-9 rounded-lg bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center transition-transform group-hover/card:scale-110">
@@ -201,7 +216,7 @@
 
 		<!-- Sponsors -->
 		<div class="group/card relative">
-			<Card class="p-5 border-l-4 border-l-orange-500 transition-all duration-150 hover:shadow-lg hover:-translate-y-0.5 cursor-default">
+			<Card class="p-5 border-l-4 border-l-orange-500 bg-slate-950 border-slate-800 text-slate-100 [&_.text-muted-foreground]:text-slate-400 transition-all duration-150 hover:shadow-lg hover:-translate-y-0.5 cursor-default">
 				<div class="flex items-center justify-between mb-3">
 					<p class="text-sm font-medium text-muted-foreground">Sponsors</p>
 					<div class="size-9 rounded-lg bg-orange-100 dark:bg-orange-900/30 flex items-center justify-center transition-transform group-hover/card:scale-110">
@@ -223,7 +238,7 @@
 
 		<!-- Franchise Pipeline -->
 		<div class="group/card relative">
-			<Card class="p-5 border-l-4 border-l-violet-500 transition-all duration-150 hover:shadow-lg hover:-translate-y-0.5 cursor-default">
+			<Card class="p-5 border-l-4 border-l-violet-500 bg-slate-950 border-slate-800 text-slate-100 [&_.text-muted-foreground]:text-slate-400 transition-all duration-150 hover:shadow-lg hover:-translate-y-0.5 cursor-default">
 				<div class="flex items-center justify-between mb-3">
 					<p class="text-sm font-medium text-muted-foreground">Franchise Pipeline</p>
 					<div class="size-9 rounded-lg bg-violet-100 dark:bg-violet-900/30 flex items-center justify-center transition-transform group-hover/card:scale-110">
@@ -246,7 +261,7 @@
 		<!-- Ticket Revenue -->
 		<div class="group/card relative">
 			<a href="/dashboard/ticket-revenue">
-				<Card class="p-5 border-l-4 border-l-amber-500 transition-all duration-150 hover:shadow-lg hover:-translate-y-0.5 cursor-pointer">
+				<Card class="p-5 border-l-4 border-l-amber-500 bg-slate-950 border-slate-800 text-slate-100 [&_.text-muted-foreground]:text-slate-400 transition-all duration-150 hover:shadow-lg hover:-translate-y-0.5 cursor-pointer">
 					<div class="flex items-center justify-between mb-3">
 						<p class="text-sm font-medium text-muted-foreground">Ticket Revenue</p>
 						<div class="size-9 rounded-lg bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center transition-transform group-hover/card:scale-110">
@@ -271,7 +286,7 @@
 		<!-- On-Course Branding Revenue -->
 		<div class="group/card relative">
 			<a href="/dashboard/on-course-branding/pipeline">
-				<Card class="p-5 border-l-4 border-l-emerald-500 transition-all duration-150 hover:shadow-lg hover:-translate-y-0.5 cursor-pointer">
+				<Card class="p-5 border-l-4 border-l-emerald-500 bg-slate-950 border-slate-800 text-slate-100 [&_.text-muted-foreground]:text-slate-400 transition-all duration-150 hover:shadow-lg hover:-translate-y-0.5 cursor-pointer">
 					<div class="flex items-center justify-between mb-3">
 						<p class="text-sm font-medium text-muted-foreground">Branding Revenue</p>
 						<div class="size-9 rounded-lg bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center transition-transform group-hover/card:scale-110">
@@ -292,6 +307,54 @@
 				</div>
 			</div>
 		</div>
+
+		<!-- Total Bank Balance -->
+		<div class="group/card relative">
+			<a href="/dashboard/bank-accounts">
+				<Card class="p-5 border-l-4 border-l-teal-500 bg-slate-950 border-slate-800 text-slate-100 [&_.text-muted-foreground]:text-slate-400 transition-all duration-150 hover:shadow-lg hover:-translate-y-0.5 cursor-pointer">
+					<div class="flex items-center justify-between mb-3">
+						<p class="text-sm font-medium text-muted-foreground">Total Bank Balance</p>
+						<div class="size-9 rounded-lg bg-teal-100 dark:bg-teal-900/30 flex items-center justify-center transition-transform group-hover/card:scale-110">
+							<Landmark class="size-5 text-teal-600 dark:text-teal-400" />
+						</div>
+					</div>
+					<p class="text-2xl font-bold">{fmt(cashflow.totalBankBalance)}</p>
+					<p class="text-xs text-muted-foreground mt-1">Active bank account allocations</p>
+				</Card>
+			</a>
+			<div class="pointer-events-none absolute left-0 top-full mt-2 z-50 w-56 opacity-0 translate-y-1 group-hover/card:opacity-100 group-hover/card:translate-y-0 transition-all duration-200">
+				<div class="rounded-xl border border-slate-700 bg-slate-900 text-slate-100 shadow-2xl p-3 text-sm space-y-1.5">
+					<p class="font-semibold text-xs uppercase tracking-wider text-teal-400 mb-2">Bank Accounts</p>
+					<div class="flex justify-between"><span class="text-slate-400">Total balance</span><span class="font-medium">{fmt(cashflow.totalBankBalance)}</span></div>
+					<div class="text-[11px] text-slate-400 mt-1">Based on active bank account allocation totals.</div>
+				</div>
+			</div>
+		</div>
+
+		<!-- Projected Revenue -->
+		<div class="group/card relative">
+			<a href="/dashboard/income">
+				<Card class="p-5 border-l-4 border-l-sky-500 bg-slate-950 border-slate-800 text-slate-100 [&_.text-muted-foreground]:text-slate-400 transition-all duration-150 hover:shadow-lg hover:-translate-y-0.5 cursor-pointer">
+					<div class="flex items-center justify-between mb-3">
+						<p class="text-sm font-medium text-muted-foreground">Projected Revenue</p>
+						<div class="size-9 rounded-lg bg-sky-100 dark:bg-sky-900/30 flex items-center justify-center transition-transform group-hover/card:scale-110">
+							<TrendingUp class="size-5 text-sky-600 dark:text-sky-400" />
+						</div>
+					</div>
+					<p class="text-2xl font-bold">{fmt(cashflow.projectedRevenue)}</p>
+					<p class="text-xs text-muted-foreground mt-1">Tickets + sponsors + branding pipeline</p>
+				</Card>
+			</a>
+			<div class="pointer-events-none absolute left-0 top-full mt-2 z-50 w-56 opacity-0 translate-y-1 group-hover/card:opacity-100 group-hover/card:translate-y-0 transition-all duration-200">
+				<div class="rounded-xl border border-slate-700 bg-slate-900 text-slate-100 shadow-2xl p-3 text-sm space-y-1.5">
+					<p class="font-semibold text-xs uppercase tracking-wider text-sky-400 mb-2">Revenue Mix</p>
+					<div class="flex justify-between"><span class="text-slate-400">Tickets projected</span><span class="font-medium">{fmt(cashflow.revenueBreakdown.ticketsProjected)}</span></div>
+					<div class="flex justify-between"><span class="text-slate-400">Sponsors committed</span><span class="font-medium">{fmt(cashflow.revenueBreakdown.sponsorsCommitted)}</span></div>
+					<div class="flex justify-between"><span class="text-slate-400">Branding contracted</span><span class="font-medium">{fmt(cashflow.revenueBreakdown.brandingContracted)}</span></div>
+					<div class="flex justify-between"><span class="text-slate-400">Branding proposed</span><span class="font-medium">{fmt(cashflow.revenueBreakdown.brandingProposed)}</span></div>
+				</div>
+			</div>
+		</div>
 	</div>
 
 	<!-- Department budgets + Approvals/Expenses row -->
@@ -301,11 +364,14 @@
 		<div class="lg:col-span-2">
 			<div class="flex items-center justify-between mb-3">
 				<div>
-					<h2 class="text-lg font-semibold">Departments</h2>
+					<div class="inline-flex items-center gap-2 rounded-lg border border-blue-700/60 bg-blue-950/50 px-2.5 py-1.5 text-blue-300">
+						<Building2 class="size-4" />
+						<h2 class="text-sm font-semibold">Departments</h2>
+					</div>
 					<p class="text-xs text-muted-foreground">Active projects first</p>
 				</div>
-				<Button href="/dashboard/departments" variant="ghost" size="sm" class="gap-1 text-xs">
-					View all <ArrowRight class="size-3" />
+				<Button href="/dashboard/departments" variant="outline" size="sm" class="gap-1 text-xs border-blue-700/70 bg-blue-950/30 text-blue-300 hover:bg-blue-900/40">
+					<Building2 class="size-3" /> View all <ArrowRight class="size-3" />
 				</Button>
 			</div>
 			<Card class="overflow-hidden">
@@ -383,55 +449,99 @@
 			<!-- Approvals -->
 			<div>
 				<div class="flex items-center justify-between mb-3">
-					<h2 class="text-lg font-semibold">Approvals</h2>
-					<Button href="/dashboard/approvals" variant="ghost" size="sm" class="gap-1 text-xs">
-						View all <ArrowRight class="size-3" />
+					<div class="inline-flex items-center gap-2 rounded-lg border border-amber-700/60 bg-amber-950/50 px-2.5 py-1.5 text-amber-300">
+						<ShieldCheck class="size-4" />
+						<h2 class="text-sm font-semibold">Approvals</h2>
+					</div>
+					<Button href="/dashboard/approvals" variant="outline" size="sm" class="gap-1 text-xs border-amber-700/70 bg-amber-950/30 text-amber-300 hover:bg-amber-900/40">
+						<ShieldCheck class="size-3" /> View all <ArrowRight class="size-3" />
 					</Button>
 				</div>
-				<Card class="p-4 space-y-3">
-					{#each [
-						{ label: 'Pending', count: approvals.pending, icon: Clock, color: 'text-yellow-600', bg: 'bg-yellow-100 dark:bg-yellow-900/30' },
-						{ label: 'Approved', count: approvals.approved, icon: CheckCircle2, color: 'text-emerald-600', bg: 'bg-emerald-100 dark:bg-emerald-900/30' },
-						{ label: 'Rejected', count: approvals.rejected, icon: AlertCircle, color: 'text-red-600', bg: 'bg-red-100 dark:bg-red-900/30' }
-					] as row}
-						<div class="flex items-center gap-3 group/row hover:bg-muted/40 -mx-2 px-2 py-1 rounded-lg transition-colors">
-							<div class="size-8 rounded-lg {row.bg} flex items-center justify-center shrink-0 transition-transform group-hover/row:scale-110">
-								<row.icon class="size-4 {row.color}" />
+				<a href="/dashboard/approvals" class="group/card block">
+					<Card class="p-4 space-y-3 transition-all duration-150 group-hover/card:-translate-y-0.5 group-hover/card:shadow-lg">
+						{#each [
+							{ label: 'Pending', count: approvals.pending, icon: Clock, color: 'text-yellow-600', bg: 'bg-yellow-100 dark:bg-yellow-900/30' },
+							{ label: 'Approved', count: approvals.approved, icon: CheckCircle2, color: 'text-emerald-600', bg: 'bg-emerald-100 dark:bg-emerald-900/30' },
+							{ label: 'Rejected', count: approvals.rejected, icon: AlertCircle, color: 'text-red-600', bg: 'bg-red-100 dark:bg-red-900/30' }
+						] as row}
+							<div class="flex items-center gap-3 group/row hover:bg-muted/40 -mx-2 px-2 py-1 rounded-lg transition-colors">
+								<div class="size-8 rounded-lg {row.bg} flex items-center justify-center shrink-0 transition-transform group-hover/row:scale-110">
+									<row.icon class="size-4 {row.color}" />
+								</div>
+								<span class="text-sm text-muted-foreground flex-1">{row.label}</span>
+								<span class="text-sm font-bold tabular-nums">{row.count}</span>
 							</div>
-							<span class="text-sm text-muted-foreground flex-1">{row.label}</span>
-							<span class="text-sm font-bold tabular-nums">{row.count}</span>
-						</div>
-					{/each}
-				</Card>
+						{/each}
+					</Card>
+				</a>
 			</div>
 
 			<!-- Expenses -->
 			<div>
 				<div class="flex items-center justify-between mb-3">
-					<h2 class="text-lg font-semibold">Expenses</h2>
-					<Button href="/dashboard/expenses" variant="ghost" size="sm" class="gap-1 text-xs">
-						View all <ArrowRight class="size-3" />
+					<div class="inline-flex items-center gap-2 rounded-lg border border-orange-700/60 bg-orange-950/50 px-2.5 py-1.5 text-orange-300">
+						<Receipt class="size-4" />
+						<h2 class="text-sm font-semibold">Expenses</h2>
+					</div>
+					<Button href="/dashboard/expenses" variant="outline" size="sm" class="gap-1 text-xs border-orange-700/70 bg-orange-950/30 text-orange-300 hover:bg-orange-900/40">
+						<Receipt class="size-3" /> View all <ArrowRight class="size-3" />
 					</Button>
 				</div>
-				<Card class="p-4 space-y-2">
-					<div class="flex justify-between items-baseline">
-						<span class="text-sm text-muted-foreground">Total</span>
-						<span class="font-bold">{fmt(expenses.totalAmount)}</span>
+				<a href="/dashboard/expenses" class="group/card block">
+					<Card class="p-4 space-y-2 transition-all duration-150 group-hover/card:-translate-y-0.5 group-hover/card:shadow-lg">
+						<div class="flex justify-between items-baseline">
+							<span class="text-sm text-muted-foreground">Total</span>
+							<span class="font-bold">{fmt(expenses.totalAmount)}</span>
+						</div>
+						<div class="flex justify-between items-baseline">
+							<span class="text-sm text-muted-foreground">Approved</span>
+							<span class="font-medium text-emerald-600">{fmt(expenses.approvedAmount ?? 0)}</span>
+						</div>
+						<div class="flex justify-between items-baseline">
+							<span class="text-sm text-muted-foreground">Pending review</span>
+							<span class="font-medium text-yellow-600">{expenses.submitted ?? 0} items</span>
+						</div>
+						<div class="h-px bg-border my-1"></div>
+						<div class="flex justify-between items-baseline">
+							<span class="text-sm text-muted-foreground">Transactions</span>
+							<span class="font-medium">{expenses.total}</span>
+						</div>
+					</Card>
+				</a>
+			</div>
+
+			<!-- Work Orders -->
+			<div>
+				<div class="flex items-center justify-between mb-3">
+					<div class="inline-flex items-center gap-2 rounded-lg border border-sky-700/60 bg-sky-950/50 px-2.5 py-1.5 text-sky-300">
+						<Briefcase class="size-4" />
+						<h2 class="text-sm font-semibold">Work Orders</h2>
 					</div>
-					<div class="flex justify-between items-baseline">
-						<span class="text-sm text-muted-foreground">Approved</span>
-						<span class="font-medium text-emerald-600">{fmt(expenses.approvedAmount ?? 0)}</span>
-					</div>
-					<div class="flex justify-between items-baseline">
-						<span class="text-sm text-muted-foreground">Pending review</span>
-						<span class="font-medium text-yellow-600">{expenses.submitted ?? 0} items</span>
-					</div>
-					<div class="h-px bg-border my-1"></div>
-					<div class="flex justify-between items-baseline">
-						<span class="text-sm text-muted-foreground">Transactions</span>
-						<span class="font-medium">{expenses.total}</span>
-					</div>
-				</Card>
+					<Button href="/dashboard/work-orders" variant="outline" size="sm" class="gap-1 text-xs border-sky-700/70 bg-sky-950/30 text-sky-300 hover:bg-sky-900/40">
+						<Briefcase class="size-3" /> View all <ArrowRight class="size-3" />
+					</Button>
+				</div>
+				<a href="/dashboard/work-orders" class="group/card block">
+					<Card class="p-4 space-y-2 transition-all duration-150 group-hover/card:-translate-y-0.5 group-hover/card:shadow-lg">
+						<div class="flex justify-between items-baseline">
+							<span class="text-sm text-muted-foreground">Total</span>
+							<span class="font-bold">{fmt(workOrders.totalAmount)}</span>
+						</div>
+						<div class="flex justify-between items-baseline">
+							<span class="text-sm text-muted-foreground">Open</span>
+							<span class="font-medium text-blue-600">{workOrders.open}</span>
+						</div>
+						<div class="flex justify-between items-baseline">
+							<span class="text-sm text-muted-foreground">Paid</span>
+							<span class="font-medium text-emerald-600">{workOrders.paid}</span>
+						</div>
+						<div class="h-px bg-border my-1"></div>
+						<div class="flex justify-between items-baseline">
+							<span class="text-sm text-muted-foreground">Transactions</span>
+							<span class="font-medium">{workOrders.total}</span>
+						</div>
+					</Card>
+				</a>
 			</div>
 		</div>
 	</div>

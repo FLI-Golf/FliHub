@@ -57,9 +57,19 @@
     "test:pipelines:tournament": "tsx scripts/test-pipelines.ts --suite=tournament",
     "test:pipelines:content": "tsx scripts/test-pipelines.ts --suite=content",
     "test:phase7:approval": "tsx scripts/test-phase7-approval-persistence.ts",
+    "test:wo-numbering:coverage": "tsx scripts/verify-wo-id-suffix-coverage.ts",
+    "seed:stadium-course:tasks": "tsx scripts/seed-stadium-course-project-tasks.ts",
+    "seed:stadium-course:tasks:apply": "tsx scripts/seed-stadium-course-project-tasks.ts --apply",
+    "seed:stadium-course:tasks:pass2": "tsx scripts/seed-stadium-course-project-tasks.ts --skip-create",
+    "seed:stadium-course:tasks:pass2:apply": "tsx scripts/seed-stadium-course-project-tasks.ts --apply --skip-create",
+    "backfill:event-payment-work-orders": "tsx scripts/backfill-event-payment-work-orders.ts",
+    "backfill:event-payment-work-orders:apply": "tsx scripts/backfill-event-payment-work-orders.ts --apply",
     "jobs:media-ai:process": "tsx scripts/process-media-ai-jobs.ts",
     "jobs:media-ai:one-shot": "tsx scripts/media-ai-one-shot.ts",
-    "migrate:media:module8-10": "tsx scripts/migrate-media-module8-10.ts"
+    "migrate:media:module8-10": "tsx scripts/migrate-media-module8-10.ts",
+    "migrate:work-orders:wo-number-unique": "tsx src/lib/migrations/add-work-order-number-unique-index.ts",
+    "migrate:bids:task-targeting": "tsx src/lib/migrations/add-bids-task-targeting-fields.ts",
+    "migrate:bids:task-targeting:apply": "tsx src/lib/migrations/add-bids-task-targeting-fields.ts --apply"
   },
   "repository": {
     "type": "git",

@@ -15,7 +15,7 @@ export const load: PageServerLoad = async ({ locals, parent }) => {
 		adminFetch('projects', {
 			filter: 'biddingOpen=true',
 			sort:   '-created',
-			fields: 'id,name,type,description,project_budget,startDate,endDate,status',
+			fields: 'id,name,type,description,startDate,endDate,status',
 		}),
 	]);
 

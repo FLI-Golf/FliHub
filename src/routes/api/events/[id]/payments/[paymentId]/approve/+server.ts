@@ -13,6 +13,10 @@ function deriveCode(name: string): string {
 		.slice(0, 6) || 'EVENT';
 }
 
+function workOrderFromRecordId(prefix: string, recordId: string): string {
+	return `WO-${prefix}-${String(recordId || '').slice(-4).toLowerCase()}`;
+}
+
 function formatPaymentTypeLabel(paymentType: string | undefined | null): string {
 	switch (paymentType) {
 		case 'broadcast_fee': return 'Broadcast fee';
@@ -164,17 +168,21 @@ export const POST: RequestHandler = async ({ params, locals }) => {
 		const existingWO = await pb.collection('work_orders').getFirstListItem(
 			`notes ~ '${marker}'`
 		).catch(() => null as any);
+		let woNumber: string | null = null;
 
-		if (!existingWO) {
-			const allWOs = await pb.collection('work_orders').getFullList({
-				fields: 'work_order_number', sort: '-created'
-			}).catch(() => []) as any[];
-			const seq = allWOs.length + 1;
+		if (existingWO) {
 			const eventCode = deriveCode(eventName);
-			const woNumber = `WO-${eventCode}-${String(seq).padStart(4, '0')}`;
-
-			await pb.collection('work_orders').create({
-				work_order_number: woNumber,
+			const derivedFromId = workOrderFromRecordId(eventCode, existingWO.id);
+			woNumber = existingWO.work_order_number || derivedFromId;
+			if (existingWO.work_order_number !== woNumber) {
+				await pb.collection('work_orders').update(existingWO.id, {
+					work_order_number: woNumber,
+				}).catch(() => null);
+			}
+		} else {
+			const eventCode = deriveCode(eventName);
+			const createdWO = await pb.collection('work_orders').create({
+				work_order_number: `WO-${eventCode}-PENDING-${Date.now()}`,
 				source: 'expense',
 				status: 'open',
 				approver: approverId,
@@ -183,6 +191,19 @@ export const POST: RequestHandler = async ({ params, locals }) => {
 				amount: Number(payment.amount) || 0,
 				approvedDate: new Date().toISOString(),
 				notes: `${marker} Approved from event payments panel.`
+			}).catch(() => null);
+
+			if (createdWO?.id) {
+				woNumber = workOrderFromRecordId(eventCode, createdWO.id);
+				await pb.collection('work_orders').update(createdWO.id, {
+					work_order_number: woNumber,
+				}).catch(() => null);
+			}
+		}
+
+		if (expense?.id && woNumber) {
+			await pb.collection('expenses').update(expense.id, {
+				work_order_number: woNumber,
 			}).catch(() => null);
 		}
 

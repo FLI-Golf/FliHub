@@ -18,6 +18,10 @@ function reimbursementWorkOrderFromClaimId(claimId: string): string {
 	return `WO-${String(claimId || '').slice(-4).toLowerCase()}`;
 }
 
+function workOrderFromRecordId(prefix: string, recordId: string): string {
+	return `WO-${prefix}-${String(recordId || '').slice(-4).toLowerCase()}`;
+}
+
 export const POST: RequestHandler = async ({ locals, request }) => {
 	const userPb = locals.pb;
 
@@ -85,19 +89,66 @@ export const POST: RequestHandler = async ({ locals, request }) => {
 				const linkedEventPaymentId = eventPaymentMatch?.[1] ?? null;
 
 				if (linkedEventPaymentId) {
+					const marker = `[EP:${linkedEventPaymentId}]`;
+					const linkedPayment = await pb.collection('event_payments').getOne(linkedEventPaymentId, {
+						expand: 'event,talent,talentGroup,eventTalent'
+					}).catch(() => null) as any;
+					const eventName = linkedPayment?.expand?.event?.name || expense?.title || expense?.description || 'Event Payment';
+					const eventCode = deriveProjectCode(eventName || 'EVENT');
+
 					await pb.collection('event_payments').update(linkedEventPaymentId, {
 						status: 'approved',
 						approvedAt: new Date().toISOString().slice(0, 10),
 						approvedBy: userProfile.id,
 					}).catch((e: any) => console.warn('event_payment update failed:', e.message));
 
+					const existingWO = await pb.collection('work_orders').getFirstListItem(
+						`notes ~ '${marker}'`
+					).catch(() => null) as any;
+
+					if (existingWO) {
+						const derivedFromId = workOrderFromRecordId(eventCode, existingWO.id);
+						workOrderNumber = existingWO.work_order_number || derivedFromId;
+						if (existingWO.work_order_number !== workOrderNumber) {
+							await pb.collection('work_orders').update(existingWO.id, {
+								work_order_number: workOrderNumber,
+							}).catch((e: any) => console.warn('event payment WO number backfill failed:', e.message));
+						}
+					} else {
+						const createdWO = await pb.collection('work_orders').create({
+							work_order_number: `WO-${eventCode}-PENDING-${Date.now()}`,
+							source:            'expense',
+							status:            'open',
+							expenseId:         expense?.id || '',
+							expense:           expense?.id || null,
+							approver:          userProfile.id,
+							approvedBy:        userProfile.id,
+							submittedBy:       expense?.submittedBy || null,
+							description:       expense?.description || expense?.title || `${eventName} payout`.slice(0, 500),
+							amount:            Number(expense?.amount ?? linkedPayment?.amount ?? 0),
+							approvedDate:      new Date().toISOString(),
+							notes:             `${marker} Approved via quorum (${voteCount}/${quorum}).`,
+						}).catch((e: any) => {
+							console.error('❌ event payment work_order create failed:', e.message, JSON.stringify(e.data ?? {}));
+							return null;
+						});
+
+						if (createdWO?.id) {
+							workOrderNumber = workOrderFromRecordId(eventCode, createdWO.id);
+							await pb.collection('work_orders').update(createdWO.id, {
+								work_order_number: workOrderNumber,
+							}).catch((e: any) => console.warn('event payment WO renumber failed:', e.message));
+						}
+					}
+
 					await pb.collection('expenses').update(expense.id, {
 						status: 'approved',
 						approvedBy: userProfile.id,
 						approvedDate: new Date().toISOString(),
+						work_order_number: workOrderNumber || '',
 					}).catch((e: any) => console.warn('event payment expense update failed:', e.message));
 
-					updatePayload.comments = `<p>Quorum reached — approved by ${voteCount} ${voteCount === 1 ? 'approver' : 'approvers'}. Event payment is ready for payout.</p>`;
+					updatePayload.comments = `<p>Quorum reached — approved by ${voteCount} ${voteCount === 1 ? 'approver' : 'approvers'}. Event Payment Work Order: ${workOrderNumber || 'n/a'}.</p>`;
 				} else {
 
 				// Reimbursements use approval.entityType='expense' with entityId = reimbursement_claims.id.
@@ -270,13 +321,56 @@ export const POST: RequestHandler = async ({ locals, request }) => {
 				// 2. Generate Work Order number: WO-{CODE}-{NNNN}
 				const projectCode = project ? deriveProjectCode(project.name) : 'GEN';
 
-				// Sequence: count all existing work orders and add 1 (avoids filter on non-indexed field)
-				const allWOs = await pb.collection('work_orders').getFullList({
-					fields: 'work_order_number',
-					sort: '-created'
-				}).catch(() => []) as any[];
-				const seq = allWOs.length + 1;
-				workOrderNumber = `WO-${projectCode}-${String(seq).padStart(4, '0')}`;
+				// Use the persisted work_orders record id suffix to avoid sequence collisions.
+				const existingWO = await pb.collection('work_orders').getFirstListItem(
+					`expense = "${expense.id}" || expenseId = "${expense.id}"`
+				).catch(() => null) as any;
+
+				if (existingWO) {
+					const derivedFromId = `WO-${projectCode}-${String(existingWO.id || '').slice(-4).toLowerCase()}`;
+					workOrderNumber = existingWO.work_order_number || derivedFromId;
+
+					if (existingWO.work_order_number !== workOrderNumber) {
+						await pb.collection('work_orders').update(existingWO.id, {
+							work_order_number: workOrderNumber,
+						}).catch((e: any) => console.warn('work_order number backfill failed:', e.message));
+					}
+				} else {
+					let createdWO: any = null;
+					try {
+						createdWO = await pb.collection('work_orders').create({
+							work_order_number: `WO-${projectCode}-PENDING-${Date.now()}`,
+							// legacy text fields (kept for backwards compat)
+							expenseId:    expense.id,
+							taskId:       expense.taskId || '',
+							projectId:    project?.id || '',
+							projectCode,
+							projectName:  project?.name || '',
+							approvedBy:   userProfile.id,
+							// proper relation fields
+							expense:      expense.id,
+							task:         expense.taskId || null,
+							project:      project?.id || null,
+							approver:     userProfile.id,
+							submittedBy:  expense.submittedBy || null,
+							// audit fields
+							description:  expense.description || '',
+							amount:       expense.amount || 0,
+							approvedDate: new Date().toISOString(),
+							source:       'expense',
+							paymentMethod: expense.paymentMethod || '',
+							status:       'open',
+						});
+
+						workOrderNumber = `WO-${projectCode}-${String(createdWO.id || '').slice(-4).toLowerCase()}`;
+						await pb.collection('work_orders').update(createdWO.id, {
+							work_order_number: workOrderNumber,
+						});
+						console.log(`✅ Work order ${workOrderNumber} created: ${createdWO.id}`);
+					} catch (e: any) {
+						console.error('❌ work_order create failed:', e.message, JSON.stringify(e.data ?? {}));
+					}
+				}
 
 				updatePayload.comments = `<p>Quorum reached — approved by ${voteCount} ${voteCount === 1 ? 'approver' : 'approvers'}. Work Order: ${workOrderNumber}</p>`;
 
@@ -287,36 +381,6 @@ export const POST: RequestHandler = async ({ locals, request }) => {
 					approvedDate: new Date().toISOString(),
 					work_order_number: workOrderNumber,
 				}).catch((e: any) => console.warn('expense update failed:', e.message));
-
-				// 4. Create work_orders record
-				try {
-					const wo = await pb.collection('work_orders').create({
-						work_order_number: workOrderNumber,
-						// legacy text fields (kept for backwards compat)
-						expenseId:    expense.id,
-						taskId:       expense.taskId || '',
-						projectId:    project?.id || '',
-						projectCode,
-						projectName:  project?.name || '',
-						approvedBy:   userProfile.id,
-						// proper relation fields
-						expense:      expense.id,
-						task:         expense.taskId || null,
-						project:      project?.id || null,
-						approver:     userProfile.id,
-						submittedBy:  expense.submittedBy || null,
-						// audit fields
-						description:  expense.description || '',
-						amount:       expense.amount || 0,
-						approvedDate: new Date().toISOString(),
-						source:       'expense',
-						paymentMethod: expense.paymentMethod || '',
-						status:       'open',
-					});
-					console.log(`✅ Work order ${workOrderNumber} created: ${wo.id}`);
-				} catch (e: any) {
-					console.error('❌ work_order create failed:', e.message, JSON.stringify(e.data ?? {}));
-				}
 
 				// 5. Flag the task for review
 				if (taskRecord) {
@@ -488,13 +552,52 @@ export const POST: RequestHandler = async ({ locals, request }) => {
 				const project = bid?.expand?.projectId ?? null;
 				const vendor  = bid?.expand?.vendorId  ?? null;
 
-				// Generate Work Order number: WO-{CODE}-{NNNN}
+				// Generate Work Order number from persisted WO record id suffix.
 				const projectCode = project ? deriveProjectCode(project.name) : 'VND';
-				const allWOs = await pb.collection('work_orders').getFullList({
-					fields: 'work_order_number', sort: '-created',
-				}).catch(() => []) as any[];
-				const seq = allWOs.length + 1;
-				workOrderNumber = `WO-${projectCode}-${String(seq).padStart(4, '0')}`;
+				const existingWO = await pb.collection('work_orders').getFirstListItem(
+					`source = "bid" && bidId = "${approval.entityId}"`
+				).catch(() => null) as any;
+
+				if (existingWO) {
+					const derivedFromId = workOrderFromRecordId(projectCode, existingWO.id);
+					workOrderNumber = existingWO.work_order_number || derivedFromId;
+					if (existingWO.work_order_number !== workOrderNumber) {
+						await pb.collection('work_orders').update(existingWO.id, {
+							work_order_number: workOrderNumber,
+						}).catch((e: any) => console.warn('bid WO number backfill failed:', e.message));
+					}
+				} else {
+					try {
+						const createdWO = await pb.collection('work_orders').create({
+							work_order_number: `WO-${projectCode}-PENDING-${Date.now()}`,
+							source:            'bid',
+							status:            'open',
+							bidId:             approval.entityId,
+							vendorId:          bid?.vendorId  ?? null,
+							projectId:         bid?.projectId ?? '',
+							project:           bid?.projectId ?? null,
+							projectName:       project?.name  ?? '',
+							projectCode:       deriveProjectCode(project?.name ?? ''),
+							expenseId:         expense?.id ?? '',
+							expense:           expense?.id ?? null,
+							approver:          userProfile.id,
+							approvedBy:        userProfile.id,
+							submittedBy:       userProfile.id,
+							description:       `Vendor PO — ${vendor?.name ?? 'Vendor'}: ${bid?.scope ?? ''}`.slice(0, 500),
+							amount:            bid?.amount ?? expense?.amount ?? 0,
+							approvedDate:      new Date().toISOString(),
+							notes:             bid?.notes ?? '',
+						});
+
+						workOrderNumber = workOrderFromRecordId(projectCode, createdWO.id);
+						await pb.collection('work_orders').update(createdWO.id, {
+							work_order_number: workOrderNumber,
+						});
+						console.log(`✅ Work order ${workOrderNumber} created for bid ${approval.entityId}`);
+					} catch (e: any) {
+						console.error('❌ work_order create failed (bid):', e.message, JSON.stringify(e.data ?? {}));
+					}
+				}
 
 				// Approve the expense, stamp WO number, and link to project
 				if (expense) {
@@ -505,33 +608,6 @@ export const POST: RequestHandler = async ({ locals, request }) => {
 						work_order_number: workOrderNumber,
 						projectId:         bid?.projectId ?? '',
 					}).catch((e: any) => console.warn('bid expense update failed:', e.message));
-				}
-
-				// Create work_order / PO record
-				try {
-					await pb.collection('work_orders').create({
-						work_order_number: workOrderNumber,
-						source:            'bid',
-						status:            'open',
-						bidId:             approval.entityId,
-						vendorId:          bid?.vendorId  ?? null,
-						projectId:         bid?.projectId ?? '',
-						project:           bid?.projectId ?? null,
-						projectName:       project?.name  ?? '',
-						projectCode:       deriveProjectCode(project?.name ?? ''),
-						expenseId:         expense?.id ?? '',
-						expense:           expense?.id ?? null,
-						approver:          userProfile.id,
-						approvedBy:        userProfile.id,
-						submittedBy:       userProfile.id,
-						description:       `Vendor PO — ${vendor?.name ?? 'Vendor'}: ${bid?.scope ?? ''}`.slice(0, 500),
-						amount:            bid?.amount ?? expense?.amount ?? 0,
-						approvedDate:      new Date().toISOString(),
-						notes:             bid?.notes ?? '',
-					});
-					console.log(`✅ Work order ${workOrderNumber} created for bid ${approval.entityId}`);
-				} catch (e: any) {
-					console.error('❌ work_order create failed (bid):', e.message, JSON.stringify(e.data ?? {}));
 				}
 
 				// Update project actual expenses
@@ -564,39 +640,53 @@ export const POST: RequestHandler = async ({ locals, request }) => {
 						.slice(0, 6) || 'GOAL'
 					: 'GOAL';
 
-				const allWOs = await pb.collection('work_orders').getFullList({
-					fields: 'work_order_number', sort: '-created'
-				}).catch(() => []) as any[];
-				const seq = allWOs.length + 1;
-				workOrderNumber = `WO-${goalCode}-${String(seq).padStart(4, '0')}`;
+				const marker = `[GT:${approval.entityId}]`;
+				const existingWO = await pb.collection('work_orders').getFirstListItem(
+					`notes ~ '${marker}'`
+				).catch(() => null) as any;
+
+				if (existingWO) {
+					const derivedFromId = workOrderFromRecordId(goalCode, existingWO.id);
+					workOrderNumber = existingWO.work_order_number || derivedFromId;
+					if (existingWO.work_order_number !== workOrderNumber) {
+						await pb.collection('work_orders').update(existingWO.id, {
+							work_order_number: workOrderNumber,
+						}).catch((e: any) => console.warn('goal_task WO number backfill failed:', e.message));
+					}
+				} else {
+					try {
+						const createdWO = await pb.collection('work_orders').create({
+							work_order_number: `WO-${goalCode}-PENDING-${Date.now()}`,
+							expenseId:    goalTask?.expenseId || '',
+							taskId:       approval.entityId,
+							projectId:    '',
+							projectCode:  goalCode,
+							projectName:  goal?.goalName || '',
+							approvedBy:   userProfile.id,
+							expense:      goalTask?.expenseId || null,
+							task:         null,
+							project:      null,
+							approver:     userProfile.id,
+							submittedBy:  goalTask?.assignedTo || null,
+							description:  goalTask?.description || goalTask?.title || '',
+							amount:       goalTask?.actualCost ?? goalTask?.estimatedCost ?? 0,
+							approvedDate: new Date().toISOString(),
+							source:       'goal_task',
+							status:       'open',
+							notes:        `${marker} Approved via quorum (${voteCount}/${quorum}).`,
+						});
+
+						workOrderNumber = workOrderFromRecordId(goalCode, createdWO.id);
+						await pb.collection('work_orders').update(createdWO.id, {
+							work_order_number: workOrderNumber,
+						});
+						console.log(`✅ Work order ${workOrderNumber} created for goal_task ${approval.entityId}`);
+					} catch (e: any) {
+						console.error('❌ work_order create failed (goal_task):', e.message, JSON.stringify(e.data ?? {}));
+					}
+				}
 
 				updatePayload.comments = `<p>Quorum reached — approved by ${voteCount} ${voteCount === 1 ? 'approver' : 'approvers'}. Work Order: ${workOrderNumber}</p>`;
-
-				// Create work_orders record
-				try {
-					await pb.collection('work_orders').create({
-						work_order_number: workOrderNumber,
-						expenseId:    goalTask?.expenseId || '',
-						taskId:       '',
-						projectId:    '',
-						projectCode:  goalCode,
-						projectName:  goal?.goalName || '',
-						approvedBy:   userProfile.id,
-						expense:      goalTask?.expenseId || null,
-						task:         null,
-						project:      null,
-						approver:     userProfile.id,
-						submittedBy:  goalTask?.assignedTo || null,
-						description:  goalTask?.description || goalTask?.title || '',
-						amount:       goalTask?.actualCost ?? goalTask?.estimatedCost ?? 0,
-						approvedDate: new Date().toISOString(),
-						source:       'goal_task',
-						status:       'open',
-					});
-					console.log(`✅ Work order ${workOrderNumber} created for goal_task ${approval.entityId}`);
-				} catch (e: any) {
-					console.error('❌ work_order create failed (goal_task):', e.message, JSON.stringify(e.data ?? {}));
-				}
 
 				// Update linked expense if one was created during task pipeline
 				if (goalTask?.expenseId) {
@@ -653,16 +743,16 @@ export const POST: RequestHandler = async ({ locals, request }) => {
 
 				if (existingWO?.work_order_number) {
 					workOrderNumber = existingWO.work_order_number;
-				} else {
-					const allWOs = await pb.collection('work_orders').getFullList({
-						fields: 'work_order_number', sort: '-created'
-					}).catch(() => []) as any[];
-					const seq = allWOs.length + 1;
+				} else if (existingWO) {
 					const eventCode = deriveProjectCode(eventName || 'EVENT');
-					workOrderNumber = `WO-${eventCode}-${String(seq).padStart(4, '0')}`;
-
-					await pb.collection('work_orders').create({
+					workOrderNumber = workOrderFromRecordId(eventCode, existingWO.id);
+					await pb.collection('work_orders').update(existingWO.id, {
 						work_order_number: workOrderNumber,
+					}).catch((e: any) => console.warn('event_payment WO number backfill failed:', e.message));
+				} else {
+					const eventCode = deriveProjectCode(eventName || 'EVENT');
+					const createdWO = await pb.collection('work_orders').create({
+						work_order_number: `WO-${eventCode}-PENDING-${Date.now()}`,
 						source:            'expense',
 						status:            'open',
 						approver:          userProfile.id,
@@ -671,7 +761,17 @@ export const POST: RequestHandler = async ({ locals, request }) => {
 						amount:            payment.amount || 0,
 						approvedDate:      new Date().toISOString(),
 						notes:             `${marker} Approved via quorum (${voteCount}/${quorum}).`,
-					}).catch((e: any) => console.error('❌ work_order create failed (event_payment):', e.message));
+					}).catch((e: any) => {
+						console.error('❌ work_order create failed (event_payment):', e.message);
+						return null;
+					});
+
+					if (createdWO?.id) {
+						workOrderNumber = workOrderFromRecordId(eventCode, createdWO.id);
+						await pb.collection('work_orders').update(createdWO.id, {
+							work_order_number: workOrderNumber,
+						}).catch((e: any) => console.warn('event_payment WO renumber failed:', e.message));
+					}
 				}
 
 				await pb.collection('event_payments').update(payment.id, {

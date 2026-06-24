@@ -48,6 +48,12 @@
 								<h3 class="font-semibold text-white">{bid.expand?.projectId?.name ?? 'Project'}</h3>
 								<span class="text-[10px] font-semibold px-2 py-0.5 rounded-full border {cfg.color}">{cfg.label}</span>
 							</div>
+								{#if bid.expand?.taskId?.title}
+									<p class="text-xs text-blue-300 mb-1">Task: {bid.expand.taskId.title}</p>
+								{/if}
+								{#if bid.referenceNumber}
+									<p class="text-[11px] text-slate-500 mb-1">Reference: <span class="text-slate-300">{bid.referenceNumber}</span></p>
+								{/if}
 							<p class="text-xs text-slate-500 mb-3">{cfg.desc}</p>
 
 							<div class="flex flex-wrap gap-4 text-xs text-slate-500">
@@ -59,6 +65,15 @@
 								{/if}
 								<span>Submitted {fmtDate(bid.created)}</span>
 							</div>
+
+							{#if bid.materialsAmount || bid.laborAmount || bid.logisticsAmount || bid.otherAmount}
+								<div class="mt-2 text-[11px] text-slate-500 flex flex-wrap gap-3">
+									{#if bid.materialsAmount}<span>Materials: <span class="text-slate-300">{fmt(bid.materialsAmount)}</span></span>{/if}
+									{#if bid.laborAmount}<span>Labor: <span class="text-slate-300">{fmt(bid.laborAmount)}</span></span>{/if}
+									{#if bid.logisticsAmount}<span>Logistics: <span class="text-slate-300">{fmt(bid.logisticsAmount)}</span></span>{/if}
+									{#if bid.otherAmount}<span>Other: <span class="text-slate-300">{fmt(bid.otherAmount)}</span></span>{/if}
+								</div>
+							{/if}
 
 							{#if bid.scope}
 								<p class="text-xs text-slate-400 mt-3 line-clamp-2 leading-relaxed">{bid.scope}</p>

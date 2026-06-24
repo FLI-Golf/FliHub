@@ -6,7 +6,11 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 	const ctx = await RequestContext.from(locals, url);
 
 	const [bids, projects, vendors, workOrders, approvals] = await Promise.all([
-		adminFetch('bids',        { sort: '-created', expand: 'projectId,vendorId' }),
+		adminFetch('bids', {
+			sort: '-created',
+			expand: 'projectId,vendorId,taskId',
+			fields: 'id,projectId,vendorId,taskId,amount,materialsAmount,laborAmount,logisticsAmount,otherAmount,referenceNumber,timeline,scope,status,notes,created,submittedAt,awardedAt'
+		}),
 		adminFetch('projects',    { filter: 'biddingOpen=true', fields: 'id,name,type,project_budget', sort: 'name' }),
 		adminFetch('vendors',     { fields: 'id,name,category', sort: 'name' }),
 		adminFetch('work_orders', { filter: 'source=bid', fields: 'id,work_order_number,bidId', sort: '-created' }),

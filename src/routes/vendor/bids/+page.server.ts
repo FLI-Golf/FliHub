@@ -9,7 +9,8 @@ export const load: PageServerLoad = async ({ locals, parent }) => {
 	const bids = await adminFetch('bids', {
 		filter: `vendorId="${vendor.id}"`,
 		sort:   '-created',
-		expand: 'projectId',
+		expand: 'projectId,taskId',
+		fields: 'id,projectId,taskId,amount,materialsAmount,laborAmount,logisticsAmount,otherAmount,referenceNumber,timeline,scope,status,created,submittedAt,notes',
 	});
 
 	return { bids };

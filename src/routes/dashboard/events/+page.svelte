@@ -17,8 +17,8 @@
 		userInterestMap = Object.fromEntries((data.userInterests ?? []).map((interest: any) => [interest.event, true]));
 	});
 
-	const canManage = data.canManage;
-	const canShowInterest = ['pro', 'vendor', 'broadcaster'].includes(data.userProfile?.role ?? '');
+	const canManage = $derived(data.canManage);
+	const canShowInterest = $derived(['pro', 'vendor', 'broadcaster'].includes(data.userProfile?.role ?? ''));
 
 	const EVENT_TYPE_LABELS: Record<string, string> = {
 		appearance: 'Appearance', clinic: 'Clinic', media: 'Media',
@@ -131,7 +131,7 @@
 		}, {})
 	);
 
-	const s = data.stats;
+	const s = $derived(data.stats);
 </script>
 
 <svelte:head><title>Events — FliHub</title></svelte:head>
