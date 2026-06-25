@@ -62,32 +62,22 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 
 		const deptMap = Object.fromEntries((departments as any[]).map(d => [d.id, d]));
 
-		// Reimbursement pipeline rollup — all claims roll up to the Tax-Exempt dept project.
-		// We key by department ID but also accept claims with no department set (legacy/seed data)
-		// by falling back to any department named 'Tax-Exempt Reimbursements'.
-		const reimbDeptId = (departments as any[]).find(d => d.name === 'Tax-Exempt Reimbursements')?.id ?? null;
-
+		// Reimbursement pipeline rollup — all reimbursement claims roll up to the
+		// Tax-Exempt Reimbursements project card, regardless of claim department.
 		const reimbRollup = { draft: 0, submitted: 0, under_review: 0, approved: 0, paid: 0, rejected: 0, total: 0, claimCount: 0, pendingCount: 0, recentClaims: [] as any[] };
 		for (const c of reimbClaims as any[]) {
-			// Include claim if it has the right dept, or if it has no dept (treat as belonging here)
-			const belongsHere = !c.department || c.department === reimbDeptId;
-			if (!belongsHere) continue;
 			const amt = c.totalAmount ?? 0;
-			const s   = c.status ?? 'draft';
+			const s = `${c.status ?? 'draft'}`.toLowerCase().replace(/[\s-]+/g, '_');
 			(reimbRollup as any)[s] = ((reimbRollup as any)[s] ?? 0) + amt;
 			reimbRollup.total      += amt;
 			reimbRollup.claimCount += 1;
 			if (s === 'submitted' || s === 'under_review' || s === 'approved') reimbRollup.pendingCount += 1;
-			if (s !== 'paid' && s !== 'rejected') reimbRollup.recentClaims.push(c);
+			if (s !== 'paid' && s !== 'rejected') reimbRollup.recentClaims.push({ ...c, status: s });
 		}
 		// Most recent 8 active (non-paid, non-rejected) claims for the card list
 		reimbRollup.recentClaims = reimbRollup.recentClaims
 			.sort((a: any, b: any) => b.id.localeCompare(a.id))
 			.slice(0, 8);
-
-		// Build a dept-keyed map so the enriched project lookup still works
-		const reimbByDept: Record<string, typeof reimbRollup> = {};
-		if (reimbDeptId) reimbByDept[reimbDeptId] = reimbRollup;
 
 		// Map taskId → draft expense count
 		const draftByTask: Record<string, number> = {};

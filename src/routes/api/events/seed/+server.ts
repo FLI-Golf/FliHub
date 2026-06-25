@@ -264,6 +264,15 @@ async function getTournamentRef(pb: any, season: number, tournamentNumber: numbe
 
 async function runSeed(pb: any) {
 	const base = { approvalThreshold: 500, requiresApproval: false };
+	const TOURNAMENT_COUNT = 6;
+	const BROADCAST_INFRA_TOTAL = 1_000_000; // from Use of Proceeds: Broadcast Infrastructure
+	const EXEC_TRAVEL_2027_TOTAL = 60_000; // from dashboard/travel-budget (2027)
+	const ENTERTAINMENT_2027_TOTAL = 600_000; // from dashboard/entertainment (2027)
+	const BROADCAST_BUDGET_PER_TOURNAMENT = Math.round(BROADCAST_INFRA_TOTAL / TOURNAMENT_COUNT);
+	const TRAVEL_BUDGET_PER_TOURNAMENT = Math.round(EXEC_TRAVEL_2027_TOTAL / TOURNAMENT_COUNT);
+	const ENTERTAINMENT_BUDGET_PER_TOURNAMENT = Math.round(ENTERTAINMENT_2027_TOTAL / TOURNAMENT_COUNT);
+	const BROADCAST_EVENT_BUDGET = BROADCAST_BUDGET_PER_TOURNAMENT + TRAVEL_BUDGET_PER_TOURNAMENT + ENTERTAINMENT_BUDGET_PER_TOURNAMENT;
+	const FLAT_BROADCASTER_RATE = 10_000;
 
 	// Fetch tournament references for realistic event naming + links
 	const t1 = await getTournamentRef(pb, 2027, 1);
@@ -310,8 +319,17 @@ async function runSeed(pb: any) {
 	await addTask(pb, content.id, { title: 'Scout filming locations', priority: 'medium' });
 	await addTask(pb, content.id, { title: 'Arrange drone operator', priority: 'high', hasCost: true, estimatedCost: 300, requiresApproval: true });
 
-	// Tournament broadcast events — one per tournament using actual dates & locations
-	const broadcastBase = { eventType: 'tournament_broadcast', season: SEASON_ID, defaultRate: 600, budget: 2500, approvalThreshold: 500, requiresApproval: false, description: '<p>Live tournament broadcast coverage. Broadcasters handle commentary, analysis, and social media.</p>' };
+	// Tournament broadcast events — one per tournament using actual dates & locations.
+	// These budgets map to Use of Proceeds pillars and force realistic approval flow.
+	const broadcastBase = {
+		eventType: 'tournament_broadcast',
+		season: SEASON_ID,
+		defaultRate: FLAT_BROADCASTER_RATE,
+		budget: BROADCAST_EVENT_BUDGET,
+		approvalThreshold: 7_500,
+		requiresApproval: false,
+		description: '<p>Live tournament broadcast coverage. Broadcasters handle play-by-play, analysis, social clips, and sponsor integrations.</p><p>Budget modeled from Use of Proceeds + Travel Budget + Entertainment (2027 baseline).</p>'
+	};
 
 	const broadcastEvents: string[] = [];
 
@@ -337,19 +355,132 @@ async function runSeed(pb: any) {
 	await createBroadcast(t5);
 	await createBroadcast(t6);
 
-	// Assign broadcasters to all tournament events
-	for (const bcId of broadcastEvents) {
-		await assignTalent(pb, bcId, T.paul_u, 'broadcaster', null, 'confirmed');
-		await assignTalent(pb, bcId, T.kona, 'broadcaster', null, 'confirmed');
-		await assignTalent(pb, bcId, T.brodie, 'broadcaster', null, 'confirmed');
-	}
+	// Assign broadcasters + finance-pillar tasks to each tournament broadcast.
+	const coreLineup = [
+		{ talentId: T.paul_u, role: 'commentator' },
+		{ talentId: T.kona, role: 'analyst' },
+		{ talentId: T.brad, role: 'analyst' },
+		{ talentId: T.brodie, role: 'broadcaster' },
+		{ talentId: T.kevin, role: 'broadcaster' },
+	];
+	const celebrityActs = ['Riley Knox', 'Ava Sterling', 'Damon Vale', 'Nia Cross', 'Mason Hart', 'Skyler Dean'];
+	const musicActs = ['Neon Valley', 'Echo Harbor', 'Velvet Current', 'Luna Drift', 'Signal Arcade', 'Copper Avenue'];
 
-	// Add tasks to first and last broadcasts
-	if (broadcastEvents[0]) {
-		await addTask(pb, broadcastEvents[0], { title: 'Test broadcast equipment', priority: 'urgent' });
-	}
-	if (broadcastEvents[broadcastEvents.length - 1]) {
-		await addTask(pb, broadcastEvents[broadcastEvents.length - 1], { title: 'Prepare graphics package', priority: 'medium', hasCost: true, estimatedCost: 400, requiresApproval: true });
+	for (let i = 0; i < broadcastEvents.length; i++) {
+		const bcId = broadcastEvents[i];
+
+		for (const slot of coreLineup) {
+			await assignTalent(pb, bcId, slot.talentId, slot.role, FLAT_BROADCASTER_RATE, 'confirmed');
+		}
+
+		// Department tasks derived from finance section (Use of Proceeds pillar mix).
+		const productionOpsCost = Math.round(BROADCAST_BUDGET_PER_TOURNAMENT * 0.6);
+		const mediaCost = Math.round(BROADCAST_BUDGET_PER_TOURNAMENT * 0.2);
+		const leagueOpsCost = Math.round(BROADCAST_BUDGET_PER_TOURNAMENT * 0.12);
+		const marketingReserveCost = Math.round(BROADCAST_BUDGET_PER_TOURNAMENT * 0.08);
+
+		// Travel Budget categories (2027 baseline split across 6 tournaments)
+		const travelAirfare = Math.round(TRAVEL_BUDGET_PER_TOURNAMENT * (25_000 / 60_000));
+		const travelLodging = Math.round(TRAVEL_BUDGET_PER_TOURNAMENT * (15_000 / 60_000));
+		const travelAuto = Math.round(TRAVEL_BUDGET_PER_TOURNAMENT * (10_000 / 60_000));
+		const travelPerDiem = TRAVEL_BUDGET_PER_TOURNAMENT - travelAirfare - travelLodging - travelAuto;
+
+		// Entertainment categories (2027 baseline per-event model)
+		const entertainmentCelebrity = Math.round(ENTERTAINMENT_BUDGET_PER_TOURNAMENT * (30_000 / 100_000));
+		const entertainmentMusic = Math.round(ENTERTAINMENT_BUDGET_PER_TOURNAMENT * (45_000 / 100_000));
+		const entertainmentTravel = Math.round(ENTERTAINMENT_BUDGET_PER_TOURNAMENT * (10_000 / 100_000));
+		const entertainmentHospitality = Math.round(ENTERTAINMENT_BUDGET_PER_TOURNAMENT * (7_500 / 100_000));
+		const entertainmentBookingFees = ENTERTAINMENT_BUDGET_PER_TOURNAMENT - entertainmentCelebrity - entertainmentMusic - entertainmentTravel - entertainmentHospitality;
+
+		await addTask(pb, bcId, {
+			title: '[Event Production & Technology] Live Broadcast Truck + Scoring Feed Sync',
+			priority: 'urgent',
+			hasCost: true,
+			estimatedCost: productionOpsCost,
+			requiresApproval: true,
+			description: 'Switcher, replay system, encoding, and real-time scoring data feed operations.',
+			checklist: ['Truck load-in complete', 'Replay/graphics channels verified', 'Scoring feed latency < 2s']
+		});
+
+		await addTask(pb, bcId, {
+			title: '[Media & Content Buildout] Social Clips + Post-Round Highlights',
+			priority: 'high',
+			hasCost: true,
+			estimatedCost: mediaCost,
+			requiresApproval: true,
+			description: 'Package short-form highlights and sponsor-tagged content from tournament day coverage.',
+			checklist: ['Clip list approved', 'Sponsor tags embedded', 'Post-round recap delivered']
+		});
+
+		await addTask(pb, bcId, {
+			title: '[League Operations & Team Development] Broadcast Crew Travel + Per Diem',
+			priority: 'medium',
+			hasCost: true,
+			estimatedCost: leagueOpsCost,
+			requiresApproval: true,
+			description: 'Travel, lodging, and per diem for on-site commentary and technical crew.',
+			checklist: ['Flights booked', 'Hotel rooming list finalized', 'Per diem reconciled']
+		});
+
+		await addTask(pb, bcId, {
+			title: '[Marketing, Working Capital & Reserve] Sponsor Ad Insert + Contingency',
+			priority: 'medium',
+			hasCost: true,
+			estimatedCost: marketingReserveCost,
+			requiresApproval: true,
+			description: 'Sponsor ad-slot integration QA and day-of contingency reserve for schedule shifts.',
+			checklist: ['Ad slate validated', 'Backup creative loaded', 'Contingency reserve logged']
+		});
+
+		await addTask(pb, bcId, {
+			title: '[Travel Budget] Airfare Block - Broadcast Crew',
+			priority: 'high',
+			hasCost: true,
+			estimatedCost: travelAirfare,
+			requiresApproval: true,
+			description: 'Executive travel budget allocation for domestic flight routing to tournament site.',
+			checklist: ['Round-trip flights ticketed', 'Carrier rates benchmarked', 'Schedule buffer approved']
+		});
+
+		await addTask(pb, bcId, {
+			title: '[Travel Budget] Lodging Block + Crew Auto Rental + Per Diem',
+			priority: 'medium',
+			hasCost: true,
+			estimatedCost: travelLodging + travelAuto + travelPerDiem,
+			requiresApproval: true,
+			description: 'Hotel, ground transportation, and per diem from 2027 executive travel budget model.',
+			checklist: ['Hotel nights reserved', 'Rental vehicles confirmed', 'Per diem envelopes reconciled']
+		});
+
+		await addTask(pb, bcId, {
+			title: `[Entertainment] Celebrity Appearance - ${celebrityActs[i] ?? `Guest ${i + 1}`}`,
+			priority: 'medium',
+			hasCost: true,
+			estimatedCost: entertainmentCelebrity,
+			requiresApproval: true,
+			description: 'Tournament trophy ceremony and sponsor meet-and-greet appearance package.',
+			checklist: ['Talent rider accepted', 'Backstage call time set', 'Sponsor photo-line scheduled']
+		});
+
+		await addTask(pb, bcId, {
+			title: `[Entertainment] Music Act - ${musicActs[i] ?? `Live Act ${i + 1}`}`,
+			priority: 'medium',
+			hasCost: true,
+			estimatedCost: entertainmentMusic,
+			requiresApproval: true,
+			description: 'Music performance slot to raise in-venue engagement and dwell time.',
+			checklist: ['Stage plot approved', 'Soundcheck complete', 'Set timing aligned to broadcast windows']
+		});
+
+		await addTask(pb, bcId, {
+			title: '[Entertainment] Talent Travel/Lodging + Hospitality + Booking Fees',
+			priority: 'low',
+			hasCost: true,
+			estimatedCost: entertainmentTravel + entertainmentHospitality + entertainmentBookingFees,
+			requiresApproval: true,
+			description: 'Combined entertainment support costs (travel, riders, and booking commissions).',
+			checklist: ['Hospitality rider funded', 'Talent transport confirmed', 'Agency fees invoiced']
+		});
 	}
 
 	// Generate payments for all broadcasts
