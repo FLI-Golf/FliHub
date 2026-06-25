@@ -91,6 +91,11 @@
 		expandedTasks = { ...expandedTasks, [id]: !expandedTasks[id] };
 	}
 
+	let expandedClaims = $state<Record<string, boolean>>({});
+	function toggleClaims(id: string) {
+		expandedClaims = { ...expandedClaims, [id]: !expandedClaims[id] };
+	}
+
 	const STATUS_ICON: Record<string, { label: string; color: string }> = {
 		todo:        { label: 'To Do',       color: 'text-slate-400' },
 		in_progress: { label: 'In Progress', color: 'text-blue-400'  },
@@ -196,6 +201,14 @@
 			{ label: 'Trademark Pipeline', href: '/dashboard/trademarks', icon: Scale },
 			{ label: 'Legal Services', href: '/dashboard/projects', icon: Scale },
 		],
+	};
+
+	const PROJECT_LINKS_BY_ID: Record<string, { label: string; href: string; icon: any }[]> = {
+		xptzufs2w7lz1j7: [
+			{ label: 'On-Course Branding', href: '/dashboard/on-course-branding', icon: FolderKanban },
+			{ label: 'Branding Pipeline', href: '/dashboard/on-course-branding/pipeline', icon: TrendingUp },
+			{ label: 'Project Tasks', href: '/dashboard/projects/xptzufs2w7lz1j7', icon: CheckCircle2 },
+		]
 	};
 
 	// Color per project for visual distinction
@@ -476,7 +489,7 @@
 	<div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
 		{#each projects as project, i (project.id)}
 			{@const color = getColor(project.name)}
-			{@const links = PROJECT_LINKS[project.name] ?? []}
+			{@const links = [...(PROJECT_LINKS[project.name] ?? []), ...(PROJECT_LINKS_BY_ID[project.id] ?? [])]}
 			{@const ProjectIcon = color.icon}
 			{@const rowEven = Math.floor(i / 2) % 2 === 0}
 			<Card class="p-0 overflow-hidden border-l-4 {color.border} {rowEven ? 'bg-slate-900' : 'bg-slate-800/60'}">
@@ -616,13 +629,19 @@
 					</div>
 					<!-- Active claims list -->
 					<div class="mb-4 space-y-1">
-						<div class="flex items-center justify-between text-xs text-muted-foreground mb-1.5">
+						<button type="button"
+							onclick={() => toggleClaims(project.id)}
+							class="w-full flex items-center justify-between text-xs text-muted-foreground mb-1.5 hover:text-slate-300 transition-colors"
+						>
 							<span class="font-medium flex items-center gap-1.5"><Wallet class="size-3.5" />Active Claims</span>
-							<span class="tabular-nums">{rp?.claimCount ?? 0} total · <span class="text-amber-400">{rp?.pendingCount ?? 0} pending</span></span>
-						</div>
+							<span class="inline-flex items-center gap-2 tabular-nums">
+								<span>{rp?.claimCount ?? 0} total · <span class="text-amber-400">{rp?.pendingCount ?? 0} pending</span></span>
+								<ChevronDown class="size-3.5 text-slate-500 transition-transform duration-200 {expandedClaims[project.id] ? 'rotate-180' : ''}" />
+							</span>
+						</button>
 						{#if (rp?.recentClaims ?? []).length === 0}
 							<p class="text-[11px] text-slate-600 italic px-2 py-1">No active claims — all claims are paid or rejected.</p>
-						{:else}
+						{:else if expandedClaims[project.id]}
 							{#each (rp?.recentClaims ?? []) as claim}
 								{@const sc = claim.status === 'approved' ? 'bg-blue-500' : claim.status === 'under_review' ? 'bg-violet-500' : 'bg-amber-400'}
 								{@const tc = claim.status === 'approved' ? 'text-blue-400' : claim.status === 'under_review' ? 'text-violet-400' : 'text-amber-400'}
@@ -634,7 +653,21 @@
 									<span class="{tc} text-[10px] shrink-0 capitalize">{(claim.status ?? '').replace('_', ' ')}</span>
 								</div>
 							{/each}
-
+						{:else}
+							{#each (rp?.recentClaims ?? []).slice(0, 3) as claim}
+								{@const sc = claim.status === 'approved' ? 'bg-blue-500' : claim.status === 'under_review' ? 'bg-violet-500' : 'bg-amber-400'}
+								{@const tc = claim.status === 'approved' ? 'text-blue-400' : claim.status === 'under_review' ? 'text-violet-400' : 'text-amber-400'}
+								<div class="flex items-center gap-2 py-1 px-2 rounded-lg hover:bg-slate-800/60 transition-colors text-xs opacity-90">
+									<span class="size-1.5 rounded-full {sc} shrink-0"></span>
+									<span class="flex-1 truncate text-slate-300">{claim.title}</span>
+									{#if claim.is_historical}<span class="text-[9px] px-1 py-0.5 rounded bg-slate-700 text-slate-500 shrink-0">historical</span>{/if}
+									<span class="tabular-nums text-slate-400 shrink-0">{fmt(claim.totalAmount ?? 0)}</span>
+									<span class="{tc} text-[10px] shrink-0 capitalize">{(claim.status ?? '').replace('_', ' ')}</span>
+								</div>
+							{/each}
+							{#if (rp?.recentClaims ?? []).length > 3}
+								<p class="text-[10px] text-slate-500 px-2 py-0.5">+ {(rp?.recentClaims ?? []).length - 3} more claim{(rp?.recentClaims ?? []).length - 3 === 1 ? '' : 's'} (expand to view all)</p>
+							{/if}
 						{/if}
 					</div>
 					{:else}

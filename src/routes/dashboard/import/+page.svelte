@@ -7,14 +7,15 @@
 	let { data }: { data: PageData } = $props();
 
 	// ── Import type definitions ───────────────────────────────────────────────
-	type ImportType = 'vendors' | 'sponsors' | 'pros' | 'territories' | 'reimbursements';
+	type ImportType = 'vendors' | 'sponsors' | 'pros' | 'territories' | 'reimbursements' | 'project_tasks';
 
 	const TYPES: { id: ImportType; label: string; description: string; color: string }[] = [
 		{ id: 'vendors',        label: 'Vendors',        description: 'Service providers, suppliers, contractors', color: 'bg-blue-950/40 border-blue-700' },
 		{ id: 'sponsors',       label: 'Sponsors',       description: 'Corporate sponsors and casino partners',    color: 'bg-emerald-950/40 border-emerald-700' },
 		{ id: 'pros',           label: 'Pros',           description: 'Players, coaches, ambassadors',             color: 'bg-violet-950/40 border-violet-700' },
 		{ id: 'territories',    label: 'Territories',    description: 'Franchise territory markets',               color: 'bg-yellow-950/40 border-yellow-700' },
-		{ id: 'reimbursements', label: 'Reimbursements', description: 'Historical & new expense claims',           color: 'bg-orange-950/40 border-orange-700' }
+		{ id: 'reimbursements', label: 'Reimbursements', description: 'Historical & new expense claims',           color: 'bg-orange-950/40 border-orange-700' },
+		{ id: 'project_tasks',  label: 'Project Tasks',  description: 'Merge CSV task rows into one target project', color: 'bg-cyan-950/40 border-cyan-700' }
 	];
 
 	// ── AI Prompt tool state ──────────────────────────────────────────────────
@@ -55,6 +56,22 @@ Here are the records to convert:
 	}
 
 	const SCHEMAS: Record<ImportType, { col: string; required: boolean; example: string; note?: string }[]> = {
+		project_tasks: [
+			{ col: 'externalRowId',    required: false, example: 'venue-001', note: 'Strongly recommended stable ID for merge matching' },
+			{ col: 'title',            required: true,  example: 'Broadcast Truck Setup' },
+			{ col: 'description',      required: false, example: 'Load in and configure switcher + replay stack' },
+			{ col: 'priority',         required: false, example: 'high', note: 'low · medium · high · urgent' },
+			{ col: 'status',           required: false, example: 'todo', note: 'todo · in_progress · blocked · completed · cancelled' },
+			{ col: 'startDate',        required: false, example: '2027-04-20', note: 'YYYY-MM-DD' },
+			{ col: 'dueDate',          required: false, example: '2027-04-24', note: 'YYYY-MM-DD' },
+			{ col: 'task_budget',      required: false, example: '25000', note: 'Number, no $ or commas' },
+			{ col: 'task_actual_cost', required: false, example: '0', note: 'Number, no $ or commas' },
+			{ col: 'estimatedHours',   required: false, example: '18', note: 'Number' },
+			{ col: 'actualHours',      required: false, example: '0', note: 'Number' },
+			{ col: 'tags',             required: false, example: 'pillar:event-production-tech,category:travel' },
+			{ col: 'notes',            required: false, example: 'Source: dashboard/travel-budget 2027 baseline' },
+			{ col: 'subTasksChecklist', required: false, example: '- [ ] Stage cables\n- [ ] Test score feed' },
+		],
 		reimbursements: [
 			{ col: 'claimTitle',       required: true,  example: 'Q1 Travel Expenses' },
 			{ col: 'claimantEmail',    required: true,  example: 'jane@example.com',           note: 'Must match a user account' },
@@ -130,7 +147,14 @@ Here are the records to convert:
 	let parseError   = $state('');
 	let importing    = $state(false);
 	let progress     = $state(0);   // 0–100
-	let result       = $state<{ created: number; failed: number; errors: string[] } | null>(null);
+	let result       = $state<{ created: number; updated?: number; skipped?: number; failed: number; dryRun?: boolean; errors: string[] } | null>(null);
+	let selectedProjectId = $state('');
+	let projectImportDryRun = $state(true);
+	const projectOptions = $derived(((data.projects ?? []) as any[]).map((p: any) => ({
+		id: p.id,
+		name: p.name,
+		status: p.status ?? 'unknown'
+	})));
 
 	const schema = $derived(SCHEMAS[selectedType]);
 	const cols   = $derived(schema.map(s => s.col));
@@ -192,9 +216,56 @@ Here are the records to convert:
 	// ── Import in batches with progress ───────────────────────────────────────
 	async function runImport() {
 		if (!rows.length) return;
+		if (selectedType === 'project_tasks' && !selectedProjectId) {
+			parseError = 'Select a target project before importing project tasks.';
+			return;
+		}
 		importing = true;
 		progress  = 0;
 		result    = null;
+		parseError = '';
+
+		if (selectedType === 'project_tasks') {
+			try {
+				const res = await fetch('/api/import/project-tasks', {
+					method: 'POST',
+					headers: { 'Content-Type': 'application/json' },
+					body: JSON.stringify({
+						projectId: selectedProjectId,
+						rows,
+						options: {
+							dryRun: projectImportDryRun,
+							matchBy: 'externalRowId_or_title',
+							syncMode: 'merge'
+						}
+					})
+				});
+				const data = await res.json();
+				if (!res.ok) throw new Error(data.message ?? `Error ${res.status}`);
+				result = {
+					created: data.created ?? 0,
+					updated: data.updated ?? 0,
+					skipped: data.skipped ?? 0,
+					failed: data.failed ?? 0,
+					dryRun: Boolean(data.dryRun),
+					errors: data.errors ?? []
+				};
+				progress = 100;
+			} catch (err: any) {
+				result = {
+					created: 0,
+					updated: 0,
+					skipped: 0,
+					failed: rows.length,
+					dryRun: projectImportDryRun,
+					errors: [err.message ?? 'Import failed']
+				};
+				progress = 100;
+			} finally {
+				importing = false;
+			}
+			return;
+		}
 
 		const BATCH = 10;
 		let created = 0, failed = 0;
@@ -227,6 +298,7 @@ Here are the records to convert:
 	function selectType(t: ImportType) {
 		selectedType = t;
 		rows = []; csvText = ''; parseError = ''; result = null; progress = 0;
+		if (t !== 'project_tasks') selectedProjectId = '';
 	}
 </script>
 
@@ -252,6 +324,30 @@ Here are the records to convert:
 			</button>
 		{/each}
 	</div>
+
+	{#if selectedType === 'project_tasks'}
+	<Card class="p-5 bg-cyan-950/30 border-cyan-700">
+		<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+			<div>
+				<p class="text-xs font-semibold text-cyan-300 uppercase tracking-wide mb-1.5">Target Project</p>
+				<select bind:value={selectedProjectId} class="w-full rounded-lg border border-cyan-700 bg-slate-900 text-slate-100 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500">
+					<option value="">Select a project…</option>
+					{#each projectOptions as p}
+						<option value={p.id}>{p.name} ({p.status})</option>
+					{/each}
+				</select>
+			</div>
+			<div>
+				<p class="text-xs font-semibold text-cyan-300 uppercase tracking-wide mb-1.5">Import Mode</p>
+				<label class="flex items-center gap-2 text-sm text-slate-200">
+					<input type="checkbox" bind:checked={projectImportDryRun} class="size-4 rounded border-slate-600 bg-slate-800 text-cyan-500 focus:ring-cyan-500" />
+					Dry run (preview merge counts, no writes)
+				</label>
+				<p class="text-[11px] text-slate-400 mt-1.5">Uncheck dry run to apply create/update changes directly to the selected project.</p>
+			</div>
+		</div>
+	</Card>
+	{/if}
 
 	<!-- AI Prompt Tool (reimbursements only) -->
 	{#if selectedType === 'reimbursements'}
@@ -414,7 +510,7 @@ Here are the records to convert:
 				class="gap-2 bg-emerald-600 hover:bg-emerald-700 text-white h-9"
 			>
 				<Upload class="size-4" />
-				{importing ? `Importing… ${progress}%` : `Import ${rows.length} ${selectedType}`}
+				{importing ? `Importing… ${progress}%` : selectedType === 'project_tasks' ? `${projectImportDryRun ? 'Dry Run' : 'Merge'} ${rows.length} task row${rows.length !== 1 ? 's' : ''}` : `Import ${rows.length} ${selectedType}`}
 			</Button>
 		</div>
 
@@ -441,12 +537,18 @@ Here are the records to convert:
 					{#if result.failed === 0}
 						<CheckCircle2 class="size-5 text-emerald-400 shrink-0" />
 						<div>
-							<p class="font-semibold text-emerald-300">Import complete — {result.created} records created</p>
+							<p class="font-semibold text-emerald-300">
+								{#if selectedType === 'project_tasks'}
+									{result.dryRun ? 'Dry run complete' : 'Merge complete'} — {result.created} created, {result.updated ?? 0} updated, {result.skipped ?? 0} skipped
+								{:else}
+									Import complete — {result.created} records created
+								{/if}
+							</p>
 						</div>
 					{:else}
 						<AlertCircle class="size-5 text-yellow-400 shrink-0" />
 						<div>
-							<p class="font-semibold text-yellow-300">{result.created} created, {result.failed} failed</p>
+							<p class="font-semibold text-yellow-300">{result.created} created{#if result.updated !== undefined}, {result.updated} updated{/if}{#if result.skipped !== undefined}, {result.skipped} skipped{/if}, {result.failed} failed</p>
 						</div>
 					{/if}
 				</div>
