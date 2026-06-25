@@ -11,28 +11,14 @@ export const load: PageServerLoad = async ({ locals }) => {
 			});
 			const userProfile = profiles[0];
 
-			// Redirect based on role
-			if (userProfile?.role === 'sales') {
-				throw redirect(303, '/dashboard/sales');
+			// Roles with dedicated porthole — send to /portal/dashboard
+			const PORTHOLE_ROLES = ['admin', 'leader', 'sales', 'pro', 'franchise_owner', 'league_owner', 'broadcaster', 'manager'];
+			if (PORTHOLE_ROLES.includes(userProfile?.role)) {
+				throw redirect(303, '/portal/dashboard');
 			}
 
 			if (userProfile?.role === 'vendor') {
 				throw redirect(303, '/vendor/dashboard');
-			}
-
-			if (userProfile?.role === 'leader') {
-				if (!userProfile.departmentId) {
-					throw redirect(303, '/dashboard/departments');
-				}
-				throw redirect(303, `/dashboard/department/${userProfile.departmentId}`);
-			}
-
-			if (userProfile?.role === 'manager') {
-				throw redirect(303, `/dashboard/my-payments/${userProfile.id}`);
-			}
-
-			if (['pro', 'broadcaster'].includes(userProfile?.role)) {
-				throw redirect(303, '/dashboard/welcome');
 			}
 		}
 		
@@ -68,48 +54,15 @@ export const actions: Actions = {
 			const userProfile = profiles[0];
 
 			if (userProfile) {
-				// Sales users - redirect to franchise sales dashboard
-				if (userProfile.role === 'sales') {
-					throw redirect(303, '/dashboard/sales');
-				}
-
-				// Vendor users - redirect to vendor portal
+				// Vendor users get dedicated vendor portal
 				if (userProfile.role === 'vendor') {
 					throw redirect(303, '/vendor/dashboard');
 				}
 
-				// Leader users - redirect to their department
-				if (userProfile.role === 'leader') {
-					if (!userProfile.departmentId) {
-						// Leader not assigned to department yet
-						throw redirect(303, '/dashboard/departments');
-					}
-					// Redirect to department-specific dashboard
-					throw redirect(303, `/dashboard/department/${userProfile.departmentId}`);
-				}
-
-				// Manager — send to their payment portal
-				if (userProfile.role === 'manager') {
-					throw redirect(303, `/dashboard/my-payments/${userProfile.id}`);
-				}
-
-				// Pro, broadcaster — send to welcome/onboarding flow
-				if (['pro', 'broadcaster'].includes(userProfile.role)) {
-					// Check if they've already seen the welcome page
-					try {
-						const pb = locals.pb;
-						const onboardingRecords = await pb.collection('onboarding_status').getFullList({
-							filter: `userId = "${userId}"`
-						});
-						const onboarding = onboardingRecords[0];
-						if (onboarding?.welcomeSeen) {
-							throw redirect(303, '/dashboard/onboarding');
-						}
-					} catch (redirectErr) {
-						if (isRedirect(redirectErr)) throw redirectErr;
-						// Collection doesn't exist yet — send to welcome
-					}
-					throw redirect(303, '/dashboard/welcome');
+				// All other named roles go to their role porthole
+				const PORTHOLE_ROLES = ['admin', 'leader', 'sales', 'pro', 'franchise_owner', 'league_owner', 'broadcaster', 'manager'];
+				if (PORTHOLE_ROLES.includes(userProfile.role)) {
+					throw redirect(303, '/portal/dashboard');
 				}
 			}
 		} catch (error) {

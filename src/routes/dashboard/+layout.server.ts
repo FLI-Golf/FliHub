@@ -1,4 +1,4 @@
-import { isRedirect } from '@sveltejs/kit';
+import { isRedirect, redirect } from '@sveltejs/kit';
 import { RequestContext } from '$lib/infra/RequestContext';
 import type { LayoutServerLoad } from './$types';
 
@@ -9,6 +9,11 @@ export const load: LayoutServerLoad = async ({ locals, url }) => {
 		//   - vendor role     → redirect to /vendor/dashboard
 		const ctx = await RequestContext.from(locals, url);
 		const { pb, profile } = ctx;
+
+		// Dashboard is admin-only. Non-admin roles use /portal
+		if (ctx.role !== 'admin') {
+			throw redirect(303, '/portal');
+		}
 
 		let userDepartment = null;
 		if (profile?.role === 'leader' && profile?.id) {

@@ -81,8 +81,8 @@
 
 <Sidebar.Provider class="h-svh overflow-hidden">
 	<FliHubSidebar collapsible="none" />
-	<Sidebar.Inset class="h-svh overflow-hidden">
-		<header class="flex h-14 shrink-0 items-center gap-2 border-b bg-card/80 backdrop-blur-sm sticky top-0 z-10">
+	<Sidebar.Inset class="h-svh overflow-y-auto overflow-x-hidden flex flex-col">
+		<header class="flex h-14 shrink-0 items-center gap-2 border-b bg-card/80 backdrop-blur-sm sticky top-0 z-20 overflow-visible">
 			<div class="flex items-center gap-3 px-4 flex-1 min-w-0">
 				<!-- Larger tap target on mobile -->
 				<Sidebar.Trigger class="-ms-1 size-9 hover:bg-muted rounded-md transition-colors" />
@@ -111,22 +111,62 @@
 				</Breadcrumb.Root>
 			</div>
 
-			<div class="flex items-center gap-2 px-4">
-				<DropdownMenu.Root>
-					<DropdownMenu.Trigger
-						class="flex items-center gap-2.5 rounded-lg px-3 py-1.5 text-sm font-medium
-							transition-all duration-150 hover:bg-muted border border-transparent hover:border-border
-							focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+			<div class="flex items-center gap-3 px-4">
+				<!-- Profile link -->
+				<a
+					href="/dashboard/player-profile"
+					class="flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium text-muted-foreground
+						hover:text-foreground hover:bg-muted transition-colors"
+					title="Profile"
+				>
+					<User class="size-4 shrink-0" />
+					<span class="hidden sm:inline">Profile</span>
+				</a>
+
+				<!-- Settings link -->
+				<a
+					href="/dashboard/settings"
+					class="flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium text-muted-foreground
+						hover:text-foreground hover:bg-muted transition-colors"
+					title="Settings"
+				>
+					<Settings class="size-4 shrink-0" />
+					<span class="hidden sm:inline">Settings</span>
+				</a>
+
+				<!-- Sign out form -->
+				<form method="POST" action="/auth/logout" class="inline">
+					<button
+						type="submit"
+						class="flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium text-red-400
+							hover:text-red-300 hover:bg-red-950/30 transition-colors"
 					>
-						<!-- Avatar circle -->
-						<span class="flex size-7 items-center justify-center rounded-full bg-gradient-to-br from-emerald-500 to-blue-600 text-white text-xs font-bold shrink-0">
-							{initials}
-						</span>
-						<span class="hidden sm:block text-sm truncate max-w-[140px]">{data.user?.email}</span>
-						<ChevronDown class="size-3.5 text-muted-foreground shrink-0" />
+						<LogOut class="size-4 shrink-0" />
+						<span class="hidden sm:inline">Sign Out</span>
+					</button>
+				</form>
+
+				<!-- Separator -->
+				<Separator orientation="vertical" class="h-5 opacity-50" />
+
+				<DropdownMenu.Root>
+					<DropdownMenu.Trigger asChild>
+						<button
+							type="button"
+							class="flex items-center gap-2.5 rounded-lg px-3 py-1.5 text-sm font-medium
+								transition-all duration-150 hover:bg-muted border border-transparent hover:border-border
+								focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring cursor-pointer"
+						>
+							<!-- Avatar circle -->
+							<span class="flex size-7 items-center justify-center rounded-full bg-gradient-to-br from-emerald-500 to-blue-600 text-white text-xs font-bold shrink-0">
+								{initials}
+							</span>
+							<span class="hidden sm:block text-sm truncate max-w-[140px]">{data.user?.email}</span>
+							<ChevronDown class="size-3.5 text-muted-foreground shrink-0" />
+						</button>
 					</DropdownMenu.Trigger>
 
-					<DropdownMenu.Content align="end" class="w-52">
+					<DropdownMenu.Content align="end" side="bottom" class="w-52 z-50">
 						<div class="px-3 py-2 border-b">
 							<p class="text-xs font-semibold truncate">{data.user?.email}</p>
 							<p class="text-[10px] text-muted-foreground capitalize mt-0.5">
@@ -146,8 +186,8 @@
 							</a>
 						</DropdownMenu.Item>
 						<DropdownMenu.Separator />
-						<div class="px-1 pb-1">
-							<form method="POST" action="/auth/logout">
+					<DropdownMenu.Item asChild>
+						<form method="POST" action="/auth/logout">
 								<button
 									type="submit"
 									class="flex w-full items-center gap-2 rounded-md bg-red-600 hover:bg-red-700 active:bg-red-800 px-3 py-2 text-sm font-semibold text-white transition-colors"
@@ -156,7 +196,7 @@
 									Logout
 								</button>
 							</form>
-						</div>
+						</DropdownMenu.Item>
 					</DropdownMenu.Content>
 				</DropdownMenu.Root>
 			</div>

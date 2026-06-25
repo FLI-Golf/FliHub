@@ -7,10 +7,19 @@ import type { RequestHandler } from './$types';
 import { RequestContext } from '$lib/infra/RequestContext';
 
 const C = {
-	navy:    '#0f172a', slate:   '#1e293b', slateL:  '#334155',
-	muted:   '#64748b', border:  '#cbd5e1', bgLight: '#f8fafc',
-	white:   '#ffffff', green:   '#10b981', blue:    '#3b82f6',
-	amber:   '#f59e0b', violet:  '#8b5cf6', red:     '#ef4444', gray: '#94a3b8',
+	navy:    '#1e293b', slate:   '#475569', slateL:  '#64748b',
+	muted:   '#94a3b8', border:  '#cbd5e1', bgLight: '#ffffff',
+	bgPage:  '#f1f5f9',
+	white:   '#ffffff', green:   '#059669', blue:    '#2563eb',
+	amber:   '#d97706', violet:  '#7c3aed', red:     '#dc2626', gray:    '#64748b',
+};
+
+const STATUS_TINT: Record<string, string> = {
+	todo:        '#f8fafc',
+	in_progress: '#eff6ff',
+	blocked:     '#fef2f2',
+	completed:   '#f0fdf4',
+	cancelled:   '#f8fafc',
 };
 
 function fmt(n: number) {
@@ -30,6 +39,19 @@ function subtaskCounts(cl: string | null | undefined) {
 	if (!cl) return { done: 0, total: 0 };
 	const lines = cl.split('\n').filter((l: string) => l.trim().startsWith('- ['));
 	return { done: lines.filter((l: string) => l.includes('[x]') || l.includes('[X]')).length, total: lines.length };
+}
+
+function parseSubtasks(cl: string | null | undefined): { text: string; done: boolean }[] {
+	if (!cl) return [];
+	// Handle both newline-separated and semicolon-separated formats
+	const sep = cl.includes('\n') ? '\n' : ';';
+	return cl.split(sep)
+		.map((l: string) => l.trim())
+		.filter((l: string) => l.startsWith('- ['))
+		.map((l: string) => ({
+			done: l.includes('[x]') || l.includes('[X]'),
+			text: l.replace(/^-\s*\[[xX ]\]\s*/, '').trim(),
+		}));
 }
 
 const STATUS_LABEL: Record<string, string> = { todo: 'To Do', in_progress: 'In Progress', blocked: 'Blocked', completed: 'Completed', cancelled: 'Cancelled' };
@@ -102,8 +124,8 @@ async function buildPDF(project: any): Promise<Buffer> {
 
 		function newPage(): number {
 			doc.addPage();
-			doc.rect(0, 0, PW, 6).fill(C.navy);
-			doc.rect(0, 6, PW, 2).fill(C.green);
+			doc.rect(0, 0, PW, 6).fill(C.bgPage);
+			doc.rect(0, 5, PW, 3).fill(C.green);
 			return 24;
 		}
 
@@ -113,25 +135,26 @@ async function buildPDF(project: any): Promise<Buffer> {
 
 		function drawFooter(n: number) {
 			const fy = PH - FOOTER_H;
-			doc.rect(0, fy, PW, FOOTER_H).fill(C.navy);
-			doc.fillColor(C.gray).font('Helvetica').fontSize(7)
+			doc.rect(0, fy, PW, FOOTER_H).fill(C.bgPage);
+			doc.moveTo(0, fy).lineTo(PW, fy).strokeColor(C.border).lineWidth(0.5).stroke();
+			doc.fillColor(C.slate).font('Helvetica').fontSize(7)
 			   .text(`Confidential \u2014 FLI Golf League  \u00b7  Generated ${genDate}  \u00b7  Page ${n}`,
 			         ML, fy + 13, { width: CW, align: 'center', lineBreak: false });
 		}
 
 		// ── Header ───────────────────────────────────────────────────────
-		doc.rect(0, 0, PW, 96).fill(C.navy);
+		doc.rect(0, 0, PW, 96).fill(C.bgPage);
 		doc.rect(0, 92, PW, 4).fill(C.green);
 		doc.fillColor(C.green).font('Helvetica-Bold').fontSize(7)
 		   .text('FLI GOLF LEAGUE  \u00b7  PROJECT STATUS REPORT', ML, 20, { characterSpacing: 1.5, lineBreak: false });
-		doc.fillColor(C.white).font('Helvetica-Bold').fontSize(20)
+		doc.fillColor(C.navy).font('Helvetica-Bold').fontSize(20)
 		   .text(project.name, ML, 34, { width: CW - 110, lineBreak: false });
 		if (project.type) {
-			doc.roundedRect(PW - MR - 95, 34, 95, 18, 4).fill(C.slateL);
-			doc.fillColor(C.gray).font('Helvetica-Bold').fontSize(7)
+			doc.roundedRect(PW - MR - 95, 34, 95, 18, 4).fillAndStroke(C.white, C.border);
+			doc.fillColor(C.slate).font('Helvetica-Bold').fontSize(7)
 			   .text(project.type.toUpperCase(), PW - MR - 95, 40, { width: 95, align: 'center', characterSpacing: 1, lineBreak: false });
 		}
-		doc.fillColor(C.gray).font('Helvetica').fontSize(8)
+		doc.fillColor(C.slate).font('Helvetica').fontSize(8)
 		   .text(`Generated ${genDate}  \u00b7  FY ${project.fiscalYear ?? new Date().getFullYear()}`, ML, 72, { lineBreak: false });
 
 		let y = 112;
@@ -150,11 +173,11 @@ async function buildPDF(project: any): Promise<Buffer> {
 		].forEach((b, i) => {
 			const bx = ML + i * (boxW + 3);
 			doc.roundedRect(bx, y, boxW, 54, 5).fillAndStroke(C.bgLight, C.border);
-			doc.fillColor(C.muted).font('Helvetica-Bold').fontSize(6.5)
+			doc.fillColor(C.muted).font('Helvetica-Bold').fontSize(7.5)
 			   .text(b.label, bx + 8, y + 9, { width: boxW - 16, characterSpacing: 0.5, lineBreak: false });
-			doc.fillColor(C.navy).font('Helvetica-Bold').fontSize(14)
+			doc.fillColor(C.navy).font('Helvetica-Bold').fontSize(15)
 			   .text(b.value, bx + 8, y + 21, { width: boxW - 16, lineBreak: false });
-			if (b.sub) doc.fillColor(C.muted).font('Helvetica').fontSize(7.5)
+			if (b.sub) doc.fillColor(C.muted).font('Helvetica').fontSize(8)
 			              .text(b.sub, bx + 8, y + 40, { width: boxW - 16, lineBreak: false });
 		});
 		y += 66;
@@ -172,11 +195,11 @@ async function buildPDF(project: any): Promise<Buffer> {
 		];
 		details.forEach(([label, val], i) => {
 			const col = i % 2, row = Math.floor(i / 2);
-			const dx = ML + col * (dcW + 12), dy = y + row * 20;
-			doc.fillColor(C.muted).font('Helvetica').fontSize(8).text(label, dx, dy, { width: 80, lineBreak: false });
-			doc.fillColor(C.navy).font('Helvetica-Bold').fontSize(8).text(val, dx + 85, dy, { width: dcW - 85, lineBreak: false });
+			const dx = ML + col * (dcW + 12), dy = y + row * 22;
+			doc.fillColor(C.muted).font('Helvetica').fontSize(9).text(label, dx, dy, { width: 80, lineBreak: false });
+			doc.fillColor(C.navy).font('Helvetica-Bold').fontSize(9).text(val, dx + 85, dy, { width: dcW - 85, lineBreak: false });
 		});
-		y += Math.ceil(details.length / 2) * 20 + 8;
+		y += Math.ceil(details.length / 2) * 22 + 8;
 
 		if (project.description) {
 			y = ensure(y, 30);
@@ -201,24 +224,31 @@ async function buildPDF(project: any): Promise<Buffer> {
 			y += 16;
 
 			for (const task of tasks) {
-				const rowH = 46;
-				y = ensure(y, rowH + 6);
 				const sub = subtaskCounts(task.subTasksChecklist);
 				const sc  = STATUS_COLOR[task.status] ?? C.gray;
 				const sl  = STATUS_LABEL[task.status] ?? task.status;
+				const subtaskItems = parseSubtasks(task.subTasksChecklist);
+
+				// Dynamic row height: base + subtask list if present
+				const baseH = 64;
+				const subtaskBlockH = subtaskItems.length > 0 ? 18 + subtaskItems.length * 16 : 0;
+				const rowH = baseH + subtaskBlockH;
+
+				y = ensure(y, rowH + 8);
 
 				doc.roundedRect(ML, y, CW, rowH, 5).fillAndStroke(C.bgLight, C.border);
 				doc.roundedRect(ML, y, 4, rowH, 3).fill(sc);
 
 				// Title
-				doc.fillColor(C.navy).font('Helvetica-Bold').fontSize(9.5)
-				   .text(reportTaskTitle(task), ML + 12, y + 8, { width: CW - 130, lineBreak: false });
+				doc.fillColor(C.navy).font('Helvetica-Bold').fontSize(11)
+				   .text(reportTaskTitle(task), ML + 14, y + 11, { width: CW - 130, lineBreak: false });
 
-				// Status badge
-				const bW = 76, bX = ML + CW - bW;
-				doc.roundedRect(bX, y + 7, bW, 15, 4).fill(sc);
-				doc.fillColor(C.white).font('Helvetica-Bold').fontSize(7)
-				   .text(sl, bX, y + 11, { width: bW, align: 'center', lineBreak: false });
+				// Status badge — light tint background with colored text
+				const bW = 90, bX = ML + CW - bW;
+				const tint = STATUS_TINT[task.status] ?? '#f8fafc';
+				doc.roundedRect(bX, y + 9, bW, 18, 4).fillAndStroke(tint, sc);
+				doc.fillColor(sc).font('Helvetica-Bold').fontSize(8)
+				   .text(sl, bX, y + 14, { width: bW, align: 'center', lineBreak: false });
 
 				// Meta
 				const meta: string[] = [];
@@ -228,10 +258,34 @@ async function buildPDF(project: any): Promise<Buffer> {
 				if (sub.total > 0) meta.push(`${sub.done}/${sub.total} subtasks`);
 				if ((task.estimatedHours ?? 0) > 0) meta.push(`${task.estimatedHours}h est.`);
 				if ((task.actualHours ?? 0) > 0) meta.push(`${task.actualHours}h actual`);
-				doc.fillColor(C.muted).font('Helvetica').fontSize(7.5)
-				   .text(meta.join('  \u00b7  '), ML + 12, y + 27, { width: CW - 24, lineBreak: false });
+				doc.fillColor(C.muted).font('Helvetica').fontSize(9)
+				   .text(meta.join('  \u00b7  '), ML + 14, y + 34, { width: CW - 24, lineBreak: false });
 
-				y += rowH + 5;
+				// Subtask checklist
+				if (subtaskItems.length > 0) {
+					let sy = y + baseH - 6;
+					doc.moveTo(ML + 14, sy).lineTo(ML + CW - 14, sy)
+					   .strokeColor('#e2e8f0').lineWidth(0.5).stroke();
+					sy += 6;
+					doc.fillColor(C.muted).font('Helvetica-Bold').fontSize(7.5)
+					   .text('SUBTASKS', ML + 14, sy, { characterSpacing: 0.8, lineBreak: false });
+					sy += 13;
+					for (const item of subtaskItems) {
+						const boxX = ML + 14;
+						// Checkbox border
+						doc.roundedRect(boxX, sy + 1, 9, 9, 1.5)
+						   .strokeColor(item.done ? C.green : C.muted).lineWidth(0.8).stroke();
+						if (item.done) {
+							doc.fillColor(C.green).font('Helvetica-Bold').fontSize(7)
+							   .text('\u2713', boxX, sy + 1.5, { width: 9, align: 'center', lineBreak: false });
+						}
+						doc.fillColor(item.done ? C.green : C.navy).font('Helvetica').fontSize(9)
+						   .text(item.text, boxX + 14, sy, { width: CW - 40, lineBreak: false });
+						sy += 16;
+					}
+				}
+
+				y += rowH + 8;
 			}
 		}
 
@@ -242,12 +296,12 @@ async function buildPDF(project: any): Promise<Buffer> {
 			y = sectionLabel('TASK NOTES', y);
 			for (const task of withNotes) {
 				y = ensure(y, 30);
-				doc.fillColor(C.slateL).font('Helvetica-Bold').fontSize(8)
+				doc.fillColor(C.slateL).font('Helvetica-Bold').fontSize(9)
 				   .text(reportTaskTitle(task), ML, y, { lineBreak: false });
-				y += 13;
-				doc.fillColor(C.muted).font('Helvetica').fontSize(7.5)
+				y += 14;
+				doc.fillColor(C.muted).font('Helvetica').fontSize(8.5)
 				   .text(task.notes, ML, y, { width: CW });
-				y = (doc as any).y + 10;
+				y = (doc as any).y + 12;
 			}
 		}
 

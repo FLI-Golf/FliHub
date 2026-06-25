@@ -106,6 +106,23 @@
 						{item.label}
 					</a>
 				{/each}
+
+				<!-- Navbar divider -->
+				<div class="w-px h-5 bg-slate-700 mx-2"></div>
+
+				<!-- Profile link -->
+				<a href="/vendor/profile" class="flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors text-slate-400 hover:text-slate-200 hover:bg-slate-800">
+					<User class="size-4 shrink-0" />
+					<span class="hidden sm:inline">Profile</span>
+				</a>
+
+				<!-- Sign out form -->
+				<form method="POST" action="/auth/logout" class="inline">
+					<button type="submit" class="flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors text-red-400 hover:text-red-300 hover:bg-red-950/30">
+						<LogOut class="size-3.5 shrink-0" />
+						<span class="hidden sm:inline">Sign Out</span>
+					</button>
+				</form>
 			</nav>
 
 			<!-- Right: vendor name + user dropdown -->
@@ -118,19 +135,22 @@
 				{/if}
 
 				<DropdownMenu.Root>
-					<DropdownMenu.Trigger
+				<DropdownMenu.Trigger asChild>
+					<button
+						type="button"
 						class="flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-sm font-medium
 						       transition-all hover:bg-slate-800 border border-transparent hover:border-slate-700
-						       focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500"
+						       focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500 cursor-pointer"
 					>
 						<span class="flex size-7 items-center justify-center rounded-full bg-gradient-to-br from-orange-500 to-amber-500 text-white text-xs font-bold shrink-0">
 							{initials}
 						</span>
 						<span class="hidden sm:block text-sm text-slate-300 truncate max-w-[140px]">{user?.email}</span>
 						<ChevronDown class="size-3.5 text-slate-500 shrink-0" />
+					</button>
 					</DropdownMenu.Trigger>
 
-					<DropdownMenu.Content align="end" class="w-56">
+					<DropdownMenu.Content align="end" side="bottom" class="w-56 z-50">
 						<!-- Identity header -->
 						<div class="px-3 py-2.5 border-b border-border">
 							<p class="text-xs font-semibold truncate">{user?.email}</p>
@@ -149,8 +169,8 @@
 							<DropdownMenu.Separator />
 						{/if}
 
-						<div class="px-1 pb-1 pt-1">
-							<form method="POST" action="/auth/logout">
+					<DropdownMenu.Item asChild>
+						<form method="POST" action="/auth/logout">
 								<button
 									type="submit"
 									class="flex w-full items-center gap-2 rounded-md bg-red-600 hover:bg-red-700 active:bg-red-800 px-3 py-2 text-sm font-semibold text-white transition-colors"
@@ -159,7 +179,7 @@
 									Sign Out
 								</button>
 							</form>
-						</div>
+						</DropdownMenu.Item>
 					</DropdownMenu.Content>
 				</DropdownMenu.Root>
 			</div>

@@ -304,6 +304,21 @@ Here are the records to convert:
 
 <svelte:head><title>Import Data — FliHub</title></svelte:head>
 
+<style>
+	@keyframes blink {
+		0%, 100% { opacity: 1; }
+		50%       { opacity: 0; }
+	}
+	:global(.live-warning) {
+		background-color: #dc2626;
+		color: #ffffff;
+		font-weight: 600;
+		padding: 4px 8px;
+		border-radius: 4px;
+		animation: blink 1s step-start infinite;
+	}
+</style>
+
 <div class="space-y-6 max-w-5xl">
 
 	<!-- Header -->
@@ -343,7 +358,9 @@ Here are the records to convert:
 					<input type="checkbox" bind:checked={projectImportDryRun} class="size-4 rounded border-slate-600 bg-slate-800 text-cyan-500 focus:ring-cyan-500" />
 					Dry run (preview merge counts, no writes)
 				</label>
-				<p class="text-[11px] text-slate-400 mt-1.5">Uncheck dry run to apply create/update changes directly to the selected project.</p>
+				<p class="text-[11px] mt-1.5 {!projectImportDryRun ? 'live-warning' : 'text-slate-400'}">
+					Uncheck dry run to apply create/update changes directly to the selected project.
+				</p>
 			</div>
 		</div>
 	</Card>
