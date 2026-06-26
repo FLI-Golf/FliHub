@@ -83,6 +83,8 @@
 			items: [
 				{ title: 'My Payments', url: '/dashboard/my-payments', icon: Wallet, roles: ['manager', 'pro', 'broadcaster'] },
 				{ title: 'My Reimbursements', url: '/dashboard/reimbursements', icon: Receipt, roles: ['manager', 'pro', 'broadcaster'] },
+				{ title: 'Reimbursements Admin', url: '/dashboard/reimbursements/admin', icon: ShieldCheck, roles: ['manager', 'pro', 'broadcaster'] },
+				{ title: 'Import Data', url: '/dashboard/import', icon: Upload, roles: ['manager', 'pro', 'broadcaster'] },
 				{ title: 'My Profile', url: '/dashboard/player-profile', icon: UserCircle, roles: ['manager', 'pro', 'broadcaster'] },
 				{ title: 'Settings', url: '/dashboard/settings', icon: BadgeCheck, roles: ['manager', 'pro', 'broadcaster'] },
 			]
@@ -150,7 +152,7 @@
 			hoverClass: 'hover:bg-blue-50 dark:hover:bg-blue-950/40 hover:text-blue-900 dark:hover:text-blue-100',
 			borderClass: 'border-blue-500',
 			iconActiveClass: 'text-blue-600 dark:text-blue-400',
-			roles: ['admin', 'leader'],
+			roles: ['admin', 'leader', 'marketing_lead', 'sales', 'franchise_owner', 'league_owner'],
 			items: [
 				{ title: 'Departments',          url: '/dashboard/departments',          icon: Building2,    roles: ['admin', 'leader'] },
 				{ title: 'People',               url: '/dashboard/people',               icon: Users,        roles: ['admin', 'leader'] },
@@ -162,8 +164,9 @@
 				{ title: 'Purchase Orders',      url: '/dashboard/purchase-orders',      icon: FileText,     roles: ['admin', 'leader'] },
 				{ title: 'Approvals',            url: '/dashboard/approvals',            icon: CheckSquare,  roles: ['admin', 'leader'] },
 				{ title: 'Work Orders',          url: '/dashboard/work-orders',          icon: ClipboardList, roles: ['admin', 'leader'] },
-				{ title: 'Reimbursements',       url: '/dashboard/reimbursements',       icon: Wallet,       roles: ['admin', 'leader'] },
-				{ title: 'Reimbursements Admin', url: '/dashboard/reimbursements/admin', icon: ShieldCheck,  roles: ['admin', 'leader'] },
+				{ title: 'Import Data',          url: '/dashboard/import',               icon: Upload,       roles: ['admin', 'leader', 'marketing_lead', 'sales', 'franchise_owner', 'league_owner'] },
+				{ title: 'Reimbursements',       url: '/dashboard/reimbursements',       icon: Wallet,       roles: ['admin', 'leader', 'marketing_lead', 'sales', 'franchise_owner', 'league_owner'] },
+				{ title: 'Reimbursements Admin', url: '/dashboard/reimbursements/admin', icon: ShieldCheck,  roles: ['admin', 'leader', 'marketing_lead', 'sales', 'franchise_owner', 'league_owner'] },
 				{ title: 'Media',                url: '/dashboard/media',                icon: Images,       roles: ['admin', 'leader'] },
 				{ title: 'Content Pipeline',     url: '/dashboard/content',              icon: FolderKanban, roles: ['admin', 'leader'] },
 				{ title: 'Continuous Improvements', url: '/dashboard/continuous-improvements', icon: Zap, roles: ['admin', 'leader'] }
@@ -264,9 +267,8 @@
 			hoverClass: 'hover:bg-rose-50 dark:hover:bg-rose-950/40 hover:text-rose-900 dark:hover:text-rose-100',
 			borderClass: 'border-rose-500',
 			iconActiveClass: 'text-rose-600 dark:text-rose-400',
-			roles: ['admin'],
+			roles: ['admin', 'leader', 'marketing_lead', 'sales'],
 			items: [
-				{ title: 'Import Data', url: '/dashboard/import', icon: Upload, roles: ['admin'] },
 				{ title: 'Admin Panel', url: '/dashboard/admin', icon: ShieldCheck, roles: ['admin'] },
 				{ title: '[TEMP] Pipeline Tests', url: '/dashboard/pipeline-tests', icon: Zap, roles: ['admin'] }
 			]
@@ -312,13 +314,13 @@
 	}
 
 	function canSeeGroup(group: NavGroup): boolean {
-		if (userRole === 'admin') return true;
+		if (userRole === 'admin' || userRole === 'league_owner') return true;
 		if (group.roles && !group.roles.includes(userRole)) return false;
 		return true;
 	}
 
 	function canSeeItem(item: NavItem): boolean {
-		if (userRole === 'admin') return true;
+		if (userRole === 'admin' || userRole === 'league_owner') return true;
 		if (item.roles && !item.roles.includes(userRole)) return false;
 		return true;
 	}

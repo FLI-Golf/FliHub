@@ -141,7 +141,7 @@ Here are the records to convert:
 	};
 
 	// ── State ─────────────────────────────────────────────────────────────────
-	let selectedType = $state<ImportType>('vendors');
+	let selectedType = $state<ImportType>('reimbursements');
 	let csvText      = $state('');
 	let rows         = $state<Record<string, string>[]>([]);
 	let parseError   = $state('');
@@ -158,10 +158,34 @@ Here are the records to convert:
 
 	const schema = $derived(SCHEMAS[selectedType]);
 	const cols   = $derived(schema.map(s => s.col));
+	const loggedInUserEmail = $derived(
+		String((data as any)?.user?.email ?? (data as any)?.userProfile?.email ?? '').trim()
+	);
+	const firstKnownUserEmail = $derived(
+		String(((data.userProfiles ?? []) as any[]).map((u: any) => u?.email).find(Boolean) ?? '').trim()
+	);
+	const reimbursementSampleClaimantEmail = $derived(
+		loggedInUserEmail || firstKnownUserEmail || 'jane@example.com'
+	);
+	const reimbursementSampleVendorName = $derived(
+		String(((data.vendors ?? []) as any[]).map((v: any) => v?.name).find(Boolean) ?? '').trim() || 'Acme Productions'
+	);
+	const reimbursementSampleDepartmentName = $derived(
+		String(((data.departments ?? []) as any[]).map((d: any) => d?.name).find(Boolean) ?? '').trim() || 'Operations'
+	);
+
+	function sampleFieldValue(field: { col: string; example: string }): string {
+		if (selectedType === 'reimbursements') {
+			if (field.col === 'claimantEmail') return reimbursementSampleClaimantEmail;
+			if (field.col === 'vendorName') return reimbursementSampleVendorName;
+			if (field.col === 'departmentName') return reimbursementSampleDepartmentName;
+		}
+		return field.example;
+	}
 
 	// Sample CSV for the selected type
 	const sampleCSV = $derived(
-		cols.join(',') + '\n' + schema.map(s => `"${s.example}"`).join(',')
+		cols.join(',') + '\n' + schema.map((s) => `"${sampleFieldValue(s).replaceAll('"', '""')}"`).join(',')
 	);
 
 	let copied = $state(false);
@@ -453,7 +477,7 @@ Here are the records to convert:
 									<span class="text-slate-500">Optional</span>
 								{/if}
 							</td>
-							<td class="py-1.5 pr-4 text-slate-400 font-mono">{field.example}</td>
+							<td class="py-1.5 pr-4 text-slate-400 font-mono">{sampleFieldValue(field)}</td>
 							<td class="py-1.5 text-slate-500">{field.note ?? '—'}</td>
 						</tr>
 					{/each}
