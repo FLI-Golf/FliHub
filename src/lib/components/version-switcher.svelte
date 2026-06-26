@@ -13,7 +13,7 @@
 <Sidebar.Menu>
 	<Sidebar.MenuItem>
 		<DropdownMenu.Root>
-			<DropdownMenu.Trigger>
+			<DropdownMenu.Trigger asChild>
 				{#snippet child({ props })}
 					<Sidebar.MenuButton
 						size="lg"

@@ -7,7 +7,7 @@
 
 	let { data }: { data: PageData } = $props();
 
-	let searchInput = $state(data.filters?.search || '');
+	let searchInput = $state('');
 	
 	// Update searchInput when data changes (e.g., on navigation)
 	$effect(() => {

@@ -51,11 +51,14 @@ const ROLE_ROUTE_MANIFEST: Record<UserRole, RoleRoutePolicy> = {
 		appShell: 'portal',
 		homeHref: '/portal/projects',
 		allowPortalLayout: true,
-		allowedHrefPrefixes: ['/portal', '/dashboard'],
+		allowedHrefPrefixes: ['/portal'],
 		portalNav: [
 			{ label: 'My Department', href: '/portal/projects', icon: 'FolderKanban' },
 			{ label: 'Tasks', href: '/portal/tasks', icon: 'CheckSquare' },
 			{ label: 'Expenses', href: '/portal/expenses', icon: 'Receipt' },
+			{ label: 'My Reimbursements', href: '/portal/reimbursements', icon: 'Wallet' },
+			{ label: 'Reimbursements Admin', href: '/portal/reimbursements/admin', icon: 'ShieldCheck' },
+			{ label: 'Import Data', href: '/portal/import', icon: 'Upload' },
 		],
 	},
 	sales: {
@@ -63,7 +66,7 @@ const ROLE_ROUTE_MANIFEST: Record<UserRole, RoleRoutePolicy> = {
 		appShell: 'portal',
 		homeHref: '/portal/leads',
 		allowPortalLayout: true,
-		allowedHrefPrefixes: ['/portal', '/dashboard'],
+		allowedHrefPrefixes: ['/portal'],
 		portalNav: [
 			{ label: 'Leads & Pipeline', href: '/portal/leads', icon: 'Target' },
 			{ label: 'Territories', href: '/portal/territories', icon: 'MapPin' },
@@ -87,7 +90,7 @@ const ROLE_ROUTE_MANIFEST: Record<UserRole, RoleRoutePolicy> = {
 		appShell: 'portal',
 		homeHref: '/portal/tournaments',
 		allowPortalLayout: true,
-		allowedHrefPrefixes: ['/portal', '/dashboard'],
+		allowedHrefPrefixes: ['/portal'],
 		portalNav: [
 			{ label: 'Tournament Schedule', href: '/portal/tournaments', icon: 'Calendar' },
 			{ label: 'Earnings', href: '/portal/earnings', icon: 'DollarSign' },
@@ -98,7 +101,7 @@ const ROLE_ROUTE_MANIFEST: Record<UserRole, RoleRoutePolicy> = {
 		appShell: 'portal',
 		homeHref: '/portal/franchise',
 		allowPortalLayout: true,
-		allowedHrefPrefixes: ['/portal', '/dashboard'],
+		allowedHrefPrefixes: ['/portal'],
 		portalNav: [
 			{ label: 'My Franchise', href: '/portal/franchise', icon: 'Trophy' },
 			{ label: 'Schedule', href: '/portal/tournaments', icon: 'Calendar' },
@@ -106,22 +109,18 @@ const ROLE_ROUTE_MANIFEST: Record<UserRole, RoleRoutePolicy> = {
 	},
 	league_owner: {
 		role: 'league_owner',
-		appShell: 'dashboard',
-		homeHref: '/dashboard',
-		allowPortalLayout: false,
-		allowedHrefPrefixes: ['/dashboard'],
-		portalNav: [
-			{ label: 'Executive Dashboard', href: '/dashboard', icon: 'LayoutDashboard' },
-			{ label: 'Financials', href: '/dashboard/use-of-proceeds', icon: 'DollarSign' },
-			{ label: 'Active Projects', href: '/dashboard/active-projects', icon: 'Zap' },
-		],
+		appShell: 'portal',
+		homeHref: '/portal/profile',
+		allowPortalLayout: true,
+		allowedHrefPrefixes: ['/portal'],
+		portalNav: [],
 	},
 	broadcaster: {
 		role: 'broadcaster',
 		appShell: 'portal',
 		homeHref: '/portal/media',
 		allowPortalLayout: true,
-		allowedHrefPrefixes: ['/portal', '/dashboard'],
+		allowedHrefPrefixes: ['/portal'],
 		portalNav: [
 			{ label: 'Media', href: '/portal/media', icon: 'Tv' },
 			{ label: 'Schedule', href: '/portal/tournaments', icon: 'Calendar' },
@@ -132,7 +131,7 @@ const ROLE_ROUTE_MANIFEST: Record<UserRole, RoleRoutePolicy> = {
 		appShell: 'portal',
 		homeHref: '/portal/payments',
 		allowPortalLayout: true,
-		allowedHrefPrefixes: ['/portal', '/dashboard'],
+		allowedHrefPrefixes: ['/portal'],
 		portalNav: [
 			{ label: 'Payments', href: '/portal/payments', icon: 'DollarSign' },
 			{ label: 'Schedule', href: '/portal/tournaments', icon: 'Calendar' },
@@ -143,10 +142,13 @@ const ROLE_ROUTE_MANIFEST: Record<UserRole, RoleRoutePolicy> = {
 		appShell: 'portal',
 		homeHref: '/portal/marketing/goals',
 		allowPortalLayout: true,
-		allowedHrefPrefixes: ['/portal', '/dashboard'],
+		allowedHrefPrefixes: ['/portal'],
 		portalNav: [
 			{ label: 'Goals', href: '/portal/marketing/goals', icon: 'Target' },
 			{ label: 'Campaigns', href: '/portal/marketing/campaigns', icon: 'Megaphone' },
+			{ label: 'My Reimbursements', href: '/portal/reimbursements', icon: 'Wallet' },
+			{ label: 'Reimbursements Admin', href: '/portal/reimbursements/admin', icon: 'ShieldCheck' },
+			{ label: 'Import Data', href: '/portal/import', icon: 'Upload' },
 		],
 	},
 	marketing_lead: {
@@ -154,12 +156,15 @@ const ROLE_ROUTE_MANIFEST: Record<UserRole, RoleRoutePolicy> = {
 		appShell: 'portal',
 		homeHref: '/portal/marketing/dashboard',
 		allowPortalLayout: true,
-		allowedHrefPrefixes: ['/portal', '/dashboard'],
+		allowedHrefPrefixes: ['/portal'],
 		portalNav: [
 			{ label: 'Dashboard', href: '/portal/marketing/dashboard', icon: 'LayoutDashboard' },
 			{ label: 'Goals', href: '/portal/marketing/goals', icon: 'Target' },
 			{ label: 'Campaigns', href: '/portal/marketing/campaigns', icon: 'Megaphone' },
 			{ label: 'Sponsorships', href: '/portal/marketing/sponsors', icon: 'Handshake' },
+			{ label: 'My Reimbursements', href: '/portal/reimbursements', icon: 'Wallet' },
+			{ label: 'Reimbursements Admin', href: '/portal/reimbursements/admin', icon: 'ShieldCheck' },
+			{ label: 'Import Data', href: '/portal/import', icon: 'Upload' },
 		],
 	},
 };

@@ -1,6 +1,7 @@
 import { json } from '@sveltejs/kit';
 import { RequestContext } from '$lib/infra/RequestContext';
 import { getAdminPocketBase } from '$lib/infra/pocketbase/pbClient';
+import { FetchReimbursementsForThisUser } from '$lib/domain/services/FetchReimbursementsForThisUser';
 import {
 	DEFAULT_REIMBURSEMENT_MAX_CLAIM_TOTAL,
 	REIMBURSEMENT_MAX_TOTAL_SETTING_KEY
@@ -41,6 +42,11 @@ export const POST: RequestHandler = async ({ locals, url, request }) => {
 
 	try {
 		const adminPb = await getAdminPocketBase();
+		const reimbursementFetcher = new FetchReimbursementsForThisUser(adminPb);
+		const defaultProfile = await reimbursementFetcher.resolveDefaultProfileForSession({
+			profileId: ctx.profile?.id ?? null,
+			sessionUserId: ctx.userId
+		});
 		const maxClaimTotal = await getMaxClaimTotal(adminPb);
 		const workOrder = await nextWorkOrderNumber(adminPb);
 		const items = body.items ?? [];
@@ -65,7 +71,7 @@ export const POST: RequestHandler = async ({ locals, url, request }) => {
 
 		const claim = await adminPb.collection('reimbursement_claims').create({
 			title:           body.title.trim(),
-			claimant:        ctx.profile?.id ?? body.claimant ?? null,
+			claimant:        defaultProfile?.id ?? ctx.profile?.id ?? body.claimant ?? null,
 			status:          'draft',
 			notes:           body.notes?.trim() || '',
 			referenceNumber: workOrder,

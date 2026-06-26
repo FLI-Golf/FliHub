@@ -2,38 +2,6 @@ import { isRedirect, redirect } from '@sveltejs/kit';
 import { RequestContext } from '$lib/infra/RequestContext';
 import type { LayoutServerLoad } from './$types';
 
-const ROLE_DASHBOARD_PATHS: Record<string, string[]> = {
-	pro: [
-		'/dashboard/welcome',
-		'/dashboard/onboarding',
-		'/dashboard/player-profile',
-		'/dashboard/my-payments',
-		'/dashboard/reimbursements',
-		'/dashboard/settings',
-	],
-	manager: [
-		'/dashboard/welcome',
-		'/dashboard/onboarding',
-		'/dashboard/player-profile',
-		'/dashboard/my-payments',
-		'/dashboard/reimbursements',
-		'/dashboard/settings',
-	],
-	broadcaster: [
-		'/dashboard/welcome',
-		'/dashboard/onboarding',
-		'/dashboard/player-profile',
-		'/dashboard/my-payments',
-		'/dashboard/reimbursements',
-		'/dashboard/settings',
-	],
-};
-
-function isPathAllowedForRole(role: string, path: string): boolean {
-	const allowed = ROLE_DASHBOARD_PATHS[role] ?? [];
-	return allowed.some((prefix) => path === prefix || path.startsWith(`${prefix}/`));
-}
-
 export const load: LayoutServerLoad = async ({ locals, url }) => {
 	try {
 		// RequestContext.from handles:
@@ -42,8 +10,7 @@ export const load: LayoutServerLoad = async ({ locals, url }) => {
 		const ctx = await RequestContext.from(locals, url);
 		const { pb, profile } = ctx;
 
-		// Dashboard is mostly admin-oriented, but some roles have specific dashboard pages.
-		if (ctx.role !== 'admin' && !isPathAllowedForRole(ctx.role, url.pathname)) {
+		if (ctx.role !== 'admin') {
 			throw redirect(303, '/portal');
 		}
 

@@ -9,10 +9,33 @@
 		ITEM_CATEGORY_LABELS, PAYMENT_METHOD_LABELS
 	} from '$lib/domain/schemas/reimbursement.schema';
 
-	let { data }: { data: PageData } = $props();
+	let { data, portalView = null }: { data: PageData; portalView?: 'my' | 'admin' | null } = $props();
 
 	const fmt     = (n: number) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 2 }).format(n ?? 0);
 	const fmtDate = (d: string) => d ? new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—';
+	const claimantDisplayName = $derived(
+		data.resolvedProfile?.label
+			|| [data.profile?.firstName, data.profile?.lastName].filter(Boolean).join(' ')
+			|| null
+	);
+	const pageHeading = $derived(
+		!data.isAdmin && portalView === 'admin' && claimantDisplayName
+			? `Reimbursements Admin for ${claimantDisplayName}`
+			: !data.isAdmin && portalView === 'admin'
+				? 'Reimbursements Admin'
+				: !data.isAdmin && claimantDisplayName
+					? `My Reimbursements for ${claimantDisplayName}`
+					: !data.isAdmin
+						? 'My Reimbursements'
+						: 'Reimbursements'
+	);
+	const pageSubheading = $derived(
+		data.isAdmin
+			? 'Submit expenses for reimbursement — group multiple transactions into one claim'
+			: portalView === 'admin'
+				? 'Session-scoped admin workspace for managing your reimbursement claims'
+				: 'Manage your own reimbursement claims for this session profile'
+	);
 
 	// ── UI state ──────────────────────────────────────────────────────────────
 	let showNewClaim    = $state(false);
@@ -49,9 +72,15 @@
 		{ description: '', amount: '', date: '', category: 'other', vendor: '', vendorId: '', notes: '', receipts: null }
 	]);
 	let editingMaxClaimTotal = $state(false);
-	let maxClaimTotalInput = $state(String(data.maxClaimTotal ?? 1500));
+	let maxClaimTotalInput = $state('1500');
 	let maxClaimTotalError = $state('');
 	let savingMaxClaimTotal = $state(false);
+
+	$effect(() => {
+		if (!editingMaxClaimTotal) {
+			maxClaimTotalInput = String(data.maxClaimTotal ?? 1500);
+		}
+	});
 
 	function addLine() {
 		lineItems = [...lineItems, { description: '', amount: '', date: '', category: 'other', vendor: '', vendorId: '', notes: '', receipts: null }];
@@ -170,6 +199,68 @@
 	function toggleSelectItem(itemId: string, checked: boolean) {
 		selectedItemIds = { ...selectedItemIds, [itemId]: checked };
 	}
+
+	const filteredMyItems = $derived.by(() => {
+		const source = (data.myItems as any[]) ?? [];
+		const q = itemFilter.trim().toLowerCase();
+		if (!q) return source;
+
+		return source.filter((item: any) => {
+			const claimTitle = claimTitleFor(item).toLowerCase();
+			const haystack = [
+				item.description,
+				item.category,
+				item.notes,
+				item.workOrderReference,
+				claimTitle
+			]
+				.filter(Boolean)
+				.join(' ')
+				.toLowerCase();
+
+			return haystack.includes(q);
+		});
+	});
+
+	const sortedFilteredMyItems = $derived.by(() => {
+		const source = [...((filteredMyItems as any[]) ?? [])];
+		source.sort((a: any, b: any) => {
+			let cmp = 0;
+			switch (itemSortKey) {
+				case 'description':
+					cmp = (a.description ?? '').localeCompare(b.description ?? '', undefined, { sensitivity: 'base' });
+					break;
+				case 'date': {
+					const aTime = a.date ? new Date(a.date).getTime() : 0;
+					const bTime = b.date ? new Date(b.date).getTime() : 0;
+					cmp = aTime - bTime;
+					break;
+				}
+				case 'category':
+					cmp = (ITEM_CATEGORY_LABELS[a.category] ?? a.category ?? '').localeCompare((ITEM_CATEGORY_LABELS[b.category] ?? b.category ?? ''), undefined, { sensitivity: 'base' });
+					break;
+				case 'notes':
+					cmp = (a.notes ?? '').localeCompare(b.notes ?? '', undefined, { sensitivity: 'base' });
+					break;
+				case 'workOrderReference':
+					cmp = (a.workOrderReference ?? '').localeCompare(b.workOrderReference ?? '', undefined, { sensitivity: 'base' });
+					break;
+				case 'receipts':
+					cmp = (a.receipts?.length ?? 0) - (b.receipts?.length ?? 0);
+					break;
+				case 'amount':
+					cmp = (Number(a.amount) || 0) - (Number(b.amount) || 0);
+					break;
+			}
+
+			if (cmp === 0) {
+				cmp = (a.description ?? '').localeCompare(b.description ?? '', undefined, { sensitivity: 'base' });
+			}
+
+			return itemSortDir === 'asc' ? cmp : -cmp;
+		});
+		return source;
+	});
 
 	function toggleSelectAllFiltered(checked: boolean) {
 		const next = { ...selectedItemIds };
@@ -511,81 +602,19 @@
 		itemSortDir = 'asc';
 	}
 
-	const filteredMyItems = $derived.by(() => {
-		const source = (data.myItems as any[]) ?? [];
-		const q = itemFilter.trim().toLowerCase();
-		if (!q) return source;
-
-		return source.filter((item: any) => {
-			const claimTitle = claimTitleFor(item).toLowerCase();
-			const haystack = [
-				item.description,
-				item.category,
-				item.notes,
-				item.workOrderReference,
-				claimTitle
-			]
-				.filter(Boolean)
-				.join(' ')
-				.toLowerCase();
-
-			return haystack.includes(q);
-		});
-	});
-
-	const sortedFilteredMyItems = $derived.by(() => {
-		const source = [...((filteredMyItems as any[]) ?? [])];
-		source.sort((a: any, b: any) => {
-			let cmp = 0;
-			switch (itemSortKey) {
-				case 'description':
-					cmp = (a.description ?? '').localeCompare(b.description ?? '', undefined, { sensitivity: 'base' });
-					break;
-				case 'date': {
-					const aTime = a.date ? new Date(a.date).getTime() : 0;
-					const bTime = b.date ? new Date(b.date).getTime() : 0;
-					cmp = aTime - bTime;
-					break;
-				}
-				case 'category':
-					cmp = (ITEM_CATEGORY_LABELS[a.category] ?? a.category ?? '').localeCompare((ITEM_CATEGORY_LABELS[b.category] ?? b.category ?? ''), undefined, { sensitivity: 'base' });
-					break;
-				case 'notes':
-					cmp = (a.notes ?? '').localeCompare(b.notes ?? '', undefined, { sensitivity: 'base' });
-					break;
-				case 'workOrderReference':
-					cmp = (a.workOrderReference ?? '').localeCompare(b.workOrderReference ?? '', undefined, { sensitivity: 'base' });
-					break;
-				case 'receipts':
-					cmp = (a.receipts?.length ?? 0) - (b.receipts?.length ?? 0);
-					break;
-				case 'amount':
-					cmp = (Number(a.amount) || 0) - (Number(b.amount) || 0);
-					break;
-			}
-
-			if (cmp === 0) {
-				cmp = (a.description ?? '').localeCompare(b.description ?? '', undefined, { sensitivity: 'base' });
-			}
-
-			return itemSortDir === 'asc' ? cmp : -cmp;
-		});
-		return source;
-	});
-
 	const INPUT = 'w-full rounded-lg border border-slate-600 bg-slate-800 text-slate-100 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 placeholder:text-slate-500';
 	const LABEL = 'block text-xs font-medium text-slate-400 mb-1';
 </script>
 
-<svelte:head><title>Reimbursements — FliHub</title></svelte:head>
+<svelte:head><title>{pageHeading} — FliHub</title></svelte:head>
 
 <div class="space-y-6">
 
 	<!-- Header -->
 	<div class="flex items-center justify-between">
 		<div>
-			<h1 class="text-3xl font-bold tracking-tight">Reimbursements</h1>
-			<p class="text-muted-foreground mt-1">Submit expenses for reimbursement — group multiple transactions into one claim</p>
+			<h1 class="text-3xl font-bold tracking-tight">{pageHeading}</h1>
+			<p class="text-muted-foreground mt-1">{pageSubheading}</p>
 		</div>
 		<div class="flex items-center gap-3">
 			{#if data.isAdmin}

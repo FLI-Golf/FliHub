@@ -20,7 +20,7 @@ const homeCases: HomeCase[] = [
 	{ role: 'vendor', expectedHome: '/portal/vendor/dashboard', expectedPortalLayout: true },
 	{ role: 'pro', expectedHome: '/portal/tournaments', expectedPortalLayout: true },
 	{ role: 'franchise_owner', expectedHome: '/portal/franchise', expectedPortalLayout: true },
-	{ role: 'league_owner', expectedHome: '/dashboard', expectedPortalLayout: false },
+	{ role: 'league_owner', expectedHome: '/portal/profile', expectedPortalLayout: true },
 	{ role: 'broadcaster', expectedHome: '/portal/media', expectedPortalLayout: true },
 	{ role: 'manager', expectedHome: '/portal/payments', expectedPortalLayout: true },
 	{ role: 'marketing', expectedHome: '/portal/marketing/goals', expectedPortalLayout: true },
@@ -46,15 +46,15 @@ const accessCases: AccessCase[] = [
 	{ role: 'admin', href: '/dashboard/projects', expected: true },
 	{ role: 'admin', href: '/portal/projects', expected: false },
 	{ role: 'leader', href: '/portal/projects', expected: true },
-	{ role: 'leader', href: '/dashboard/tasks', expected: true },
+	{ role: 'leader', href: '/dashboard/tasks', expected: false },
 	{ role: 'leader', href: '/portal/vendor/dashboard', expected: false },
 	{ role: 'vendor', href: '/portal/vendor/dashboard', expected: true },
 	{ role: 'vendor', href: '/vendor/dashboard', expected: false },
 	{ role: 'vendor', href: '/portal/profile', expected: false },
-	{ role: 'league_owner', href: '/dashboard/use-of-proceeds', expected: true },
-	{ role: 'league_owner', href: '/portal/profile', expected: false },
+	{ role: 'league_owner', href: '/dashboard/use-of-proceeds', expected: false },
+	{ role: 'league_owner', href: '/portal/profile', expected: true },
 	{ role: 'marketing_lead', href: '/portal/marketing/dashboard', expected: true },
-	{ role: 'marketing_lead', href: '/dashboard/marketing-goals', expected: true },
+	{ role: 'marketing_lead', href: '/dashboard/marketing-goals', expected: false },
 	{ role: 'marketing_lead', href: '/portal/vendor/bids', expected: false },
 ];
 
@@ -71,6 +71,78 @@ assert.equal(
 	getRolePortalNav('vendor').every((item) => item.href.startsWith('/portal/vendor')),
 	true,
 	'vendor portal nav should be scoped to /portal/vendor'
+);
+
+assert.equal(
+	getRolePortalNav('leader').some((item) => item.href === '/portal/reimbursements'),
+	true,
+	'leader portal nav should include reimbursements'
+);
+
+assert.equal(
+	getRolePortalNav('leader').find((item) => item.href === '/portal/reimbursements')?.label,
+	'My Reimbursements',
+	'leader portal reimbursements label should expose personal claimant workspace'
+);
+
+assert.equal(
+	getRolePortalNav('leader').find((item) => item.href === '/portal/reimbursements/admin')?.label,
+	'Reimbursements Admin',
+	'leader portal reimbursements admin label should expose session admin workspace'
+);
+
+assert.equal(
+	getRolePortalNav('leader').some((item) => item.href === '/portal/import'),
+	true,
+	'leader portal nav should include import data'
+);
+
+assert.equal(
+	getRolePortalNav('marketing').some((item) => item.href === '/portal/reimbursements'),
+	true,
+	'marketing portal nav should include reimbursements'
+);
+
+assert.equal(
+	getRolePortalNav('marketing').find((item) => item.href === '/portal/reimbursements')?.label,
+	'My Reimbursements',
+	'marketing portal reimbursements label should expose personal claimant workspace'
+);
+
+assert.equal(
+	getRolePortalNav('marketing').find((item) => item.href === '/portal/reimbursements/admin')?.label,
+	'Reimbursements Admin',
+	'marketing portal reimbursements admin label should expose session admin workspace'
+);
+
+assert.equal(
+	getRolePortalNav('marketing').some((item) => item.href === '/portal/import'),
+	true,
+	'marketing portal nav should include import data'
+);
+
+assert.equal(
+	getRolePortalNav('marketing_lead').some((item) => item.href === '/portal/reimbursements'),
+	true,
+	'marketing lead portal nav should include reimbursements'
+);
+
+assert.equal(
+	getRolePortalNav('marketing_lead').find((item) => item.href === '/portal/reimbursements')?.label,
+	'My Reimbursements',
+	'marketing lead portal reimbursements label should expose personal claimant workspace'
+);
+
+assert.equal(
+	getRolePortalNav('marketing_lead').find((item) => item.href === '/portal/reimbursements/admin')?.label,
+	'Reimbursements Admin',
+	'marketing lead portal reimbursements admin label should expose session admin workspace'
+);
+
+assert.equal(
+	getRolePortalNav('marketing_lead').some((item) => item.href === '/portal/import'),
+	true,
+	'marketing lead portal nav should include import data'
 );
 
 // Ensure dashboard nav renderer receives filtered groups/items.

@@ -2,6 +2,33 @@ import { json } from '@sveltejs/kit';
 import { RequestContext } from '$lib/infra/RequestContext';
 import type { RequestHandler } from './$types';
 
+const VENDOR_TYPE_ALIASES: Record<string, string> = {
+	service_provider: 'service_provider',
+	service: 'service_provider',
+	other: 'service_provider',
+	venue: 'venue',
+	product_supplier: 'product_supplier',
+	supplier: 'product_supplier',
+	equipment: 'product_supplier',
+	beverage: 'beverage',
+	technology: 'technology',
+	gaming: 'gaming'
+};
+
+function normalizeVendorType(rawType: string | undefined): string {
+	const normalized = (rawType || '').trim().toLowerCase();
+	if (!normalized) return 'service_provider';
+	return VENDOR_TYPE_ALIASES[normalized] || 'service_provider';
+}
+
+function pickField(row: Record<string, string>, ...keys: string[]): string {
+	for (const key of keys) {
+		const value = row[key];
+		if (typeof value === 'string' && value.trim().length > 0) return value.trim();
+	}
+	return '';
+}
+
 // POST /api/import
 // Body: { type: 'vendors' | 'sponsors' | 'pros', rows: Record<string, string>[] }
 // Returns: { created, failed, errors[] } via streaming-friendly JSON
@@ -9,6 +36,10 @@ import type { RequestHandler } from './$types';
 export const POST: RequestHandler = async ({ locals, url, request }) => {
 	const ctx = await RequestContext.fromApi(locals, url);
 	if (!ctx) return json({ message: 'Unauthorized' }, { status: 401 });
+	const role = ctx.profile?.role;
+	if (!['admin', 'leader', 'marketing', 'marketing_lead'].includes(role ?? '')) {
+		return json({ message: 'Unauthorized' }, { status: 403 });
+	}
 	const pb = ctx.pb;
 	const { type, rows } = await request.json() as { type: string; rows: Record<string, string>[] };
 
@@ -50,16 +81,18 @@ export const POST: RequestHandler = async ({ locals, url, request }) => {
 		const row = rows[i];
 		try {
 			if (type === 'vendors') {
+				const normalizedVendorType = normalizeVendorType(row.type);
 				await pb.collection('vendors').create({
-					name:            row.name?.trim() || '',
-					type:            row.type?.trim() || 'service_provider',
-					contactName:     row.contactName?.trim() || '',
-					contactEmail:    row.contactEmail?.trim() || '',
-					contactPhone:    row.contactPhone?.trim() || '',
-					website:         row.website?.trim() || '',
-					location:        row.location?.trim() || '',
-					status:          row.status?.trim() || 'active',
-					notes:           row.notes?.trim() || ''
+					name:            pickField(row, 'name'),
+					type:            normalizedVendorType,
+					// Vendor collection uses snake_case contact fields; keep camelCase as accepted CSV aliases.
+					contact_name:    pickField(row, 'contact_name', 'contactName'),
+					contact_email:   pickField(row, 'contact_email', 'contactEmail').toLowerCase(),
+					contact_phone:   pickField(row, 'contact_phone', 'contactPhone'),
+					website:         pickField(row, 'website'),
+					address:         pickField(row, 'address', 'location'),
+					active:          (pickField(row, 'status').toLowerCase() || 'active') !== 'inactive',
+					about:           pickField(row, 'about', 'notes')
 				});
 			} else if (type === 'sponsors') {
 				await pb.collection('sponsors').create({

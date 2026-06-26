@@ -101,7 +101,7 @@ Here are the records to convert:
 		],
 		vendors: [
 			{ col: 'name',         required: true,  example: 'Acme Productions' },
-			{ col: 'type',         required: false, example: 'service_provider', note: 'service_provider · equipment · venue · technology · other' },
+			{ col: 'type',         required: false, example: 'service_provider', note: 'service_provider · product_supplier · venue · beverage · technology · gaming (aliases: equipment -> product_supplier, other -> service_provider)' },
 			{ col: 'contactName',  required: false, example: 'Jane Smith' },
 			{ col: 'contactEmail', required: false, example: 'jane@acme.com' },
 			{ col: 'contactPhone', required: false, example: '+1 555 000 0001' },

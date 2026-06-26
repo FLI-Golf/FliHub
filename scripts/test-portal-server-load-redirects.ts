@@ -103,7 +103,9 @@ async function run() {
 		);
 
 		setMockContext({ userId: 'u1', role: 'league_owner' });
-		await expectRedirect(() => portalLayoutLoad({ locals: fakeLocals, url: testUrl }), '/dashboard');
+		const leagueOwnerResult: any = await portalLayoutLoad({ locals: fakeLocals, url: testUrl });
+		assert.equal(leagueOwnerResult.portalRole, 'league_owner');
+		assert.ok(Array.isArray(leagueOwnerResult.portalConfig?.nav), 'expected league owner portal nav array');
 
 		// Layout load returns hydrated config for allowed role
 		setMockContext({

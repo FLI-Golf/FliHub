@@ -10,7 +10,13 @@
 	} from 'lucide-svelte';
 	import type { PageData } from './$types';
 
-	let { data }: { data: PageData } = $props();
+	let {
+		data,
+		backHref = '/dashboard/reimbursements'
+	}: {
+		data: PageData;
+		backHref?: string;
+	} = $props();
 
 	// ── Helpers ───────────────────────────────────────────────────────────────
 	const fmt     = (n: number) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(n ?? 0);
@@ -281,6 +287,7 @@
 		{ key: 'approved',     label: 'Approved',     color: 'text-violet-400',  bg: 'bg-violet-950/40 border-violet-800/50' },
 		{ key: 'paid',         label: 'Paid',         color: 'text-emerald-400', bg: 'bg-emerald-950/40 border-emerald-800/50' },
 	];
+
 </script>
 
 <svelte:head><title>Reimbursements Admin — FliHub</title></svelte:head>
@@ -293,7 +300,7 @@
 			<h1 class="text-2xl font-bold text-slate-100">Reimbursements — Admin</h1>
 			<p class="text-sm text-slate-400 mt-0.5">Review, approve, and process reimbursement claims</p>
 		</div>
-		<a href="/dashboard/reimbursements" class="text-xs text-slate-400 hover:text-slate-200 underline underline-offset-2">← Claimant view</a>
+		<a href={backHref} class="text-xs text-slate-400 hover:text-slate-200 underline underline-offset-2">← Claimant view</a>
 	</div>
 
 	<!-- Pipeline metrics -->
