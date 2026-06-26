@@ -48,6 +48,12 @@ const resolveBankAccount = async (adminPb: any, rawAccountId: unknown, rawAccoun
 	}) ?? null;
 };
 
+const extractPaymentIdsFromNotes = (notes: unknown): string[] => {
+	const text = String(notes ?? '');
+	const ids = Array.from(text.matchAll(/\[PP:([^\]]+)\]/g)).map((match) => String(match[1] ?? '').trim()).filter(Boolean);
+	return Array.from(new Set(ids));
+};
+
 export const PATCH: RequestHandler = async ({ locals, url, params, request }) => {
 	const ctx = await RequestContext.fromApi(locals, url);
 	if (!ctx) return json({ message: 'Unauthorized' }, { status: 401 });
@@ -87,6 +93,12 @@ export const PATCH: RequestHandler = async ({ locals, url, params, request }) =>
 		const record = await adminPb.collection('work_orders').update(params.id, update);
 		const isNowPaid = toPaymentStatus(record.status) === 'paid';
 		const shouldDeductBankAccount = !wasPaid && isNowPaid;
+		const paymentIds = Array.isArray(record.proPayment)
+			? record.proPayment.filter((id: any) => typeof id === 'string' && id.length > 0)
+			: [];
+		const notePaymentIds = extractPaymentIdsFromNotes(record.notes);
+		const allPaymentIds = Array.from(new Set([...paymentIds, ...notePaymentIds]));
+		let syncedProPayments = 0;
 		let bankAccountDeducted: { id: string; label: string; amount: number; newAllocation: number } | null = null;
 		let bankAccountWarning: string | null = null;
 
@@ -136,6 +148,37 @@ export const PATCH: RequestHandler = async ({ locals, url, params, request }) =>
 			}
 		}
 
+		// Keep linked pro payouts in sync when this work order is marked paid or given a QB reference.
+		if ((isNowPaid || body.qb_transaction_id !== undefined) && allPaymentIds.length > 0) {
+			const paidAt = new Date().toISOString().replace('T', ' ').slice(0, 19);
+			const qbTxn = String(body.qb_transaction_id ?? '').trim();
+			const actor = profile?.id ?? 'system';
+
+			await Promise.all(allPaymentIds.map(async (paymentId: string) => {
+				const current = await adminPb.collection('pro_payments').getOne(paymentId, {
+					fields: 'id,status,transactionId,paidAt,paidBy'
+				}).catch(() => null);
+				if (!current) return;
+
+				const next: Record<string, any> = {};
+				if (isNowPaid && String(current.status ?? '').toLowerCase() !== 'paid') {
+					next.status = 'paid';
+					next.paidAt = paidAt;
+					next.paidBy = actor;
+				}
+				if (qbTxn) {
+					next.transactionId = qbTxn;
+				}
+
+				if (Object.keys(next).length === 0) return;
+				await adminPb.collection('pro_payments').update(paymentId, next).then(() => {
+					syncedProPayments += 1;
+				}).catch((e: any) => {
+					console.warn('[wo] pro_payment sync failed:', paymentId, e?.message);
+				});
+			}));
+		}
+
 		const qbTouched = (
 			body.qb_transaction_id !== undefined ||
 			body.qb_entered_date !== undefined ||
@@ -166,10 +209,6 @@ export const PATCH: RequestHandler = async ({ locals, url, params, request }) =>
 			record.notes = nextNotes;
 
 			// For pro payout work orders, also append to the canonical payment_audit_log table.
-			const paymentIds = Array.isArray(record.proPayment)
-				? record.proPayment.filter((id: any) => typeof id === 'string' && id.length > 0)
-				: [];
-
 			if (paymentIds.length > 0) {
 				await writeAuditLogBatch(adminPb, paymentIds.map((paymentId: string) => ({
 					paymentId,
@@ -253,6 +292,7 @@ export const PATCH: RequestHandler = async ({ locals, url, params, request }) =>
 
 		return json({
 			...record,
+			_syncedProPayments: syncedProPayments,
 			_bankAccountDeducted: bankAccountDeducted,
 			_bankAccountWarning: bankAccountWarning,
 		});

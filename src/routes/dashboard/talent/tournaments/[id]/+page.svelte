@@ -142,7 +142,7 @@
 	const paidCount     = $derived((data.proPayments ?? []).filter((p: any) => p.status === 'paid').length);
 	const workOrderCount = $derived((data.workOrders ?? []).length);
 	const totalWorkOrderAmount = $derived((data.workOrders ?? []).reduce((s: number, wo: any) => s + (wo.amount ?? 0), 0));
-	const workOrdersByRecipient = $derived(() => {
+	const workOrdersByRecipient = $derived((() => {
 		const grouped = new Map<string, any[]>();
 		for (const workOrder of (data.workOrders ?? [])) {
 			const notes = String(workOrder.notes ?? '').toLowerCase();
@@ -158,8 +158,8 @@
 			workOrders,
 			total: workOrders.reduce((sum, wo) => sum + (wo.amount ?? 0), 0),
 		}));
-	});
-	const workOrderMappings = $derived(() => {
+	})());
+	const workOrderMappings = $derived((() => {
 		const byPaymentId = new Map<string, any>();
 		for (const wo of (data.workOrders ?? [])) {
 			const idsFromRelation = Array.isArray(wo.proPayment) ? wo.proPayment : [];
@@ -185,7 +185,7 @@
 				const recipientOrder = a.recipient.localeCompare(b.recipient);
 				return recipientOrder !== 0 ? recipientOrder : a.paymentName.localeCompare(b.paymentName);
 			});
-	});
+	})());
 
 	let expandedFranchises = $state<Set<string>>(new Set());
 	let expandedPayout     = $state<number | null>(null);
@@ -827,7 +827,7 @@
 					</div>
 				</div>
 
-				{#each workOrdersByRecipient() as group}
+				{#each workOrdersByRecipient as group}
 					<div class="rounded-lg border border-slate-700 bg-slate-900/40 overflow-hidden">
 						<div class="px-4 py-2.5 flex items-center justify-between gap-3 border-b border-slate-800">
 							<div class="flex items-center gap-2 min-w-0">

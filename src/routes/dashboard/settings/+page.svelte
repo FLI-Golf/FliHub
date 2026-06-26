@@ -69,7 +69,7 @@
 			</div>
 
 			<a
-				href="/dashboard/player-profile"
+				href="/portal/player-profile"
 				class="inline-flex items-center gap-2 text-sm text-orange-400 hover:text-orange-300 transition-colors"
 			>
 				Edit full player profile <ChevronRight class="size-3.5" />

@@ -510,7 +510,7 @@ Andrew@FLIGolf.com | fligolf.com`;
 					{/if}
 				</div>
 				<a
-					href="/dashboard/player-profile"
+					href="/portal/player-profile"
 					class="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg {data.playerProfile ? 'bg-muted hover:bg-muted/80 text-foreground' : 'bg-black text-white hover:bg-gray-800'} font-semibold text-sm transition-all duration-150"
 				>
 					{data.playerProfile ? normalizePlayerTerminology('Edit Player Profile') : normalizePlayerTerminology('Fill Out Player Profile')}

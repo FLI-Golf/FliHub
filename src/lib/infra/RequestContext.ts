@@ -36,7 +36,6 @@ export interface UserProfile {
 	firstName?: string;
 	lastName?: string;
 	vendorId?: string;
-	proReference?: string;
 	talentReference?: string;
 	[key: string]: unknown;
 }
@@ -85,12 +84,12 @@ export class RequestContext {
 
 	/**
 	 * Throws a 303 redirect if the current user's role is not in the allowed list.
-	 * Vendor-role users are always redirected to /vendor/dashboard unless
+	 * Vendor-role users are always redirected to /portal/vendor/dashboard unless
 	 * VENDOR_ROLE is explicitly included in the allowed list.
 	 */
 	requireRole(...allowed: UserRole[]): void {
 		if (this.isVendor && !allowed.includes(VENDOR_ROLE as UserRole)) {
-			throw redirect(303, '/vendor/dashboard');
+			throw redirect(303, '/portal/vendor/dashboard');
 		}
 		if (!allowed.includes(this.role)) {
 			throw redirect(303, '/dashboard');
@@ -102,7 +101,7 @@ export class RequestContext {
 	 *
 	 * Automatically:
 	 *   - Redirects unauthenticated requests to /auth/login
-	 *   - Redirects vendor-role users to /vendor/dashboard (they have their own portal)
+	 *   - Returns role + profile context for route-level policy checks
 	 *
 	 * For API route handlers use RequestContext.fromApi() instead — it throws
 	 * JSON errors rather than redirects.
@@ -125,7 +124,7 @@ export class RequestContext {
 		try {
 			const records = await pb.collection('user_profiles').getFullList({
 				filter: `userId = "${userId}"`,
-				fields: 'id,userId,role,firstName,lastName,vendorId,proReference,talentReference'
+				fields: 'id,userId,role,firstName,lastName,vendorId,talentReference'
 			});
 			profile = (records[0] as unknown as UserProfile) ?? null;
 		} catch {
@@ -133,11 +132,6 @@ export class RequestContext {
 		}
 
 		const ctx = new RequestContext(pb, userId, profile, url ?? new URL('http://localhost'));
-
-		// Vendor-role users belong in the vendor portal — block all /dashboard access
-		if (ctx.isVendor) {
-			throw redirect(303, '/vendor/dashboard');
-		}
 
 		return ctx;
 	}
@@ -165,7 +159,7 @@ export class RequestContext {
 		try {
 			const records = await pb.collection('user_profiles').getFullList({
 				filter: `userId = "${userId}"`,
-				fields: 'id,userId,role,firstName,lastName,vendorId,proReference,talentReference'
+				fields: 'id,userId,role,firstName,lastName,vendorId,talentReference'
 			});
 			profile = (records[0] as unknown as UserProfile) ?? null;
 		} catch {

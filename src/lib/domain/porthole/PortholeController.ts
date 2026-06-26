@@ -4,14 +4,15 @@
  *
  * Usage (server-side):
  *   const ctrl = PortholeControllerFactory.for('pro');
- *   ctrl.getLandingUrl()          // → '/portal/dashboard'
+ *   ctrl.getLandingUrl()          // → role-specific home from route manifest
  *   ctrl.decorateNav(items)       // adds { external: true } to off-portal links
  *   ctrl.canAccessAdminDashboard() // → false for pro, true for admin
  */
 
 import { PortholeFactory, type PortalRole, type PortholeNavItem } from './RolePorthole';
+import { getRoleHomeHref } from '$lib/domain/routing/RoleRouteManifest';
 
-const PORTAL_PREFIXES = ['/portal/', '/vendor/'];
+const PORTAL_PREFIXES = ['/portal/'];
 const ADMIN_ROLES     = new Set<PortalRole>(['admin', 'league_owner']);
 
 export type DecoratedNavItem = PortholeNavItem & { external: boolean };
@@ -30,7 +31,7 @@ export class PortholeController {
 		return ADMIN_ROLES.has(this.role);
 	}
 
-	/** Vendor role uses its own isolated portal, not /portal. */
+	/** Vendor role uses vendor pages within the shared /portal shell. */
 	isVendorRole(): boolean {
 		return this.role === 'vendor';
 	}
@@ -39,8 +40,7 @@ export class PortholeController {
 
 	/** URL the user should land on after successful login. */
 	getLandingUrl(): string {
-		if (this.isVendorRole()) return '/vendor/dashboard';
-		return '/portal/dashboard';
+		return getRoleHomeHref(this.role);
 	}
 
 	/** Whether a given href stays within the porthole shell. */
@@ -68,9 +68,9 @@ export class PortholeController {
 
 	/** Returns a redirect URL if the user should not be on this path, null if OK. */
 	guardPath(path: string): string | null {
-		// Vendor should be in /vendor, not /portal
-		if (this.isVendorRole() && path.startsWith('/portal/')) {
-			return '/vendor/dashboard';
+		// Vendor should stay inside /portal/vendor namespace.
+		if (this.isVendorRole() && !path.startsWith('/portal/vendor')) {
+			return '/portal/vendor/dashboard';
 		}
 		return null;
 	}

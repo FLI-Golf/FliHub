@@ -284,7 +284,7 @@ export class RoleManager {
 
 		const profile = profiles[0];
 		await this.pb.collection('user_profiles').update(profile.id, {
-			proReference: null
+			talentReference: null
 		});
 	}
 

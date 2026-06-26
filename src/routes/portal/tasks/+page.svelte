@@ -48,7 +48,7 @@
 	}
 
 	function getProjectName(projectId: string): string {
-		return projects.find(p => p.id === projectId)?.name || 'Unknown Project';
+		return projects.find((p: any) => p.id === projectId)?.name || 'Unknown Project';
 	}
 
 	// Task workflow pipeline

@@ -174,7 +174,7 @@
 			status: person.status || '',
 			vendorId: person.vendorId || '',
 			departmentId: person.departmentId || '',
-			talentReference: person.talentReference || person.proReference || '',
+			talentReference: person.talentReference || '',
 			broadcasterReference: person.broadcasterReference || ''
 		};
 		sheetOpen = true;
@@ -197,7 +197,6 @@
 				vendorId: role === 'vendor' ? (editForm.vendorId || null) : null,
 				departmentId: role === 'leader' ? (editForm.departmentId || null) : null,
 				talentReference: role === 'pro' ? (editForm.talentReference || null) : null,
-				proReference: role === 'pro' ? (editForm.talentReference || null) : null,
 				broadcasterReference: role === 'broadcaster' ? (editForm.broadcasterReference || null) : null
 			};
 
@@ -631,12 +630,12 @@
 									<div class="col-span-2 space-y-1">
 										<label class="text-xs text-muted-foreground flex items-center gap-1">
 											<Award class="size-3" />
-											Pro Reference
+											Talent Reference
 										</label>
 										<Input 
-											bind:value={editData[person.id].proReference}
+											bind:value={editData[person.id].talentReference}
 											class="h-8 text-sm font-mono"
-											placeholder="Pro ID..."
+											placeholder="Talent ID..."
 										/>
 									</div>
 								{/if}
@@ -673,13 +672,13 @@
 									</div>
 								{/if}
 								
-								{#if person.proReference}
+								{#if person.talentReference}
 									<div class="col-span-2">
 										<span class="text-xs text-muted-foreground flex items-center gap-1">
 											<Award class="size-3" />
-											Pro Reference
+											Talent Reference
 										</span>
-										<p class="font-mono text-xs mt-1">{person.proReference}</p>
+										<p class="font-mono text-xs mt-1">{person.talentReference}</p>
 									</div>
 								{/if}
 								

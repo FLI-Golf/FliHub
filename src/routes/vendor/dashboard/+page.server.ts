@@ -1,32 +1,6 @@
-import { adminFetch } from '$lib/infra/pocketbase/pbClient';
+import { redirect } from '@sveltejs/kit';
 import type { PageServerLoad } from './$types';
 
-export const load: PageServerLoad = async ({ locals, parent }) => {
-	const { profile, vendor } = await parent();
-
-	if (!vendor) return { bids: [], openProjects: [], stats: null };
-
-	const [bids, openProjects] = await Promise.all([
-		adminFetch('bids', {
-			filter: `vendorId="${vendor.id}"`,
-			sort:   '-created',
-			expand: 'projectId',
-		}),
-		adminFetch('projects', {
-			filter: 'biddingOpen=true',
-			sort:   '-created',
-			fields: 'id,name,type,description,startDate,endDate,status',
-		}),
-	]);
-
-	const stats = {
-		totalBids:    bids.length,
-		submitted:    (bids as any[]).filter(b => b.status === 'submitted').length,
-		underReview:  (bids as any[]).filter(b => b.status === 'under_review').length,
-		shortlisted:  (bids as any[]).filter(b => b.status === 'shortlisted').length,
-		awarded:      (bids as any[]).filter(b => b.status === 'awarded').length,
-		openProjects: openProjects.length,
-	};
-
-	return { bids, openProjects, stats };
+export const load: PageServerLoad = async ({ url }) => {
+	throw redirect(308, `/portal/vendor/dashboard${url.search}`);
 };

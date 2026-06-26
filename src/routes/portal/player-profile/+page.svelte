@@ -1,29 +1,79 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
+	import { browser } from '$app/environment';
 	import type { PageData, ActionData } from './$types';
 	import { ChevronRight, ChevronLeft, Save, Send, CheckCircle, User, Trophy, Megaphone, Star, Users, Shield, MessageSquare } from 'lucide-svelte';
+	import { getDashboardPlayerProfileWizard } from '$lib/domain/player-profile-wizard/DashboardPlayerProfileWizard';
 
 	let { data, form }: { data: PageData; form: ActionData } = $props();
 
 	const p = data.playerProfile ?? {};
+	const wizard = getDashboardPlayerProfileWizard(data.role);
+	const wizardHeader = wizard.getHeader();
+	const selectedProId = data.selectedProId ?? '';
+	const representedPros = data.representedPros ?? [];
+	const canEdit = data.canEdit ?? true;
+	const profileActionQuery = selectedProId ? `&pro=${encodeURIComponent(selectedProId)}` : '';
+	const lastSavedAt = data.playerProfile?.updated ? new Date(data.playerProfile.updated).toLocaleString() : null;
 
 	// ── Multi-step form state ────────────────────────────────────────────
 	let currentStep = $state(0);
+	let didInitStep = $state(false);
 
-	const steps = [
-		{ id: 'personal', label: 'Personal Info', icon: User },
-		{ id: 'competitive', label: 'Competitive Background', icon: Trophy },
-		{ id: 'branding', label: 'Branding & Media', icon: Megaphone },
-		{ id: 'sponsorship', label: 'Sponsorship', icon: Star },
-		{ id: 'management', label: 'Management', icon: Users },
-		{ id: 'integrity', label: 'Betting & Integrity', icon: Shield },
-		{ id: 'additional', label: 'Additional Info', icon: MessageSquare }
-	];
+	const steps = wizard.getSteps();
+	const iconByStepId = {
+		personal: User,
+		competitive: Trophy,
+		branding: Megaphone,
+		sponsorship: Star,
+		management: Users,
+		integrity: Shield,
+		additional: MessageSquare,
+	} as const;
 
 	function next() { if (currentStep < steps.length - 1) currentStep++; }
 	function prev() { if (currentStep > 0) currentStep--; }
 
+	const currentStepId = $derived(steps[currentStep]?.id ?? 'personal');
+
 	const isSubmitted = data.playerProfile?.status === 'submitted' || data.playerProfile?.status === 'approved';
+
+	function clampStepIndex(value: number): number {
+		if (!Number.isFinite(value)) return 0;
+		if (value < 0) return 0;
+		if (value > steps.length - 1) return steps.length - 1;
+		return value;
+	}
+
+	const stepStorageKey = `player-profile-step:${data.role}:${selectedProId || data.userId}`;
+
+	$effect(() => {
+		if (!browser || didInitStep) return;
+
+		const params = new URLSearchParams(window.location.search);
+		const stepFromUrlRaw = Number(params.get('step') ?? '');
+		const stepFromUrl = Number.isFinite(stepFromUrlRaw) && stepFromUrlRaw > 0
+			? clampStepIndex(stepFromUrlRaw - 1)
+			: null;
+
+		const stepFromStorageRaw = Number(window.localStorage.getItem(stepStorageKey) ?? '');
+		const stepFromStorage = Number.isFinite(stepFromStorageRaw)
+			? clampStepIndex(stepFromStorageRaw)
+			: 0;
+
+		currentStep = stepFromUrl ?? stepFromStorage;
+		didInitStep = true;
+	});
+
+	$effect(() => {
+		if (!browser || !didInitStep) return;
+
+		window.localStorage.setItem(stepStorageKey, String(currentStep));
+
+		const nextUrl = new URL(window.location.href);
+		nextUrl.searchParams.set('step', String(currentStep + 1));
+		window.history.replaceState({}, '', `${nextUrl.pathname}${nextUrl.search}`);
+	});
 </script>
 
 <svelte:head>
@@ -34,16 +84,50 @@
 
 	<!-- Header -->
 	<div class="mb-6">
-		<a href="/dashboard/onboarding" class="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground mb-3 transition-colors">
-			<ChevronLeft class="w-4 h-4" /> Back to Onboarding
+		<a href="/portal/profile" class="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground mb-3 transition-colors">
+			<ChevronLeft class="w-4 h-4" /> Back to Profile
 		</a>
-		<h1 class="text-2xl font-black tracking-tight">FLI Golf Player Profile</h1>
+		<h1 class="text-2xl font-black tracking-tight">{wizardHeader.title}</h1>
 		<p class="text-muted-foreground mt-1">
-			This information is used for broadcast, media, league records, and sponsorship matching.
+			{wizardHeader.subtitle}
 		</p>
+		<p class="text-xs text-muted-foreground mt-2">
+			Save your draft anytime and come back later. Your progress is preserved.
+		</p>
+		<div class="mt-2 text-xs text-muted-foreground">
+			{#if lastSavedAt}
+				Last saved: {lastSavedAt}
+			{:else}
+				No draft saved yet.
+			{/if}
+		</div>
 		{#if isSubmitted}
 			<div class="mt-3 inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-emerald-100 dark:bg-emerald-900 text-emerald-700 dark:text-emerald-300 text-sm font-semibold">
 				<CheckCircle class="w-4 h-4" /> Profile submitted — under review
+			</div>
+		{/if}
+
+		{#if data.role === 'manager'}
+			<div class="mt-4 p-4 rounded-lg border border-border bg-muted/30">
+				<label class="block text-sm font-semibold mb-2" for="managerProSelect">Managed Pro</label>
+				{#if representedPros.length > 0}
+					<form method="GET" class="flex items-center gap-2">
+						<input type="hidden" name="step" value={String(currentStep + 1)} />
+						<select
+							id="managerProSelect"
+							name="pro"
+							class="field"
+							value={selectedProId}
+							onchange={(e) => (e.currentTarget.form?.requestSubmit())}
+						>
+							{#each representedPros as pro}
+								<option value={pro.id}>{pro.label}</option>
+							{/each}
+						</select>
+					</form>
+				{:else}
+					<p class="text-sm text-muted-foreground">No represented pros are assigned to your manager account yet.</p>
+				{/if}
 			</div>
 		{/if}
 	</div>
@@ -63,7 +147,7 @@
 	<!-- Step indicator -->
 	<div class="flex items-center gap-1 mb-8 overflow-x-auto pb-1">
 		{#each steps as step, i}
-			{@const Icon = step.icon}
+			{@const Icon = iconByStepId[step.id as keyof typeof iconByStepId] ?? User}
 			<button
 				type="button"
 				onclick={() => (currentStep = i)}
@@ -87,11 +171,17 @@
 		{/each}
 	</div>
 
+	{#if !canEdit}
+		<div class="mb-4 p-4 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-lg text-sm text-amber-700 dark:text-amber-300 font-medium">
+			You can only edit player profiles for pros represented by your account.
+		</div>
+	{/if}
+
 	<form method="POST" use:enhance class="space-y-6">
-		<input type="hidden" name="currentStep" value={steps[currentStep].id} />
+		<input type="hidden" name="currentStep" value={currentStepId} />
 
 		<!-- ── Step 0: Personal Information ─────────────────────────────── -->
-		{#if currentStep === 0}
+		{#if currentStepId === 'personal'}
 			<div class="space-y-5">
 				<h2 class="text-lg font-bold border-b pb-2">1. Personal Information</h2>
 
@@ -162,7 +252,7 @@
 		{/if}
 
 		<!-- ── Step 1: Competitive Background ───────────────────────────── -->
-		{#if currentStep === 1}
+		{#if currentStepId === 'competitive'}
 			<div class="space-y-5">
 				<h2 class="text-lg font-bold border-b pb-2">2. Competitive Background</h2>
 
@@ -211,7 +301,7 @@
 		{/if}
 
 		<!-- ── Step 2: Branding & Media ──────────────────────────────────── -->
-		{#if currentStep === 2}
+		{#if currentStepId === 'branding'}
 			<div class="space-y-5">
 				<h2 class="text-lg font-bold border-b pb-2">3. Branding & Media Presence</h2>
 
@@ -263,7 +353,7 @@
 		{/if}
 
 		<!-- ── Step 3: Sponsorship ───────────────────────────────────────── -->
-		{#if currentStep === 3}
+		{#if currentStepId === 'sponsorship'}
 			<div class="space-y-5">
 				<h2 class="text-lg font-bold border-b pb-2">4. Sponsorship & Endorsement Details</h2>
 
@@ -293,7 +383,7 @@
 		{/if}
 
 		<!-- ── Step 4: Management / Representation ───────────────────────── -->
-		{#if currentStep === 4}
+		{#if currentStepId === 'management'}
 			<div class="space-y-5">
 				<h2 class="text-lg font-bold border-b pb-2">5. Management / Representation Contact</h2>
 
@@ -328,7 +418,7 @@
 		{/if}
 
 		<!-- ── Step 5: Betting & Integrity ──────────────────────────────── -->
-		{#if currentStep === 5}
+		{#if currentStepId === 'integrity'}
 			<div class="space-y-5">
 				<h2 class="text-lg font-bold border-b pb-2">6. Betting & Competitive Integrity</h2>
 
@@ -361,7 +451,7 @@
 		{/if}
 
 		<!-- ── Step 6: Additional Information ───────────────────────────── -->
-		{#if currentStep === 6}
+		{#if currentStepId === 'additional'}
 			<div class="space-y-5">
 				<h2 class="text-lg font-bold border-b pb-2">7. Additional Information</h2>
 
@@ -394,7 +484,7 @@
 			<button
 				type="button"
 				onclick={prev}
-				disabled={currentStep === 0}
+				disabled={currentStep === 0 || !canEdit}
 				class="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg border-2 border-border font-semibold text-sm hover:bg-muted transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
 			>
 				<ChevronLeft class="w-4 h-4" /> Previous
@@ -403,25 +493,28 @@
 			<div class="flex items-center gap-2">
 				<!-- Save draft (always available) -->
 				<button
-					formaction="?/saveDraft"
+					formaction={`?/saveDraft${profileActionQuery}`}
 					type="submit"
+					disabled={!canEdit}
 					class="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg border-2 border-border font-semibold text-sm hover:bg-muted transition-colors"
 				>
-					<Save class="w-4 h-4" /> Save Draft
+					<Save class="w-4 h-4" /> Save Draft & Continue Later
 				</button>
 
 				{#if currentStep < steps.length - 1}
 					<button
 						type="button"
 						onclick={next}
+						disabled={!canEdit}
 						class="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg bg-black text-white dark:bg-white dark:text-black font-semibold text-sm hover:opacity-90 transition-opacity"
 					>
 						Next <ChevronRight class="w-4 h-4" />
 					</button>
 				{:else}
 					<button
-						formaction="?/submit"
+						formaction={`?/submit${profileActionQuery}`}
 						type="submit"
+						disabled={!canEdit}
 						class="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-sm transition-colors"
 					>
 						<Send class="w-4 h-4" /> Submit Profile

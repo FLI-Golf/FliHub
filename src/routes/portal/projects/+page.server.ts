@@ -12,6 +12,7 @@ export const load: PageServerLoad = async ({ locals, url, parent }) => {
 	const profileId = profile?.id ?? null;
 	const departmentId = profile?.departmentId ?? null;
 	const role = ctx.role;
+	const useDepartmentScope = ['leader', 'marketing', 'marketing_lead'].includes(role);
 
 	try {
 		let projects: any[] = [];
@@ -19,8 +20,8 @@ export const load: PageServerLoad = async ({ locals, url, parent }) => {
 		let allDepartments: any[] = [];
 		let allTasks: any[] = [];
 
-		if (role === 'leader') {
-			// Fetch all departments where this leader is the head
+		if (useDepartmentScope) {
+			// Fetch all departments where this user is the head (leader-style scoping)
 			if (profileId) {
 				departments = await adminPb.collection('departments').getFullList({
 					filter: `headOfDepartment = "${profileId}"`,
@@ -54,7 +55,7 @@ export const load: PageServerLoad = async ({ locals, url, parent }) => {
 					}
 				}
 
-				projects = allProjects.filter(p => 
+				projects = allProjects.filter(p =>
 					deptIds.includes(p.department) || (profileId && p.headOfDepartment === profileId)
 				);
 			} catch (e) {

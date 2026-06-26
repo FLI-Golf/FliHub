@@ -31,6 +31,9 @@
 	let sortDir = $state<SortDir>('asc');
 	let overrideOpenId = $state<string | null>(null);
 	let viewMode = $state<'chart' | 'table'>('table');
+	let seedTargetTotal = $state('7500000');
+	let seedAnchorCode = $state('1040');
+	let seedResetOpen = $state(false);
 
 	function fmt(amount: number) {
 		return new Intl.NumberFormat('en-US', {
@@ -101,6 +104,10 @@
 		}
 		sortBy = key;
 		sortDir = 'asc';
+	}
+
+	function recommendedAnchorAllocation() {
+		return Math.max(0, 7500000 - (data.totalAllocation - allocationValue(accounts.find((account) => account.code === seedAnchorCode)?.allocation ?? 0)));
 	}
 
 	function sortIcon(key: SortKey) {
@@ -226,6 +233,79 @@
 		<Card class="px-4 py-3 border-amber-700/40 bg-amber-950/20">
 			<p class="text-[10px] uppercase tracking-wide text-amber-300">Total Allocation</p>
 			<p class="text-lg font-semibold text-amber-100">{fmt(data.totalAllocation)}</p>
+		</Card>
+		<Card class="px-4 py-3 border-slate-700/60 bg-slate-900/60 min-w-[320px]">
+			<div class="flex items-center justify-between gap-2 mb-2">
+				<p class="text-[10px] uppercase tracking-wide text-slate-400">Seed Reset</p>
+				<button
+					type="button"
+					onclick={() => (seedResetOpen = !seedResetOpen)}
+					class="inline-flex items-center gap-1 rounded-md border border-slate-700 px-2 py-1 text-[11px] text-slate-300 hover:bg-slate-800/60"
+				>
+					{seedResetOpen ? 'Collapse' : 'Open'}
+					<svelte:component this={seedResetOpen ? ArrowUp : ArrowDown} class="size-3" />
+				</button>
+			</div>
+			{#if seedResetOpen}
+			<form method="POST" action="?/resetToSeedTarget" class="space-y-2">
+				<div class="grid grid-cols-2 gap-2">
+					<label class="space-y-1">
+						<span class="text-[10px] uppercase tracking-wide text-slate-500">Target Total</span>
+						<input
+							type="number"
+							name="targetTotal"
+							min="0"
+							step="1"
+							bind:value={seedTargetTotal}
+							class="w-full rounded-md border border-slate-700 bg-slate-950/50 px-3 py-2 text-sm text-slate-200 outline-none focus:border-amber-500"
+						/>
+					</label>
+					<label class="space-y-1">
+						<span class="text-[10px] uppercase tracking-wide text-slate-500">Anchor Code</span>
+						<input
+							type="text"
+							name="anchorCode"
+							bind:value={seedAnchorCode}
+							class="w-full rounded-md border border-slate-700 bg-slate-950/50 px-3 py-2 text-sm text-slate-200 outline-none focus:border-amber-500"
+						/>
+					</label>
+				</div>
+				<div>
+					<label class="space-y-1">
+						<span class="text-[10px] uppercase tracking-wide text-slate-500">Reason</span>
+						<input
+							type="text"
+							name="reason"
+							placeholder="Seed funding reset after fees"
+							required
+							class="w-full rounded-md border border-slate-700 bg-slate-950/50 px-3 py-2 text-sm text-slate-200 outline-none focus:border-amber-500"
+						/>
+					</label>
+				</div>
+				<div>
+					<label class="space-y-1">
+						<span class="text-[10px] uppercase tracking-wide text-slate-500">Type RESET to confirm</span>
+						<input
+							type="text"
+							name="confirmText"
+							placeholder="RESET"
+							required
+							class="w-full rounded-md border border-slate-700 bg-slate-950/50 px-3 py-2 text-sm text-slate-200 outline-none focus:border-amber-500"
+						/>
+					</label>
+				</div>
+				<p class="text-[10px] text-slate-500">
+					Resets the anchor account so active allocations add up to the target total.
+				</p>
+				<button type="submit" class="w-full rounded-md bg-amber-600 px-3 py-2 text-sm font-semibold text-white hover:bg-amber-500">
+					Reset to Seed Target
+				</button>
+			</form>
+			{:else}
+			<p class="text-xs text-slate-500">
+				Reset the anchor account so active allocations match your funded target.
+			</p>
+			{/if}
 		</Card>
 	</div>
 
@@ -577,6 +657,14 @@
 						{/each}
 					{/if}
 				</tbody>
+				<tfoot>
+					<tr class="border-t-2 border-amber-700/50 bg-amber-950/20 text-amber-100">
+						<td class="px-4 py-3 font-semibold" colspan="5">Table Total</td>
+						<td class="px-4 py-3 text-right font-bold">{fmt(filteredTotalAllocation)}</td>
+						<td class="px-4 py-3 text-xs text-amber-300/80">—</td>
+						<td class="px-4 py-3 text-xs text-amber-300/80">—</td>
+					</tr>
+				</tfoot>
 			</table>
 		</div>
 	</Card>

@@ -92,7 +92,7 @@ export class PermissionGuard {
 				return '/dashboard/vendors';
 
 			case 'pro':
-				if (!profile.proReference) {
+				if (!profile.talentReference) {
 					return '/dashboard/talent?setup=true';
 				}
 				return '/dashboard/talent';

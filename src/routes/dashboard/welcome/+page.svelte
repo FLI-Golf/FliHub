@@ -58,7 +58,7 @@
 			title: 'Player Dashboard',
 			description: 'Track your performance and opportunities',
 			actions: [
-				{ label: 'Player Profile', href: '/dashboard/player-profile', icon: Users, color: 'text-indigo-600' },
+				{ label: 'Player Profile', href: '/portal/player-profile', icon: Users, color: 'text-indigo-600' },
 				{ label: 'Events', href: '/dashboard/events', icon: Calendar, color: 'text-cyan-600' },
 				{ label: 'Media', href: '/dashboard/media', icon: Tv, color: 'text-pink-600' },
 				{ label: 'My Payments', href: '/dashboard/my-payments', icon: DollarSign, color: 'text-green-600' }

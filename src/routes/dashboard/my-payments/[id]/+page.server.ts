@@ -34,7 +34,7 @@ export const load: PageServerLoad = async ({ locals, url, params }) => {
 		paymentFilters = [`managerEmail = '${userEmail}'`, `recipient = 'manager'`];
 		pageSubheading = 'Manager earnings from FLI Golf tournaments';
 	} else if (ctx.role === 'pro' || ctx.role === 'broadcaster') {
-		let resolvedProId = ((profile as any)?.proReference || (profile as any)?.talentReference || '') as string;
+		let resolvedProId = ((profile as any)?.talentReference || '') as string;
 
 		if (!resolvedProId && userEmail) {
 			const talent = await pb.collection('talent').getFirstListItem(`email = "${userEmail}"`, { fields: 'id' }).catch(() => null);

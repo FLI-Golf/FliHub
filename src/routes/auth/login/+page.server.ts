@@ -1,5 +1,6 @@
 import { redirect, fail, isRedirect } from '@sveltejs/kit';
 import type { Actions, PageServerLoad } from './$types';
+import { getRoleHomeHref } from '$lib/domain/routing/RoleRouteManifest';
 
 export const load: PageServerLoad = async ({ locals }) => {
 	if (locals.pb.authStore.isValid) {
@@ -11,14 +12,8 @@ export const load: PageServerLoad = async ({ locals }) => {
 			});
 			const userProfile = profiles[0];
 
-			// Roles with dedicated porthole — send to /portal/dashboard
-			const PORTHOLE_ROLES = ['admin', 'leader', 'sales', 'pro', 'franchise_owner', 'league_owner', 'broadcaster', 'manager'];
-			if (PORTHOLE_ROLES.includes(userProfile?.role)) {
-				throw redirect(303, '/portal/dashboard');
-			}
-
-			if (userProfile?.role === 'vendor') {
-				throw redirect(303, '/vendor/dashboard');
+			if (userProfile?.role) {
+				throw redirect(303, getRoleHomeHref(userProfile.role));
 			}
 		}
 		
@@ -54,15 +49,8 @@ export const actions: Actions = {
 			const userProfile = profiles[0];
 
 			if (userProfile) {
-				// Vendor users get dedicated vendor portal
-				if (userProfile.role === 'vendor') {
-					throw redirect(303, '/vendor/dashboard');
-				}
-
-				// All other named roles go to their role porthole
-				const PORTHOLE_ROLES = ['admin', 'leader', 'sales', 'pro', 'franchise_owner', 'league_owner', 'broadcaster', 'manager'];
-				if (PORTHOLE_ROLES.includes(userProfile.role)) {
-					throw redirect(303, '/portal/dashboard');
+				if (userProfile.role) {
+					throw redirect(303, getRoleHomeHref(userProfile.role));
 				}
 			}
 		} catch (error) {

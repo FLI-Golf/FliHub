@@ -402,29 +402,33 @@ export const actions: Actions = {
 		const fd = await request.formData();
 		const id = fd.get('id') as string;
 		const newStatus = fd.get('status') as string;
+		const transactionId = String(fd.get('transactionId') ?? '').trim();
+		const finalStatus = transactionId ? 'paid' : newStatus;
+		const paidAt = finalStatus === 'paid' ? new Date().toISOString().split('T')[0] : '';
 		try {
 			const current = await pb.collection('pro_payments').getOne(id, { fields: 'id,status,amount,recipient' }).catch(() => null);
 
 			await pb.collection('pro_payments').update(id, {
 				amount:        parseFloat(fd.get('amount') as string),
-				status:        newStatus,
+				status:        finalStatus,
 				paymentMethod: fd.get('paymentMethod') as string,
-				transactionId: fd.get('transactionId') as string,
+				transactionId,
+				paidAt,
 				notes:         fd.get('notes') as string,
 				dueDate:       fd.get('dueDate') as string,
 			});
 
 			// Only log if status actually changed
-			if (current && current.status !== newStatus) {
+			if (current && current.status !== finalStatus) {
 				await writeAuditLog(pb, {
 					paymentId:     id,
 					fromStatus:    current.status,
-					toStatus:      newStatus,
+					toStatus:      finalStatus,
 					changedBy:     'admin',
 					amount:        parseFloat(fd.get('amount') as string),
 					recipient:     current.recipient,
 					paymentMethod: fd.get('paymentMethod') as string || undefined,
-					notes:         fd.get('notes') as string || undefined,
+					notes:         transactionId ? `QB ref ${transactionId}` : (fd.get('notes') as string || undefined),
 				});
 			}
 			return { success: true };

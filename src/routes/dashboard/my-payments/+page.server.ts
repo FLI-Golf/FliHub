@@ -19,24 +19,24 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 	}
 
 	if (role === 'pro' || role === 'broadcaster') {
-		let proReference = ((profile as any)?.proReference || (profile as any)?.talentReference || '') as string;
-		if (!proReference) {
+		let talentReference = ((profile as any)?.talentReference || '') as string;
+		if (!talentReference) {
 			const userEmail = (locals.pb?.authStore?.model?.email ?? '') as string;
 			if (userEmail) {
 				const talent = await pb.collection('talent').getFirstListItem(`email = "${userEmail}"`, { fields: 'id' }).catch(() => null);
-				proReference = (talent?.id ?? '') as string;
+				talentReference = (talent?.id ?? '') as string;
 			}
 		}
-		if (!proReference) {
+		if (!talentReference) {
 			const fullName = normalize(`${profile?.firstName ?? ''} ${profile?.lastName ?? ''}`);
 			if (fullName) {
 				const talentRows = await pb.collection('talent').getFullList({ fields: 'id,name' }).catch(() => []);
 				const exact = (talentRows as any[]).find((t: any) => normalize(t.name) === fullName);
 				const startsWith = (talentRows as any[]).find((t: any) => normalize(t.name).startsWith(fullName));
-				proReference = (exact?.id || startsWith?.id || '') as string;
+				talentReference = (exact?.id || startsWith?.id || '') as string;
 			}
 		}
-		if (proReference) throw redirect(303, `/dashboard/my-payments/${proReference}`);
+		if (talentReference) throw redirect(303, `/dashboard/my-payments/${talentReference}`);
 		if (profile?.id) throw redirect(303, `/dashboard/my-payments/${profile.id}`);
 		throw redirect(303, '/dashboard');
 	}

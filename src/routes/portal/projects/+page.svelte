@@ -18,7 +18,7 @@
 	);
 	const emptyMessage = $derived(
 		departments.length > 0
-			? `No projects in ${departments.map(d => d.name).join(', ')}.`
+			? `No projects in ${departments.map((d: any) => d.name).join(', ')}.`
 			: 'No projects led by you.'
 	);
 
@@ -208,7 +208,7 @@
 			</h1>
 			{#if departments.length > 0}
 				<p class="text-sm text-slate-400 mt-1">
-					{departments.map(d => d.name).join(', ')}
+					{departments.map((d: any) => d.name).join(', ')}
 				</p>
 			{/if}
 		</div>

@@ -78,6 +78,6 @@ export const actions = {
 			return fail(400, { error: err?.message ?? 'Registration failed. Please try again.', firstName, lastName, email, companyName, category, website, phone, about, location });
 		}
 
-		throw redirect(303, '/vendor/dashboard');
+		throw redirect(303, '/portal/vendor/dashboard');
 	}
 } satisfies Actions;

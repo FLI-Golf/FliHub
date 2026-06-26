@@ -9,7 +9,7 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 
 	const filter = isAdmin ? '' : `userId = "${userId}"`;
 	const [people, vendors, departments] = await Promise.all([
-		pb.collection('user_profiles').getFullList({ filter, sort: 'firstName,lastName', expand: 'vendorId,proReference' }).catch(() => []),
+		pb.collection('user_profiles').getFullList({ filter, sort: 'firstName,lastName', expand: 'vendorId,talentReference' }).catch(() => []),
 		isAdmin ? pb.collection('vendors').getFullList({ sort: 'name', fields: 'id,name,active' }).catch(() => []) : Promise.resolve([]),
 		isAdmin ? pb.collection('departments').getFullList({ sort: 'name', fields: 'id,name,status' }).catch(() => []) : Promise.resolve([])
 	]);

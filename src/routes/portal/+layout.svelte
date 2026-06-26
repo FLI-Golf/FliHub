@@ -1,18 +1,17 @@
 <script lang="ts">
 	import type { LayoutData } from './$types';
 	import { page } from '$app/stores';
-	import * as DropdownMenu from '$lib/components/ui/dropdown-menu/index.js';
 	import {
 		LayoutDashboard, FolderKanban, FolderOpen, Star, Trophy, Users,
 		DollarSign, Upload, Zap, TrendingUp, Target, MapPin, Calendar,
 		Film, Tv, Images, CheckSquare, CheckCircle2, Receipt, Briefcase,
-		User, FileText, LogOut, ChevronRight, ChevronDown, Megaphone, Handshake,
+		User, FileText, LogOut, ChevronRight, Megaphone, Handshake,
 	} from 'lucide-svelte';
 
 	let { data, children }: { data: LayoutData; children: any } = $props();
 
-	const config  = $derived(data.portalConfig);
-	const profile = $derived(data.portalProfile);
+	const config  = $derived((data.portalConfig ?? {}) as any);
+	const profile = $derived((data.portalProfile ?? {}) as any);
 
 	const displayName = $derived(
 		[profile?.firstName, profile?.lastName].filter(Boolean).join(' ') ||
@@ -154,51 +153,12 @@
 				</form>
 			</nav>
 
-			<!-- Right: user dropdown -->
-			<DropdownMenu.Root>
-				<DropdownMenu.Trigger asChild>
-					<button
-						type="button"
-						class="flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-sm font-medium
-							transition-all hover:bg-slate-800 border border-transparent hover:border-slate-700
-							focus-visible:outline-none cursor-pointer"
-					>
-						<span class="flex size-7 items-center justify-center rounded-full
-							bg-gradient-to-br {config.logoGradient} text-white text-xs font-bold shrink-0">
-							{initials}
-						</span>
-						<span class="hidden sm:block text-sm text-slate-300 truncate max-w-[140px]">{displayName}</span>
-						<ChevronDown class="size-3.5 text-slate-500 shrink-0" />
-					</button>
-				</DropdownMenu.Trigger>
-
-				<DropdownMenu.Content align="end" side="bottom" class="w-56 z-50">
-					<div class="px-3 py-2.5 border-b border-border">
-						<p class="text-xs font-semibold truncate">{displayName}</p>
-						<p class="text-[10px] text-muted-foreground mt-0.5">{config.label} · {config.tagline}</p>
-					</div>
-
-					<DropdownMenu.Item class="gap-2 cursor-pointer p-0">
-						<a href="/portal/profile" class="flex items-center gap-2 w-full px-2 py-1.5">
-							<User class="size-4 text-muted-foreground" />
-							<span>My Profile</span>
-						</a>
-					</DropdownMenu.Item>
-
-					<DropdownMenu.Separator />
-
-					<DropdownMenu.Item asChild>
-						<form method="POST" action="/auth/logout">
-							<button type="submit"
-								class="flex w-full items-center gap-2 rounded-md bg-red-600 hover:bg-red-700
-									px-3 py-2 text-sm font-semibold text-white transition-colors">
-								<LogOut class="size-4 shrink-0" />
-								Sign Out
-							</button>
-						</form>
-					</DropdownMenu.Item>
-				</DropdownMenu.Content>
-			</DropdownMenu.Root>
+			<div class="flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-sm font-medium border border-slate-700 bg-slate-800/60">
+				<span class="flex size-7 items-center justify-center rounded-full bg-gradient-to-br {config.logoGradient} text-white text-xs font-bold shrink-0">
+					{initials}
+				</span>
+				<span class="hidden sm:block text-sm text-slate-300 truncate max-w-[180px]">{displayName}</span>
+			</div>
 		</header>
 
 		<!-- Page content -->

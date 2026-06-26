@@ -66,6 +66,7 @@
 		'/dashboard/welcome': 'Welcome',
 		'/dashboard/onboarding': 'Onboarding',
 		'/dashboard/player-profile': 'Player Profile',
+		'/portal/player-profile': 'Player Profile',
 		'/dashboard/settings': 'Settings',
 		'/dashboard/income':           'Income Pipeline',
 		'/dashboard/bank-accounts':    'Manage Bank Accounts',
@@ -114,7 +115,7 @@
 			<div class="flex items-center gap-3 px-4">
 				<!-- Profile link -->
 				<a
-					href="/dashboard/player-profile"
+					href="/portal/player-profile"
 					class="flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium text-muted-foreground
 						hover:text-foreground hover:bg-muted transition-colors"
 					title="Profile"
@@ -174,7 +175,7 @@
 							</p>
 						</div>
 						<DropdownMenu.Item class="gap-2 cursor-pointer p-0">
-							<a href="/dashboard/player-profile" class="flex items-center gap-2 w-full px-2 py-1.5">
+							<a href="/portal/player-profile" class="flex items-center gap-2 w-full px-2 py-1.5">
 								<User class="size-4 text-muted-foreground" />
 								<span>Profile</span>
 							</a>

@@ -181,9 +181,9 @@ export class VendorPorthole extends RolePorthole {
 		logoBg: 'bg-orange-600',
 		logoGradient: 'from-orange-500 to-amber-600',
 		nav: [
-			{ label: 'Dashboard',      href: '/vendor/dashboard', icon: 'LayoutDashboard' },
-			{ label: 'Open Projects',  href: '/vendor/projects',  icon: 'FolderOpen' },
-			{ label: 'My Bids',        href: '/vendor/bids',      icon: 'FileText' },
+			{ label: 'Dashboard',      href: '/portal/vendor/dashboard', icon: 'LayoutDashboard' },
+			{ label: 'Open Projects',  href: '/portal/vendor/projects',  icon: 'FolderOpen' },
+			{ label: 'My Bids',        href: '/portal/vendor/bids',      icon: 'FileText' },
 		],
 		quickStats: [
 			{ key: 'openProjects', label: 'Open Projects', sub: 'to bid on',  icon: 'FolderOpen' },
@@ -191,7 +191,7 @@ export class VendorPorthole extends RolePorthole {
 			{ key: 'shortlisted',  label: 'Shortlisted',   sub: 'in review',  icon: 'Star' },
 			{ key: 'awarded',      label: 'Awarded',        sub: 'won',        icon: 'Trophy' },
 		],
-		primaryAction: { label: 'Vendor Dashboard', href: '/vendor/dashboard' },
+		primaryAction: { label: 'Vendor Dashboard', href: '/portal/vendor/dashboard' },
 	};
 }
 

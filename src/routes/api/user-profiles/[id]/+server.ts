@@ -45,7 +45,6 @@ export const PATCH: RequestHandler = async ({ request, locals, params }) => {
 		if (data.organization !== undefined) updateData.organization = data.organization || '';
 		if (data.broadcasterReference !== undefined) updateData.broadcasterReference = data.broadcasterReference || null;
 		if (data.talentReference !== undefined) updateData.talentReference = data.talentReference || null;
-			if (data.proReference !== undefined) updateData.proReference = data.proReference || null;
 		if (data.departmentId !== undefined) updateData.departmentId = data.departmentId || null;
 
 		if (data.role !== undefined) {

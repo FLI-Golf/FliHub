@@ -1,6 +1,6 @@
 <script lang="ts">
 	import type { PageData } from './$types';
-	import { Megaphone, PlayCircle2 } from 'lucide-svelte';
+	import { Megaphone } from 'lucide-svelte';
 
 	let { data }: { data: PageData } = $props();
 	const config = $derived((data as any).portalConfig);
