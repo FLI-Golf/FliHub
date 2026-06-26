@@ -47,8 +47,8 @@ function withCsvKey(notes: unknown, key: string): string {
 export const POST: RequestHandler = async ({ locals, url, request }) => {
 	const ctx = await RequestContext.fromApi(locals, url);
 	if (!ctx) return json({ message: 'Unauthorized' }, { status: 401 });
-	if (!['admin', 'leader'].includes(ctx.role)) {
-		return json({ message: 'Admin or leader access required' }, { status: 403 });
+	if (!['admin', 'leader', 'marketing_lead', 'sales', 'franchise_owner', 'pro', 'broadcaster', 'league_owner'].includes(ctx.role)) {
+		return json({ message: 'Admin, leader, marketing lead, sales, franchise owner, pro, broadcaster, or league owner access required' }, { status: 403 });
 	}
 
 	const body = await request.json() as {

@@ -10,7 +10,9 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 	const ctx     = await RequestContext.from(locals, url);
 	const pb      = ctx.pb;
 	const profile = ctx.profile;
-	const isAdmin = profile?.role === 'admin' || profile?.role === 'leader';
+		const role = profile?.role;
+		const canAccessAdminView = role === 'admin' || role === 'leader' || role === 'marketing_lead' || role === 'sales' || role === 'franchise_owner' || role === 'pro' || role === 'broadcaster' || role === 'league_owner';
+		const canViewAllClaims = role === 'admin' || role === 'leader';
 
 	try {
 		const vendors = await pb.collection('vendors').getFullList({
@@ -49,7 +51,7 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 			}).catch(() => [])
 			: [];
 
-		// All claims (admin/leader only)
+		// All claims (admin/leader globally, claimant-scoped for marketing_lead)
 		let allClaims: any[] = [];
 		let allItems:  any[] = [];
 		const settings = await adminPb.collection('settings').getFullList({ fields: 'id,key,value,label' }).catch(() => []);
@@ -58,7 +60,7 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 		const maxClaimTotal = Number.isFinite(maxClaimTotalParsed) && maxClaimTotalParsed > 0
 			? maxClaimTotalParsed
 			: DEFAULT_REIMBURSEMENT_MAX_CLAIM_TOTAL;
-		if (isAdmin) {
+		if (canViewAllClaims) {
 			allClaims = await adminPb.collection('reimbursement_claims').getFullList({
 				sort: '-id',
 				expand: 'claimant,paidBy,department'
@@ -72,6 +74,10 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 					expand: 'vendorId'
 				}).catch(() => []);
 			}
+		} else if (canAccessAdminView) {
+			// Claimant-scoped "admin" summaries for marketing_lead users.
+			allClaims = [...(myClaims as any[])];
+			allItems = [...(myItems as any[])];
 		}
 
 		const pendingCount  = allClaims.filter(c => c.status === 'submitted' || c.status === 'under_review').length;
@@ -80,7 +86,7 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 
 		return {
 			profile,
-			isAdmin,
+			isAdmin: canAccessAdminView,
 			vendors,
 			myClaims,
 			myItems,
@@ -97,7 +103,7 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 		console.error('[reimb] load error:', e?.message);
 		return {
 			profile,
-			isAdmin,
+			isAdmin: role === 'admin' || role === 'leader' || role === 'marketing_lead' || role === 'sales' || role === 'franchise_owner' || role === 'pro' || role === 'broadcaster' || role === 'league_owner',
 			vendors: [],
 			myClaims: [],
 			myItems: [],

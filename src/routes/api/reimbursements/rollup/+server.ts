@@ -78,9 +78,10 @@ export const POST: RequestHandler = async ({ locals, url, request }) => {
 	if (!ctx) return json({ message: 'Unauthorized' }, { status: 401 });
 
 	const role = ctx.profile?.role;
-	if (role !== 'admin' && role !== 'leader') {
+	if (role !== 'admin' && role !== 'leader' && role !== 'marketing_lead' && role !== 'sales' && role !== 'franchise_owner' && role !== 'pro' && role !== 'broadcaster' && role !== 'league_owner') {
 		return json({ message: 'Unauthorized' }, { status: 403 });
 	}
+	const isGlobalAdmin = role === 'admin' || role === 'leader';
 
 	const body = await request.json().catch(() => ({}));
 	const rawClaimIds: unknown[] = Array.isArray((body as any).claimIds) ? (body as any).claimIds : [];
@@ -103,6 +104,14 @@ export const POST: RequestHandler = async ({ locals, url, request }) => {
 				})
 			)
 		);
+
+		if (!isGlobalAdmin) {
+			const ownClaimantId = ctx.profile?.id;
+			const hasForeignClaim = (claims as any[]).some((c: any) => c.claimant !== ownClaimantId);
+			if (hasForeignClaim) {
+				return json({ message: 'Unauthorized: you can only roll up your own claims' }, { status: 403 });
+			}
+		}
 
 		const claimantIds = new Set(claims.map((c: any) => c.claimant).filter(Boolean));
 		if (claimantIds.size !== 1) {

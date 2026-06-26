@@ -171,6 +171,68 @@
 		selectedItemIds = { ...selectedItemIds, [itemId]: checked };
 	}
 
+	const filteredMyItems = $derived.by(() => {
+		const source = (data.myItems as any[]) ?? [];
+		const q = itemFilter.trim().toLowerCase();
+		if (!q) return source;
+
+		return source.filter((item: any) => {
+			const claimTitle = claimTitleFor(item).toLowerCase();
+			const haystack = [
+				item.description,
+				item.category,
+				item.notes,
+				item.workOrderReference,
+				claimTitle
+			]
+				.filter(Boolean)
+				.join(' ')
+				.toLowerCase();
+
+			return haystack.includes(q);
+		});
+	});
+
+	const sortedFilteredMyItems = $derived.by(() => {
+		const source = [...((filteredMyItems as any[]) ?? [])];
+		source.sort((a: any, b: any) => {
+			let cmp = 0;
+			switch (itemSortKey) {
+				case 'description':
+					cmp = (a.description ?? '').localeCompare(b.description ?? '', undefined, { sensitivity: 'base' });
+					break;
+				case 'date': {
+					const aTime = a.date ? new Date(a.date).getTime() : 0;
+					const bTime = b.date ? new Date(b.date).getTime() : 0;
+					cmp = aTime - bTime;
+					break;
+				}
+				case 'category':
+					cmp = (ITEM_CATEGORY_LABELS[a.category] ?? a.category ?? '').localeCompare((ITEM_CATEGORY_LABELS[b.category] ?? b.category ?? ''), undefined, { sensitivity: 'base' });
+					break;
+				case 'notes':
+					cmp = (a.notes ?? '').localeCompare(b.notes ?? '', undefined, { sensitivity: 'base' });
+					break;
+				case 'workOrderReference':
+					cmp = (a.workOrderReference ?? '').localeCompare(b.workOrderReference ?? '', undefined, { sensitivity: 'base' });
+					break;
+				case 'receipts':
+					cmp = (a.receipts?.length ?? 0) - (b.receipts?.length ?? 0);
+					break;
+				case 'amount':
+					cmp = (Number(a.amount) || 0) - (Number(b.amount) || 0);
+					break;
+			}
+
+			if (cmp === 0) {
+				cmp = (a.description ?? '').localeCompare(b.description ?? '', undefined, { sensitivity: 'base' });
+			}
+
+			return itemSortDir === 'asc' ? cmp : -cmp;
+		});
+		return source;
+	});
+
 	function toggleSelectAllFiltered(checked: boolean) {
 		const next = { ...selectedItemIds };
 		for (const item of filteredMyItems as any[]) {
@@ -510,68 +572,6 @@
 		itemSortKey = key;
 		itemSortDir = 'asc';
 	}
-
-	const filteredMyItems = $derived.by(() => {
-		const source = (data.myItems as any[]) ?? [];
-		const q = itemFilter.trim().toLowerCase();
-		if (!q) return source;
-
-		return source.filter((item: any) => {
-			const claimTitle = claimTitleFor(item).toLowerCase();
-			const haystack = [
-				item.description,
-				item.category,
-				item.notes,
-				item.workOrderReference,
-				claimTitle
-			]
-				.filter(Boolean)
-				.join(' ')
-				.toLowerCase();
-
-			return haystack.includes(q);
-		});
-	});
-
-	const sortedFilteredMyItems = $derived.by(() => {
-		const source = [...((filteredMyItems as any[]) ?? [])];
-		source.sort((a: any, b: any) => {
-			let cmp = 0;
-			switch (itemSortKey) {
-				case 'description':
-					cmp = (a.description ?? '').localeCompare(b.description ?? '', undefined, { sensitivity: 'base' });
-					break;
-				case 'date': {
-					const aTime = a.date ? new Date(a.date).getTime() : 0;
-					const bTime = b.date ? new Date(b.date).getTime() : 0;
-					cmp = aTime - bTime;
-					break;
-				}
-				case 'category':
-					cmp = (ITEM_CATEGORY_LABELS[a.category] ?? a.category ?? '').localeCompare((ITEM_CATEGORY_LABELS[b.category] ?? b.category ?? ''), undefined, { sensitivity: 'base' });
-					break;
-				case 'notes':
-					cmp = (a.notes ?? '').localeCompare(b.notes ?? '', undefined, { sensitivity: 'base' });
-					break;
-				case 'workOrderReference':
-					cmp = (a.workOrderReference ?? '').localeCompare(b.workOrderReference ?? '', undefined, { sensitivity: 'base' });
-					break;
-				case 'receipts':
-					cmp = (a.receipts?.length ?? 0) - (b.receipts?.length ?? 0);
-					break;
-				case 'amount':
-					cmp = (Number(a.amount) || 0) - (Number(b.amount) || 0);
-					break;
-			}
-
-			if (cmp === 0) {
-				cmp = (a.description ?? '').localeCompare(b.description ?? '', undefined, { sensitivity: 'base' });
-			}
-
-			return itemSortDir === 'asc' ? cmp : -cmp;
-		});
-		return source;
-	});
 
 	const INPUT = 'w-full rounded-lg border border-slate-600 bg-slate-800 text-slate-100 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 placeholder:text-slate-500';
 	const LABEL = 'block text-xs font-medium text-slate-400 mb-1';

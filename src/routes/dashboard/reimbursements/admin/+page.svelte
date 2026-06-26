@@ -259,7 +259,7 @@
 
 	// ── Status display ────────────────────────────────────────────────────────
 	const STATUS_LABEL: Record<string,string> = {
-		draft: 'Draft', submitted: 'Submitted', under_review: 'Under Review',
+		draft: 'Draft', submitted: 'Pending', under_review: 'Under Review',
 		approved: 'Approved', paid: 'Paid', rejected: 'Rejected'
 	};
 	const STATUS_CLASS: Record<string,string> = {
@@ -276,7 +276,7 @@
 
 	// ── Pipeline counts for header ────────────────────────────────────────────
 	const PIPELINE = [
-		{ key: 'submitted',    label: 'Submitted',    color: 'text-blue-400',    bg: 'bg-blue-950/40 border-blue-800/50' },
+		{ key: 'submitted',    label: 'Pending',      color: 'text-blue-400',    bg: 'bg-blue-950/40 border-blue-800/50' },
 		{ key: 'under_review', label: 'Under Review', color: 'text-yellow-400',  bg: 'bg-yellow-950/40 border-yellow-800/50' },
 		{ key: 'approved',     label: 'Approved',     color: 'text-violet-400',  bg: 'bg-violet-950/40 border-violet-800/50' },
 		{ key: 'paid',         label: 'Paid',         color: 'text-emerald-400', bg: 'bg-emerald-950/40 border-emerald-800/50' },
@@ -329,7 +329,7 @@
 				class="h-9 rounded-md border border-slate-600 bg-slate-900 text-slate-200 text-sm px-3 focus:outline-none [color-scheme:dark]">
 				<option value="all">All Statuses</option>
 				<option value="draft">Draft</option>
-				<option value="submitted">Submitted</option>
+				<option value="submitted">Pending</option>
 				<option value="under_review">Under Review</option>
 				<option value="approved">Approved</option>
 				<option value="paid">Paid</option>
