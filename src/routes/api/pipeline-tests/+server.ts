@@ -103,6 +103,14 @@ async function suiteOnboarding(r: TestRunner, pb: any) {
 		r.assert(content.includes('approved'), 'Must define approved stage');
 	});
 
+	await r.test('onboarding user page shows granular signing progress', async () => {
+		const content = readFileSync('src/routes/dashboard/onboarding/+page.svelte', 'utf8');
+		r.assert(content.includes('Signing Progress'), 'Must show a signing progress section');
+		r.assert(content.includes('requiredInitialDocs'), 'Must define required onboarding document list');
+		r.assert(content.includes('documentsSignedCount'), 'Must compute signed document count');
+		r.assert(content.includes('Player contract'), 'Must show contract status in tracker');
+	});
+
 	await r.test('PATCH /api/onboarding/[userId] route file exists', async () => {
 		const content = readFileSync('src/routes/api/onboarding/[userId]/+server.ts', 'utf8');
 		r.assert(content.includes('pipelineStage'), 'Must update pipelineStage field');

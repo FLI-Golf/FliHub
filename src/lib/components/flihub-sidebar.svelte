@@ -48,6 +48,7 @@
 		Plus,
 		Ticket
 	} from 'lucide-svelte';
+import { ROLE_MENU_CONTROL_ROLES, type RoleMenuVisibility } from '$lib/config/role-menu-controls';
 
 	type NavItem = {
 		title: string;
@@ -81,6 +82,7 @@
 			iconActiveClass: 'text-amber-600 dark:text-amber-400',
 			roles: ['manager', 'pro', 'broadcaster'],
 			items: [
+				{ title: 'Dashboard', url: '/dashboard', icon: LayoutDashboard, roles: ['manager', 'pro', 'broadcaster'] },
 				{ title: 'My Payments', url: '/dashboard/my-payments', icon: Wallet, roles: ['manager', 'pro', 'broadcaster'] },
 				{ title: 'My Reimbursements', url: '/dashboard/reimbursements', icon: Receipt, roles: ['manager', 'pro', 'broadcaster'] },
 				{ title: 'Reimbursements Admin', url: '/dashboard/reimbursements/admin', icon: ShieldCheck, roles: ['manager', 'pro', 'broadcaster'] },
@@ -182,7 +184,7 @@
 			iconActiveClass: 'text-violet-600 dark:text-violet-400',
 			roles: ['admin', 'leader'],
 			items: [
-				{ title: 'League Overview',   url: '/dashboard/league',                    icon: Award,       roles: ['admin', 'leader'] },
+				{ title: 'League Logos',      url: '/dashboard/league',                    icon: Award,       roles: ['admin', 'leader'] },
 				{ title: 'Talent Management', url: '/dashboard/talent',                    icon: UserCircle,  roles: ['admin', 'leader'] },
 				{ title: 'Tournaments',       url: '/dashboard/talent/tournaments',        icon: Trophy,      roles: ['admin', 'leader'] },
 				{ title: 'Events',            url: '/dashboard/events',                    icon: PartyPopper, roles: ['admin', 'leader'] },
@@ -295,6 +297,7 @@
 	};
 
 	const userRole = $derived($page.data?.userProfile?.role || 'admin');
+	const roleMenuVisibility = $derived(($page.data?.roleMenuVisibility as RoleMenuVisibility | null) ?? null);
 
 	let expandedGroups = $state<Record<string, boolean>>({
 		'manager-portal': true,
@@ -322,6 +325,13 @@
 	function canSeeItem(item: NavItem): boolean {
 		if (userRole === 'admin' || userRole === 'league_owner') return true;
 		if (item.roles && !item.roles.includes(userRole)) return false;
+
+		const controlled = roleMenuVisibility?.[item.url];
+		if (controlled) {
+			if (!ROLE_MENU_CONTROL_ROLES.includes(userRole as any)) return false;
+			return Boolean(controlled[userRole as keyof typeof controlled]);
+		}
+
 		return true;
 	}
 
@@ -345,6 +355,46 @@
 	}
 
 	const visibleGroups = $derived(navGroups.filter(canSeeGroup));
+	const sidebarNotes = $derived(($page.data?.sidebarNotes as Record<string, string> | null) ?? {});
+	const sidebarNoteLines = $derived(($page.data?.sidebarNoteLines as Record<string, string[]> | null) ?? {});
+	const onboardingWelcomeNote = $derived(($page.data?.onboardingWelcomeNote as string | null) ?? null);
+	const onboardingBadge = $derived(($page.data?.onboardingBadge as string | null) ?? null);
+	const playerProfileNote = $derived(($page.data?.playerProfileNote as string | null) ?? null);
+	const onboardingPipelineStats = $derived(($page.data?.onboardingPipelineStats as {
+		total: number;
+		invited: number;
+		docsSent: number;
+		docsSigned: number;
+		approved: number;
+		rejected: number;
+	} | null) ?? null);
+
+	function getItemInlineNote(item: NavItem): string | null {
+		const genericNote = sidebarNotes[item.url];
+		if (genericNote) return genericNote;
+		if (item.url === '/dashboard/welcome' && onboardingWelcomeNote) return onboardingWelcomeNote;
+		if (item.url === '/dashboard/onboarding' && onboardingBadge) return onboardingBadge;
+		if (item.url === '/dashboard/player-profile' && playerProfileNote) return playerProfileNote;
+		return null;
+	}
+
+	function getPillBadge(item: NavItem): string | null {
+		return item.badge ?? null;
+	}
+
+	function getOnboardingPipelineLines(item: NavItem): string[] {
+		const genericLines = sidebarNoteLines[item.url];
+		if (genericLines?.length) return genericLines;
+		if (item.url !== '/dashboard/onboarding/admin' || !onboardingPipelineStats) return [];
+		return [
+			`${onboardingPipelineStats.total} total`,
+			`${onboardingPipelineStats.invited} invited`,
+			`${onboardingPipelineStats.docsSent} docs sent`,
+			`${onboardingPipelineStats.docsSigned} docs signed`,
+			`${onboardingPipelineStats.approved} approved`,
+			`${onboardingPipelineStats.rejected} rejected`
+		];
+	}
 
 	function handleSidebarNavigation(event: MouseEvent, href: string) {
 		if (event.defaultPrevented) return;
@@ -419,11 +469,14 @@
 								{@const active = isActive(item.url)}
 								{@const Icon = item.icon}
 								{@const itemHref = resolveItemUrl(item)}
+								{@const itemInlineNote = getItemInlineNote(item)}
+								{@const itemBadge = getPillBadge(item)}
+								{@const onboardingPipelineLines = getOnboardingPipelineLines(item)}
 								<a
 									href={itemHref}
 									onclick={(event) => handleSidebarNavigation(event, itemHref)}
 									class="
-										group/item relative flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium
+										group/item relative flex items-start gap-2.5 rounded-lg px-3 py-2 text-sm font-medium
 										transition-all duration-150 border-l-2
 										{active
 											? `${group.activeClass} ${group.borderClass} shadow-sm`
@@ -432,14 +485,28 @@
 									"
 								>
 									<Icon
-										class="size-4 shrink-0 transition-colors duration-150
+										class="size-4 shrink-0 mt-0.5 transition-colors duration-150
 											{active ? group.iconActiveClass : `${group.iconActiveClass} opacity-50 group-hover/item:opacity-100`}"
 									/>
-									<span class="truncate leading-none">{item.title}</span>
+									<div class="min-w-0 flex-1">
+										<span class="truncate leading-none block">{item.title}</span>
+										{#if itemInlineNote}
+											<p class="text-[10px] mt-1 leading-none text-emerald-500 dark:text-emerald-400">
+												{itemInlineNote}
+											</p>
+										{/if}
+										{#if onboardingPipelineLines.length > 0}
+											<div class="mt-1 space-y-0.5">
+												{#each onboardingPipelineLines as line}
+													<p class="text-[10px] leading-none text-emerald-500 dark:text-emerald-400">{line}</p>
+												{/each}
+											</div>
+										{/if}
+									</div>
 
-									{#if item.badge}
+									{#if itemBadge && !itemInlineNote}
 										<span class="ml-auto text-[10px] font-bold px-1.5 py-0.5 rounded-full {group.activeClass}">
-											{item.badge}
+											{itemBadge}
 										</span>
 									{/if}
 								</a>

@@ -112,7 +112,7 @@
 		{
 			id: 'overview',
 			number: '1',
-			title: 'League Overview',
+			title: 'League Logos',
 			icon: Trophy,
 			color: 'emerald',
 			content: [

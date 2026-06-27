@@ -21,6 +21,8 @@
     "test:seed:players": "tsx scripts/seed-player-data.ts",
     "test:seed:marketing": "tsx scripts/seed-marketing-data.ts",
     "test:seed:vendors": "tsx scripts/seed-vendor-data.ts",
+    "test:seed:tickets": "tsx scripts/seed-ticket-revenue-from-tournaments.ts",
+    "test:seed:tickets:reset": "tsx scripts/seed-ticket-revenue-from-tournaments.ts --reset",
     "test:seed:media": "tsx scripts/seed-media-assets-phase1.ts",
     "test:seed:media:phase2": "tsx scripts/seed-media-assets-phase2.ts",
     "test:seed:media:phase3": "tsx scripts/seed-media-assets-phase3.ts",

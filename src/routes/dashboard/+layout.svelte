@@ -33,7 +33,7 @@
 		'/dashboard/work-orders': 'Work Orders',
 		'/dashboard/sponsor-collections': 'Collections',
 		'/dashboard/media': 'Media',
-		'/dashboard/league': 'League Overview',
+		'/dashboard/league': 'League Logos',
 		'/dashboard/talent': 'Talent Management',
 		'/dashboard/talent/tournaments': 'Tournaments',
 		'/dashboard/events': 'Events',
@@ -77,6 +77,7 @@
 	};
 
 	$: currentLabel = routeLabels[$page.url.pathname] ?? 'Dashboard';
+	$: settingsEmailStatus = data.sidebarNotes?.['/dashboard/settings'] ?? '';
 </script>
 
 <Sidebar.Provider class="h-svh overflow-hidden">
@@ -142,7 +143,12 @@
 						<DropdownMenu.Item class="gap-2 cursor-pointer p-0">
 							<a href="/dashboard/settings" class="flex items-center gap-2 w-full px-2 py-1.5">
 								<Settings class="size-4 text-muted-foreground" />
-								<span>Settings</span>
+								<span class="flex items-center justify-between w-full gap-2">
+									<span>Settings</span>
+									{#if settingsEmailStatus}
+										<span class="text-[10px] uppercase tracking-wide text-muted-foreground/80">{settingsEmailStatus}</span>
+									{/if}
+								</span>
 							</a>
 						</DropdownMenu.Item>
 						<DropdownMenu.Separator />
