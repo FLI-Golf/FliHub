@@ -1,7 +1,9 @@
-import { isRedirect } from '@sveltejs/kit';
+import { isRedirect, redirect } from '@sveltejs/kit';
 import { RequestContext } from '$lib/infra/RequestContext';
 import { getEmailDeliveryStatus } from '$lib/server/email-config';
 import { getAdminPocketBase } from '$lib/infra/pocketbase/pbClient';
+import { RoleRouter } from '$lib/server/RoleRouter';
+import { canRoleViewControlledMenu, getRoleMenuVisibility } from '$lib/server/role-menu-visibility';
 import type { LayoutServerLoad } from './$types';
 
 export const load: LayoutServerLoad = async ({ locals, url }) => {
@@ -12,6 +14,21 @@ export const load: LayoutServerLoad = async ({ locals, url }) => {
 		const ctx = await RequestContext.from(locals, url);
 		const { pb, profile } = ctx;
 		const { emailDeliveryEnabled } = getEmailDeliveryStatus();
+		const roleMenuVisibility = await getRoleMenuVisibility();
+		const routeIsAllowed = canRoleViewControlledMenu(ctx.role, url.pathname, roleMenuVisibility);
+		if (routeIsAllowed === false) {
+			throw redirect(303, '/dashboard');
+		}
+		const sessionModel = (locals.pb?.authStore?.model ?? {}) as any;
+
+		await new RoleRouter(pb).logSessionRole({
+			sessionUser: {
+				id: sessionModel.id,
+				email: sessionModel.email,
+				username: sessionModel.username,
+			},
+			role: profile?.role ?? 'unknown',
+		});
 
 		const sidebarNotes: Record<string, string> = {};
 		const sidebarNoteLines: Record<string, string[]> = {};
@@ -41,8 +58,15 @@ export const load: LayoutServerLoad = async ({ locals, url }) => {
 		let onboardingWelcomeNote: string | null = null;
 		let onboardingBadge: string | null = null;
 		let playerProfileNote: string | null = null;
-		let onboardingPipelineStats: { total: number; docsSent: number; docsSigned: number } | null = null;
-		if (profile?.role === 'leader' && profile?.id) {
+		let onboardingPipelineStats: {
+			total: number;
+			invited: number;
+			docsSent: number;
+			docsSigned: number;
+			approved: number;
+			rejected: number;
+		} | null = null;
+		if (['leader', 'admin'].includes(profile?.role ?? '') && profile?.id) {
 			const depts = await pb.collection('departments')
 				.getFullList({ filter: `headOfDepartment = "${profile.id}"` })
 				.catch(() => []);
@@ -168,19 +192,23 @@ export const load: LayoutServerLoad = async ({ locals, url }) => {
 		}
 
 		if (['admin', 'leader'].includes(profile?.role ?? '')) {
-			const onboardingRows = await pb.collection('onboarding_status').getFullList({
-				fields: 'id,pipelineStage'
-			}).catch(() => []);
+			const [onboardingTotal, invited, docsSent, docsSigned, approved, rejected] = await Promise.all([
+				countRecords('talent'),
+				countRecords('onboarding_status', 'pipelineStage = "invited"'),
+				countRecords('onboarding_status', 'pipelineStage = "documents_sent"'),
+				countRecords('onboarding_status', 'pipelineStage = "documents_signed"'),
+				countRecords('onboarding_status', 'pipelineStage = "approved"'),
+				countRecords('onboarding_status', 'pipelineStage = "rejected"')
+			]);
 
-			const onboardingTotal = onboardingRows.length;
-			const docsSent = onboardingRows.filter((r: any) => r.pipelineStage === 'documents_sent').length;
-			const docsSigned = onboardingRows.filter((r: any) => r.pipelineStage === 'documents_signed').length;
-
-			onboardingPipelineStats = { total: onboardingTotal, docsSent, docsSigned };
+			onboardingPipelineStats = { total: onboardingTotal, invited, docsSent, docsSigned, approved, rejected };
 			sidebarNoteLines['/dashboard/onboarding/admin'] = [
 				`${onboardingTotal} total`,
+				`${invited} invited`,
 				`${docsSent} docs sent`,
-				`${docsSigned} docs signed`
+				`${docsSigned} docs signed`,
+				`${approved} approved`,
+				`${rejected} rejected`
 			];
 
 			const [
@@ -266,6 +294,7 @@ export const load: LayoutServerLoad = async ({ locals, url }) => {
 			onboardingBadge,
 			playerProfileNote,
 			onboardingPipelineStats,
+			roleMenuVisibility,
 			sidebarNotes,
 			sidebarNoteLines
 		};
@@ -273,6 +302,6 @@ export const load: LayoutServerLoad = async ({ locals, url }) => {
 		// Always propagate redirects — never swallow them
 		if (isRedirect(err)) throw err;
 		console.error('Layout load error:', err?.message ?? err);
-		return { user: null, userProfile: null, userDepartment: null, onboardingWelcomeNote: null, onboardingBadge: null, playerProfileNote: null, onboardingPipelineStats: null, sidebarNotes: {}, sidebarNoteLines: {} };
+		return { user: null, userProfile: null, userDepartment: null, onboardingWelcomeNote: null, onboardingBadge: null, playerProfileNote: null, onboardingPipelineStats: null, roleMenuVisibility: {}, sidebarNotes: {}, sidebarNoteLines: {} };
 	}
 };

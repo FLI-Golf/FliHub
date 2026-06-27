@@ -3,11 +3,18 @@
 	import Card from '$lib/components/ui/card.svelte';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import {
+		ROLE_MENU_CONTROL_ITEMS,
+		ROLE_MENU_CONTROL_ROLES,
+		createDefaultRoleMenuVisibility,
+		type RoleMenuControlRole,
+		type RoleMenuVisibility,
+	} from '$lib/config/role-menu-controls';
+	import {
 		DollarSign, Users, FolderKanban, Receipt,
 		Trophy, Star, Building2, TrendingUp, ArrowRight, Flag,
 		Video, Wrench, Megaphone, Cpu, Scale, Wallet, ShieldCheck, Globe, Handshake,
 		Landmark, Briefcase, Film, Ticket, BadgeCheck,
-		CheckCircle2, Clock, AlertCircle
+		CheckCircle2, Clock, AlertCircle, Images, PartyPopper, UserCircle, Zap
 	} from 'lucide-svelte';
 
 	let { data }: { data: PageData } = $props();
@@ -33,24 +40,296 @@
 	const expenses = $derived(data.metrics?.expenses ?? { total: 0, totalAmount: 0, approvedAmount: 0, submitted: 0, approved: 0, paid: 0, draft: 0 });
 	const workOrders = $derived(data.metrics?.workOrders ?? { total: 0, totalAmount: 0, open: 0, paid: 0, cancelled: 0 });
 	const approvals = $derived(data.metrics?.approvals ?? { pending: 0, approved: 0, rejected: 0 });
+	const roleLabel = $derived.by(() => {
+		const rawRole = String(data.userProfile?.role ?? '').trim();
+		if (!rawRole) return '';
+		return rawRole.charAt(0).toUpperCase() + rawRole.slice(1);
+	});
+	const welcomeName = $derived.by(() => {
+		const firstName = String(data.userProfile?.firstName ?? '').trim();
+		if (firstName) return firstName;
+
+		const email = String(data.user?.email ?? '').trim();
+		if (!email) return 'there';
+		const [localPart] = email.split('@');
+		return localPart || email;
+	});
+	const activeRole = $derived(String(data.userProfile?.role ?? ''));
+	const isAdmin = $derived(activeRole === 'admin');
+	const isLeader = $derived(activeRole === 'leader');
+	const canUseMyDepartmentsFilter = $derived((isLeader || isAdmin) && Boolean(myDepartmentId));
+	const onboardingWelcomeNote = $derived((data.onboardingWelcomeNote as string | null) ?? null);
+	const onboardingBadge = $derived((data.onboardingBadge as string | null) ?? null);
+	const playerProfileNote = $derived((data.playerProfileNote as string | null) ?? null);
+	const myDepartmentId = $derived(String((data as any).userDepartment?.id ?? ''));
+
+	function normalizeRoleMenuVisibility(raw: unknown): RoleMenuVisibility {
+		const normalized = createDefaultRoleMenuVisibility();
+		const root = (raw && typeof raw === 'object' && !Array.isArray(raw))
+			? (raw as Record<string, unknown>)
+			: {};
+
+		for (const item of ROLE_MENU_CONTROL_ITEMS) {
+			const row = root[item.url];
+			const rowObj = (row && typeof row === 'object' && !Array.isArray(row))
+				? (row as Record<string, unknown>)
+				: {};
+
+			for (const role of ROLE_MENU_CONTROL_ROLES) {
+				const value = rowObj[role];
+				if (typeof value === 'boolean') {
+					normalized[item.url][role] = value;
+				}
+			}
+		}
+
+		return normalized;
+	}
+
+	let roleMenuVisibility = $state<RoleMenuVisibility>(createDefaultRoleMenuVisibility());
+	let roleSettingsBusy = $state(false);
+	let roleSettingsMessage = $state('');
+	let roleSettingsError = $state('');
+
+	$effect(() => {
+		roleMenuVisibility = normalizeRoleMenuVisibility(data.roleMenuVisibility);
+	});
+
+	function formatRoleLabel(role: string): string {
+		return role.split('_').map((part) => part.charAt(0).toUpperCase() + part.slice(1)).join(' ');
+	}
+
+	function canRoleSeeQuickAccess(url: string): boolean {
+		if (activeRole === 'admin') return true;
+		const controlled = roleMenuVisibility[url];
+		if (!controlled) return true;
+		if (!ROLE_MENU_CONTROL_ROLES.includes(activeRole as RoleMenuControlRole)) return false;
+		return Boolean(controlled[activeRole as RoleMenuControlRole]);
+	}
+
+	async function saveRoleMenuVisibility(next: RoleMenuVisibility): Promise<void> {
+		roleSettingsBusy = true;
+		roleSettingsError = '';
+		roleSettingsMessage = '';
+
+		try {
+			const response = await fetch('/api/admin/role-menu-visibility', {
+				method: 'POST',
+				headers: { 'content-type': 'application/json' },
+				body: JSON.stringify({ visibility: next }),
+			});
+
+			if (!response.ok) {
+				const payload = await response.json().catch(() => ({}));
+				throw new Error(payload?.message ?? 'Unable to save role settings');
+			}
+
+			const payload = await response.json();
+			roleMenuVisibility = normalizeRoleMenuVisibility(payload?.visibility ?? {});
+			roleSettingsMessage = 'Role menu visibility updated';
+		} catch (error: any) {
+			roleSettingsError = error?.message ?? 'Unable to save role settings';
+			roleMenuVisibility = normalizeRoleMenuVisibility(data.roleMenuVisibility);
+		} finally {
+			roleSettingsBusy = false;
+		}
+	}
+
+	async function toggleRoleVisibility(url: string, role: RoleMenuControlRole): Promise<void> {
+		if (roleSettingsBusy) return;
+
+		const next = normalizeRoleMenuVisibility(roleMenuVisibility);
+		next[url][role] = !Boolean(next[url][role]);
+		roleMenuVisibility = next;
+		await saveRoleMenuVisibility(next);
+	}
+
+	const quickAccessLinks = [
+		{ label: 'Departments',  href: '/dashboard/departments',         icon: Building2,    color: 'text-blue-400',   bg: 'bg-blue-950/50 border-blue-800/50' },
+		{ label: 'Projects',     href: '/dashboard/projects',          icon: FolderKanban, color: 'text-emerald-400', bg: 'bg-emerald-950/50 border-emerald-800/50' },
+		{ label: 'Expenses',     href: '/dashboard/expenses',          icon: Receipt,      color: 'text-orange-400', bg: 'bg-orange-950/50 border-orange-800/50' },
+		{ label: 'People',       href: '/dashboard/people',            icon: Users,        color: 'text-violet-400', bg: 'bg-violet-950/50 border-violet-800/50' },
+		{ label: 'Reimbursements', href: '/dashboard/reimbursements',  icon: Wallet,       color: 'text-fuchsia-400', bg: 'bg-fuchsia-950/50 border-fuchsia-800/50' },
+		{ label: 'Vendors',      href: '/dashboard/vendors',           icon: Briefcase,    color: 'text-sky-400',    bg: 'bg-sky-950/50 border-sky-800/50' },
+		{ label: 'Sponsors',     href: '/dashboard/sponsors',          icon: Star,         color: 'text-yellow-400', bg: 'bg-yellow-950/50 border-yellow-800/50' },
+		{ label: 'Franchises',   href: '/dashboard/franchises',        icon: Trophy,       color: 'text-rose-400',   bg: 'bg-rose-950/50 border-rose-800/50' },
+		{ label: 'Collections',  href: '/dashboard/active-collections', icon: DollarSign,   color: 'text-teal-400',   bg: 'bg-teal-950/50 border-teal-800/50' },
+		{ label: 'Trademarks',   href: '/dashboard/trademarks',        icon: BadgeCheck,   color: 'text-lime-400',   bg: 'bg-lime-950/50 border-lime-800/50' },
+		{ label: 'Import CSV Data', href: '/dashboard/import',         icon: Cpu,          color: 'text-cyan-400',   bg: 'bg-cyan-950/50 border-cyan-800/50' },
+	];
+
+	const visibleQuickAccessLinks = $derived.by(() => quickAccessLinks.filter((link) => canRoleSeeQuickAccess(link.href)));
+	const roleKey = $derived.by(() => {
+		const role = String(data.userProfile?.role ?? '').trim().toLowerCase();
+		if (role === 'admin' || role === 'leader') return 'admin_leader';
+		if (role === 'sales') return 'sales';
+		if (role === 'marketing' || role === 'marketing_lead') return 'marketing';
+		if (role === 'manager' || role === 'pro' || role === 'broadcaster') return 'talent';
+		return 'general';
+	});
+
+	const roleTheme = $derived.by(() => {
+		if (roleKey === 'admin_leader') {
+			return {
+				card: 'border-blue-800/60 bg-blue-950/25',
+				title: 'text-blue-200',
+				subtitle: 'text-blue-300/80'
+			};
+		}
+		if (roleKey === 'sales') {
+			return {
+				card: 'border-emerald-800/60 bg-emerald-950/25',
+				title: 'text-emerald-200',
+				subtitle: 'text-emerald-300/80'
+			};
+		}
+		if (roleKey === 'marketing') {
+			return {
+				card: 'border-fuchsia-800/80 bg-fuchsia-950/45',
+				title: 'text-fuchsia-200',
+				subtitle: 'text-fuchsia-300/80'
+			};
+		}
+		if (roleKey === 'talent') {
+			return {
+				card: 'border-indigo-800/60 bg-indigo-950/25',
+				title: 'text-indigo-200',
+				subtitle: 'text-indigo-300/80'
+			};
+		}
+		return {
+			card: 'border-slate-800 bg-slate-950/70',
+			title: 'text-slate-200',
+			subtitle: 'text-slate-400'
+		};
+	});
+
+	const roleQuickAccessOrder = $derived.by(() => {
+		if (roleKey === 'admin_leader') {
+			return [
+				'/dashboard/departments',
+				'/dashboard/projects',
+				'/dashboard/people',
+				'/dashboard/expenses',
+				'/dashboard/vendors',
+				'/dashboard/reimbursements',
+				'/dashboard/sponsors',
+				'/dashboard/franchises',
+				'/dashboard/active-collections',
+				'/dashboard/trademarks',
+				'/dashboard/import',
+			];
+		}
+
+		if (roleKey === 'sales') {
+			return [
+				'/dashboard/sponsors',
+				'/dashboard/franchises',
+				'/dashboard/active-collections',
+				'/dashboard/reimbursements',
+				'/dashboard/import',
+				'/dashboard/projects',
+			];
+		}
+
+		if (roleKey === 'marketing') {
+			return [
+				'/dashboard/sponsors',
+				'/dashboard/projects',
+				'/dashboard/reimbursements',
+				'/dashboard/import',
+				'/dashboard/active-collections',
+			];
+		}
+
+		if (roleKey === 'talent') {
+			return [
+				'/dashboard/reimbursements',
+				'/dashboard/import',
+			];
+		}
+
+		return quickAccessLinks.map((link) => link.href);
+	});
+
+	const roleQuickAccessLinks = $derived.by(() => {
+		const order = roleQuickAccessOrder;
+		const ordered = visibleQuickAccessLinks
+			.filter((link) => order.includes(link.href))
+			.sort((a, b) => order.indexOf(a.href) - order.indexOf(b.href));
+
+		if (ordered.length > 0) return ordered;
+		return visibleQuickAccessLinks.slice(0, 6);
+	});
+
+	const rolePrimaryCards = $derived.by(() => {
+		if (roleKey === 'admin_leader') {
+			return [
+				{ label: 'Open Projects', value: String(projects.in_progress ?? 0), hint: 'in progress now', href: '/dashboard/projects', icon: FolderKanban },
+				{ label: 'Pending Approvals', value: String(approvals.pending ?? 0), hint: 'awaiting decision', href: '/dashboard/approvals', icon: CheckCircle2 },
+				{ label: 'Submitted Expenses', value: String(expenses.submitted ?? 0), hint: 'need review', href: '/dashboard/expenses', icon: Receipt },
+				{ label: 'Active Income', value: fmt(cashflow.projectedRevenue ?? 0), hint: 'pipeline value', href: '/dashboard/active-income', icon: TrendingUp },
+			];
+		}
+
+		if (roleKey === 'sales') {
+			return [
+				{ label: 'Sponsor Commitments', value: fmt(sponsors.totalCommitted ?? 0), hint: 'signed value', href: '/dashboard/sponsors', icon: Star },
+				{ label: 'Franchise Leads', value: String(franchise.pipeline.leads ?? 0), hint: 'active leads', href: '/dashboard/sales', icon: Users },
+				{ label: 'Projected Tickets', value: fmt(tickets.totalProjected ?? 0), hint: 'ticket pipeline', href: '/dashboard/ticket-revenue', icon: Ticket },
+				{ label: 'Collections', value: fmt(tickets.totalReceived ?? 0), hint: 'received to date', href: '/dashboard/active-collections', icon: DollarSign },
+			];
+		}
+
+		if (roleKey === 'marketing') {
+			return [
+				{ label: 'Campaigns Running', value: String((projects.in_progress ?? 0) + (projects.planned ?? 0)), hint: 'active initiatives', href: '/dashboard/campaigns', icon: Megaphone },
+				{ label: 'Branding Pipeline', value: fmt((branding.totalContracted ?? 0) + (branding.totalProposed ?? 0)), hint: 'contracted + proposed', href: '/dashboard/on-course-branding/pipeline', icon: Flag },
+				{ label: 'Media Queue', value: String(m.content ?? 0), hint: 'content workload', href: '/dashboard/manage-media-content', icon: Images },
+				{ label: 'Sponsor Revenue', value: fmt(sponsors.totalCommitted ?? 0), hint: 'marketing impact', href: '/dashboard/sponsors', icon: TrendingUp },
+			];
+		}
+
+		if (roleKey === 'talent') {
+			return [
+				{ label: 'My Reimbursements', value: String(expenses.total ?? 0), hint: 'tracked requests', href: '/dashboard/reimbursements', icon: Wallet },
+				{ label: 'Onboarding Status', value: onboardingBadge ?? 'up to date', hint: 'docs progress', href: '/dashboard/onboarding', icon: BadgeCheck },
+				{ label: 'Welcome', value: onboardingWelcomeNote ?? 'pending', hint: 'orientation', href: '/dashboard/welcome', icon: PartyPopper },
+				{ label: 'My Profile', value: playerProfileNote ?? 'ready', hint: 'player profile', href: '/dashboard/player-profile', icon: UserCircle },
+			];
+		}
+
+		return [
+			{ label: 'Projects', value: String(projects.total ?? 0), hint: 'total tracked', href: '/dashboard/projects', icon: FolderKanban },
+			{ label: 'Sponsors', value: String(sponsors.total ?? 0), hint: 'active records', href: '/dashboard/sponsors', icon: Star },
+			{ label: 'Revenue Pipeline', value: fmt(cashflow.projectedRevenue ?? 0), hint: 'projected total', href: '/dashboard/active-income', icon: TrendingUp },
+			{ label: 'People', value: String(m.people ?? 0), hint: 'team size', href: '/dashboard/people', icon: Users },
+		];
+	});
+
+	const rolePrimaryTitle = $derived.by(() => {
+		if (roleKey === 'admin_leader') return 'Executive Command Center';
+		if (roleKey === 'sales') return 'Sales Command Center';
+		if (roleKey === 'marketing') return 'Marketing Command Center';
+		if (roleKey === 'talent') return 'My Portal Snapshot';
+		return 'Dashboard Snapshot';
+	});
+
 	let primaryPanelView = $state<'departments' | 'income'>('departments');
+	let departmentScope = $state<'my' | 'all'>(isLeader && myDepartmentId ? 'my' : 'all');
+	const visibleDeptBudgets = $derived.by(() => {
+		if (departmentScope === 'my' && myDepartmentId) {
+			return deptBudgets.filter((dept: any) => dept.id === myDepartmentId);
+		}
+		return deptBudgets;
+	});
 
 	function fmt(n: number) {
 		return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(n);
 	}
-	function fmtM(n: number) {
-		return '$' + (n / 1_000_000).toFixed(1) + 'M';
-	}
 	function pct(a: number, b: number) {
 		return b === 0 ? 0 : Math.min(100, (a / b) * 100);
 	}
-
-	// Phase model constants
-	const TOTAL_BUDGET   = 14_638_300;
-	const SEED_RAISE     = 7_500_000;
-	const REVENUE_FUNDED = TOTAL_BUDGET - SEED_RAISE;
-	const PHASE1_PCT     = Math.round((SEED_RAISE / TOTAL_BUDGET) * 100);
-	const PHASE2_PCT     = 100 - PHASE1_PCT;
 
 	// Maps department name keywords → { icon, colors }
 	const DEPT_ICONS: Array<{ keywords: string[]; icon: any; bg: string; fg: string }> = [
@@ -123,64 +402,125 @@
 	<!-- Page header -->
 	<div class="flex items-center justify-between flex-wrap gap-3">
 		<div>
-			<h1 class="text-3xl font-bold tracking-tight">Dashboard</h1>
-			<p class="text-muted-foreground mt-1">Welcome back, {data.userProfile?.firstName ?? data.user?.email}</p>
+			<h1 class="text-3xl font-bold tracking-tight">Dashboard{roleLabel ? ` (${roleLabel})` : ''}</h1>
+			<p class="text-muted-foreground mt-1">Welcome back, {welcomeName}</p>
 		</div>
 		<a href="/dashboard/financial-projections" class="text-xs text-slate-500 hover:text-slate-300 transition-colors flex items-center gap-1">
 			<TrendingUp class="size-3" /> Financial Projections
 		</a>
 	</div>
 
-	<!-- Phase context banner — 2 phases -->
-	<div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-		<!-- Phase 1: Pre-Tournaments -->
-		<div class="rounded-xl border border-amber-500/30 bg-amber-500/10 p-4">
-			<div class="flex items-center gap-2 mb-1">
-				<span class="size-5 rounded-full bg-amber-500 text-white text-[10px] font-black flex items-center justify-center shrink-0">1</span>
-				<p class="text-xs font-bold text-amber-400 uppercase tracking-wide">Phase 1 · Pre-Tournaments</p>
+	<!-- Role-specific main content -->
+	<div class="rounded-xl border {roleTheme.card} p-4 sm:p-5">
+		<div class="flex items-center justify-between gap-3 flex-wrap">
+			<div>
+				<h2 class="text-sm sm:text-base font-semibold {roleTheme.title} inline-flex items-center gap-2">
+					{#if roleKey === 'talent'}
+						<UserCircle class="size-4" />
+					{/if}
+					{rolePrimaryTitle}
+				</h2>
+				<p class="text-xs mt-1 {roleTheme.subtitle}">Tailored priorities for {roleLabel || 'your role'}.</p>
 			</div>
-			<p class="text-xl font-black text-white">Funded June 30, 2026</p>
-			<div class="mt-2 h-1.5 rounded-full bg-slate-700 overflow-hidden">
-				<div class="h-full rounded-full bg-amber-500" style="width:{PHASE1_PCT}%"></div>
-			</div>
-			<p class="text-xs text-amber-300/70 mt-1">{fmtM(SEED_RAISE)} seed raise · {PHASE1_PCT}% of {fmtM(TOTAL_BUDGET)} total · ops, tech, hiring — no payouts</p>
 		</div>
-		<!-- Phase 2: Tournaments Live -->
-		<div class="rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-4">
-			<div class="flex items-center gap-2 mb-1">
-				<span class="size-5 rounded-full bg-emerald-500 text-white text-[10px] font-black flex items-center justify-center shrink-0">2</span>
-				<p class="text-xs font-bold text-emerald-400 uppercase tracking-wide">Phase 2 · Tournaments Live</p>
-			</div>
-			<p class="text-xl font-black text-white">Revenue Positive 2027</p>
-			<div class="mt-2 h-1.5 rounded-full bg-slate-700 overflow-hidden">
-				<div class="h-full rounded-full bg-emerald-500" style="width:{PHASE2_PCT}%"></div>
-			</div>
-			<p class="text-xs text-emerald-300/70 mt-1">First tournament Apr 24, 2027 · prize pools, pro payouts &amp; franchise cuts activate · self-funded from 2027</p>
+		<div class="mt-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+			{#each rolePrimaryCards as card}
+				<a href={card.href} class="group rounded-lg border border-slate-800 bg-slate-900/80 p-3 hover:border-slate-600 transition-colors">
+					<div class="flex items-center justify-between">
+						<p class="text-[11px] uppercase tracking-wide text-slate-400">{card.label}</p>
+						<card.icon class="size-4 text-slate-400 group-hover:text-slate-200 transition-colors" />
+					</div>
+					<p class="mt-2 text-lg font-semibold text-slate-100">{card.value}</p>
+					<p class="text-[11px] text-slate-500 mt-1">{card.hint}</p>
+				</a>
+			{/each}
 		</div>
 	</div>
 
-	<!-- Quick Access -->
-	<div class="grid grid-cols-5 sm:grid-cols-10 gap-2">
-		{#each [
-			{ label: 'Departments',  href: '/dashboard/departments',         icon: Building2,    color: 'text-blue-400',   bg: 'bg-blue-950/50 border-blue-800/50' },
-			{ label: 'Projects',     href: '/dashboard/projects',          icon: FolderKanban, color: 'text-emerald-400', bg: 'bg-emerald-950/50 border-emerald-800/50' },
-			{ label: 'Expenses',     href: '/dashboard/expenses',          icon: Receipt,      color: 'text-orange-400', bg: 'bg-orange-950/50 border-orange-800/50' },
-			{ label: 'People',       href: '/dashboard/people',            icon: Users,        color: 'text-violet-400', bg: 'bg-violet-950/50 border-violet-800/50' },
-			{ label: 'Reimbursements', href: '/dashboard/reimbursements',  icon: Wallet,       color: 'text-fuchsia-400', bg: 'bg-fuchsia-950/50 border-fuchsia-800/50' },
-			{ label: 'Vendors',      href: '/dashboard/vendors',           icon: Briefcase,    color: 'text-sky-400',    bg: 'bg-sky-950/50 border-sky-800/50' },
-			{ label: 'Sponsors',     href: '/dashboard/sponsors',          icon: Star,         color: 'text-yellow-400', bg: 'bg-yellow-950/50 border-yellow-800/50' },
-			{ label: 'Franchises',   href: '/dashboard/franchises',        icon: Trophy,       color: 'text-rose-400',   bg: 'bg-rose-950/50 border-rose-800/50' },
-			{ label: 'Collections',  href: '/dashboard/active-collections', icon: DollarSign,   color: 'text-teal-400',   bg: 'bg-teal-950/50 border-teal-800/50' },
-			{ label: 'Trademarks',   href: '/dashboard/trademarks',        icon: BadgeCheck,   color: 'text-lime-400',   bg: 'bg-lime-950/50 border-lime-800/50' },
-			{ label: 'Import CSV Data', href: '/dashboard/import',         icon: Cpu,          color: 'text-cyan-400',   bg: 'bg-cyan-950/50 border-cyan-800/50' },
-		] as link}
-			<a href={link.href}
-				class="group flex flex-col items-center gap-2 rounded-xl border {link.bg} px-2 py-3 text-center hover:brightness-125 transition-all duration-150">
-				<link.icon class="size-5 {link.color} transition-transform group-hover:scale-110" />
-				<span class="text-[11px] font-medium text-slate-300">{link.label}</span>
-			</a>
-		{/each}
-	</div>
+	{#if roleKey === 'sales' || roleKey === 'admin_leader' || roleKey === 'general'}
+		<!-- Role-aware quick access (top) -->
+		<div class="rounded-xl border border-slate-800 bg-slate-950/70 p-4">
+			<div class="flex items-center justify-between mb-3">
+				<h3 class="text-xs font-semibold uppercase tracking-wide text-slate-300">{roleLabel || 'Role'} Shortcuts</h3>
+				<span class="text-[10px] text-slate-500">{roleQuickAccessLinks.length} shown</span>
+			</div>
+			<div class="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-2">
+				{#each roleQuickAccessLinks as link}
+					<a href={link.href}
+						class="group flex flex-col items-center gap-2 rounded-xl border {link.bg} px-2 py-3 text-center hover:brightness-125 transition-all duration-150">
+						<link.icon class="size-5 {link.color} transition-transform group-hover:scale-110" />
+						<span class="text-[11px] font-medium text-slate-300">{link.label}</span>
+					</a>
+				{/each}
+			</div>
+		</div>
+	{/if}
+
+	{#if roleKey === 'admin_leader'}
+	{#if isAdmin}
+		<Card class="p-5 border border-slate-700 bg-slate-950 text-slate-100">
+			<details>
+				<summary class="list-none cursor-pointer flex items-start justify-between gap-4 flex-wrap">
+					<div>
+						<h2 class="text-base font-semibold inline-flex items-center gap-2">
+							<ShieldCheck class="size-4 text-cyan-300" />
+							Role Settings
+						</h2>
+						<p class="text-xs text-slate-400 mt-1">Toggle which roles can see the selected dashboard menu items.</p>
+					</div>
+					<div class="flex items-center gap-2">
+						{#if roleSettingsBusy}
+							<span class="text-xs text-amber-300">Saving...</span>
+						{/if}
+						<span class="text-xs text-slate-400">Expand</span>
+					</div>
+				</summary>
+
+				{#if roleSettingsError}
+					<p class="mt-3 text-xs text-red-300">{roleSettingsError}</p>
+				{:else if roleSettingsMessage}
+					<p class="mt-3 text-xs text-emerald-300">{roleSettingsMessage}</p>
+				{/if}
+
+				<div class="mt-4 overflow-x-auto rounded-lg border border-slate-800">
+					<table class="min-w-full text-xs">
+						<thead class="bg-slate-900/80">
+							<tr class="border-b border-slate-800">
+								<th class="px-3 py-2 text-left font-semibold text-slate-300">Menu Item</th>
+								{#each ROLE_MENU_CONTROL_ROLES as role}
+									<th class="px-2 py-2 text-center font-semibold text-slate-300 whitespace-nowrap">{formatRoleLabel(role)}</th>
+								{/each}
+							</tr>
+						</thead>
+						<tbody>
+							{#each ROLE_MENU_CONTROL_ITEMS as item}
+								<tr class="border-b border-slate-900 last:border-b-0">
+									<td class="px-3 py-2">
+										<div class="font-medium text-slate-200">{item.title}</div>
+										<div class="text-[10px] text-slate-500">{item.url}</div>
+									</td>
+									{#each ROLE_MENU_CONTROL_ROLES as role}
+										<td class="px-2 py-2 text-center">
+											<button
+												type="button"
+												onclick={() => toggleRoleVisibility(item.url, role)}
+												disabled={roleSettingsBusy}
+												class="w-12 rounded-full px-2 py-1 text-[10px] font-semibold transition-colors disabled:opacity-50 {roleMenuVisibility[item.url][role] ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40' : 'bg-slate-800 text-slate-400 border border-slate-700'}"
+											>
+												{roleMenuVisibility[item.url][role] ? 'On' : 'Off'}
+											</button>
+										</td>
+									{/each}
+								</tr>
+							{/each}
+						</tbody>
+					</table>
+				</div>
+
+				<p class="mt-3 text-[11px] text-slate-500">Admin access remains available regardless of these toggles.</p>
+			</details>
+		</Card>
+	{/if}
 
 	<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2">
 		{#each [
@@ -419,16 +759,35 @@
 				<div class="flex items-center gap-2">
 					<div class="inline-flex items-center rounded-lg border border-slate-700 bg-slate-900 p-1">
 						<button
-							onclick={() => primaryPanelView = 'departments'}
-							class="h-7 px-2.5 text-xs font-semibold rounded-md border transition-colors {primaryPanelView === 'departments' ? 'bg-blue-700 border-blue-600 text-white' : 'border-slate-700 text-slate-200 hover:text-white hover:border-slate-500'}"
+							onclick={() => {
+								primaryPanelView = 'departments';
+								departmentScope = 'all';
+							}}
+							class="h-10 px-4 text-sm font-bold rounded-md border transition-colors {primaryPanelView === 'departments' ? 'bg-blue-700 border-blue-600 text-white' : 'border-slate-700 text-slate-200 hover:text-white hover:border-slate-500'}"
 						>
 							<span class="inline-flex items-center gap-1.5">
-								<Building2 class="size-3.5" /> Departments
+								<Building2 class="size-3.5" /> All
 							</span>
 						</button>
+						{#if canUseMyDepartmentsFilter}
+							<button
+								onclick={() => {
+									primaryPanelView = 'departments';
+									departmentScope = 'my';
+								}}
+								class="h-10 px-4 text-sm font-bold rounded-md border transition-colors {departmentScope === 'my' && primaryPanelView === 'departments' ? 'bg-blue-700 border-blue-600 text-white' : 'border-slate-700 text-slate-200 hover:text-white hover:border-slate-500'}"
+							>
+								<span class="inline-flex items-center gap-1.5">
+									<Users class="size-3.5" /> My Departments
+								</span>
+							</button>
+						{/if}
 						<button
-							onclick={() => primaryPanelView = 'income'}
-							class="h-7 px-2.5 text-xs font-semibold rounded-md border transition-colors bg-green-900 {primaryPanelView === 'income' ? 'border-green-500 text-white shadow-[0_0_0_1px_rgba(34,197,94,0.25)]' : 'border-green-700 text-green-100 hover:border-green-500 hover:text-white'}"
+							onclick={() => {
+								primaryPanelView = 'income';
+								departmentScope = 'all';
+							}}
+							class="h-10 px-4 text-sm font-bold rounded-md border transition-colors bg-green-900 {primaryPanelView === 'income' ? 'border-green-500 text-white shadow-[0_0_0_1px_rgba(34,197,94,0.25)]' : 'border-green-700 text-green-100 hover:border-green-500 hover:text-white'}"
 						>
 							<span class="inline-flex items-center gap-1.5">
 								<TrendingUp class="size-3.5" /> Income
@@ -447,7 +806,7 @@
 			</div>
 			<Card class="overflow-hidden">
 				{#if primaryPanelView === 'departments'}
-				{#each deptBudgets.slice(0, 8) as dept, i}
+				{#each visibleDeptBudgets.slice(0, 8) as dept, i}
 					{@const used       = pct(dept.actual ?? 0, dept.budget || 0)}
 					{@const forecasted = pct(dept.forecasted ?? 0, dept.budget || 0)}
 					{@const deptIcon   = getDeptIcon(dept.name)}
@@ -509,7 +868,7 @@
 						</div>
 					</a>
 				{/each}
-					{#if deptBudgets.length === 0}
+					{#if visibleDeptBudgets.length === 0}
 						<p class="px-4 py-6 text-sm text-muted-foreground text-center">No department data</p>
 					{/if}
 				{:else}
@@ -636,6 +995,267 @@
 			</div>
 		</div>
 	</div>
+	{:else if roleKey === 'sales'}
+		<div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+			<Card class="p-4 lg:col-span-2 border border-emerald-800/70 bg-emerald-950/30 text-slate-100">
+				<div class="flex items-center justify-between mb-3">
+					<h2 class="text-sm font-semibold">Sales Pipeline</h2>
+					<a href="/dashboard/sales" class="text-xs text-emerald-300 hover:text-emerald-200">Open Sales Board</a>
+				</div>
+				<div class="space-y-3">
+					{#each [
+						{ label: 'Leads', value: franchise.pipeline.leads ?? 0, color: 'bg-emerald-500' },
+						{ label: 'Opportunities', value: franchise.pipeline.opportunities ?? 0, color: 'bg-cyan-500' },
+						{ label: 'Deals', value: franchise.pipeline.deals ?? 0, color: 'bg-amber-500' }
+					] as row}
+						<div>
+							<div class="flex justify-between text-xs mb-1">
+								<span class="text-slate-300">{row.label}</span>
+								<span class="font-semibold">{row.value}</span>
+							</div>
+							<div class="h-2 rounded-full bg-slate-800 overflow-hidden">
+								<div class="h-full {row.color}" style="width:{Math.min(100, (row.value / Math.max(1, (franchise.pipeline.leads ?? 0))) * 100)}%"></div>
+							</div>
+						</div>
+					{/each}
+				</div>
+			</Card>
+
+			<Card class="p-4 border border-slate-800 bg-slate-950 text-slate-100">
+				<h3 class="text-sm font-semibold mb-3">Sales Actions</h3>
+				<div class="space-y-2">
+					<a href="/dashboard/sponsors" class="block rounded-lg border border-slate-800 bg-slate-900 px-3 py-2 text-xs hover:border-slate-600">Manage Sponsors</a>
+					<a href="/dashboard/franchise-sales" class="block rounded-lg border border-slate-800 bg-slate-900 px-3 py-2 text-xs hover:border-slate-600">Review Forecast</a>
+					<a href="/dashboard/active-collections" class="block rounded-lg border border-slate-800 bg-slate-900 px-3 py-2 text-xs hover:border-slate-600">Track Collections</a>
+					<a href="/dashboard/ticket-revenue" class="block rounded-lg border border-slate-800 bg-slate-900 px-3 py-2 text-xs hover:border-slate-600">Open Ticket Revenue</a>
+				</div>
+			</Card>
+		</div>
+
+		<div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+			<Card class="p-4 border border-amber-800/70 bg-amber-950/30 text-slate-100">
+				<p class="text-xs text-amber-200">Sponsor Commitments</p>
+				<p class="text-xl font-bold mt-1">{fmt(sponsors.totalCommitted ?? 0)}</p>
+			</Card>
+			<Card class="p-4 border border-cyan-800/70 bg-cyan-950/30 text-slate-100">
+				<p class="text-xs text-cyan-200">Ticket Projection</p>
+				<p class="text-xl font-bold mt-1">{fmt(tickets.totalProjected ?? 0)}</p>
+			</Card>
+			<Card class="p-4 border border-violet-800/70 bg-violet-950/30 text-slate-100">
+				<p class="text-xs text-violet-200">Branding Pipeline</p>
+				<p class="text-xl font-bold mt-1">{fmt((branding.totalContracted ?? 0) + (branding.totalProposed ?? 0))}</p>
+			</Card>
+		</div>
+	{:else if roleKey === 'marketing'}
+		<div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+			<Card class="p-4 lg:col-span-2 border border-fuchsia-800/80 bg-fuchsia-950/50 text-slate-100 shadow-lg shadow-fuchsia-950/20">
+				<div class="flex items-center justify-between mb-3">
+					<h2 class="text-sm font-semibold inline-flex items-center gap-2">
+						<Megaphone class="size-4 text-fuchsia-300" />
+						Marketing Performance
+					</h2>
+					<a href="/dashboard/campaigns" class="text-xs text-fuchsia-300 hover:text-fuchsia-200 inline-flex items-center gap-1">
+						<ArrowRight class="size-3" />
+						Open Campaigns
+					</a>
+				</div>
+				<div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+					{#each [
+						{ label: 'Sponsor Revenue', value: sponsors.totalCommitted ?? 0, color: 'bg-amber-500', icon: Star, iconColor: 'text-amber-300' },
+						{ label: 'Branding Contracted', value: branding.totalContracted ?? 0, color: 'bg-emerald-500', icon: Flag, iconColor: 'text-emerald-300' },
+						{ label: 'Branding Proposed', value: branding.totalProposed ?? 0, color: 'bg-violet-500', icon: Film, iconColor: 'text-violet-300' },
+						{ label: 'Ticket Pipeline', value: tickets.totalProjected ?? 0, color: 'bg-cyan-500', icon: Ticket, iconColor: 'text-cyan-300' }
+					] as row}
+						<div class="rounded-lg border border-slate-800 bg-slate-950 p-3">
+							<p class="text-[11px] uppercase tracking-wide text-slate-400 inline-flex items-center gap-2">
+								<row.icon class="size-3.5 {row.iconColor}" />
+								{row.label}
+							</p>
+							<p class="text-lg font-semibold mt-1">{fmt(row.value)}</p>
+							<div class="h-1.5 rounded-full bg-slate-800 mt-2 overflow-hidden">
+								<div class="h-full {row.color}" style="width:{Math.min(100, (row.value / Math.max(1, cashflow.projectedRevenue || 1)) * 100)}%"></div>
+							</div>
+						</div>
+					{/each}
+				</div>
+			</Card>
+
+			<Card class="p-4 border border-fuchsia-900/60 bg-slate-950 text-slate-100 shadow-lg shadow-black/20">
+				<h3 class="text-sm font-semibold mb-3 inline-flex items-center gap-2">
+					<Zap class="size-4 text-fuchsia-300" />
+					Marketing Actions
+				</h3>
+				<div class="space-y-2">
+					<a href="/dashboard/campaigns" class="block rounded-lg border border-slate-800 bg-slate-900 px-3 py-2 text-xs hover:border-slate-600 inline-flex items-center gap-2 w-full">
+						<Megaphone class="size-3.5 text-fuchsia-300" />
+						Campaign Board
+					</a>
+					<a href="/dashboard/marketing/campaigns/new" class="block rounded-lg border border-slate-800 bg-slate-900 px-3 py-2 text-xs hover:border-slate-600 inline-flex items-center gap-2 w-full">
+						<ArrowRight class="size-3.5 text-emerald-300" />
+						Create Campaign
+					</a>
+					<a href="/dashboard/manage-media-content" class="block rounded-lg border border-slate-800 bg-slate-900 px-3 py-2 text-xs hover:border-slate-600 inline-flex items-center gap-2 w-full">
+						<Images class="size-3.5 text-rose-300" />
+						Manage Media Content
+					</a>
+					<a href="/dashboard/sponsors" class="block rounded-lg border border-slate-800 bg-slate-900 px-3 py-2 text-xs hover:border-slate-600 inline-flex items-center gap-2 w-full">
+						<Star class="size-3.5 text-amber-300" />
+						Sponsor Accounts
+					</a>
+				</div>
+			</Card>
+		</div>
+
+		<!-- Role-aware quick access (middle) -->
+		<div class="rounded-xl border border-fuchsia-900/60 bg-slate-950/90 p-4 shadow-lg shadow-fuchsia-950/10">
+			<div class="flex items-center justify-between mb-3">
+				<h3 class="text-xs font-semibold uppercase tracking-wide text-slate-300 inline-flex items-center gap-2">
+					<Cpu class="size-3.5 text-fuchsia-300" />
+					{roleLabel || 'Role'} Shortcuts
+				</h3>
+				<span class="text-[10px] text-slate-500">{roleQuickAccessLinks.length} shown</span>
+			</div>
+			<div class="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-2">
+				{#each roleQuickAccessLinks as link}
+					<a href={link.href}
+						class="group flex flex-col items-center gap-2 rounded-xl border {link.bg} px-2 py-3 text-center hover:brightness-125 transition-all duration-150">
+						<link.icon class="size-5 {link.color} transition-transform group-hover:scale-110" />
+						<span class="text-[11px] font-medium text-slate-300">{link.label}</span>
+					</a>
+				{/each}
+			</div>
+		</div>
+
+		<div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+			<Card class="p-4 border border-rose-800/80 bg-rose-950/45 text-slate-100 shadow-lg shadow-rose-950/10">
+				<p class="text-xs text-rose-200 inline-flex items-center gap-2">
+					<Images class="size-3.5" />
+					Content Queue
+				</p>
+				<p class="text-xl font-bold mt-1">{Number(m.content ?? 0)}</p>
+			</Card>
+			<Card class="p-4 border border-blue-800/80 bg-blue-950/45 text-slate-100 shadow-lg shadow-blue-950/10">
+				<p class="text-xs text-blue-200 inline-flex items-center gap-2">
+					<CheckCircle2 class="size-3.5" />
+					Active Goals
+				</p>
+				<p class="text-xl font-bold mt-1">{Number(m.goals ?? 0)}</p>
+			</Card>
+			<Card class="p-4 border border-emerald-800/80 bg-emerald-950/45 text-slate-100 shadow-lg shadow-emerald-950/10">
+				<p class="text-xs text-emerald-200 inline-flex items-center gap-2">
+					<PartyPopper class="size-3.5" />
+					Events in Pipeline
+				</p>
+				<p class="text-xl font-bold mt-1">{Number(m.events ?? 0)}</p>
+			</Card>
+		</div>
+	{:else if roleKey === 'talent'}
+		<div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+			<Card class="p-4 lg:col-span-2 border border-indigo-800/70 bg-indigo-950/30 text-slate-100">
+				<div class="flex items-center justify-between mb-3">
+					<h2 class="text-sm font-semibold inline-flex items-center gap-2">
+						<BadgeCheck class="size-4 text-indigo-300" />
+						My Progress
+					</h2>
+					<a href="/dashboard/onboarding" class="text-xs text-indigo-300 hover:text-indigo-200 inline-flex items-center gap-1">
+						<ArrowRight class="size-3" />
+						Open Onboarding
+					</a>
+				</div>
+				<div class="space-y-3">
+					{#each [
+						{ label: 'Welcome', state: onboardingWelcomeNote ?? 'pending', icon: PartyPopper },
+						{ label: 'Documents', state: onboardingBadge ?? 'pending', icon: BadgeCheck },
+						{ label: 'Player Profile', state: playerProfileNote ?? 'pending', icon: UserCircle }
+					] as row}
+						<div class="rounded-lg border border-slate-800 bg-slate-900 px-3 py-2 flex items-center justify-between">
+							<span class="text-xs text-slate-300 inline-flex items-center gap-2">
+								<row.icon class="size-3.5 text-indigo-300" />
+								{row.label}
+							</span>
+							<span class="text-xs font-semibold text-emerald-300">{row.state}</span>
+						</div>
+					{/each}
+				</div>
+			</Card>
+
+			<Card class="p-4 border border-slate-800 bg-slate-950 text-slate-100">
+				<h3 class="text-sm font-semibold mb-3 inline-flex items-center gap-2">
+					<Zap class="size-4 text-cyan-300" />
+					My Actions
+				</h3>
+				<div class="space-y-2">
+					<a href="/dashboard/my-payments" class="block rounded-lg border border-slate-800 bg-slate-900 px-3 py-2 text-xs hover:border-slate-600 inline-flex items-center gap-2 w-full">
+						<Wallet class="size-3.5 text-cyan-300" />
+						View My Payments
+					</a>
+					<a href="/dashboard/reimbursements" class="block rounded-lg border border-slate-800 bg-slate-900 px-3 py-2 text-xs hover:border-slate-600 inline-flex items-center gap-2 w-full">
+						<Receipt class="size-3.5 text-fuchsia-300" />
+						Submit Reimbursement
+					</a>
+					<a href="/dashboard/player-profile" class="block rounded-lg border border-slate-800 bg-slate-900 px-3 py-2 text-xs hover:border-slate-600 inline-flex items-center gap-2 w-full">
+						<UserCircle class="size-3.5 text-emerald-300" />
+						Update Profile
+					</a>
+					<a href="/dashboard/welcome" class="block rounded-lg border border-slate-800 bg-slate-900 px-3 py-2 text-xs hover:border-slate-600 inline-flex items-center gap-2 w-full">
+						<PartyPopper class="size-3.5 text-amber-300" />
+						Open Welcome
+					</a>
+				</div>
+			</Card>
+		</div>
+
+		<div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+			<Card class="p-4 border border-fuchsia-800/70 bg-fuchsia-950/30 text-slate-100">
+				<p class="text-xs text-fuchsia-200 inline-flex items-center gap-2">
+					<Receipt class="size-3.5" />
+					My Claims
+				</p>
+				<p class="text-xl font-bold mt-1">{Number(m.reimbursements ?? 0)}</p>
+			</Card>
+			<Card class="p-4 border border-cyan-800/70 bg-cyan-950/30 text-slate-100">
+				<p class="text-xs text-cyan-200 inline-flex items-center gap-2">
+					<Wallet class="size-3.5" />
+					Open Payments
+				</p>
+				<p class="text-xl font-bold mt-1">{Number(m.payments ?? 0)}</p>
+			</Card>
+			<Card class="p-4 border border-amber-800/70 bg-amber-950/30 text-slate-100">
+				<p class="text-xs text-amber-200 inline-flex items-center gap-2">
+					<UserCircle class="size-3.5" />
+					Profile Readiness
+				</p>
+				<p class="text-xl font-bold mt-1">{playerProfileNote ?? 'pending'}</p>
+			</Card>
+		</div>
+
+		<!-- Role-aware quick access (bottom) -->
+		<div class="rounded-xl border border-slate-800 bg-slate-950/70 p-4">
+			<div class="flex items-center justify-between mb-3">
+				<h3 class="text-xs font-semibold uppercase tracking-wide text-slate-300">{roleLabel || 'Role'} Shortcuts</h3>
+				<span class="text-[10px] text-slate-500">{roleQuickAccessLinks.length} shown</span>
+			</div>
+			<div class="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-2">
+				{#each roleQuickAccessLinks as link}
+					<a href={link.href}
+						class="group flex flex-col items-center gap-2 rounded-xl border {link.bg} px-2 py-3 text-center hover:brightness-125 transition-all duration-150">
+						<link.icon class="size-5 {link.color} transition-transform group-hover:scale-110" />
+						<span class="text-[11px] font-medium text-slate-300">{link.label}</span>
+					</a>
+				{/each}
+			</div>
+		</div>
+	{:else}
+		<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+			{#each rolePrimaryCards as card}
+				<a href={card.href} class="rounded-lg border border-slate-800 bg-slate-900 px-3 py-3 hover:border-slate-600 transition-colors">
+					<p class="text-[11px] uppercase tracking-wide text-slate-400">{card.label}</p>
+					<p class="text-lg font-semibold mt-1 text-slate-100">{card.value}</p>
+					<p class="text-[11px] text-slate-500 mt-1">{card.hint}</p>
+				</a>
+			{/each}
+		</div>
+	{/if}
 
 
 </div>

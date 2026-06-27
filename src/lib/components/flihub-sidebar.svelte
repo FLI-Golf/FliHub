@@ -48,6 +48,7 @@
 		Plus,
 		Ticket
 	} from 'lucide-svelte';
+import { ROLE_MENU_CONTROL_ROLES, type RoleMenuVisibility } from '$lib/config/role-menu-controls';
 
 	type NavItem = {
 		title: string;
@@ -81,6 +82,7 @@
 			iconActiveClass: 'text-amber-600 dark:text-amber-400',
 			roles: ['manager', 'pro', 'broadcaster'],
 			items: [
+				{ title: 'Dashboard', url: '/dashboard', icon: LayoutDashboard, roles: ['manager', 'pro', 'broadcaster'] },
 				{ title: 'My Payments', url: '/dashboard/my-payments', icon: Wallet, roles: ['manager', 'pro', 'broadcaster'] },
 				{ title: 'My Reimbursements', url: '/dashboard/reimbursements', icon: Receipt, roles: ['manager', 'pro', 'broadcaster'] },
 				{ title: 'Reimbursements Admin', url: '/dashboard/reimbursements/admin', icon: ShieldCheck, roles: ['manager', 'pro', 'broadcaster'] },
@@ -295,6 +297,7 @@
 	};
 
 	const userRole = $derived($page.data?.userProfile?.role || 'admin');
+	const roleMenuVisibility = $derived(($page.data?.roleMenuVisibility as RoleMenuVisibility | null) ?? null);
 
 	let expandedGroups = $state<Record<string, boolean>>({
 		'manager-portal': true,
@@ -322,6 +325,13 @@
 	function canSeeItem(item: NavItem): boolean {
 		if (userRole === 'admin' || userRole === 'league_owner') return true;
 		if (item.roles && !item.roles.includes(userRole)) return false;
+
+		const controlled = roleMenuVisibility?.[item.url];
+		if (controlled) {
+			if (!ROLE_MENU_CONTROL_ROLES.includes(userRole as any)) return false;
+			return Boolean(controlled[userRole as keyof typeof controlled]);
+		}
+
 		return true;
 	}
 
@@ -350,7 +360,14 @@
 	const onboardingWelcomeNote = $derived(($page.data?.onboardingWelcomeNote as string | null) ?? null);
 	const onboardingBadge = $derived(($page.data?.onboardingBadge as string | null) ?? null);
 	const playerProfileNote = $derived(($page.data?.playerProfileNote as string | null) ?? null);
-	const onboardingPipelineStats = $derived(($page.data?.onboardingPipelineStats as { total: number; docsSent: number; docsSigned: number } | null) ?? null);
+	const onboardingPipelineStats = $derived(($page.data?.onboardingPipelineStats as {
+		total: number;
+		invited: number;
+		docsSent: number;
+		docsSigned: number;
+		approved: number;
+		rejected: number;
+	} | null) ?? null);
 
 	function getItemInlineNote(item: NavItem): string | null {
 		const genericNote = sidebarNotes[item.url];
@@ -371,8 +388,11 @@
 		if (item.url !== '/dashboard/onboarding/admin' || !onboardingPipelineStats) return [];
 		return [
 			`${onboardingPipelineStats.total} total`,
+			`${onboardingPipelineStats.invited} invited`,
 			`${onboardingPipelineStats.docsSent} docs sent`,
-			`${onboardingPipelineStats.docsSigned} docs signed`
+			`${onboardingPipelineStats.docsSigned} docs signed`,
+			`${onboardingPipelineStats.approved} approved`,
+			`${onboardingPipelineStats.rejected} rejected`
 		];
 	}
 
