@@ -224,6 +224,13 @@ Andrew@FLIGolf.com | fligolf.com`;
 		| 'player_contract'
 		| 'legal_documents';
 
+	const requiredInitialDocs: Array<{ type: Exclude<DocType, 'player_contract'>; label: string }> = [
+		{ type: 'player_information_packet', label: 'Player Information Packet' },
+		{ type: 'player_opportunity_packet', label: 'Player Opportunity Packet' },
+		{ type: 'integrity_substance_policy', label: 'Integrity & Substance Policy' },
+		{ type: 'legal_documents', label: 'Legal Documents & Disclosures' }
+	];
+
 	const signatureFor = (type: DocType) => (data.signatures as any)?.[type] ?? null;
 	const isSigned = (type: DocType) => !!signatureFor(type);
 
@@ -298,24 +305,23 @@ Andrew@FLIGolf.com | fligolf.com`;
 		(data.playerProfile?.status === 'submitted' || data.playerProfile?.status === 'approved')
 	);
 
+	const documentsSignedCount = $derived(
+		requiredInitialDocs.filter((d) => sigStates[d.type].signed).length
+	);
+
+	const contractDone = $derived(sigStates.player_contract.signed || Boolean(data.progress?.contractSigned));
+
 	const steps = $derived([
 		{ id: 'welcome', label: 'Welcome', done: true },
 		{
 			id: 'documents',
-			label: 'Documents',
-			done:
-				Boolean(data.progress?.documentsInitialed) ||
-				(
-					sigStates.player_information_packet.signed &&
-					sigStates.player_opportunity_packet.signed &&
-					sigStates.integrity_substance_policy.signed &&
-					sigStates.legal_documents.signed
-				)
+			label: `Documents (${documentsSignedCount}/${requiredInitialDocs.length})`,
+			done: documentsSignedCount === requiredInitialDocs.length
 		},
 		{
 			id: 'contract',
 			label: 'Contract',
-			done: Boolean(data.progress?.contractSigned) || sigStates.player_contract.signed
+			done: contractDone
 		},
 		{
 			id: 'profile',
@@ -370,6 +376,57 @@ Andrew@FLIGolf.com | fligolf.com`;
 						<Circle class="w-5 h-5 text-muted-foreground" />
 					{/if}
 					<span class="text-xs font-medium {step.done ? 'text-emerald-600' : 'text-muted-foreground'}">{step.label}</span>
+				</div>
+			{/each}
+		</div>
+	</div>
+
+	<!-- Document-level progress tracker -->
+	<div class="bg-card border-2 border-border rounded-xl p-5 space-y-4">
+		<div class="flex items-center justify-between gap-3">
+			<div>
+				<p class="text-sm font-semibold">Signing Progress</p>
+				<p class="text-xs text-muted-foreground">Track exactly what is signed and what is still pending.</p>
+			</div>
+			<span class="text-xs font-semibold px-2 py-1 rounded-full border border-emerald-600/40 bg-emerald-500/10 text-emerald-600">
+				{documentsSignedCount}/{requiredInitialDocs.length} docs initialed
+			</span>
+		</div>
+
+		<div class="grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs">
+			<div class="rounded-lg border border-border px-3 py-2 flex items-center justify-between">
+				<span class="text-muted-foreground">Initial documents</span>
+				<span class="font-semibold">{documentsSignedCount}/{requiredInitialDocs.length}</span>
+			</div>
+			<div class="rounded-lg border border-border px-3 py-2 flex items-center justify-between">
+				<span class="text-muted-foreground">Player contract</span>
+				<span class="font-semibold {contractDone ? 'text-emerald-600' : 'text-amber-600'}">{contractDone ? 'Signed' : 'Pending'}</span>
+			</div>
+			<div class="rounded-lg border border-border px-3 py-2 flex items-center justify-between">
+				<span class="text-muted-foreground">Pro profile</span>
+				<span class="font-semibold {profileDone ? 'text-emerald-600' : 'text-amber-600'}">{profileDone ? 'Submitted' : 'Pending'}</span>
+			</div>
+		</div>
+
+		<div class="space-y-2">
+			{#each requiredInitialDocs as doc}
+				<div class="rounded-lg border border-border px-3 py-2 flex items-center justify-between gap-3">
+					<div class="flex items-center gap-2 min-w-0">
+						{#if sigStates[doc.type].signed}
+							<CheckCircle class="w-4 h-4 text-emerald-500 shrink-0" />
+						{:else}
+							<Circle class="w-4 h-4 text-muted-foreground shrink-0" />
+						{/if}
+						<span class="text-sm truncate">{doc.label}</span>
+					</div>
+					<div class="text-right shrink-0">
+						<p class="text-xs font-semibold {sigStates[doc.type].signed ? 'text-emerald-600' : 'text-amber-600'}">
+							{sigStates[doc.type].signed ? 'Signed' : 'Pending'}
+						</p>
+						{#if sigStates[doc.type].signed && sigStates[doc.type].initials}
+							<p class="text-[10px] text-muted-foreground">Initials: {sigStates[doc.type].initials}</p>
+						{/if}
+					</div>
 				</div>
 			{/each}
 		</div>

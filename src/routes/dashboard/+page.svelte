@@ -6,7 +6,7 @@
 		DollarSign, Users, FolderKanban, Receipt,
 		Trophy, Star, Building2, TrendingUp, ArrowRight, Flag,
 		Video, Wrench, Megaphone, Cpu, Scale, Wallet, ShieldCheck, Globe, Handshake,
-		Landmark, Briefcase, Film, Ticket,
+		Landmark, Briefcase, Film, Ticket, BadgeCheck,
 		CheckCircle2, Clock, AlertCircle
 	} from 'lucide-svelte';
 
@@ -33,6 +33,7 @@
 	const expenses = $derived(data.metrics?.expenses ?? { total: 0, totalAmount: 0, approvedAmount: 0, submitted: 0, approved: 0, paid: 0, draft: 0 });
 	const workOrders = $derived(data.metrics?.workOrders ?? { total: 0, totalAmount: 0, open: 0, paid: 0, cancelled: 0 });
 	const approvals = $derived(data.metrics?.approvals ?? { pending: 0, approved: 0, rejected: 0 });
+	let primaryPanelView = $state<'departments' | 'income'>('departments');
 
 	function fmt(n: number) {
 		return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(n);
@@ -73,6 +74,46 @@
 		const match = DEPT_ICONS.find(d => d.keywords.some(k => lower.includes(k)));
 		return match ?? { icon: Building2, bg: 'bg-slate-100 dark:bg-slate-800', fg: 'text-slate-600 dark:text-slate-400' };
 	}
+
+	const otherIncomeSources = $derived([
+		{
+			label: 'Active Income',
+			description: 'Combined sponsorship, ticket, and branding pipeline',
+			href: '/dashboard/active-income',
+			amount: cashflow.projectedRevenue,
+			icon: TrendingUp,
+			accent: 'text-emerald-300',
+			bg: 'bg-emerald-900/30'
+		},
+		{
+			label: 'Sponsor Commitments',
+			description: 'Committed sponsorship contracts',
+			href: '/dashboard/sponsors',
+			amount: sponsors.totalCommitted,
+			icon: Star,
+			accent: 'text-amber-300',
+			bg: 'bg-amber-900/30'
+		},
+		{
+			label: 'Ticket Revenue',
+			description: 'Projected ticket sales intake',
+			href: '/dashboard/ticket-revenue',
+			amount: tickets.totalProjected,
+			icon: Ticket,
+			accent: 'text-cyan-300',
+			bg: 'bg-cyan-900/30'
+		},
+		{
+			label: 'Branding Revenue',
+			description: 'Contracted and proposed branding placements',
+			href: '/dashboard/on-course-branding/pipeline',
+			amount: branding.totalContracted + branding.totalProposed,
+			icon: Flag,
+			accent: 'text-violet-300',
+			bg: 'bg-violet-900/30'
+		}
+	]);
+
 </script>
 
 <svelte:head><title>Dashboard — FliHub</title></svelte:head>
@@ -130,6 +171,7 @@
 			{ label: 'Sponsors',     href: '/dashboard/sponsors',          icon: Star,         color: 'text-yellow-400', bg: 'bg-yellow-950/50 border-yellow-800/50' },
 			{ label: 'Franchises',   href: '/dashboard/franchises',        icon: Trophy,       color: 'text-rose-400',   bg: 'bg-rose-950/50 border-rose-800/50' },
 			{ label: 'Collections',  href: '/dashboard/active-collections', icon: DollarSign,   color: 'text-teal-400',   bg: 'bg-teal-950/50 border-teal-800/50' },
+			{ label: 'Trademarks',   href: '/dashboard/trademarks',        icon: BadgeCheck,   color: 'text-lime-400',   bg: 'bg-lime-950/50 border-lime-800/50' },
 			{ label: 'Import CSV Data', href: '/dashboard/import',         icon: Cpu,          color: 'text-cyan-400',   bg: 'bg-cyan-950/50 border-cyan-800/50' },
 		] as link}
 			<a href={link.href}
@@ -362,19 +404,49 @@
 
 		<!-- Department budget list -->
 		<div class="lg:col-span-2">
-			<div class="flex items-center justify-between mb-3">
+			<div class="flex items-center justify-between mb-3 gap-3 flex-wrap">
 				<div>
-					<div class="inline-flex items-center gap-2 rounded-lg border border-blue-700/60 bg-blue-950/50 px-2.5 py-1.5 text-blue-300">
-						<Building2 class="size-4" />
-						<h2 class="text-sm font-semibold">Departments</h2>
+					<div class="inline-flex items-center gap-2 rounded-lg border px-2.5 py-1.5 {primaryPanelView === 'departments' ? 'border-blue-700/60 bg-blue-950/50 text-blue-300' : 'border-emerald-700/60 bg-emerald-950/50 text-emerald-300'}">
+						{#if primaryPanelView === 'departments'}
+							<Building2 class="size-4" />
+						{:else}
+							<TrendingUp class="size-4" />
+						{/if}
+						<h2 class="text-sm font-semibold">{primaryPanelView === 'departments' ? 'Departments' : 'Income'}</h2>
 					</div>
-					<p class="text-xs text-muted-foreground">Active projects first</p>
+					<p class="text-xs text-muted-foreground">{primaryPanelView === 'departments' ? 'Active projects first' : 'Top income streams to explore'}</p>
 				</div>
-				<Button href="/dashboard/departments" variant="outline" size="sm" class="gap-1 text-xs border-blue-700/70 bg-blue-950/30 text-blue-300 hover:bg-blue-900/40">
-					<Building2 class="size-3" /> View all <ArrowRight class="size-3" />
-				</Button>
+				<div class="flex items-center gap-2">
+					<div class="inline-flex items-center rounded-lg border border-slate-700 bg-slate-900 p-1">
+						<button
+							onclick={() => primaryPanelView = 'departments'}
+							class="h-7 px-2.5 text-xs font-semibold rounded-md border transition-colors {primaryPanelView === 'departments' ? 'bg-blue-700 border-blue-600 text-white' : 'border-slate-700 text-slate-200 hover:text-white hover:border-slate-500'}"
+						>
+							<span class="inline-flex items-center gap-1.5">
+								<Building2 class="size-3.5" /> Departments
+							</span>
+						</button>
+						<button
+							onclick={() => primaryPanelView = 'income'}
+							class="h-7 px-2.5 text-xs font-semibold rounded-md border transition-colors bg-green-900 {primaryPanelView === 'income' ? 'border-green-500 text-white shadow-[0_0_0_1px_rgba(34,197,94,0.25)]' : 'border-green-700 text-green-100 hover:border-green-500 hover:text-white'}"
+						>
+							<span class="inline-flex items-center gap-1.5">
+								<TrendingUp class="size-3.5" /> Income
+							</span>
+						</button>
+					</div>
+					<Button href={primaryPanelView === 'departments' ? '/dashboard/departments' : '/dashboard/active-income'} variant="outline" size="sm" class="gap-1 text-xs {primaryPanelView === 'departments' ? 'border-blue-700/70 bg-blue-950/30 text-blue-300 hover:bg-blue-900/40' : 'border-green-800/80 bg-green-950/50 text-green-200 hover:bg-green-900/60'}">
+						{#if primaryPanelView === 'departments'}
+							<Building2 class="size-3" />
+						{:else}
+							<TrendingUp class="size-3" />
+						{/if}
+						View all <ArrowRight class="size-3" />
+					</Button>
+				</div>
 			</div>
 			<Card class="overflow-hidden">
+				{#if primaryPanelView === 'departments'}
 				{#each deptBudgets.slice(0, 8) as dept, i}
 					{@const used       = pct(dept.actual ?? 0, dept.budget || 0)}
 					{@const forecasted = pct(dept.forecasted ?? 0, dept.budget || 0)}
@@ -437,8 +509,27 @@
 						</div>
 					</a>
 				{/each}
-				{#if deptBudgets.length === 0}
-					<p class="px-4 py-6 text-sm text-muted-foreground text-center">No department data</p>
+					{#if deptBudgets.length === 0}
+						<p class="px-4 py-6 text-sm text-muted-foreground text-center">No department data</p>
+					{/if}
+				{:else}
+					{#each otherIncomeSources as income}
+						{@const IncomeIcon = income.icon}
+						<a href={income.href} class="flex items-center gap-3 px-4 py-3 transition-colors group {income.label === 'Active Income' ? 'bg-slate-900 hover:bg-slate-800' : 'bg-slate-800/70 hover:bg-slate-700/70'}">
+							<div class="size-8 rounded-lg {income.bg} flex items-center justify-center shrink-0">
+								<IncomeIcon class="size-4 {income.accent}" />
+							</div>
+							<div class="flex-1 min-w-0">
+								<p class="text-sm font-semibold truncate">{income.label}</p>
+								<p class="text-xs text-muted-foreground truncate">{income.description}</p>
+							</div>
+							<div class="text-right shrink-0">
+								<p class="text-sm font-bold tabular-nums">{fmt(income.amount)}</p>
+								<p class="text-[10px] text-muted-foreground">pipeline</p>
+							</div>
+							<ArrowRight class="size-3 text-slate-500 group-hover:text-slate-300 transition-colors shrink-0" />
+						</a>
+					{/each}
 				{/if}
 			</Card>
 		</div>

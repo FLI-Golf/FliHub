@@ -5,21 +5,36 @@
 	import {
 		Megaphone, DollarSign, BarChart3, Target,
 		ArrowRight, Calendar, TrendingUp, CheckCircle2, Plus,
-		Clock, AlertCircle, ChevronDown, Images, Star, Link
+		Clock, AlertCircle, ChevronDown, Images, Star, Link, GripVertical
 	} from 'lucide-svelte';
 
 	let { data }: { data: PageData } = $props();
 
-	const campaigns   = $derived(data.campaigns ?? []);
-	const stats       = $derived(data.stats ?? { total: 0, totalBudget: 0, totalSpend: 0, byStatus: {}, byType: {} });
+	let campaignsState = $state<any[]>([...(data.campaigns ?? [])]);
+	const campaigns   = $derived(campaignsState);
+	const stats       = $derived.by(() => {
+		const totalBudget = campaignsState.reduce((sum, c) => sum + Number(c?.budget ?? 0), 0);
+		const totalSpend = campaignsState.reduce((sum, c) => sum + Number(c?.actualSpend ?? 0), 0);
+		const byStatus: Record<string, number> = {};
+		const byType: Record<string, number> = {};
+		for (const c of campaignsState) {
+			if (c?.status) byStatus[c.status] = (byStatus[c.status] ?? 0) + 1;
+			if (c?.type) byType[c.type] = (byType[c.type] ?? 0) + 1;
+		}
+		return {
+			total: campaignsState.length,
+			totalBudget,
+			totalSpend,
+			byStatus,
+			byType
+		};
+	});
 	const goals       = $derived(data.marketingGoals ?? []);
 
-	let statusFilter  = $state('all');
 	let expandedDesc  = $state<Record<string, boolean>>({});
-
-	const filtered = $derived(
-		statusFilter === 'all' ? campaigns : campaigns.filter(c => c.status === statusFilter)
-	);
+	let draggingCampaignId = $state('');
+	let dragSavingId = $state('');
+	let dragError = $state('');
 
 	function fmt(n: number) {
 		return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(n);
@@ -38,6 +53,7 @@
 		'Completed':    { label: 'Completed',  color: 'text-slate-400',   bg: 'bg-slate-500/15 border-slate-500/30',     bar: 'bg-slate-500',   icon: CheckCircle2 },
 		'Paused':       { label: 'Paused',     color: 'text-amber-400',   bg: 'bg-amber-500/15 border-amber-500/30',     bar: 'bg-amber-500',   icon: AlertCircle },
 	};
+	const KANBAN_STATUSES = ['Planning', 'Active', 'Paused', 'Completed'];
 
 	const TYPE_COLORS: Record<string, string> = {
 		'Marketing':      'bg-violet-500/15 text-violet-300 border-violet-500/30',
@@ -57,12 +73,67 @@
 		return STATUS_CONFIG[s] ?? { label: s, color: 'text-slate-400', bg: 'bg-slate-500/15 border-slate-500/30', bar: 'bg-slate-500', icon: Megaphone };
 	}
 
-	const statusTabs = $derived([
-		{ id: 'all', label: 'All', count: campaigns.length },
-		...Object.entries(stats.byStatus).map(([s, n]) => ({ id: s, label: s, count: n as number }))
-	]);
+	const kanbanColumns = $derived(
+		KANBAN_STATUSES.map((status) => ({
+			status,
+			count: campaigns.filter((c: any) => c.status === status).length,
+			items: campaigns.filter((c: any) => c.status === status)
+		}))
+	);
 
 	const activeGoals = $derived(goals.filter((g: any) => g.status !== 'Completed').slice(0, 4));
+
+	async function updateCampaignStatus(campaignId: string, status: string) {
+		dragSavingId = campaignId;
+		dragError = '';
+		try {
+			const res = await fetch(`/api/campaigns/${campaignId}`, {
+				method: 'PATCH',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ status })
+			});
+			if (!res.ok) {
+				const payload = await res.json().catch(() => ({}));
+				throw new Error(payload?.message ?? 'Failed to update campaign status');
+			}
+		} catch (err: any) {
+			dragError = err?.message ?? 'Failed to update campaign status';
+		} finally {
+			dragSavingId = '';
+		}
+	}
+
+	function onCardDragStart(event: DragEvent, campaignId: string) {
+		draggingCampaignId = campaignId;
+		event.dataTransfer?.setData('text/campaign-id', campaignId);
+		event.dataTransfer?.setData('text/plain', campaignId);
+		if (event.dataTransfer) event.dataTransfer.effectAllowed = 'move';
+	}
+
+	function onCardDragEnd() {
+		draggingCampaignId = '';
+	}
+
+	async function onColumnDrop(event: DragEvent, targetStatus: string) {
+		event.preventDefault();
+		const campaignId = event.dataTransfer?.getData('text/campaign-id') || event.dataTransfer?.getData('text/plain') || draggingCampaignId;
+		if (!campaignId) return;
+		const campaign = campaignsState.find((c: any) => c.id === campaignId);
+		if (!campaign || campaign.status === targetStatus) return;
+
+		const previousStatus = campaign.status;
+		campaignsState = campaignsState.map((c: any) => c.id === campaignId ? { ...c, status: targetStatus } : c);
+		await updateCampaignStatus(campaignId, targetStatus);
+		if (dragError) {
+			campaignsState = campaignsState.map((c: any) => c.id === campaignId ? { ...c, status: previousStatus } : c);
+		}
+		draggingCampaignId = '';
+	}
+
+	function onColumnDragOver(event: DragEvent) {
+		event.preventDefault();
+		if (event.dataTransfer) event.dataTransfer.dropEffect = 'move';
+	}
 </script>
 
 <svelte:head><title>Campaigns — FliHub</title></svelte:head>
@@ -127,112 +198,112 @@
 	<!-- Main content: campaigns + goals sidebar -->
 	<div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
 
-		<!-- Campaigns list -->
+		<!-- Campaigns board -->
 		<div class="lg:col-span-2 flex flex-col gap-4">
+			{#if dragError}
+				<div class="rounded-lg border border-red-500/30 bg-red-500/10 p-3 text-xs text-red-300">{dragError}</div>
+			{/if}
 
-			<!-- Status filter tabs -->
-			<div class="flex gap-1 flex-wrap">
-				{#each statusTabs as tab}
-					{@const active = statusFilter === tab.id}
-					<button
-						onclick={() => statusFilter = tab.id}
-						class="px-3 py-1.5 rounded-lg text-xs font-medium transition-colors
-							{active ? 'bg-slate-700 text-white' : 'text-muted-foreground hover:text-slate-300 hover:bg-slate-800'}"
+			<div class="grid grid-cols-1 xl:grid-cols-2 gap-4">
+				{#each kanbanColumns as column}
+					{@const s = getStatus(column.status)}
+					<div
+						class="rounded-xl border border-slate-700 bg-slate-900/70 min-h-[200px]"
+						ondragover={onColumnDragOver}
+						ondrop={(event) => onColumnDrop(event, column.status)}
 					>
-						{tab.label}
-						<span class="ml-1 text-[10px] opacity-60">{tab.count}</span>
-					</button>
-				{/each}
-			</div>
-
-			<!-- Campaign cards -->
-			{#each filtered as campaign, i (campaign.id)}
-				{@const s = getStatus(campaign.status)}
-				{@const StatusIcon = s.icon}
-				{@const borderColor = BORDER_COLORS[campaign.status] ?? 'border-l-slate-500'}
-				{@const typeColor = TYPE_COLORS[campaign.type] ?? 'bg-slate-500/15 text-slate-300 border-slate-500/30'}
-				{@const rowEven = i % 2 === 0}
-				<Card class="p-0 overflow-hidden border-l-4 {borderColor} {rowEven ? 'bg-slate-900' : 'bg-slate-800/60'}">
-					<div class="p-5">
-						<!-- Title row -->
-						<div class="flex items-start justify-between gap-3 mb-3">
-							<div class="flex items-center gap-2.5 min-w-0">
-								<div class="size-9 rounded-lg {rowEven ? 'bg-slate-700' : 'bg-slate-700/80'} flex items-center justify-center shrink-0">
-									<StatusIcon class="size-4 {s.color}" />
-								</div>
-								<div class="min-w-0">
-									<p class="text-sm font-bold leading-tight line-clamp-1">{campaign.name}</p>
-									<div class="flex items-center gap-1.5 mt-0.5 flex-wrap">
-										<span class="text-[10px] font-bold px-1.5 py-0.5 rounded border {s.bg} {s.color}">{s.label}</span>
-										{#if campaign.type}
-											<span class="text-[10px] font-medium px-1.5 py-0.5 rounded border {typeColor}">{campaign.type}</span>
-										{/if}
-									</div>
-								</div>
+						<div class="flex items-center justify-between px-4 py-3 border-b border-slate-800">
+							<div class="flex items-center gap-2">
+								<s.icon class="size-4 {s.color}" />
+								<p class="text-sm font-semibold text-white">{column.status}</p>
 							</div>
-							<div class="text-right shrink-0">
-								<p class="text-sm font-bold tabular-nums">{fmt(campaign.actualSpend)}</p>
-								<p class="text-xs text-muted-foreground">/ {fmt(campaign.budget)}</p>
-							</div>
+							<span class="text-xs text-slate-400">{column.count}</span>
 						</div>
-
-						<!-- Linked goal badge -->
-						{#if campaign.linkedGoal}
-							<a
-								href="/dashboard/marketing-goals/{campaign.linkedGoal.id}"
-								class="inline-flex items-center gap-1.5 mb-3 text-[10px] font-medium px-2 py-1 rounded border bg-violet-500/10 border-violet-500/30 text-violet-300 hover:bg-violet-500/20 transition-colors"
-								onclick={(e) => e.stopPropagation()}
-							>
-								<Link class="size-3 shrink-0" />
-								Goal: {campaign.linkedGoal.goalName}
-							</a>
-						{/if}
-
-						<!-- Description collapsible -->
-						{#if campaign.description}
-							<button
-								onclick={() => expandedDesc[campaign.id] = !expandedDesc[campaign.id]}
-								class="w-full text-left group/desc mb-3"
-							>
-								<p class="text-xs text-muted-foreground leading-relaxed {expandedDesc[campaign.id] ? '' : 'line-clamp-2'}">
-									{@html campaign.description}
-								</p>
-								<span class="inline-flex items-center gap-0.5 text-[10px] text-slate-500 group-hover/desc:text-slate-300 transition-colors mt-0.5">
-									<ChevronDown class="size-3 transition-transform duration-200 {expandedDesc[campaign.id] ? 'rotate-180' : ''}" />
-									{expandedDesc[campaign.id] ? 'less' : 'more'}
-								</span>
-							</button>
-						{/if}
-
-						<!-- Budget bar -->
-						<div class="mb-3">
-							<div class="h-1.5 rounded-full overflow-hidden {rowEven ? 'bg-slate-700' : 'bg-slate-600/70'}">
-								<div class="h-full rounded-full transition-all {s.bar}"
-									style="width:{campaign.budgetPct.toFixed(1)}%"></div>
-							</div>
-							<p class="text-[10px] text-muted-foreground mt-0.5">{campaign.budgetPct.toFixed(0)}% spent</p>
-						</div>
-
-						<!-- Dates + assets row -->
-						<div class="flex items-center justify-between gap-3 pt-3 border-t {rowEven ? 'border-slate-700/60' : 'border-slate-700/40'}">
-							<div class="flex items-center gap-1 text-xs text-muted-foreground">
-								<Calendar class="size-3.5 shrink-0" />
-								<span>{fmtDate(campaign.startDate)} — {fmtDate(campaign.endDate)}</span>
-							</div>
-							{#if campaign.assets.length > 0}
-								<div class="flex items-center gap-1 text-xs text-muted-foreground">
-									<Images class="size-3.5" />
-									<span>{campaign.assets.length} asset{campaign.assets.length !== 1 ? 's' : ''}</span>
+						<div class="p-3 space-y-3">
+							{#if column.items.length === 0}
+								<div class="rounded-lg border border-dashed border-slate-700 p-4 text-center text-xs text-slate-500">
+									Drop campaigns here
 								</div>
 							{/if}
+
+							{#each column.items as campaign (campaign.id)}
+								{@const typeColor = TYPE_COLORS[campaign.type] ?? 'bg-slate-500/15 text-slate-300 border-slate-500/30'}
+								<div
+									draggable="true"
+									ondragstart={(event) => onCardDragStart(event, campaign.id)}
+									ondragend={onCardDragEnd}
+									class="{draggingCampaignId === campaign.id ? 'opacity-50' : ''}"
+								>
+									<Card class="p-0 border border-slate-700/70 bg-slate-900 overflow-hidden">
+									<div class="p-4 space-y-3">
+										<div class="flex items-start gap-2">
+											<div class="pt-0.5 text-slate-500" title="Drag to move">
+												<GripVertical class="size-4" />
+											</div>
+											<div class="flex-1 space-y-3 min-w-0">
+										<div class="flex items-start justify-between gap-3">
+											<div class="min-w-0">
+												<p class="text-sm font-bold leading-tight line-clamp-1">{campaign.name}</p>
+												<div class="flex items-center gap-1.5 mt-1 flex-wrap">
+													{#if campaign.type}
+														<span class="text-[10px] font-medium px-1.5 py-0.5 rounded border {typeColor}">{campaign.type}</span>
+													{/if}
+													{#if dragSavingId === campaign.id}
+														<span class="text-[10px] text-slate-400">saving...</span>
+													{/if}
+												</div>
+											</div>
+											<div class="text-right shrink-0">
+												<p class="text-sm font-bold tabular-nums">{fmt(campaign.actualSpend)}</p>
+												<p class="text-xs text-muted-foreground">/ {fmt(campaign.budget)}</p>
+											</div>
+										</div>
+
+										{#if campaign.linkedGoal}
+											<a
+												href="/dashboard/marketing-goals/{campaign.linkedGoal.id}"
+												class="inline-flex items-center gap-1.5 text-[10px] font-medium px-2 py-1 rounded border bg-violet-500/10 border-violet-500/30 text-violet-300 hover:bg-violet-500/20 transition-colors"
+												onclick={(event) => event.stopPropagation()}
+											>
+												<Link class="size-3 shrink-0" />
+												Goal: {campaign.linkedGoal.goalName}
+											</a>
+										{/if}
+
+										{#if campaign.description}
+											<button
+												onclick={() => expandedDesc[campaign.id] = !expandedDesc[campaign.id]}
+												class="w-full text-left group/desc"
+											>
+												<p class="text-xs text-muted-foreground leading-relaxed {expandedDesc[campaign.id] ? '' : 'line-clamp-2'}">
+													{@html campaign.description}
+												</p>
+												<span class="inline-flex items-center gap-0.5 text-[10px] text-slate-500 group-hover/desc:text-slate-300 transition-colors mt-0.5">
+													<ChevronDown class="size-3 transition-transform duration-200 {expandedDesc[campaign.id] ? 'rotate-180' : ''}" />
+													{expandedDesc[campaign.id] ? 'less' : 'more'}
+												</span>
+											</button>
+										{/if}
+
+										<div class="h-1.5 rounded-full overflow-hidden bg-slate-700">
+											<div class="h-full rounded-full transition-all {s.bar}" style="width:{campaign.budgetPct.toFixed(1)}%"></div>
+										</div>
+										<div class="flex items-center justify-between text-[11px] text-muted-foreground">
+											<span class="inline-flex items-center gap-1"><Calendar class="size-3.5" />{fmtDate(campaign.startDate)} — {fmtDate(campaign.endDate)}</span>
+											{#if campaign.assets.length > 0}
+												<span class="inline-flex items-center gap-1"><Images class="size-3.5" />{campaign.assets.length}</span>
+											{/if}
+										</div>
+											</div>
+										</div>
+									</div>
+									</Card>
+								</div>
+							{/each}
 						</div>
 					</div>
-				</Card>
-			{/each}
-
-			{#if filtered.length === 0}
-				<div class="text-center py-12 text-muted-foreground text-sm">No campaigns match this filter.</div>
-			{/if}
+				{/each}
+			</div>
 		</div>
 
 		<!-- Right sidebar: goals + type breakdown -->

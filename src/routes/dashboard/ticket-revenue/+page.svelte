@@ -18,7 +18,10 @@
 	let showAdd = $state(false);
 	let showDaily = $state(false);
 	let saving  = $state(false);
+	let seeding = $state(false);
 	let saveErr = $state('');
+	let testingMsg = $state('');
+	let testingErr = $state('');
 
 	let form = $state({
 		eventName:      '',
@@ -116,6 +119,33 @@
 		finally { saving = false; }
 	}
 
+	async function seedTestingData(reset = false) {
+		seeding = true;
+		testingErr = '';
+		testingMsg = '';
+
+		try {
+			const res = await fetch('/api/ticket-sales/testing/seed', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ reset }),
+			});
+
+			const payload = await res.json().catch(() => ({}));
+			if (!res.ok) {
+				testingErr = payload?.message ?? 'Failed to seed test ticket revenue data.';
+				return;
+			}
+
+			testingMsg = payload?.message ?? 'Ticket revenue test data seeded.';
+			await invalidateAll();
+		} catch {
+			testingErr = 'Network error while seeding ticket revenue test data.';
+		} finally {
+			seeding = false;
+		}
+	}
+
 	// ── Status helpers ────────────────────────────────────────────────────────
 	const STATUS_COLOR: Record<string, string> = {
 		projected:  'bg-slate-700 text-slate-300',
@@ -148,8 +178,8 @@
 <div class="min-h-screen bg-slate-950 text-white p-6 space-y-6">
 
 	<!-- Header -->
-	<div class="flex items-center justify-between">
-		<div class="flex items-center gap-3">
+	<div class="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+		<div class="flex items-start gap-3">
 			<div class="p-2 bg-emerald-600/20 rounded-lg">
 				<Ticket class="size-6 text-emerald-400" />
 			</div>
@@ -158,7 +188,7 @@
 				<p class="text-slate-400 text-sm">Track ticket sales across all FLI Golf events</p>
 			</div>
 		</div>
-		<div class="flex flex-wrap justify-end gap-2">
+		<div class="flex flex-wrap justify-end gap-2 md:pt-1">
 			<Button onclick={() => showDaily = true} variant="outline" class="gap-2 border-emerald-700 text-emerald-300 hover:bg-emerald-950/40">
 				<DollarSign class="size-4" /> Daily Website Intake
 			</Button>
@@ -167,6 +197,39 @@
 			</Button>
 		</div>
 	</div>
+
+	<Card class="bg-slate-900 border-slate-700 p-3 md:p-4">
+		<div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+			<div>
+				<p class="text-[11px] uppercase tracking-wider text-slate-400">Testing Tools</p>
+				<p class="text-xs text-slate-500">Seed tournament-linked ticket sales for QA and demos.</p>
+			</div>
+			<div class="flex flex-wrap gap-2">
+				<Button
+					onclick={() => seedTestingData(false)}
+					variant="outline"
+					disabled={seeding}
+					class="gap-2 border-slate-600 text-slate-300 hover:bg-slate-800"
+				>
+					{seeding ? 'Seeding…' : 'Seed Testing Data'}
+				</Button>
+				<Button
+					onclick={() => seedTestingData(true)}
+					variant="outline"
+					disabled={seeding}
+					class="gap-2 border-amber-700 text-amber-300 hover:bg-amber-950/40"
+				>
+					{seeding ? 'Resetting…' : 'Reset Testing Data'}
+				</Button>
+			</div>
+		</div>
+		{#if testingMsg}
+			<p class="mt-2 text-xs text-emerald-300">{testingMsg}</p>
+		{/if}
+		{#if testingErr}
+			<p class="mt-2 text-xs text-red-300">{testingErr}</p>
+		{/if}
+	</Card>
 
 	<!-- KPI Strip -->
 	<div class="grid grid-cols-2 md:grid-cols-4 gap-4">
