@@ -79,22 +79,6 @@ export class RoleRouter {
 		const truncatedUsers = this.truncateUsers(users, payload.truncateTo ?? 6);
 		const matchedUserId = this.matchUser(payload.sessionUser, users);
 
-		console.log('[RoleRouter]', {
-			sessionUser: {
-				id: payload.sessionUser.id ?? null,
-				email: payload.sessionUser.email ?? null,
-				username: payload.sessionUser.username ?? null,
-			},
-			role: payload.role,
-			matchedUserId,
-			truncatedUsers: truncatedUsers.map((u) => ({
-				id: u.id,
-				email: u.email ?? null,
-				username: u.username ?? null,
-				name: u.name ?? null,
-			})),
-		});
-
 		return matchedUserId;
 	}
 }

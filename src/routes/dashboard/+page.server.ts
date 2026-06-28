@@ -135,6 +135,37 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 			sponsorMetrics.totalCommitted +
 			brandingMetrics.totalContracted +
 			brandingMetrics.totalProposed;
+		const incomeDebug = {
+			total: projectedRevenue,
+			breakdown: {
+				ticketsProjected: ticketMetrics.totalProjected,
+				sponsorsCommitted: sponsorMetrics.totalCommitted,
+				brandingContracted: brandingMetrics.totalContracted,
+				brandingProposed: brandingMetrics.totalProposed,
+			}
+		};
+
+		console.debug('[dashboard] expenses-object', expByStatus);
+		console.debug('[dashboard] income-object', incomeDebug);
+
+		console.debug('[dashboard] work-orders-chart-inputs', {
+			incomeTotal: projectedRevenue,
+			expenseTotal: expTotal,
+			bankAccountTotal: totalBankBalance,
+			incomeBreakdown: {
+				ticketsProjected: ticketMetrics.totalProjected,
+				sponsorsCommitted: sponsorMetrics.totalCommitted,
+				brandingContracted: brandingMetrics.totalContracted,
+				brandingProposed: brandingMetrics.totalProposed,
+			},
+			recordCounts: {
+				ticketSales: ts.length,
+				sponsors: sponsors.length,
+				brandingPlacements: bp.length,
+				expenses: expenses.length,
+				activeBankAccounts: activeBankAccounts.length,
+			}
+		});
 
 		return {
 			user: locals.pb.authStore.model,

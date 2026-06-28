@@ -57,11 +57,11 @@
 	const activeRole = $derived(String(data.userProfile?.role ?? ''));
 	const isAdmin = $derived(activeRole === 'admin');
 	const isLeader = $derived(activeRole === 'leader');
+	const myDepartmentId = $derived(String((data as any).userDepartment?.id ?? ''));
 	const canUseMyDepartmentsFilter = $derived((isLeader || isAdmin) && Boolean(myDepartmentId));
 	const onboardingWelcomeNote = $derived((data.onboardingWelcomeNote as string | null) ?? null);
 	const onboardingBadge = $derived((data.onboardingBadge as string | null) ?? null);
 	const playerProfileNote = $derived((data.playerProfileNote as string | null) ?? null);
-	const myDepartmentId = $derived(String((data as any).userDepartment?.id ?? ''));
 
 	function normalizeRoleMenuVisibility(raw: unknown): RoleMenuVisibility {
 		const normalized = createDefaultRoleMenuVisibility();
@@ -330,6 +330,55 @@
 	function pct(a: number, b: number) {
 		return b === 0 ? 0 : Math.min(100, (a / b) * 100);
 	}
+
+	const workOrderChartSummary = $derived.by(() => {
+		const income = Number(cashflow.projectedRevenue ?? 0);
+		const expense = Number(expenses.totalAmount ?? 0);
+		const bank = Number(cashflow.totalBankBalance ?? 0);
+		const maxValue = Math.max(income, expense, bank, 1);
+		const chartHeight = 112;
+		const topPadding = 10;
+		const usableHeight = chartHeight - (topPadding * 2);
+
+		const toY = (value: number) => {
+			const ratio = value <= 0 ? 0 : value / maxValue;
+			return chartHeight - topPadding - (ratio * usableHeight);
+		};
+
+		const xPoints = [12, 112, 212, 312];
+		return {
+			maxValue,
+			series: [
+				{
+					label: 'Income',
+					value: income,
+					stroke: '#34d399',
+					dot: '#6ee7b7',
+					points: xPoints.map((x) => `${x},${toY(income)}`).join(' '),
+					dotX: xPoints[xPoints.length - 1],
+					dotY: toY(income),
+				},
+				{
+					label: 'Expense',
+					value: expense,
+					stroke: '#fb923c',
+					dot: '#fdba74',
+					points: xPoints.map((x) => `${x},${toY(expense)}`).join(' '),
+					dotX: xPoints[xPoints.length - 1],
+					dotY: toY(expense),
+				},
+				{
+					label: 'Bank Total',
+					value: bank,
+					stroke: '#38bdf8',
+					dot: '#7dd3fc',
+					points: xPoints.map((x) => `${x},${toY(bank)}`).join(' '),
+					dotX: xPoints[xPoints.length - 1],
+					dotY: toY(bank),
+				},
+			],
+		};
+	});
 
 	// Maps department name keywords → { icon, colors }
 	const DEPT_ICONS: Array<{ keywords: string[]; icon: any; bg: string; fg: string }> = [
@@ -992,6 +1041,47 @@
 						</div>
 					</Card>
 				</a>
+
+				<Card class="mt-3 p-4 border border-slate-800 bg-slate-950/90">
+					<div class="flex items-center justify-between mb-2">
+						<h3 class="text-xs font-semibold uppercase tracking-wide text-slate-300">Income vs Expense vs Bank</h3>
+						<span class="text-[10px] text-slate-500">normalized to max</span>
+					</div>
+
+					<div class="rounded-lg border border-slate-800 bg-slate-900/60 p-2">
+						<svg viewBox="0 0 324 112" class="w-full h-32" role="img" aria-label="Income, expense, and bank total line chart">
+							<line x1="12" y1="10" x2="312" y2="10" stroke="rgba(148,163,184,0.25)" stroke-width="1" />
+							<line x1="12" y1="56" x2="312" y2="56" stroke="rgba(148,163,184,0.18)" stroke-width="1" />
+							<line x1="12" y1="102" x2="312" y2="102" stroke="rgba(148,163,184,0.25)" stroke-width="1" />
+
+							{#each workOrderChartSummary.series as line}
+								<polyline
+									fill="none"
+									stroke={line.stroke}
+									stroke-width="2.5"
+									stroke-linecap="round"
+									stroke-linejoin="round"
+									points={line.points}
+								/>
+								<circle cx={line.dotX} cy={line.dotY} r="3" fill={line.dot} />
+							{/each}
+						</svg>
+					</div>
+
+					<div class="mt-3 grid grid-cols-1 sm:grid-cols-3 gap-2">
+						{#each workOrderChartSummary.series as line}
+							<div class="rounded-md border border-slate-800 bg-slate-900/70 px-2.5 py-2">
+								<div class="flex items-center justify-between gap-2">
+									<span class="text-[11px] text-slate-300 inline-flex items-center gap-1.5">
+										<span class="size-2 rounded-full" style={`background:${line.stroke}`}></span>
+										{line.label}
+									</span>
+									<span class="text-xs font-semibold tabular-nums text-slate-100">{fmt(line.value)}</span>
+								</div>
+							</div>
+						{/each}
+					</div>
+				</Card>
 			</div>
 		</div>
 	</div>
