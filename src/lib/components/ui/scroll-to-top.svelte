@@ -21,11 +21,12 @@
 	<button
 		onclick={scrollToTop}
 		aria-label="Scroll to top"
-		class="fixed bottom-6 right-6 z-50 flex size-10 items-center justify-center rounded-full
+		class="fixed bottom-6 right-6 z-50 flex items-center justify-center
 		       bg-slate-800 border border-slate-600 text-slate-200 shadow-lg
 		       hover:bg-slate-700 hover:border-slate-500 hover:text-white
-		       transition-all duration-200 hover:-translate-y-0.5 hover:shadow-xl"
+		       transition-all duration-200 hover:-translate-y-0.5 hover:shadow-xl
+		       px-3 py-2 rounded-lg text-sm font-medium"
 	>
-		<ChevronUp class="size-5" />
+		top
 	</button>
 {/if}

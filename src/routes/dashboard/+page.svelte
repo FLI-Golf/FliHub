@@ -90,6 +90,7 @@
 	let roleSettingsBusy = $state(false);
 	let roleSettingsMessage = $state('');
 	let roleSettingsError = $state('');
+	let roleSettingsFilterText = $state('');
 
 	$effect(() => {
 		roleMenuVisibility = normalizeRoleMenuVisibility(data.roleMenuVisibility);
@@ -143,6 +144,14 @@
 		roleMenuVisibility = next;
 		await saveRoleMenuVisibility(next);
 	}
+
+	const filteredRoleMenuItems = $derived.by(() => {
+		const filter = roleSettingsFilterText.toLowerCase().trim();
+		if (!filter) return ROLE_MENU_CONTROL_ITEMS;
+		return ROLE_MENU_CONTROL_ITEMS.filter((item) =>
+			item.title.toLowerCase().includes(filter) || item.url.toLowerCase().includes(filter)
+		);
+	});
 
 	const quickAccessLinks = [
 		{ label: 'Departments',  href: '/dashboard/departments',         icon: Building2,    color: 'text-blue-400',   bg: 'bg-blue-950/50 border-blue-800/50' },
@@ -509,7 +518,7 @@
 	{#if isAdmin}
 		<Card class="p-5 border border-slate-700 bg-slate-950 text-slate-100">
 			<details>
-				<summary class="list-none cursor-pointer flex items-start justify-between gap-4 flex-wrap">
+				<summary class="list-none cursor-pointer flex items-start justify-between gap-4">
 					<div>
 						<h2 class="text-base font-semibold inline-flex items-center gap-2">
 							<ShieldCheck class="size-4 text-cyan-300" />
@@ -517,7 +526,7 @@
 						</h2>
 						<p class="text-xs text-slate-400 mt-1">Toggle which roles can see the selected dashboard menu items.</p>
 					</div>
-					<div class="flex items-center gap-2">
+					<div class="flex items-center gap-2 shrink-0">
 						{#if roleSettingsBusy}
 							<span class="text-xs text-amber-300">Saving...</span>
 						{/if}
@@ -526,10 +535,24 @@
 				</summary>
 
 				{#if roleSettingsError}
-					<p class="mt-3 text-xs text-red-300">{roleSettingsError}</p>
+					<p class="mt-4 text-xs text-red-300">{roleSettingsError}</p>
 				{:else if roleSettingsMessage}
-					<p class="mt-3 text-xs text-emerald-300">{roleSettingsMessage}</p>
+					<p class="mt-4 text-xs text-emerald-300">{roleSettingsMessage}</p>
 				{/if}
+
+				<div class="mt-4 flex items-center gap-3">
+					<input
+						type="text"
+						placeholder="Search routes..."
+						bind:value={roleSettingsFilterText}
+						class="px-3 py-1.5 text-xs rounded-lg border border-slate-700 bg-slate-900/80 text-slate-100 placeholder-slate-500 focus:outline-none focus:border-slate-600 focus:ring-1 focus:ring-slate-600 flex-1"
+					/>
+					{#if roleSettingsFilterText}
+						<span class="text-[10px] text-slate-400 whitespace-nowrap">
+							{filteredRoleMenuItems.length} of {ROLE_MENU_CONTROL_ITEMS.length}
+						</span>
+					{/if}
+				</div>
 
 				<div class="mt-4 overflow-x-auto rounded-lg border border-slate-800">
 					<table class="min-w-full text-xs">
@@ -542,7 +565,7 @@
 							</tr>
 						</thead>
 						<tbody>
-							{#each ROLE_MENU_CONTROL_ITEMS as item}
+							{#each filteredRoleMenuItems as item}
 								<tr class="border-b border-slate-900 last:border-b-0">
 									<td class="px-3 py-2">
 										<div class="font-medium text-slate-200">{item.title}</div>

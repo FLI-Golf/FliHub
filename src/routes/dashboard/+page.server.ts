@@ -1,4 +1,5 @@
 import { RequestContext } from '$lib/infra/RequestContext';
+import { getRoleMenuVisibility } from '$lib/server/role-menu-visibility';
 import type { PageServerLoad } from './$types';
 
 export const load: PageServerLoad = async ({ locals, url }) => {
@@ -8,7 +9,7 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 	
 	
 		// Fetch all core data in parallel — each wrapped so one failure doesn't kill the page
-		const [projects, departments, expenses, approvals, workOrders, sponsors, franchiseLeads, franchiseOpps, ticketSales, brandingPlacements, bankAccounts] = await Promise.all([
+		const [projects, departments, expenses, approvals, workOrders, sponsors, franchiseLeads, franchiseOpps, ticketSales, brandingPlacements, bankAccounts, roleMenuVisibility] = await Promise.all([
 			pb.collection('projects').getFullList({ fields: 'id,name,status,department,project_budget,project_actual_expenses,project_forecasted_expenses,fiscalYear' }).catch(() => []),
 			pb.collection('departments').getFullList({ fields: 'id,name,description,status,department_annual_budget,department_actual_expenses' }).catch(() => []),
 			pb.collection('expenses').getFullList({ fields: 'id,amount,status,project' }).catch(() => []),
@@ -20,6 +21,7 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 			pb.collection('ticket_sales').getFullList({ fields: 'id,status,grossRevenue,netRevenue,quantity,pricePerTicket,platformFees' }).catch(() => []),
 			pb.collection('branding_placements').getFullList({ fields: 'id,status,grossRevenue,quantity,ratePerPlacement' }).catch(() => []),
 			pb.collection('bank_accounts').getFullList({ fields: 'id,allocation,status' }).catch(() => []),
+			getRoleMenuVisibility().catch(() => ({})),
 		]);
 	
 		// Budget rollup. The seed raise is the cash ceiling; department budgets can
@@ -170,6 +172,7 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 		return {
 			user: locals.pb.authStore.model,
 			userProfile,
+			roleMenuVisibility,
 			metrics: {
 				budget: {
 					total: seedRaise,

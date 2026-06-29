@@ -112,6 +112,20 @@
 				</Breadcrumb.Root>
 			</div>
 
+			<div class="flex items-center gap-3 px-4">
+				<form method="POST" action="/auth/logout">
+					<button
+						type="submit"
+						class="hidden sm:flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-sm font-medium text-red-500 hover:bg-red-500/10 transition-colors"
+						title="Logout"
+					>
+						<LogOut class="size-4 shrink-0" />
+						<span>Logout</span>
+					</button>
+				</form>
+				<Separator orientation="vertical" class="h-5 opacity-30" />
+			</div>
+
 			<div class="flex items-center gap-2 px-4">
 				<DropdownMenu.Root>
 					<DropdownMenu.Trigger
@@ -152,17 +166,6 @@
 							</a>
 						</DropdownMenu.Item>
 						<DropdownMenu.Separator />
-						<div class="px-1 pb-1">
-							<form method="POST" action="/auth/logout">
-								<button
-									type="submit"
-									class="flex w-full items-center gap-2 rounded-md bg-red-600 hover:bg-red-700 active:bg-red-800 px-3 py-2 text-sm font-semibold text-white transition-colors"
-								>
-									<LogOut class="size-4 shrink-0" />
-									Logout
-								</button>
-							</form>
-						</div>
 					</DropdownMenu.Content>
 				</DropdownMenu.Root>
 			</div>
