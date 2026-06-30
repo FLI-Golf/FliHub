@@ -21,10 +21,7 @@ export const load: PageServerLoad = async ({ locals }) => {
 			}
 
 			if (userProfile?.role === 'leader') {
-				if (!userProfile.departmentId) {
-					throw redirect(303, '/dashboard/departments');
-				}
-				throw redirect(303, `/dashboard/department/${userProfile.departmentId}`);
+				throw redirect(303, '/dashboard');
 			}
 
 			if (['manager', 'pro', 'broadcaster'].includes(userProfile?.role)) {
@@ -76,12 +73,7 @@ export const actions: Actions = {
 
 				// Leader users - redirect to their department
 				if (userProfile.role === 'leader') {
-					if (!userProfile.departmentId) {
-						// Leader not assigned to department yet
-						throw redirect(303, '/dashboard/departments');
-					}
-					// Redirect to department-specific dashboard
-					throw redirect(303, `/dashboard/department/${userProfile.departmentId}`);
+					throw redirect(303, '/dashboard');
 				}
 
 				// Manager, pro, broadcaster — send to dashboard

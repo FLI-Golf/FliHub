@@ -12,7 +12,7 @@
 	import {
 		DollarSign, Users, FolderKanban, Receipt,
 		Trophy, Star, Building2, TrendingUp, ArrowRight, Flag,
-		Video, Wrench, Megaphone, Cpu, Scale, Wallet, ShieldCheck, Globe, Handshake,
+		Video, Wrench, Megaphone, Cpu, Scale, Wallet, ShieldCheck, Globe, Handshake, Medal,
 		Landmark, Briefcase, Film, Ticket, BadgeCheck,
 		CheckCircle2, Clock, AlertCircle, Images, PartyPopper, UserCircle, Zap, Loader2
 	} from 'lucide-svelte';
@@ -133,6 +133,7 @@
 	let roleSettingsMessage = $state('');
 	let roleSettingsError = $state('');
 	let roleSettingsFilterText = $state('');
+	let roleSettingsRoleFilters = $state<RoleMenuControlRole[]>([]);
 
 	$effect(() => {
 		roleMenuVisibility = normalizeRoleMenuVisibility(data.roleMenuVisibility);
@@ -148,6 +149,19 @@
 		if (!controlled) return true;
 		if (!ROLE_MENU_CONTROL_ROLES.includes(activeRole as RoleMenuControlRole)) return false;
 		return Boolean(controlled[activeRole as RoleMenuControlRole]);
+	}
+
+	function isRoleSettingsRoleSelected(role: RoleMenuControlRole): boolean {
+		return roleSettingsRoleFilters.includes(role);
+	}
+
+	function toggleRoleSettingsRoleFilter(role: RoleMenuControlRole): void {
+		if (roleSettingsRoleFilters.includes(role)) {
+			roleSettingsRoleFilters = roleSettingsRoleFilters.filter((item) => item !== role);
+			return;
+		}
+
+		roleSettingsRoleFilters = [...roleSettingsRoleFilters, role];
 	}
 
 	async function saveRoleMenuVisibility(next: RoleMenuVisibility): Promise<void> {
@@ -189,10 +203,28 @@
 
 	const filteredRoleMenuItems = $derived.by(() => {
 		const filter = roleSettingsFilterText.toLowerCase().trim();
-		if (!filter) return ROLE_MENU_CONTROL_ITEMS;
-		return ROLE_MENU_CONTROL_ITEMS.filter((item) =>
-			item.title.toLowerCase().includes(filter) || item.url.toLowerCase().includes(filter)
-		);
+		return ROLE_MENU_CONTROL_ITEMS.filter((item) => {
+			if (!filter) return true;
+			return item.title.toLowerCase().includes(filter) || item.url.toLowerCase().includes(filter);
+		});
+	});
+
+	const visibleRoleMenuColumns = $derived.by(() => {
+		const selectedRoles = new Set(roleSettingsRoleFilters);
+		if (selectedRoles.size === 0) return ROLE_MENU_CONTROL_ROLES;
+		return [
+			...ROLE_MENU_CONTROL_ROLES.filter((role) => selectedRoles.has(role)),
+			...ROLE_MENU_CONTROL_ROLES.filter((role) => !selectedRoles.has(role)),
+		];
+	});
+
+	const orderedRoleSettingsFilterRoles = $derived.by(() => {
+		if (roleSettingsRoleFilters.length === 0) return ROLE_MENU_CONTROL_ROLES;
+		const selectedRoles = new Set(roleSettingsRoleFilters);
+		return [
+			...ROLE_MENU_CONTROL_ROLES.filter((role) => selectedRoles.has(role)),
+			...ROLE_MENU_CONTROL_ROLES.filter((role) => !selectedRoles.has(role)),
+		];
 	});
 
 	const quickAccessLinks = [
@@ -287,6 +319,8 @@
 			return [
 				'/dashboard/sponsors',
 				'/dashboard/projects',
+				'/dashboard/events',
+				'/dashboard/talent/special-events',
 				'/dashboard/reimbursements',
 				'/dashboard/import',
 				'/dashboard/active-collections',
@@ -681,12 +715,27 @@
 					{/if}
 				</div>
 
+				<div class="mt-4 flex flex-nowrap items-center gap-2 overflow-x-auto rounded-lg border border-slate-800 bg-slate-900/40 px-3 py-2">
+					<span class="text-[10px] font-semibold uppercase tracking-wide text-slate-500">Role filter</span>
+					{#each orderedRoleSettingsFilterRoles as role}
+						<label class="inline-flex items-center gap-1.5 rounded-full border border-slate-700 bg-slate-950/60 px-2.5 py-1 text-[10px] font-medium text-slate-200 transition-colors {isRoleSettingsRoleSelected(role) ? 'ring-1 ring-cyan-500/40' : ''}">
+							<input
+								type="checkbox"
+								checked={isRoleSettingsRoleSelected(role)}
+								onchange={() => toggleRoleSettingsRoleFilter(role)}
+								class="size-3.5 rounded border-slate-600 bg-slate-950 text-cyan-400 focus:ring-cyan-500"
+							/>
+							<span>{formatRoleLabel(role)}</span>
+						</label>
+					{/each}
+				</div>
+
 				<div class="mt-4 overflow-x-auto rounded-lg border border-slate-800">
 					<table class="min-w-full text-xs">
 						<thead class="bg-slate-900/80">
 							<tr class="border-b border-slate-800">
 								<th class="px-3 py-2 text-left font-semibold text-slate-300">Menu Item</th>
-								{#each ROLE_MENU_CONTROL_ROLES as role}
+								{#each visibleRoleMenuColumns as role}
 									<th class="px-2 py-2 text-center font-semibold text-slate-300 whitespace-nowrap">{formatRoleLabel(role)}</th>
 								{/each}
 							</tr>
@@ -698,7 +747,7 @@
 										<div class="font-medium text-slate-200">{item.title}</div>
 										<div class="text-[10px] text-slate-500">{item.url}</div>
 									</td>
-									{#each ROLE_MENU_CONTROL_ROLES as role}
+									{#each visibleRoleMenuColumns as role}
 										<td class="px-2 py-2 text-center">
 											<button
 												type="button"
@@ -1337,6 +1386,14 @@
 					<a href="/dashboard/manage-media-content" class="block rounded-lg border border-slate-800 bg-slate-900 px-3 py-2 text-xs hover:border-slate-600 inline-flex items-center gap-2 w-full">
 						<Images class="size-3.5 text-rose-300" />
 						Manage Media Content
+					</a>
+					<a href="/dashboard/events" class="block rounded-lg border border-slate-800 bg-slate-900 px-3 py-2 text-xs hover:border-slate-600 inline-flex items-center gap-2 w-full">
+						<PartyPopper class="size-3.5 text-cyan-300" />
+						Events
+					</a>
+					<a href="/dashboard/talent/special-events" class="block rounded-lg border border-slate-800 bg-slate-900 px-3 py-2 text-xs hover:border-slate-600 inline-flex items-center gap-2 w-full">
+						<Medal class="size-3.5 text-violet-300" />
+						Special Events
 					</a>
 					<a href="/dashboard/sponsors" class="block rounded-lg border border-slate-800 bg-slate-900 px-3 py-2 text-xs hover:border-slate-600 inline-flex items-center gap-2 w-full">
 						<Star class="size-3.5 text-amber-300" />
