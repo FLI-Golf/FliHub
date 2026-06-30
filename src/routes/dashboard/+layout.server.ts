@@ -1,10 +1,73 @@
 import { isRedirect, redirect } from '@sveltejs/kit';
 import { RequestContext } from '$lib/infra/RequestContext';
 import { getEmailDeliveryStatus } from '$lib/server/email-config';
-import { getAdminPocketBase } from '$lib/infra/pocketbase/pbClient';
+import { getAdminPocketBase, getAdminPocketBaseForBaseUrl } from '$lib/infra/pocketbase/pbClient';
 import { RoleRouter } from '$lib/server/RoleRouter';
 import { canRoleViewControlledMenu, getRoleMenuVisibility } from '$lib/server/role-menu-visibility';
 import type { LayoutServerLoad } from './$types';
+
+function getSessionPbBaseUrl(locals: any): string {
+	const raw = String(locals?.pb?.baseUrl ?? '').trim();
+	return raw ? raw.replace(/\/$/, '') : '';
+}
+
+async function getAdminReadPocketBase(locals: any): Promise<any | null> {
+	const sessionBaseUrl = getSessionPbBaseUrl(locals);
+	if (sessionBaseUrl) {
+		return await getAdminPocketBaseForBaseUrl(sessionBaseUrl).catch(() => null);
+	}
+	return await getAdminPocketBase().catch(() => null);
+}
+
+async function getRowsByUser(readPb: any, collection: string, userId: string, fields: string, sort = '-updated'): Promise<any[]> {
+	const filters = [
+		`userId = "${userId}"`,
+		`user = "${userId}"`,
+		`userId.id = "${userId}"`,
+		`user.id = "${userId}"`,
+		`userId ?= "${userId}"`,
+		`user ?= "${userId}"`,
+	];
+
+	for (const filter of filters) {
+		const rows = await readPb.collection(collection).getFullList({
+			filter,
+			fields,
+			sort,
+		}).catch(async () => {
+			return await readPb.collection(collection).getFullList({
+				filter,
+				fields,
+			}).catch(async () => {
+				return await readPb.collection(collection).getFullList({
+					filter,
+				}).catch(() => null);
+			});
+		});
+
+		if (Array.isArray(rows) && rows.length > 0) return rows as any[];
+	}
+
+	const scanned = await readPb.collection(collection).getList(1, 200, { sort })
+		.then((r: any) => r?.items ?? [])
+		.catch(async () => {
+			return await readPb.collection(collection).getList(1, 200)
+				.then((r: any) => r?.items ?? [])
+				.catch(() => []);
+		});
+
+	const matches = (scanned as any[]).filter((row) => {
+		const userIdValue = row?.userId;
+		const userValue = row?.user;
+		if (Array.isArray(userIdValue) && userIdValue.map(String).includes(userId)) return true;
+		if (Array.isArray(userValue) && userValue.map(String).includes(userId)) return true;
+		if (String(userIdValue ?? '') === userId) return true;
+		if (String(userValue ?? '') === userId) return true;
+		return false;
+	});
+
+	return matches;
+}
 
 export const load: LayoutServerLoad = async ({ locals, url }) => {
 	try {
@@ -20,6 +83,7 @@ export const load: LayoutServerLoad = async ({ locals, url }) => {
 			throw redirect(303, '/dashboard');
 		}
 		const sessionModel = (locals.pb?.authStore?.model ?? {}) as any;
+		const adminPb = await getAdminReadPocketBase(locals);
 
 		await new RoleRouter(pb).logSessionRole({
 			sessionUser: {
@@ -35,7 +99,6 @@ export const load: LayoutServerLoad = async ({ locals, url }) => {
 		sidebarNotes['/dashboard/settings'] = emailDeliveryEnabled ? 'email enabled' : 'email not wired';
 
 		if (profile?.id) {
-			const adminPb = await getAdminPocketBase().catch(() => null);
 			if (adminPb) {
 				const myClaimsCount = await adminPb.collection('reimbursement_claims').getList(1, 1, {
 					filter: `claimant="${profile.id}"`,
@@ -55,9 +118,17 @@ export const load: LayoutServerLoad = async ({ locals, url }) => {
 		};
 
 		let userDepartment = null;
-		let onboardingWelcomeNote: string | null = null;
 		let onboardingBadge: string | null = null;
 		let playerProfileNote: string | null = null;
+		let onboardingState: {
+			stageKey: string;
+			stageLabel: string;
+			completionPercent: number;
+			isComplete: boolean;
+			message: string;
+			ctaLabel: string;
+			ctaHref: string;
+		} | null = null;
 		let onboardingPipelineStats: {
 			total: number;
 			invited: number;
@@ -73,19 +144,30 @@ export const load: LayoutServerLoad = async ({ locals, url }) => {
 			userDepartment = depts[0] ?? null;
 		}
 
-		if (['pro', 'manager', 'broadcaster', 'admin', 'leader'].includes(profile?.role ?? '')) {
-			const onboardingStatusRows = await pb.collection('onboarding_status').getFullList({
-				filter: `userId = "${ctx.userId}"`,
-				fields: 'id,welcomeSeen'
-			}).catch(() => []);
-			const onboardingStatus = onboardingStatusRows[0] ?? null;
-			onboardingWelcomeNote = onboardingStatus?.welcomeSeen ? 'seen' : 'pending';
-			sidebarNotes['/dashboard/welcome'] = onboardingWelcomeNote;
+		if (profile?.id) {
+			const readPb = adminPb ?? pb;
 
-			const signatures = await pb.collection('document_signatures').getFullList({
-				filter: `userId = "${ctx.userId}"`,
-				fields: 'documentType'
-			}).catch(() => []);
+			const signatures = await getRowsByUser(
+				readPb,
+				'document_signatures',
+				ctx.userId,
+				'documentType',
+				'-updated'
+			).catch(() => []);
+
+			const onboardingStatusRows = await getRowsByUser(
+				readPb,
+				'onboarding_status',
+				ctx.userId,
+				'id,pipelineStage,welcomeSeen,documentsInitialed,contractSigned,profileCompleted',
+				'-updated'
+			).catch(() => []);
+			const onboardingStatus = onboardingStatusRows[0] ?? null;
+			const onboardingStatusAny = {
+				documentsInitialed: (onboardingStatusRows as any[]).some((row: any) => Boolean(row?.documentsInitialed)),
+				contractSigned: (onboardingStatusRows as any[]).some((row: any) => Boolean(row?.contractSigned)),
+				profileCompleted: (onboardingStatusRows as any[]).some((row: any) => Boolean(row?.profileCompleted)),
+			};
 
 			const signedTypes = new Set(signatures.map((s: any) => String(s.documentType ?? '')));
 			// Documents & Signing sidebar badge tracks the 4 initial docs only.
@@ -97,21 +179,35 @@ export const load: LayoutServerLoad = async ({ locals, url }) => {
 			];
 
 			const signedCount = requiredTypes.filter((t) => signedTypes.has(t)).length;
-			const pendingCount = Math.max(0, requiredTypes.length - signedCount);
+			const documentsInitialedFromStatus = onboardingStatusAny.documentsInitialed;
+			const pendingCount = documentsInitialedFromStatus
+				? 0
+				: Math.max(0, requiredTypes.length - signedCount);
 			onboardingBadge = `${pendingCount} pending`;
 			sidebarNotes['/dashboard/onboarding'] = onboardingBadge;
+			const documentsInitialed = Boolean(onboardingStatusAny.documentsInitialed || pendingCount === 0);
+			const contractSigned = Boolean(onboardingStatusAny.contractSigned || signedTypes.has('player_contract'));
 
-			const profiles = await pb.collection('player_profiles').getFullList({
-				filter: `userId = "${ctx.userId}"`,
-				fields: 'id,status,fullName,dateOfBirth,nationality,countryOfResidence,primaryLanguages,phone,email,mailingAddress,emergencyContactName,emergencyContactRelationship,emergencyContactPhone,emergencyContactEmail,worldRanking,yearsCompeting,majorTournamentWins,notableAchievements,otherLeagues,playingStyle,strongestSkills,knownInjuries,broadcastNickname,instagram,twitter,youtube,otherSocialMedia,personalWebsite,mediaFeatures,comfortableWithInterviews,openToBehindScenes,currentSponsorships,openToNewSponsors,wantsLeagueSponsorHelp,personalBrandingGoals,hasAgent,repName,repAgency,repPosition,repPhone,repEmail,participatedInBetting,understandsIntegrityPolicy,priorIntegrityViolations,integrityViolationDetails,excitementAboutLeague,careerGoals,additionalInfo'
-			}).catch(() => []);
+			const profiles = await getRowsByUser(
+				readPb,
+				'player_profiles',
+				ctx.userId,
+				'id,status,fullName,dateOfBirth,nationality,countryOfResidence,primaryLanguages,phone,email,mailingAddress,emergencyContactName,emergencyContactRelationship,emergencyContactPhone,emergencyContactEmail,worldRanking,yearsCompeting,majorTournamentWins,notableAchievements,otherLeagues,playingStyle,strongestSkills,knownInjuries,broadcastNickname,instagram,twitter,youtube,otherSocialMedia,personalWebsite,mediaFeatures,comfortableWithInterviews,openToBehindScenes,currentSponsorships,openToNewSponsors,wantsLeagueSponsorHelp,personalBrandingGoals,hasAgent,repName,repAgency,repPosition,repPhone,repEmail,participatedInBetting,understandsIntegrityPolicy,priorIntegrityViolations,integrityViolationDetails,excitementAboutLeague,careerGoals,additionalInfo',
+				'-updated'
+			).catch(() => []);
 
-			const playerProfile = profiles[0] ?? null;
-			if (!playerProfile) {
+			const normalizedProfiles = profiles as any[];
+			const profileApproved = normalizedProfiles.find((p: any) => String(p?.status ?? '').toLowerCase() === 'approved') ?? null;
+			const profileSubmitted = normalizedProfiles.find((p: any) => String(p?.status ?? '').toLowerCase() === 'submitted') ?? null;
+			const playerProfile = profileApproved ?? profileSubmitted ?? normalizedProfiles[0] ?? null;
+
+			if (onboardingStatusAny.profileCompleted) {
+				playerProfileNote = playerProfile?.status === 'approved' ? 'approved' : 'submitted';
+			} else if (!playerProfile) {
 				playerProfileNote = '7 pending';
-			} else if (playerProfile.status === 'approved') {
+			} else if (String(playerProfile.status ?? '').toLowerCase() === 'approved') {
 				playerProfileNote = 'approved';
-			} else if (playerProfile.status === 'submitted') {
+			} else if (String(playerProfile.status ?? '').toLowerCase() === 'submitted') {
 				playerProfileNote = 'submitted';
 			} else {
 				const hasValue = (...values: any[]) => values.some((v) => {
@@ -189,6 +285,55 @@ export const load: LayoutServerLoad = async ({ locals, url }) => {
 				playerProfileNote = `${pendingSteps} pending`;
 			}
 			sidebarNotes['/dashboard/player-profile'] = playerProfileNote;
+
+			const profileCompleted = Boolean(onboardingStatusAny.profileCompleted || ['submitted', 'approved'].includes(String(playerProfile?.status ?? '').toLowerCase()));
+			const pipelineStage = String(onboardingStatus?.pipelineStage ?? '').toLowerCase();
+			const isComplete = pipelineStage === 'approved' || (documentsInitialed && contractSigned && profileCompleted);
+			const started = Boolean(onboardingStatus || signatures.length > 0 || playerProfile);
+			const completedCount = [documentsInitialed, contractSigned, profileCompleted].filter(Boolean).length;
+			const completionPercent = isComplete ? 100 : Math.round((completedCount / 3) * 100);
+
+			let stageKey = 'not_started';
+			let stageLabel = 'Not Started';
+			let message = 'Optional onboarding helps personalize your dashboard and profile.';
+			let ctaLabel = 'Start Onboarding';
+			let ctaHref = '/dashboard/onboarding';
+
+			if (isComplete) {
+				stageKey = 'completed';
+				stageLabel = 'Completed';
+				message = 'Onboarding is complete. You can update your info anytime.';
+				ctaLabel = 'Review My Info';
+				ctaHref = '/dashboard/player-profile';
+			} else if (profileCompleted && documentsInitialed && contractSigned) {
+				stageKey = 'ready_for_approval';
+				stageLabel = 'Ready For Approval';
+				message = 'Everything is submitted. We are waiting for final approval.';
+				ctaLabel = 'View Documents';
+				ctaHref = '/dashboard/onboarding';
+			} else if (profileCompleted) {
+				stageKey = 'profile_done';
+				stageLabel = 'Profile Complete';
+				message = 'Profile is complete. Finish documents to continue.';
+				ctaLabel = 'Finish Documents';
+				ctaHref = '/dashboard/onboarding';
+			} else if (documentsInitialed || contractSigned || started) {
+				stageKey = 'in_progress';
+				stageLabel = 'In Progress';
+				message = 'Onboarding started. Continue where you left off.';
+				ctaLabel = 'Continue Onboarding';
+				ctaHref = '/dashboard/onboarding';
+			}
+
+			onboardingState = {
+				stageKey,
+				stageLabel,
+				completionPercent,
+				isComplete,
+				message,
+				ctaLabel,
+				ctaHref,
+			};
 		}
 
 		if (['admin', 'leader'].includes(profile?.role ?? '')) {
@@ -290,7 +435,7 @@ export const load: LayoutServerLoad = async ({ locals, url }) => {
 			user: locals.pb?.authStore?.model ?? null,
 			userProfile: profile,
 			userDepartment,
-			onboardingWelcomeNote,
+			onboardingState,
 			onboardingBadge,
 			playerProfileNote,
 			onboardingPipelineStats,
@@ -302,6 +447,6 @@ export const load: LayoutServerLoad = async ({ locals, url }) => {
 		// Always propagate redirects — never swallow them
 		if (isRedirect(err)) throw err;
 		console.error('Layout load error:', err?.message ?? err);
-		return { user: null, userProfile: null, userDepartment: null, onboardingWelcomeNote: null, onboardingBadge: null, playerProfileNote: null, onboardingPipelineStats: null, roleMenuVisibility: {}, sidebarNotes: {}, sidebarNoteLines: {} };
+		return { user: null, userProfile: null, userDepartment: null, onboardingState: null, onboardingBadge: null, playerProfileNote: null, onboardingPipelineStats: null, roleMenuVisibility: {}, sidebarNotes: {}, sidebarNoteLines: {} };
 	}
 };

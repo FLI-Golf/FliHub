@@ -16,7 +16,7 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 	const ctx = await RequestContext.from(locals, url);
 	
 	if (!TOURNAMENT_VIEW_ROLES.has(ctx.role)) {
-		throw redirect(303, '/dashboard/welcome');
+		throw redirect(303, '/dashboard');
 	}
 	
 	const { pb, role, userId } = ctx;

@@ -1,5 +1,5 @@
 <script lang="ts">
-	import type { PageData } from './$types';
+	import type { ActionData, PageData } from './$types';
 	import Card from '$lib/components/ui/card.svelte';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import {
@@ -14,10 +14,10 @@
 		Trophy, Star, Building2, TrendingUp, ArrowRight, Flag,
 		Video, Wrench, Megaphone, Cpu, Scale, Wallet, ShieldCheck, Globe, Handshake,
 		Landmark, Briefcase, Film, Ticket, BadgeCheck,
-		CheckCircle2, Clock, AlertCircle, Images, PartyPopper, UserCircle, Zap
+		CheckCircle2, Clock, AlertCircle, Images, PartyPopper, UserCircle, Zap, Loader2
 	} from 'lucide-svelte';
 
-	let { data }: { data: PageData } = $props();
+	let { data, form }: { data: PageData; form?: ActionData } = $props();
 
 	const m = $derived(data.metrics ?? {});
 	const sponsors = $derived(data.metrics?.sponsors ?? { total: 0, totalCommitted: 0, totalPaid: 0, byTier: {} });
@@ -59,9 +59,51 @@
 	const isLeader = $derived(activeRole === 'leader');
 	const myDepartmentId = $derived(String((data as any).userDepartment?.id ?? ''));
 	const canUseMyDepartmentsFilter = $derived((isLeader || isAdmin) && Boolean(myDepartmentId));
-	const onboardingWelcomeNote = $derived((data.onboardingWelcomeNote as string | null) ?? null);
 	const onboardingBadge = $derived((data.onboardingBadge as string | null) ?? null);
 	const playerProfileNote = $derived((data.playerProfileNote as string | null) ?? null);
+	const onboardingState = $derived((data.onboardingState as {
+		stageKey: string;
+		stageLabel: string;
+		completionPercent: number;
+		isComplete: boolean;
+		message: string;
+		ctaLabel: string;
+		ctaHref: string;
+	} | null) ?? null);
+	const upcoming = $derived((data.upcoming as any) ?? { tournaments: [], specialEvents: [], campaigns: [] });
+	const upcomingTournaments = $derived((upcoming.tournaments as any[]) ?? []);
+	const upcomingSpecialEvents = $derived((upcoming.specialEvents as any[]) ?? []);
+	const upcomingCampaigns = $derived((upcoming.campaigns as any[]) ?? []);
+	const canShowOnboardingTestControls = $derived.by(() => {
+		const role = String(data.userProfile?.role ?? '').toLowerCase();
+		const email = String(data.user?.email ?? '').toLowerCase();
+		return role === 'admin' || role === 'leader' || email === 'paige@fligolf.com';
+	});
+	let pendingOnboardingAction = $state<'' | 'seed-stage' | 'complete' | 'seed-data' | 'reset'>('');
+	const hasPendingOnboardingAction = $derived(pendingOnboardingAction !== '');
+
+	function beginOnboardingAction(action: 'seed-stage' | 'complete' | 'seed-data' | 'reset') {
+		pendingOnboardingAction = action;
+	}
+
+	const onboardingToneClasses = $derived.by(() => {
+		if (!onboardingState) return 'border-slate-700 bg-slate-900/40 text-slate-300';
+		if (onboardingState.isComplete) return 'border-emerald-700 bg-emerald-900/20 text-emerald-200';
+		if (onboardingState.stageKey === 'in_progress') return 'border-blue-700 bg-blue-900/20 text-blue-200';
+		if (onboardingState.stageKey === 'ready_for_approval') return 'border-amber-700 bg-amber-900/20 text-amber-200';
+		return 'border-slate-700 bg-slate-900/40 text-slate-300';
+	});
+
+	function normalizeTalentProgressState(label: 'Documents' | 'Player Profile', state: string): string {
+		const value = String(state ?? '').trim().toLowerCase();
+		if (label === 'Documents' && (value === '0 pending' || value === 'complete' || value === 'completed')) {
+			return 'complete';
+		}
+		if (label === 'Player Profile' && ['submitted', 'approved', 'complete', 'completed'].includes(value)) {
+			return 'complete';
+		}
+		return state;
+	}
 
 	function normalizeRoleMenuVisibility(raw: unknown): RoleMenuVisibility {
 		const normalized = createDefaultRoleMenuVisibility();
@@ -271,6 +313,20 @@
 		return visibleQuickAccessLinks.slice(0, 6);
 	});
 
+	let hasLoggedTalentUpcoming = $state(false);
+	$effect(() => {
+		if (roleKey !== 'talent' || hasLoggedTalentUpcoming) return;
+		hasLoggedTalentUpcoming = true;
+		console.log('[dashboard][talent][onboarding-status]', {
+			role: activeRole,
+			onboardingBadge,
+			playerProfileNote,
+		});
+		console.log('[dashboard][talent][upcoming-tournaments]', upcomingTournaments);
+		console.log('[dashboard][talent][upcoming-special-events]', upcomingSpecialEvents);
+		console.log('[dashboard][talent][upcoming-campaigns]', upcomingCampaigns);
+	});
+
 	const rolePrimaryCards = $derived.by(() => {
 		if (roleKey === 'admin_leader') {
 			return [
@@ -303,7 +359,6 @@
 			return [
 				{ label: 'My Reimbursements', value: String(expenses.total ?? 0), hint: 'tracked requests', href: '/dashboard/reimbursements', icon: Wallet },
 				{ label: 'Onboarding Status', value: onboardingBadge ?? 'up to date', hint: 'docs progress', href: '/dashboard/onboarding', icon: BadgeCheck },
-				{ label: 'Welcome', value: onboardingWelcomeNote ?? 'pending', hint: 'orientation', href: '/dashboard/welcome', icon: PartyPopper },
 				{ label: 'My Profile', value: playerProfileNote ?? 'ready', hint: 'player profile', href: '/dashboard/player-profile', icon: UserCircle },
 			];
 		}
@@ -462,10 +517,82 @@
 		<div>
 			<h1 class="text-3xl font-bold tracking-tight">Dashboard{roleLabel ? ` (${roleLabel})` : ''}</h1>
 			<p class="text-muted-foreground mt-1">Welcome back, {welcomeName}</p>
+			{#if onboardingState}
+				<div class="mt-2 flex items-center gap-2 flex-wrap">
+					<span class="inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-semibold {onboardingToneClasses}">
+						Onboarding: {onboardingState.stageLabel}
+					</span>
+					<span class="text-xs text-muted-foreground">{onboardingState.completionPercent}% complete</span>
+				</div>
+				<p class="text-xs mt-1 text-muted-foreground">{onboardingState.message}</p>
+				<div class="mt-2 flex items-center gap-2 flex-wrap">
+					<a href={onboardingState.ctaHref} class="inline-flex items-center rounded-md border border-slate-700 bg-slate-900 px-2.5 py-1 text-xs font-medium text-slate-200 hover:bg-slate-800 transition-colors">
+						{onboardingState.ctaLabel}
+					</a>
+					{#if onboardingState.isComplete}
+						<a href="/dashboard/player-profile" class="inline-flex items-center rounded-md border border-slate-700 px-2.5 py-1 text-xs font-medium text-slate-300 hover:bg-slate-900 transition-colors">
+							Update My Info
+						</a>
+					{/if}
+				</div>
+			{/if}
+			{#if form?.onboardingActionMessage}
+				<p class="text-xs mt-2 text-emerald-500">{form.onboardingActionMessage}</p>
+			{:else if form?.onboardingActionError}
+				<p class="text-xs mt-2 text-rose-500">{form.onboardingActionError}</p>
+			{/if}
 		</div>
-		<a href="/dashboard/financial-projections" class="text-xs text-slate-500 hover:text-slate-300 transition-colors flex items-center gap-1">
-			<TrendingUp class="size-3" /> Financial Projections
-		</a>
+		<div class="flex items-center gap-2 flex-wrap justify-end">
+			{#if canShowOnboardingTestControls}
+				<form method="POST" action="?/seedOnboardingStage" class="inline-flex items-center gap-2" onsubmit={() => beginOnboardingAction('seed-stage')}>
+					<select
+						name="stage"
+						disabled={hasPendingOnboardingAction}
+						class="h-8 rounded-md border border-slate-700 bg-slate-900 px-2 text-xs text-slate-100"
+					>
+						<option value="invited">Seed: Invited</option>
+						<option value="documents_sent" selected>Seed: Documents Sent</option>
+						<option value="documents_signed">Seed: Documents Signed</option>
+						<option value="profile_complete">Seed: Profile Complete</option>
+						<option value="approved">Seed: Approved</option>
+					</select>
+					<button type="submit" disabled={hasPendingOnboardingAction} class="h-8 rounded-md border border-blue-700 bg-blue-900/40 px-2.5 text-xs text-blue-200 hover:bg-blue-800/50 transition-colors inline-flex items-center gap-1.5 disabled:opacity-60 disabled:cursor-not-allowed">
+						{#if pendingOnboardingAction === 'seed-stage'}
+							<Loader2 class="size-3.5 animate-spin" />
+						{/if}
+						<span>Seed Stage</span>
+					</button>
+				</form>
+				<form method="POST" action="?/completeOnboarding" onsubmit={() => beginOnboardingAction('complete')}>
+					<button type="submit" disabled={hasPendingOnboardingAction} class="h-8 rounded-md border border-emerald-700 bg-emerald-900/40 px-2.5 text-xs text-emerald-200 hover:bg-emerald-800/50 transition-colors inline-flex items-center gap-1.5 disabled:opacity-60 disabled:cursor-not-allowed">
+						{#if pendingOnboardingAction === 'complete'}
+							<Loader2 class="size-3.5 animate-spin" />
+						{/if}
+						<span>Complete + Seed Data</span>
+					</button>
+				</form>
+				<form method="POST" action="?/seedOnboardingDataOnly" onsubmit={() => beginOnboardingAction('seed-data')}>
+					<button type="submit" disabled={hasPendingOnboardingAction} class="h-8 rounded-md border border-amber-700 bg-amber-900/40 px-2.5 text-xs text-amber-200 hover:bg-amber-800/50 transition-colors inline-flex items-center gap-1.5 disabled:opacity-60 disabled:cursor-not-allowed">
+						{#if pendingOnboardingAction === 'seed-data'}
+							<Loader2 class="size-3.5 animate-spin" />
+						{/if}
+						<span>Seed Only Docs/Profile</span>
+					</button>
+				</form>
+				<form method="POST" action="?/resetOnboarding" onsubmit={() => beginOnboardingAction('reset')}>
+					<button type="submit" disabled={hasPendingOnboardingAction} class="h-8 rounded-md border border-rose-700 bg-rose-900/40 px-2.5 text-xs text-rose-200 hover:bg-rose-800/50 transition-colors inline-flex items-center gap-1.5 disabled:opacity-60 disabled:cursor-not-allowed">
+						{#if pendingOnboardingAction === 'reset'}
+							<Loader2 class="size-3.5 animate-spin" />
+						{/if}
+						<span>Reset Onboarding</span>
+					</button>
+				</form>
+			{/if}
+
+			<a href="/dashboard/financial-projections" class="text-xs text-slate-500 hover:text-slate-300 transition-colors flex items-center gap-1">
+				<TrendingUp class="size-3" /> Financial Projections
+			</a>
+		</div>
 	</div>
 
 	<!-- Role-specific main content -->
@@ -1263,6 +1390,10 @@
 			</Card>
 		</div>
 	{:else if roleKey === 'talent'}
+		{@const progressRows = [
+			{ label: 'Documents' as const, state: onboardingBadge ?? 'pending', icon: BadgeCheck, href: '/dashboard/onboarding' },
+			{ label: 'Player Profile' as const, state: playerProfileNote ?? 'pending', icon: UserCircle, href: '/dashboard/player-profile' }
+		]}
 		<div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
 			<Card class="p-4 lg:col-span-2 border border-indigo-800/70 bg-indigo-950/30 text-slate-100">
 				<div class="flex items-center justify-between mb-3">
@@ -1276,18 +1407,14 @@
 					</a>
 				</div>
 				<div class="space-y-3">
-					{#each [
-						{ label: 'Welcome', state: onboardingWelcomeNote ?? 'pending', icon: PartyPopper },
-						{ label: 'Documents', state: onboardingBadge ?? 'pending', icon: BadgeCheck },
-						{ label: 'Player Profile', state: playerProfileNote ?? 'pending', icon: UserCircle }
-					] as row}
-						<div class="rounded-lg border border-slate-800 bg-slate-900 px-3 py-2 flex items-center justify-between">
+					{#each progressRows as row}
+						<a href={row.href} class="rounded-lg border border-slate-800 bg-slate-900 px-3 py-2 flex items-center justify-between hover:border-slate-600 transition-colors">
 							<span class="text-xs text-slate-300 inline-flex items-center gap-2">
 								<row.icon class="size-3.5 text-indigo-300" />
 								{row.label}
 							</span>
-							<span class="text-xs font-semibold text-emerald-300">{row.state}</span>
-						</div>
+							<span class="text-xs font-semibold text-emerald-300">{normalizeTalentProgressState(row.label, row.state)}</span>
+						</a>
 					{/each}
 				</div>
 			</Card>
@@ -1309,10 +1436,6 @@
 					<a href="/dashboard/player-profile" class="block rounded-lg border border-slate-800 bg-slate-900 px-3 py-2 text-xs hover:border-slate-600 inline-flex items-center gap-2 w-full">
 						<UserCircle class="size-3.5 text-emerald-300" />
 						Update Profile
-					</a>
-					<a href="/dashboard/welcome" class="block rounded-lg border border-slate-800 bg-slate-900 px-3 py-2 text-xs hover:border-slate-600 inline-flex items-center gap-2 w-full">
-						<PartyPopper class="size-3.5 text-amber-300" />
-						Open Welcome
 					</a>
 				</div>
 			</Card>

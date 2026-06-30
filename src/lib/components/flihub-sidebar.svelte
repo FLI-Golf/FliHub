@@ -102,7 +102,6 @@ import { ROLE_MENU_CONTROL_ROLES, type RoleMenuVisibility } from '$lib/config/ro
 			iconActiveClass: 'text-emerald-600 dark:text-emerald-400',
 			roles: ['pro', 'manager', 'broadcaster'],
 			items: [
-				{ title: 'Welcome',             url: '/dashboard/welcome',            icon: PartyPopper,  roles: ['pro', 'manager', 'broadcaster'] },
 				{ title: 'Documents & Signing', url: '/dashboard/onboarding',         icon: FileText,     roles: ['pro', 'manager', 'broadcaster'] },
 				{ title: 'Player Profile',      url: '/dashboard/player-profile',     icon: ClipboardList, roles: ['pro', 'manager', 'broadcaster'] },
 				{ title: 'Onboarding Pipeline', url: '/dashboard/onboarding/admin',   icon: FolderKanban, roles: ['admin', 'leader'] }
@@ -357,7 +356,6 @@ import { ROLE_MENU_CONTROL_ROLES, type RoleMenuVisibility } from '$lib/config/ro
 	const visibleGroups = $derived(navGroups.filter(canSeeGroup));
 	const sidebarNotes = $derived(($page.data?.sidebarNotes as Record<string, string> | null) ?? {});
 	const sidebarNoteLines = $derived(($page.data?.sidebarNoteLines as Record<string, string[]> | null) ?? {});
-	const onboardingWelcomeNote = $derived(($page.data?.onboardingWelcomeNote as string | null) ?? null);
 	const onboardingBadge = $derived(($page.data?.onboardingBadge as string | null) ?? null);
 	const playerProfileNote = $derived(($page.data?.playerProfileNote as string | null) ?? null);
 	const onboardingPipelineStats = $derived(($page.data?.onboardingPipelineStats as {
@@ -372,7 +370,6 @@ import { ROLE_MENU_CONTROL_ROLES, type RoleMenuVisibility } from '$lib/config/ro
 	function getItemInlineNote(item: NavItem): string | null {
 		const genericNote = sidebarNotes[item.url];
 		if (genericNote) return genericNote;
-		if (item.url === '/dashboard/welcome' && onboardingWelcomeNote) return onboardingWelcomeNote;
 		if (item.url === '/dashboard/onboarding' && onboardingBadge) return onboardingBadge;
 		if (item.url === '/dashboard/player-profile' && playerProfileNote) return playerProfileNote;
 		return null;
