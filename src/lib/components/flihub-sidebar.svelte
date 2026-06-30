@@ -410,6 +410,10 @@ import { ROLE_MENU_CONTROL_ROLES, type RoleMenuVisibility } from '$lib/config/ro
 		}
 		window.location.assign(href);
 	}
+
+	function handleMobileSidebarClose(): void {
+		sidebar.setOpenMobile(false);
+	}
 </script>
 
 <Sidebar.Root {...restProps} bind:ref class="bg-sidebar">
@@ -433,7 +437,7 @@ import { ROLE_MENU_CONTROL_ROLES, type RoleMenuVisibility } from '$lib/config/ro
 		{#if sidebar.isMobile}
 			<button
 				type="button"
-				onclick={() => sidebar.toggle()}
+				onclick={handleMobileSidebarClose}
 				aria-label="Close navigation"
 				class="ml-2 shrink-0 flex items-center justify-center size-9 rounded-lg bg-slate-800 hover:bg-slate-700 transition-colors text-slate-100"
 			>
