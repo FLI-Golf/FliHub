@@ -186,6 +186,12 @@
 		.filter((url) => canSeeRoleControlledUrl(url))
 		.slice(0, 5)
 		.map((url) => ({ url, label: getQuickLabel(url) }));
+
+	function isQuickLinkActive(url: string): boolean {
+		const pathname = $page.url.pathname;
+		if (url === '/dashboard') return pathname === '/dashboard';
+		return pathname === url || pathname.startsWith(`${url}/`);
+	}
 </script>
 
 <Sidebar.Provider class="h-svh overflow-hidden">
@@ -201,17 +207,17 @@
 						<Breadcrumb.Item>
 							<Breadcrumb.Link
 								href="/dashboard"
-								class="text-muted-foreground hover:text-foreground transition-colors text-sm font-medium"
+								class="text-blue-600 hover:text-blue-700 transition-colors text-sm font-medium"
 							>
 								FliHub
 							</Breadcrumb.Link>
 						</Breadcrumb.Item>
 						{#if currentLabel !== 'Dashboard'}
 							<Breadcrumb.Item>
-								<span class="text-muted-foreground/50 mx-1">/</span>
+								<span class="text-blue-400/80 mx-1">/</span>
 							</Breadcrumb.Item>
 							<Breadcrumb.Item>
-								<Breadcrumb.Page class="text-sm font-semibold text-foreground">
+								<Breadcrumb.Page class="text-sm font-semibold text-blue-700">
 									{currentLabel}
 								</Breadcrumb.Page>
 							</Breadcrumb.Item>
@@ -220,11 +226,11 @@
 				</Breadcrumb.Root>
 
 				{#if headerQuickLinks.length > 0}
-					<div class="hidden md:flex items-center gap-1.5 min-w-0 overflow-hidden">
+					<div class="hidden md:flex items-center gap-3 min-w-0 overflow-hidden font-serif">
 						{#each headerQuickLinks as link}
 							<a
 								href={link.url}
-								class="inline-flex items-center rounded-md border border-border/50 bg-muted/20 px-2 py-1 text-[11px] font-medium text-muted-foreground hover:text-foreground hover:bg-muted/40 transition-colors whitespace-nowrap"
+								class={`inline-flex items-center py-0.5 text-[13px] font-semibold text-emerald-700 underline-offset-4 decoration-2 transition-colors whitespace-nowrap hover:text-emerald-800 hover:underline hover:decoration-emerald-700 ${isQuickLinkActive(link.url) ? 'underline decoration-emerald-500' : 'no-underline decoration-emerald-500/0'}`}
 							>
 								{link.label}
 							</a>
