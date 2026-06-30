@@ -283,7 +283,7 @@ import { ROLE_MENU_CONTROL_ROLES, type RoleMenuVisibility } from '$lib/config/ro
 	import { useSidebar } from '$lib/components/ui/sidebar/context.svelte.js';
 	import type { ComponentProps } from 'svelte';
 	import { page } from '$app/stores';
-	import { X, PanelLeft } from 'lucide-svelte';
+	import { X, PanelLeft, ChevronUp } from 'lucide-svelte';
 
 	let { ref = $bindable(null), ...restProps }: ComponentProps<typeof Sidebar.Root> = $props();
 
@@ -410,6 +410,10 @@ import { ROLE_MENU_CONTROL_ROLES, type RoleMenuVisibility } from '$lib/config/ro
 		}
 		window.location.assign(href);
 	}
+
+	function handleMobileSidebarClose(): void {
+		sidebar.setOpenMobile(false);
+	}
 </script>
 
 <Sidebar.Root {...restProps} bind:ref class="bg-sidebar">
@@ -429,17 +433,17 @@ import { ROLE_MENU_CONTROL_ROLES, type RoleMenuVisibility } from '$lib/config/ro
 					<span class="text-[10px] text-muted-foreground uppercase tracking-widest font-medium">Business OS</span>
 				</div>
 			</a>
-			<!-- Mobile close button inside the sheet -->
-			{#if sidebar.isMobile}
-				<button
-					type="button"
-					onclick={() => sidebar.toggle()}
-					aria-label="Close navigation"
-					class="ml-2 shrink-0 flex items-center justify-center size-9 rounded-lg hover:bg-muted transition-colors text-muted-foreground"
-				>
-					<X class="size-5" />
-				</button>
-			{/if}
+		<!-- Mobile close button inside the sheet -->
+		{#if sidebar.isMobile}
+			<button
+				type="button"
+				onclick={handleMobileSidebarClose}
+				aria-label="Close navigation"
+				class="ml-2 shrink-0 flex items-center justify-center size-9 rounded-lg bg-slate-800 hover:bg-slate-700 transition-colors text-slate-100"
+			>
+				<X class="size-5" />
+			</button>
+		{/if}
 		</div>
 	</Sidebar.Header>
 

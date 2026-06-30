@@ -1,16 +1,4 @@
 {
-  "/dashboard": {
-    "leader": true,
-    "sales": true,
-    "marketing": true,
-    "marketing_lead": true,
-    "franchise_owner": false,
-    "league_owner": false,
-    "manager": true,
-    "pro": true,
-    "broadcaster": true,
-    "vendor": false
-  },
   "/dashboard/my-payments": {
     "leader": false,
     "sales": false,
@@ -18,6 +6,30 @@
     "marketing_lead": false,
     "franchise_owner": false,
     "league_owner": false,
+    "manager": true,
+    "pro": true,
+    "broadcaster": true,
+    "vendor": false
+  },
+  "/dashboard/reimbursements": {
+    "leader": true,
+    "sales": true,
+    "marketing": false,
+    "marketing_lead": true,
+    "franchise_owner": true,
+    "league_owner": true,
+    "manager": true,
+    "pro": true,
+    "broadcaster": true,
+    "vendor": false
+  },
+  "/dashboard/reimbursements/admin": {
+    "leader": true,
+    "sales": true,
+    "marketing": false,
+    "marketing_lead": true,
+    "franchise_owner": true,
+    "league_owner": true,
     "manager": true,
     "pro": true,
     "broadcaster": true,
@@ -69,18 +81,6 @@
     "manager": true,
     "pro": true,
     "broadcaster": true,
-    "vendor": false
-  },
-  "/dashboard/onboarding/admin": {
-    "leader": true,
-    "sales": false,
-    "marketing": false,
-    "marketing_lead": false,
-    "franchise_owner": false,
-    "league_owner": false,
-    "manager": false,
-    "pro": false,
-    "broadcaster": false,
     "vendor": false
   },
   "/dashboard/active-projects": {
@@ -252,7 +252,7 @@
     "vendor": false
   },
   "/dashboard/people": {
-    "leader": true,
+    "leader": false,
     "sales": false,
     "marketing": false,
     "marketing_lead": false,
@@ -357,30 +357,6 @@
     "manager": false,
     "pro": false,
     "broadcaster": false,
-    "vendor": false
-  },
-  "/dashboard/reimbursements": {
-    "leader": true,
-    "sales": true,
-    "marketing": false,
-    "marketing_lead": true,
-    "franchise_owner": true,
-    "league_owner": true,
-    "manager": true,
-    "pro": true,
-    "broadcaster": true,
-    "vendor": false
-  },
-  "/dashboard/reimbursements/admin": {
-    "leader": true,
-    "sales": true,
-    "marketing": false,
-    "marketing_lead": true,
-    "franchise_owner": true,
-    "league_owner": true,
-    "manager": true,
-    "pro": true,
-    "broadcaster": true,
     "vendor": false
   },
   "/dashboard/import": {

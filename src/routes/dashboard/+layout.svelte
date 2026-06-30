@@ -1,7 +1,6 @@
 <script lang="ts">
 	import type { LayoutData } from './$types';
 	import FliHubSidebar from '$lib/components/flihub-sidebar.svelte';
-	import ScrollToTop from '$lib/components/ui/scroll-to-top.svelte';
 	import * as Sidebar from '$lib/components/ui/sidebar/index.js';
 	import * as Breadcrumb from '$lib/components/ui/breadcrumb/index.js';
 	import { Separator } from '$lib/components/ui/separator/index.js';
@@ -81,7 +80,7 @@
 </script>
 
 <Sidebar.Provider class="h-svh overflow-hidden">
-	<FliHubSidebar collapsible="none" />
+	<FliHubSidebar collapsible="offcanvas" />
 	<Sidebar.Inset class="h-svh overflow-hidden">
 		<header class="flex h-14 shrink-0 items-center gap-2 border-b bg-card/80 backdrop-blur-sm sticky top-0 z-10">
 			<div class="flex items-center gap-3 px-4 flex-1 min-w-0">
@@ -110,6 +109,20 @@
 						{/if}
 					</Breadcrumb.List>
 				</Breadcrumb.Root>
+			</div>
+
+			<div class="flex items-center gap-3 px-4">
+				<form method="POST" action="/auth/logout">
+					<button
+						type="submit"
+						class="hidden sm:flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-sm font-medium text-red-500 hover:bg-red-500/10 transition-colors"
+						title="Logout"
+					>
+						<LogOut class="size-4 shrink-0" />
+						<span>Logout</span>
+					</button>
+				</form>
+				<Separator orientation="vertical" class="h-5 opacity-30" />
 			</div>
 
 			<div class="flex items-center gap-2 px-4">
@@ -152,26 +165,14 @@
 							</a>
 						</DropdownMenu.Item>
 						<DropdownMenu.Separator />
-						<div class="px-1 pb-1">
-							<form method="POST" action="/auth/logout">
-								<button
-									type="submit"
-									class="flex w-full items-center gap-2 rounded-md bg-red-600 hover:bg-red-700 active:bg-red-800 px-3 py-2 text-sm font-semibold text-white transition-colors"
-								>
-									<LogOut class="size-4 shrink-0" />
-									Logout
-								</button>
-							</form>
-						</div>
 					</DropdownMenu.Content>
 				</DropdownMenu.Root>
 			</div>
 		</header>
 
-		<div class="flex flex-1 min-h-0 flex-col gap-6 overflow-y-auto p-6 min-w-0">
+		<div data-scroll-root class="flex flex-1 min-h-0 flex-col gap-6 overflow-y-auto p-6 min-w-0">
 			<slot />
 		</div>
 	</Sidebar.Inset>
 </Sidebar.Provider>
 
-<ScrollToTop />
