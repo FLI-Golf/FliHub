@@ -27,12 +27,8 @@ export const load: PageServerLoad = async ({ locals }) => {
 				throw redirect(303, `/dashboard/department/${userProfile.departmentId}`);
 			}
 
-			if (userProfile?.role === 'manager') {
-				throw redirect(303, `/dashboard/my-payments/${userProfile.id}`);
-			}
-
-			if (['pro', 'broadcaster'].includes(userProfile?.role)) {
-				throw redirect(303, '/dashboard/welcome');
+			if (['manager', 'pro', 'broadcaster'].includes(userProfile?.role)) {
+				throw redirect(303, '/dashboard');
 			}
 		}
 		
@@ -88,28 +84,9 @@ export const actions: Actions = {
 					throw redirect(303, `/dashboard/department/${userProfile.departmentId}`);
 				}
 
-				// Manager — send to their payment portal
-				if (userProfile.role === 'manager') {
-					throw redirect(303, `/dashboard/my-payments/${userProfile.id}`);
-				}
-
-				// Pro, broadcaster — send to welcome/onboarding flow
-				if (['pro', 'broadcaster'].includes(userProfile.role)) {
-					// Check if they've already seen the welcome page
-					try {
-						const pb = locals.pb;
-						const onboardingRecords = await pb.collection('onboarding_status').getFullList({
-							filter: `userId = "${userId}"`
-						});
-						const onboarding = onboardingRecords[0];
-						if (onboarding?.welcomeSeen) {
-							throw redirect(303, '/dashboard/onboarding');
-						}
-					} catch (redirectErr) {
-						if (isRedirect(redirectErr)) throw redirectErr;
-						// Collection doesn't exist yet — send to welcome
-					}
-					throw redirect(303, '/dashboard/welcome');
+				// Manager, pro, broadcaster — send to dashboard
+				if (['manager', 'pro', 'broadcaster'].includes(userProfile.role)) {
+					throw redirect(303, '/dashboard');
 				}
 			}
 		} catch (error) {

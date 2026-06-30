@@ -35,7 +35,7 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 	
 	// Restrict access: only admins and leaders can view earnings/payments
 	if (!['admin', 'leader'].includes(ctx.role)) {
-		throw redirect(303, '/dashboard/welcome');
+		throw redirect(303, '/dashboard');
 	}
 	
 	const pb = await getAdminPocketBase();

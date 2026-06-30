@@ -30,14 +30,19 @@ export function createPocketBaseClient(url?: string): PocketBase {
  * Use this in server load functions that need to read collections
  * regardless of the logged-in user's role permissions.
  */
-let _adminToken: string | null = null;
-let _adminTokenExpiry = 0;
+const _adminTokenByBase = new Map<string, { token: string; expiry: number }>();
 
-async function getAdminToken(): Promise<string> {
-	// Reuse token briefly to limit auth requests while avoiding stale-token issues.
-	if (_adminToken && Date.now() < _adminTokenExpiry) return _adminToken;
+function normalizeBaseUrl(input: string): string {
+	return String(input).trim().replace(/\/$/, '');
+}
 
-	const baseUrl = requireEnv('POCKETBASE_URL').replace(/\/$/, '');
+async function getAdminToken(baseUrlInput?: string): Promise<string> {
+	const baseUrl = normalizeBaseUrl(baseUrlInput || requireEnv('POCKETBASE_URL'));
+
+	// Reuse token briefly per base URL to limit auth requests while avoiding stale-token issues.
+	const cached = _adminTokenByBase.get(baseUrl);
+	if (cached && Date.now() < cached.expiry) return cached.token;
+
 	const identity = requireEnv('POCKETBASE_ADMIN_EMAIL');
 	const password = requireEnv('POCKETBASE_ADMIN_PASSWORD');
 	const res = await fetch(`${baseUrl}/api/collections/_superusers/auth-with-password`, {
@@ -51,17 +56,31 @@ async function getAdminToken(): Promise<string> {
 			`Failed superuser auth (${res.status}): ${data?.message ?? 'Unknown PocketBase auth error'}`
 		);
 	}
-	_adminToken = data.token;
-	_adminTokenExpiry = Date.now() + 2 * 60 * 1000;
-	return _adminToken as string;
+
+	const token = String(data.token);
+	_adminTokenByBase.set(baseUrl, {
+		token,
+		expiry: Date.now() + 2 * 60 * 1000,
+	});
+	return token;
 }
 
 export async function getAdminPocketBase(): Promise<PocketBase> {
-	const baseUrl = requireEnv('POCKETBASE_URL').replace(/\/$/, '');
+	const baseUrl = normalizeBaseUrl(requireEnv('POCKETBASE_URL'));
+	const pb = await getAdminPocketBaseForBaseUrl(baseUrl);
+	return pb;
+}
+
+export async function getAdminPocketBaseForBaseUrl(baseUrlInput: string): Promise<PocketBase> {
+	const baseUrl = normalizeBaseUrl(baseUrlInput);
+	if (!baseUrl) {
+		throw new Error('PocketBase base URL is required');
+	}
+
 	const pb = new PocketBase(baseUrl);
 	pb.autoCancellation(false);
 
-	const token = await getAdminToken();
+	const token = await getAdminToken(baseUrl);
 	pb.authStore.save(token, null);
 
 	return pb;
@@ -78,8 +97,8 @@ export async function adminFetch(
 	collection: string,
 	params: Record<string, string | number> = {}
 ): Promise<any[]> {
-	const baseUrl = requireEnv('POCKETBASE_URL').replace(/\/$/, '');
-	const token   = await getAdminToken();
+	const baseUrl = normalizeBaseUrl(requireEnv('POCKETBASE_URL'));
+	const token   = await getAdminToken(baseUrl);
 
 	// Build query string — omit sort (applied client-side) and filter (appended raw)
 	const qs = new URLSearchParams();

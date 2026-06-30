@@ -7,6 +7,12 @@
 	import * as DropdownMenu from '$lib/components/ui/dropdown-menu/index.js';
 	import { ChevronDown, User, LogOut, Settings, PanelLeft } from 'lucide-svelte';
 	import { page } from '$app/stores';
+	import {
+		ROLE_MENU_CONTROL_ITEMS,
+		ROLE_MENU_CONTROL_ROLES,
+		type RoleMenuControlRole,
+		type RoleMenuVisibility,
+	} from '$lib/config/role-menu-controls';
 
 	export let data: LayoutData;
 
@@ -62,7 +68,6 @@
 		'/dashboard/fantasy-gaming': 'Fantasy & Gaming',
 		'/dashboard/streaming-media': 'Streaming & Media',
 		'/dashboard/league-licensing': 'League Licensing',
-		'/dashboard/welcome': 'Welcome',
 		'/dashboard/onboarding': 'Onboarding',
 		'/dashboard/player-profile': 'Player Profile',
 		'/dashboard/settings': 'Settings',
@@ -77,6 +82,110 @@
 
 	$: currentLabel = routeLabels[$page.url.pathname] ?? 'Dashboard';
 	$: settingsEmailStatus = data.sidebarNotes?.['/dashboard/settings'] ?? '';
+	$: role = String(data.userProfile?.role ?? '').toLowerCase();
+	$: roleMenuVisibility = (data.roleMenuVisibility as RoleMenuVisibility | null) ?? {};
+
+	const defaultHeaderQuickLinkUrls = [
+		'/dashboard',
+		'/dashboard/projects',
+		'/dashboard/approvals',
+		'/dashboard/work-orders',
+		'/dashboard/sponsors',
+		'/dashboard/campaigns',
+		'/dashboard/events',
+		'/dashboard/settings',
+		'/dashboard/reimbursements',
+		'/dashboard/my-payments',
+		'/dashboard/onboarding',
+		'/dashboard/player-profile',
+		'/dashboard/talent/tournaments',
+		'/dashboard/talent/special-events',
+		'/dashboard/sales'
+	];
+
+	const roleHeaderQuickLinkPriority: Record<string, string[]> = {
+		pro: [
+			'/dashboard/my-payments',
+			'/dashboard/onboarding',
+			'/dashboard/player-profile',
+			'/dashboard/talent/tournaments',
+			'/dashboard/talent/special-events'
+		],
+		manager: [
+			'/dashboard/my-payments',
+			'/dashboard/onboarding',
+			'/dashboard/player-profile',
+			'/dashboard/reimbursements',
+			'/dashboard/talent/tournaments'
+		],
+		broadcaster: [
+			'/dashboard/my-payments',
+			'/dashboard/onboarding',
+			'/dashboard/player-profile',
+			'/dashboard/talent/tournaments',
+			'/dashboard/events'
+		],
+		sales: [
+			'/dashboard/sales',
+			'/dashboard/sponsors',
+			'/dashboard/reimbursements',
+			'/dashboard/projects',
+			'/dashboard/settings'
+		],
+		marketing: [
+			'/dashboard/campaigns',
+			'/dashboard/sponsors',
+			'/dashboard/projects',
+			'/dashboard/reimbursements',
+			'/dashboard/settings'
+		],
+		marketing_lead: [
+			'/dashboard/campaigns',
+			'/dashboard/sponsors',
+			'/dashboard/projects',
+			'/dashboard/approvals',
+			'/dashboard/settings'
+		],
+		leader: [
+			'/dashboard/projects',
+			'/dashboard/approvals',
+			'/dashboard/work-orders',
+			'/dashboard/events',
+			'/dashboard/sponsors'
+		],
+		admin: [
+			'/dashboard/projects',
+			'/dashboard/approvals',
+			'/dashboard/work-orders',
+			'/dashboard/events',
+			'/dashboard/sponsors'
+		]
+	};
+
+	function canSeeRoleControlledUrl(url: string): boolean {
+		if (role === 'admin' || role === 'league_owner') return true;
+		if (!ROLE_MENU_CONTROL_ROLES.includes(role as RoleMenuControlRole)) return false;
+
+		const controlled = roleMenuVisibility[url];
+		if (!controlled) return false;
+		return Boolean(controlled[role as RoleMenuControlRole]);
+	}
+
+	function getQuickLabel(url: string): string {
+		if (url === '/dashboard') return 'Dashboard';
+		const controlled = ROLE_MENU_CONTROL_ITEMS.find((item) => item.url === url);
+		return controlled?.title ?? routeLabels[url] ?? 'Open';
+	}
+
+	$: orderedHeaderQuickLinkUrls = [
+		...(roleHeaderQuickLinkPriority[role] ?? []),
+		...defaultHeaderQuickLinkUrls
+	].filter((url, idx, arr) => arr.indexOf(url) === idx);
+
+	$: headerQuickLinks = orderedHeaderQuickLinkUrls
+		.filter((url) => canSeeRoleControlledUrl(url))
+		.slice(0, 5)
+		.map((url) => ({ url, label: getQuickLabel(url) }));
 </script>
 
 <Sidebar.Provider class="h-svh overflow-hidden">
@@ -109,6 +218,19 @@
 						{/if}
 					</Breadcrumb.List>
 				</Breadcrumb.Root>
+
+				{#if headerQuickLinks.length > 0}
+					<div class="hidden md:flex items-center gap-1.5 min-w-0 overflow-hidden">
+						{#each headerQuickLinks as link}
+							<a
+								href={link.url}
+								class="inline-flex items-center rounded-md border border-border/50 bg-muted/20 px-2 py-1 text-[11px] font-medium text-muted-foreground hover:text-foreground hover:bg-muted/40 transition-colors whitespace-nowrap"
+							>
+								{link.label}
+							</a>
+						{/each}
+					</div>
+				{/if}
 			</div>
 
 			<div class="flex items-center gap-3 px-4">
@@ -165,6 +287,14 @@
 							</a>
 						</DropdownMenu.Item>
 						<DropdownMenu.Separator />
+						<DropdownMenu.Item class="gap-2 cursor-pointer p-0">
+							<form method="POST" action="/auth/logout" class="w-full">
+								<button type="submit" class="flex items-center gap-2 w-full px-2 py-1.5 text-red-500 hover:bg-red-500/10 transition-colors">
+									<LogOut class="size-4" />
+									<span>Logout</span>
+								</button>
+							</form>
+						</DropdownMenu.Item>
 					</DropdownMenu.Content>
 				</DropdownMenu.Root>
 			</div>

@@ -28,7 +28,6 @@ export const ROLE_MENU_CONTROL_ITEMS: RoleMenuItem[] = [
 	{ title: 'My Profile', url: '/dashboard/player-profile' },
 	{ title: 'Settings', url: '/dashboard/settings' },
 	// ── My Onboarding ──
-	{ title: 'Welcome', url: '/dashboard/welcome' },
 	{ title: 'Documents & Signing', url: '/dashboard/onboarding' },
 	// ── Overview ──
 	{ title: 'Active Projects', url: '/dashboard/active-projects' },
@@ -118,7 +117,6 @@ const ENABLED_BY_DEFAULT: Record<string, RoleMenuControlRole[]> = {
 	'/dashboard/player-profile': ['manager', 'pro', 'broadcaster'],
 	'/dashboard/settings': ['manager', 'pro', 'broadcaster'],
 	// ── My Onboarding ──
-	'/dashboard/welcome': ['pro', 'manager', 'broadcaster'],
 	'/dashboard/onboarding': ['pro', 'manager', 'broadcaster'],
 	// ── Overview ──
 	'/dashboard/active-projects': ['leader', 'marketing', 'marketing_lead'],

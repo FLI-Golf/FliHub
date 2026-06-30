@@ -13,7 +13,7 @@ const ADMIN_REVIEW_ROLES = new Set(['admin', 'leader']);
 export const load: PageServerLoad = async ({ locals, url }) => {
 	const ctx = await RequestContext.from(locals, url);
 	if (!ADMIN_REVIEW_ROLES.has(ctx.role)) {
-		throw redirect(303, '/dashboard/welcome');
+		throw redirect(303, '/dashboard');
 	}
 	const { pb } = ctx;
 	const bookingFilter = BOOKING_ROLES.map((role) => `role = '${role}'`).join(' || ');
