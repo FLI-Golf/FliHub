@@ -1,7 +1,7 @@
 /**
  * Migration: Create Pro Payment Management Collections
  * 
- * Creates collections for managing pro payments, tournaments, and special events
+ * Creates collections for managing pro payments, tournaments, and events
  */
 
 export const proPaymentCollections = [

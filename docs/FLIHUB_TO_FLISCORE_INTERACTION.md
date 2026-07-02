@@ -9,6 +9,18 @@ Primary goal:
 - Prevent payout drift between systems.
 - Ensure every payout run is auditable and repeatable.
 
+## Current Status (Temporary)
+
+Payload exchange between FliScore and FliHub is currently on hold.
+
+Temporary operational approach:
+- Final tournament input is a confirmed 12-franchise order of finish entered directly in FliHub.
+- Detailed scoring context (ties, playoffs, hole-level or round-level narrative) is optional and not required for payout execution in this mode.
+- FliHub remains the only payout execution and accounting authority.
+
+Integration readiness note:
+- The payload model in this document remains the target design if cross-app wiring is resumed later.
+
 ## System Roles
 
 - FliScore:
@@ -39,6 +51,14 @@ Temporary transition rule:
 4. FliHub runs validation gates before writing payout artifacts.
 5. If validation passes, FliHub creates payout records atomically.
 6. FliHub logs run result and returns run summary.
+
+Current temporary data flow (manual order mode):
+
+1. Operator enters final 12-franchise order in FliHub.
+2. Operator confirms the order is final.
+3. FliHub validates payout prerequisites.
+4. FliHub generates payout artifacts atomically.
+5. FliHub logs execution and reconciliation details.
 
 ## Payload Contract (FliScore -> FliHub)
 

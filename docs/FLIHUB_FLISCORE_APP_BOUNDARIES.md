@@ -13,6 +13,21 @@ Use this as the decision rule when adding features:
 - FliScore decides who finished where and why.
 - FliHub decides what gets paid, when, and under what controls.
 
+## Current Operating Mode (Payload Exchange On Hold)
+
+Current decision:
+- Payload exchange is paused.
+- Final standings are set directly in FliHub.
+- The only required competitive input for payout is the final 12-franchise order of finish.
+
+Scope for this mode:
+- No tie narrative, playoff narrative, or round-by-round detail is required for payout execution.
+- Operators enter and confirm rank positions 1 to 12 in FliHub.
+- After confirmation, FliHub runs payout logic from that final order.
+
+Re-enable trigger for integration:
+- Resume FliScore payload wiring only if operational complexity, scale, or audit requirements make direct-entry insufficient.
+
 ## Ownership by Domain
 
 ### FliScore Owns
@@ -63,6 +78,13 @@ Use this as the decision rule when adding features:
 4. FliHub blocks or executes payout generation.
 5. FliHub returns run status and diagnostics.
 6. FliScore displays sync outcome for operator action.
+
+Current simplified model while integration is paused:
+
+1. Operator sets 12-franchise order directly in FliHub.
+2. Operator confirms order is final.
+3. FliHub executes payout generation from confirmed order.
+4. FliHub stores audit logs and payout records.
 
 ## Source-of-Truth Policy
 

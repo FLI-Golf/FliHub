@@ -203,7 +203,7 @@
 		<div class="flex gap-2">
 			<Button href="/dashboard/talent/tournaments">Tournaments</Button>
 			<Button href="/dashboard/talent/payments">Payments</Button>
-			<Button href="/dashboard/talent/special-events">Special Events</Button>
+			<Button href="/dashboard/events">Events</Button>
 			<Button href="/dashboard/talent/franchise-payouts">Franchise Payouts</Button>
 		</div>
 	</div>

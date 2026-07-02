@@ -42,7 +42,6 @@
 		'/dashboard/talent': 'Talent Management',
 		'/dashboard/talent/tournaments': 'Tournaments',
 		'/dashboard/events': 'Events',
-		'/dashboard/talent/special-events': 'Special Events',
 		'/dashboard/talent/franchise-payouts': 'Franchise Payouts',
 		'/dashboard/talent/payments': 'Pro Payments',
 		'/dashboard/marketing-goals': 'Marketing Goals',
@@ -99,7 +98,6 @@
 		'/dashboard/onboarding',
 		'/dashboard/player-profile',
 		'/dashboard/talent/tournaments',
-		'/dashboard/talent/special-events',
 		'/dashboard/sales'
 	];
 
@@ -109,7 +107,7 @@
 			'/dashboard/onboarding',
 			'/dashboard/player-profile',
 			'/dashboard/talent/tournaments',
-			'/dashboard/talent/special-events'
+			'/dashboard/events'
 		],
 		manager: [
 			'/dashboard/my-payments',
