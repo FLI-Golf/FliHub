@@ -320,7 +320,6 @@
 				'/dashboard/sponsors',
 				'/dashboard/projects',
 				'/dashboard/events',
-				'/dashboard/talent/special-events',
 				'/dashboard/reimbursements',
 				'/dashboard/import',
 				'/dashboard/active-collections',
@@ -1390,10 +1389,6 @@
 					<a href="/dashboard/events" class="block rounded-lg border border-slate-800 bg-slate-900 px-3 py-2 text-xs hover:border-slate-600 inline-flex items-center gap-2 w-full">
 						<PartyPopper class="size-3.5 text-cyan-300" />
 						Events
-					</a>
-					<a href="/dashboard/talent/special-events" class="block rounded-lg border border-slate-800 bg-slate-900 px-3 py-2 text-xs hover:border-slate-600 inline-flex items-center gap-2 w-full">
-						<Medal class="size-3.5 text-violet-300" />
-						Special Events
 					</a>
 					<a href="/dashboard/sponsors" class="block rounded-lg border border-slate-800 bg-slate-900 px-3 py-2 text-xs hover:border-slate-600 inline-flex items-center gap-2 w-full">
 						<Star class="size-3.5 text-amber-300" />

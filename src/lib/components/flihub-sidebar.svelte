@@ -188,7 +188,6 @@ import { ROLE_MENU_CONTROL_ROLES, type RoleMenuVisibility } from '$lib/config/ro
 				{ title: 'Tournaments',       url: '/dashboard/talent/tournaments',        icon: Trophy,      roles: ['admin', 'leader'] },
 				{ title: 'Events',            url: '/dashboard/events',                    icon: PartyPopper, roles: ['admin', 'leader', 'marketing', 'marketing_lead'] },
 				{ title: 'Event Bookings',    url: '/dashboard/events/bookings',           icon: Music,       roles: ['admin', 'leader'] },
-				{ title: 'Special Events',    url: '/dashboard/talent/special-events',     icon: Medal,       roles: ['admin', 'leader', 'marketing', 'marketing_lead'] },
 				{ title: 'Franchise Payouts', url: '/dashboard/talent/franchise-payouts',  icon: DollarSign,  roles: ['admin', 'leader'] },
 				{ title: 'Pro Payments',      url: '/dashboard/talent/payments',           icon: Flag,        roles: ['admin', 'leader'] },
 				{ title: 'Payout Testing',    url: '/dashboard/talent/payout-testing',     icon: Zap,         roles: ['admin', 'leader'] },
