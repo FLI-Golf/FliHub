@@ -9,6 +9,9 @@ Welcome to the FliHub documentation. This directory contains comprehensive guide
 - [Migrations Guide](./MIGRATIONS.md) - Database setup and data import
 - [Domain Models](./DOMAIN_MODELS.md) - Complete data model reference
 
+### Finance & Fundraising
+- [FliHub Bridge Financing Memo ($150K)](./FLIHUB-BRIDGE-FINANCING-MEMO.md) - Near-term bridge plan supporting commercialization and the future ~$7M raise
+
 ### Architecture
 
 **4-Layer Clean Architecture**:
