@@ -179,12 +179,19 @@
 
 		return source.filter((item: any) => {
 			const claimTitle = claimTitleFor(item).toLowerCase();
+			const amount = Number(item.amount);
 			const haystack = [
 				item.description,
+				item.vendor,
 				item.category,
 				item.notes,
 				item.workOrderReference,
-				claimTitle
+				claimTitle,
+				item.id,
+				Number.isFinite(amount) ? amount.toFixed(2) : '',
+				Number.isFinite(amount) ? fmt(amount) : '',
+				toDateOnly(item.date) ?? '',
+				fmtDate(item.date)
 			]
 				.filter(Boolean)
 				.join(' ')
@@ -959,7 +966,7 @@
 				<input
 					type="text"
 					bind:value={itemFilter}
-					placeholder="Filter by description, claim title, category, notes, WO#..."
+					placeholder="Filter by description, vendor, amount, date, claim title, category, notes, WO#, or record ID..."
 					class={`${INPUT} flex-1 min-w-[240px]`}
 				/>
 				<Button
