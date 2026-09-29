@@ -1,5 +1,9 @@
 import { json } from '@sveltejs/kit';
 import { RequestContext } from '$lib/infra/RequestContext';
+import {
+	applyReimbursementImport,
+	previewReimbursementImport
+} from '$lib/server/reimbursements/import';
 import type { RequestHandler } from './$types';
 
 // POST /api/import
@@ -9,11 +13,33 @@ import type { RequestHandler } from './$types';
 export const POST: RequestHandler = async ({ locals, url, request }) => {
 	const ctx = await RequestContext.fromApi(locals, url);
 	if (!ctx) return json({ message: 'Unauthorized' }, { status: 401 });
+	if (ctx.role !== 'admin' && ctx.role !== 'leader') {
+		return json({ message: 'Administrator access is required for bulk imports' }, { status: 403 });
+	}
 	const pb = ctx.pb;
-	const { type, rows } = await request.json() as { type: string; rows: Record<string, string>[] };
+	const { type, rows, preview = false, overrideRowIndexes = [] } = await request.json() as {
+		type: string;
+		rows: Record<string, string>[];
+		preview?: boolean;
+		overrideRowIndexes?: number[];
+	};
 
 	if (!type || !rows?.length) {
 		return json({ message: 'type and rows are required' }, { status: 400 });
+	}
+
+	if (type === 'reimbursements') {
+		try {
+			const importPreview = await previewReimbursementImport(pb, rows);
+			if (preview) return json(importPreview);
+			if (importPreview.summary.invalidRows > 0) {
+				return json({ message: 'Resolve invalid rows before importing', ...importPreview }, { status: 400 });
+			}
+			return json(await applyReimbursementImport(pb, importPreview, overrideRowIndexes));
+		} catch (error: any) {
+			console.error('[import] reimbursement import failed:', error?.message ?? 'Unknown error');
+			return json({ message: 'Reimbursement import failed' }, { status: 500 });
+		}
 	}
 
 	let created = 0;
@@ -21,8 +47,6 @@ export const POST: RequestHandler = async ({ locals, url, request }) => {
 	const errors: string[] = [];
 
 	function formatCreateError(err: any): string {
-		console.error('IMPORT CREATE ERROR', JSON.stringify(err, null, 2));
-
 		const fieldIssues = err?.data?.data || err?.response?.data?.data || err?.response?.data;
 		if (fieldIssues && typeof fieldIssues === 'object' && !Array.isArray(fieldIssues)) {
 			const message = Object.entries(fieldIssues)
@@ -42,9 +66,6 @@ export const POST: RequestHandler = async ({ locals, url, request }) => {
 			|| err?.message
 			|| 'Failed to create record.';
 	}
-
-	// Cache for grouping multi-item reimbursement rows into one claim per title+claimant
-	const claimCache = new Map<string, string>();
 
 	for (let i = 0; i < rows.length; i++) {
 		const row = rows[i];
@@ -106,89 +127,6 @@ export const POST: RequestHandler = async ({ locals, url, request }) => {
 					description: row.description?.trim() || '',
 					notes:       row.notes?.trim() || ''
 				});
-			} else if (type === 'reimbursements') {
-				// Resolve claimant profile by email (reimbursement_claims.claimant -> user_profiles)
-				const email = row.claimantEmail?.trim();
-				if (!email) throw new Error('claimantEmail is required');
-
-				let claimantId: string;
-				try {
-					const profile = await pb.collection('user_profiles').getFirstListItem(`email="${email}"`, { fields: 'id' });
-					claimantId = profile.id;
-				} catch {
-					throw new Error(`No user profile found with email: ${email}`);
-				}
-
-				// Resolve optional vendor by name
-				let vendorId: string | null = null;
-				const vendorName = row.vendorName?.trim();
-				if (vendorName) {
-					try {
-						const vendor = await pb.collection('vendors').getFirstListItem(`name="${vendorName}"`);
-						vendorId = vendor.id;
-					} catch {
-						// Vendor not found — proceed without linking
-					}
-				}
-
-				// Resolve optional department by name
-				let departmentId: string | null = null;
-				const deptName = row.departmentName?.trim();
-				if (deptName) {
-					try {
-						const dept = await pb.collection('departments').getFirstListItem(`name="${deptName}"`);
-						departmentId = dept.id;
-					} catch {
-						// Department not found — proceed without linking
-					}
-				}
-
-				const isHistorical = row.isHistorical?.trim().toLowerCase() === 'true';
-				const itemAmount   = row.itemAmount ? Number(row.itemAmount.replace(/[^0-9.]/g, '')) : 0;
-				const claimTitle   = row.claimTitle?.trim() || '';
-				const claimStatus  = row.claimStatus?.trim() || 'draft';
-
-				// Group multi-item rows: reuse an existing claim created in this import
-				// batch if claimTitle + claimantEmail match a previously created claim.
-				const cacheKey = `${email}::${claimTitle}`;
-				let claimId: string;
-
-				if (claimCache.has(cacheKey)) {
-					claimId = claimCache.get(cacheKey)!;
-					// Update totalAmount on the existing claim
-					const existing = await pb.collection('reimbursement_claims').getOne(claimId, { fields: 'id,totalAmount' });
-					await pb.collection('reimbursement_claims').update(claimId, {
-						totalAmount: (existing.totalAmount || 0) + itemAmount
-					});
-				} else {
-					const claimPayload = {
-						title:         claimTitle,
-						claimant:      claimantId,
-						status:        claimStatus,
-						totalAmount:   itemAmount,
-						notes:         row.claimNotes?.trim() || '',
-						department:    departmentId,
-						is_historical: isHistorical,
-					};
-					console.log('CREATE PAYLOAD', claimPayload);
-					const claim = await pb.collection('reimbursement_claims').create(claimPayload);
-					claimId = claim.id;
-					claimCache.set(cacheKey, claimId);
-				}
-
-				// Create the line item
-				const itemPayload = {
-					claim:       claimId,
-					description: row.itemDescription?.trim() || '',
-					amount:      itemAmount,
-					date:        row.itemDate?.trim() || null,
-					category:    row.itemCategory?.trim() || 'other',
-					vendor:      vendorName || '',
-					vendorId:    vendorId,
-					notes:       row.itemNotes?.trim() || ''
-				};
-				console.log('CREATE PAYLOAD', itemPayload);
-				await pb.collection('reimbursement_items').create(itemPayload);
 			} else {
 				return json({ message: `Unknown import type: ${type}` }, { status: 400 });
 			}

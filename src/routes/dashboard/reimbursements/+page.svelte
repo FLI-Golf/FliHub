@@ -8,11 +8,12 @@
 		CLAIM_STATUS_LABELS, CLAIM_STATUS_COLORS, CLAIMANT_PIPELINE,
 		ITEM_CATEGORY_LABELS, PAYMENT_METHOD_LABELS
 	} from '$lib/domain/schemas/reimbursement.schema';
+	import { formatDateOnly, toDateOnly } from '$lib/domain/reimbursements/integrity';
 
 	let { data }: { data: PageData } = $props();
 
 	const fmt     = (n: number) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 2 }).format(n ?? 0);
-	const fmtDate = (d: string) => d ? new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—';
+	const fmtDate = formatDateOnly;
 
 	// ── UI state ──────────────────────────────────────────────────────────────
 	let showNewClaim    = $state(false);
@@ -202,9 +203,7 @@
 					cmp = (a.description ?? '').localeCompare(b.description ?? '', undefined, { sensitivity: 'base' });
 					break;
 				case 'date': {
-					const aTime = a.date ? new Date(a.date).getTime() : 0;
-					const bTime = b.date ? new Date(b.date).getTime() : 0;
-					cmp = aTime - bTime;
+					cmp = (toDateOnly(a.date) ?? '').localeCompare(toDateOnly(b.date) ?? '');
 					break;
 				}
 				case 'category':

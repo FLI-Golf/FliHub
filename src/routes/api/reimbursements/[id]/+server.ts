@@ -1,6 +1,7 @@
 import { json } from '@sveltejs/kit';
 import { RequestContext } from '$lib/infra/RequestContext';
 import { getAdminPocketBase } from '$lib/infra/pocketbase/pbClient';
+import { requiresBusinessPurposeReview } from '$lib/domain/reimbursements/integrity';
 import {
 	DEFAULT_REIMBURSEMENT_MAX_CLAIM_TOTAL,
 	REIMBURSEMENT_MAX_TOTAL_SETTING_KEY
@@ -17,10 +18,25 @@ async function getMaxClaimTotal(pb: any): Promise<number> {
 
 // PATCH /api/reimbursements/:id — update status, reference number, review notes, payment info
 export const PATCH: RequestHandler = async ({ locals, url, params, request }) => {
-	const ctx  = await RequestContext.from(locals, url);
+	const ctx = await RequestContext.fromApi(locals, url);
+	if (!ctx) return json({ message: 'Unauthorized' }, { status: 401 });
 	const body = await request.json();
 
 	try {
+		const adminPb = await getAdminPocketBase();
+		const currentClaim = await adminPb.collection('reimbursement_claims').getOne(params.id, {
+			fields: 'id,claimant,status'
+		});
+		const isAdministrator = ctx.role === 'admin' || ctx.role === 'leader';
+		const isOwner = currentClaim.claimant === ctx.profile?.id;
+		if (!isAdministrator && !isOwner) return json({ message: 'Forbidden' }, { status: 403 });
+		if (!isAdministrator && currentClaim.status !== 'draft') {
+			return json({ message: 'Only administrators can update submitted claims' }, { status: 403 });
+		}
+		if (body.status && ['under_review', 'approved', 'paid', 'rejected'].includes(body.status) && !isAdministrator) {
+			return json({ message: 'Administrator access is required for review and payment actions' }, { status: 403 });
+		}
+
 		const update: Record<string, any> = {};
 		if (body.title           !== undefined) update.title           = body.title;
 		if (body.status          !== undefined) update.status          = body.status;
@@ -31,13 +47,30 @@ export const PATCH: RequestHandler = async ({ locals, url, params, request }) =>
 		if (body.paidDate        !== undefined) update.paidDate        = body.paidDate || null;
 		if (body.paidBy          !== undefined) update.paidBy          = body.paidBy  || null;
 
-		const adminPb = await getAdminPocketBase();
 		const maxClaimTotal = await getMaxClaimTotal(adminPb);
+
+		if (body.status === 'approved' || body.status === 'paid') {
+			const items = await adminPb.collection('reimbursement_items').getFullList({
+				filter: `claim="${params.id}"`,
+				fields: 'id,vendor,description,businessPurposeStatus,isArchived'
+			});
+			const unresolved = items.filter((item: any) =>
+				item.isArchived !== true
+				&& (item.businessPurposeStatus === 'unconfirmed'
+					|| (item.businessPurposeStatus !== 'confirmed' && requiresBusinessPurposeReview(item)))
+			);
+			if (unresolved.length > 0) {
+				return json({
+					message: `${unresolved.length} transaction(s) require business-purpose confirmation before approval or payment`,
+					itemIds: unresolved.map((item: any) => item.id)
+				}, { status: 409 });
+			}
+		}
 
 		if (body.status === 'submitted') {
 			const items = await adminPb.collection('reimbursement_items')
-				.getFullList({ filter: `claim="${params.id}"`, fields: 'amount' });
-			const total = items.reduce((s, i) => s + (i.amount || 0), 0);
+				.getFullList({ filter: `claim="${params.id}"`, fields: 'amount,isArchived' });
+			const total = items.filter((item: any) => item.isArchived !== true).reduce((s, i) => s + (i.amount || 0), 0);
 			if (total > maxClaimTotal) {
 				return json({
 					message: `Claim total cannot exceed $${maxClaimTotal.toFixed(2)}`,
@@ -51,8 +84,8 @@ export const PATCH: RequestHandler = async ({ locals, url, params, request }) =>
 		// Recalculate total from items if requested
 		if (body.recalcTotal) {
 			const items = await adminPb.collection('reimbursement_items')
-				.getFullList({ filter: `claim="${params.id}"`, fields: 'amount' });
-			const total = items.reduce((s, i) => s + (i.amount || 0), 0);
+				.getFullList({ filter: `claim="${params.id}"`, fields: 'amount,isArchived' });
+			const total = items.filter((item: any) => item.isArchived !== true).reduce((s, i) => s + (i.amount || 0), 0);
 			if (total > maxClaimTotal) {
 				return json({
 					message: `Claim total cannot exceed $${maxClaimTotal.toFixed(2)}`,

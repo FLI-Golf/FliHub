@@ -6,15 +6,16 @@
 	import {
 		Search, ChevronDown, ChevronUp, CheckCircle2, Clock,
 		AlertCircle, XCircle, DollarSign, FileText, ArrowRight,
-		ChevronsUpDown, ChevronRight, Receipt, Trash2
+		ChevronsUpDown, ChevronRight, Receipt, Trash2, Archive, BadgeCheck, ShieldAlert
 	} from 'lucide-svelte';
+	import { formatDateOnly } from '$lib/domain/reimbursements/integrity';
 	import type { PageData } from './$types';
 
 	let { data }: { data: PageData } = $props();
 
 	// ── Helpers ───────────────────────────────────────────────────────────────
 	const fmt     = (n: number) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(n ?? 0);
-	const fmtDate = (d: string) => d ? new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—';
+	const fmtDate = formatDateOnly;
 	function claimantName(c: any) {
 		const u = c.expand?.claimant;
 		if (!u) return '—';
@@ -78,12 +79,38 @@
 	let itemDeleteBusyByClaim = $state<Record<string, boolean>>({});
 	let rollupToast = $state<{ type: 'success' | 'error'; message: string } | null>(null);
 	let itemToast = $state<{ type: 'success' | 'error'; message: string } | null>(null);
+	let reviewBusyItemId = $state<string | null>(null);
 
 	function showItemToast(type: 'success' | 'error', message: string, timeoutMs = 3200) {
 		itemToast = { type, message };
 		setTimeout(() => {
 			itemToast = null;
 		}, timeoutMs);
+	}
+
+	function isFinalized(status: string) {
+		return status === 'approved' || status === 'paid' || status === 'rejected';
+	}
+
+	async function reviewItem(itemId: string, action: string, suggestedReason: string) {
+		const reason = prompt('Reason for this review decision:', suggestedReason)?.trim();
+		if (!reason) return;
+		reviewBusyItemId = itemId;
+		try {
+			const res = await fetch(`/api/reimbursements/items/${itemId}/review`, {
+				method: 'PATCH',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ action, reason })
+			});
+			const response = await res.json().catch(() => ({}));
+			if (!res.ok) throw new Error(response.message ?? 'Review action failed');
+			await invalidateAll();
+			showItemToast('success', 'Review decision recorded.');
+		} catch (error: any) {
+			showItemToast('error', error?.message ?? 'Review action failed', 4500);
+		} finally {
+			reviewBusyItemId = null;
+		}
 	}
 
 	const selectableRows = $derived(() => rows().filter((c: any) => c.status !== 'paid' && c.status !== 'rejected'));
@@ -316,6 +343,66 @@
 		{/each}
 	</div>
 
+	{#if data.canAudit}
+		<section class="space-y-3" aria-labelledby="duplicate-audit-heading">
+			<div class="flex flex-wrap items-end justify-between gap-2">
+				<div>
+					<h2 id="duplicate-audit-heading" class="flex items-center gap-2 text-lg font-semibold text-slate-100"><ShieldAlert class="size-5 text-amber-400" /> Duplicate Audit</h2>
+					<p class="text-xs text-slate-400">Suspected groups only. Review records individually; nothing is removed automatically.</p>
+				</div>
+				<p class="text-xs text-slate-400">{data.duplicateGroups.length} group{data.duplicateGroups.length === 1 ? '' : 's'} · {fmt(data.duplicateGroups.reduce((sum: number, group: any) => sum + group.potentialDuplicatedAmount, 0))} potential exposure</p>
+			</div>
+
+			{#if data.duplicateGroups.length === 0}
+				<div class="border border-slate-700 bg-slate-900/30 px-4 py-3 text-sm text-slate-400">No suspected duplicate groups.</div>
+			{:else}
+				<div class="space-y-3">
+					{#each data.duplicateGroups as group, groupIndex}
+						<div class="overflow-x-auto border border-amber-900/60 bg-slate-900/30">
+							<div class="flex flex-wrap justify-between gap-2 border-b border-slate-700 px-3 py-2 text-xs">
+								<span class="font-semibold text-amber-300">Group {groupIndex + 1} · {group.occurrences} occurrences · {group.classification.replaceAll('_', ' ')}</span>
+								<span class="text-amber-200">Potential duplicated amount: {fmt(group.potentialDuplicatedAmount)}</span>
+							</div>
+							<table class="w-full text-xs">
+								<thead class="bg-slate-950/40 text-left text-slate-500"><tr><th class="p-2">Vendor / Date</th><th class="p-2">Amount</th><th class="p-2">Claimant / Claim</th><th class="p-2">PocketBase ID</th><th class="p-2">Evidence</th><th class="p-2 text-right">Review</th></tr></thead>
+								<tbody class="divide-y divide-slate-800">
+									{#each group.items as item}
+										<tr>
+											<td class="p-2 text-slate-200"><p>{item.vendor || item.description}</p><p class="text-slate-500">{fmtDate(item.transactionDate)}</p></td>
+											<td class="p-2 font-semibold text-emerald-300">{fmt(item.amount)}</td>
+											<td class="p-2 text-slate-300"><p>{item.claimantName}</p><p class="max-w-64 truncate text-slate-500" title={item.claimTitle}>{item.claimTitle}</p></td>
+											<td class="p-2 font-mono text-slate-400">{item.id}</td>
+											<td class="p-2 text-slate-400"><p>{item.receipts?.length ?? 0} receipt{item.receipts?.length === 1 ? '' : 's'}</p><p>{item.bankStatement ? 'Bank statement linked' : 'No bank statement link'}</p></td>
+											<td class="p-2"><div class="flex justify-end gap-1.5"><button onclick={() => reviewItem(item.id, 'keep', 'Reviewed against supporting evidence; retain this transaction.')} disabled={reviewBusyItemId === item.id} class="inline-flex items-center gap-1 border border-emerald-800 bg-emerald-950/40 px-2 py-1 text-emerald-300 disabled:opacity-50"><BadgeCheck class="size-3" /> Keep</button><button onclick={() => reviewItem(item.id, 'archive', 'Confirmed duplicate transaction; retain the reviewed matching record.')} disabled={reviewBusyItemId === item.id || isFinalized(item.claimStatus)} title={isFinalized(item.claimStatus) ? 'Finalized claims cannot be archived' : 'Archive duplicate'} class="inline-flex items-center gap-1 border border-red-800 bg-red-950/40 px-2 py-1 text-red-300 disabled:cursor-not-allowed disabled:opacity-40"><Archive class="size-3" /> Archive</button></div></td>
+										</tr>
+									{/each}
+								</tbody>
+							</table>
+						</div>
+					{/each}
+				</div>
+			{/if}
+		</section>
+
+		<section class="space-y-3" aria-labelledby="business-purpose-heading">
+			<div>
+				<h2 id="business-purpose-heading" class="text-lg font-semibold text-slate-100">Business Purpose Review</h2>
+				<p class="text-xs text-slate-400">Payment and transfer-like transactions remain non-payable until an administrator confirms their business purpose.</p>
+			</div>
+			{#if data.businessPurposeItems.length === 0}
+				<div class="border border-slate-700 bg-slate-900/30 px-4 py-3 text-sm text-slate-400">No transactions require confirmation.</div>
+			{:else}
+				<div class="overflow-x-auto border border-amber-900/60 bg-slate-900/30">
+					<table class="w-full text-xs"><thead class="bg-slate-950/40 text-left text-slate-500"><tr><th class="p-2">Transaction</th><th class="p-2">Date</th><th class="p-2">Amount</th><th class="p-2">Claimant / Claim</th><th class="p-2">PocketBase ID</th><th class="p-2 text-right">Decision</th></tr></thead><tbody class="divide-y divide-slate-800">
+						{#each data.businessPurposeItems as item}
+							<tr><td class="p-2 text-amber-200">{item.vendor || item.description}</td><td class="p-2 text-slate-300">{fmtDate(item.transactionDate)}</td><td class="p-2 font-semibold text-emerald-300">{fmt(item.amount)}</td><td class="p-2 text-slate-300"><p>{item.claimantName}</p><p class="max-w-64 truncate text-slate-500">{item.claimTitle}</p></td><td class="p-2 font-mono text-slate-400">{item.id}</td><td class="p-2 text-right"><button onclick={() => reviewItem(item.id, 'confirm_business_purpose', 'Administrator verified the documented FLI Golf business purpose.')} disabled={reviewBusyItemId === item.id} class="inline-flex items-center gap-1 border border-emerald-800 bg-emerald-950/40 px-2 py-1 text-emerald-300 disabled:opacity-50"><BadgeCheck class="size-3" /> Confirm business purpose</button></td></tr>
+						{/each}
+					</tbody></table>
+				</div>
+			{/if}
+		</section>
+	{/if}
+
 	<!-- Filters -->
 	<Card class="bg-slate-800/50 border-slate-700 p-4">
 		<div class="flex flex-wrap gap-3 items-center">
@@ -495,7 +582,7 @@
 													{/if}
 													<button
 														onclick={() => removeSelectedItems(claim.id)}
-														disabled={(itemDeleteBusyByClaim[claim.id] ?? false) || selectedItemsForClaim(claim.id).length === 0}
+														disabled={claim.status !== 'draft' || (itemDeleteBusyByClaim[claim.id] ?? false) || selectedItemsForClaim(claim.id).length === 0}
 														class="text-[11px] px-2 py-1 rounded bg-red-900/40 border border-red-700/40 text-red-300 hover:bg-red-900/60 disabled:opacity-50 disabled:cursor-not-allowed"
 													>
 														{#if itemDeleteBusyByClaim[claim.id] ?? false}
@@ -540,7 +627,7 @@
 																		checked={isItemSelected(claim.id, item.id)}
 																		onchange={() => toggleItemSelected(claim.id, item.id)}
 																		class="rounded border-slate-600 accent-red-500"
-																		disabled={itemDeleteBusyByClaim[claim.id] ?? false}
+																		disabled={claim.status !== 'draft' || (itemDeleteBusyByClaim[claim.id] ?? false)}
 																	/>
 																</td>
 																<td class="py-1.5 pr-3 text-slate-200">{item.description}</td>
@@ -551,7 +638,7 @@
 																<td class="py-1.5 pl-3 text-right">
 																	<button
 																		onclick={() => removeSingleItem(claim.id, item.id)}
-																		disabled={itemDeleteBusyByClaim[claim.id] ?? false}
+																		disabled={claim.status !== 'draft' || (itemDeleteBusyByClaim[claim.id] ?? false)}
 																		class="inline-flex items-center gap-1 rounded border border-red-700/40 bg-red-900/30 px-2 py-1 text-[11px] text-red-300 hover:bg-red-900/60 disabled:opacity-50 disabled:cursor-not-allowed"
 																		title="Remove line item"
 																	>

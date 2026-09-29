@@ -39,7 +39,7 @@ RULES:
 - itemCategory: one of → travel · meals · equipment · software · marketing · legal · office · other
 - vendorName: optional, match exactly to one of → ${vendorNames || 'vendor name as written'}
 - claimStatus: use "under_review" for imported historical reimbursement claims, "submitted" for pending
-- if claimStatus is "paid", importer will automatically convert it to "under_review"
+- if claimStatus is "approved" or "paid", importer will automatically convert it to "under_review"
 - departmentName: one of → ${deptNames || 'department name'}
 - isHistorical: true for all records that existed before FliHub was set up, false for new claims
 - claimNotes: add "Historical import — pre-FliHub" for historical records
@@ -77,11 +77,13 @@ Here are the records to convert:
 			{ col: 'claimantEmail',    required: true,  example: 'jane@example.com',           note: 'Must match a user account' },
 			{ col: 'itemDescription',  required: true,  example: 'Flight to Phoenix' },
 			{ col: 'itemAmount',       required: true,  example: '342.50',                     note: 'Number, no $ or commas' },
-			{ col: 'itemDate',         required: false, example: '2025-03-15',                 note: 'YYYY-MM-DD' },
+			{ col: 'itemDate',         required: true,  example: '2025-03-15',                 note: 'YYYY-MM-DD' },
 			{ col: 'itemCategory',     required: false, example: 'travel',                     note: 'travel · meals · equipment · software · marketing · legal · office · other' },
 			{ col: 'vendorName',       required: false, example: 'Delta Airlines',             note: 'Matched by name in vendors collection' },
+			{ col: 'sourceTransactionId', required: false, example: 'txn_20250315_001',         note: 'Stable bank/card transaction ID when available' },
+			{ col: 'bankStatementId',  required: false, example: '',                            note: 'PocketBase bank statement record ID when available' },
 			{ col: 'itemNotes',        required: false, example: 'Round trip, economy' },
-			{ col: 'claimStatus',      required: false, example: 'under_review',               note: 'draft · submitted · under_review · approved · paid · rejected (paid is auto-mapped to under_review on import)' },
+			{ col: 'claimStatus',      required: false, example: 'under_review',               note: 'draft · submitted · under_review · approved · paid · rejected (approved/paid import as under_review)' },
 			{ col: 'claimNotes',       required: false, example: 'Historical import — pre-FliHub' },
 			{ col: 'departmentName',   required: false, example: 'Tax-Exempt Reimbursements',  note: 'Matched by name — debits dept budget when paid' },
 			{ col: 'isHistorical',     required: false, example: 'true',                       note: 'true for pre-FliHub records, false for new claims' },
@@ -148,6 +150,32 @@ Here are the records to convert:
 	let importing    = $state(false);
 	let progress     = $state(0);   // 0–100
 	let result       = $state<{ created: number; updated?: number; skipped?: number; failed: number; dryRun?: boolean; errors: string[] } | null>(null);
+	type ReimbursementPreviewRow = {
+		rowIndex: number;
+		classification: 'new' | 'potential_duplicate' | 'exact_match' | 'invalid';
+		claimantEmail: string;
+		transactionDate: string;
+		vendor?: string;
+		description: string;
+		amount: number;
+		reason?: string;
+		errors: string[];
+		businessPurposeStatus: 'not_required' | 'unconfirmed';
+	};
+	type ReimbursementPreview = {
+		batchId: string;
+		rows: ReimbursementPreviewRow[];
+		summary: {
+			newTransactions: number;
+			potentialDuplicates: number;
+			exactMatches: number;
+			invalidRows: number;
+			totalProposedAmount: number;
+			totalPotentiallyDuplicatedAmount: number;
+		};
+	};
+	let reimbursementPreview = $state<ReimbursementPreview | null>(null);
+	let reimbursementOverrides = $state<Record<number, boolean>>({});
 	let selectedProjectId = $state('');
 	let projectImportDryRun = $state(true);
 	const projectOptions = $derived(((data.projects ?? []) as any[]).map((p: any) => ({
@@ -228,6 +256,8 @@ Here are the records to convert:
 		parseError = '';
 		rows       = [];
 		result     = null;
+		reimbursementPreview = null;
+		reimbursementOverrides = {};
 		if (!csvText.trim()) return;
 		try { rows = parseCSV(csvText); }
 		catch (err: any) { parseError = err.message; }
@@ -235,7 +265,14 @@ Here are the records to convert:
 
 	function clearAll() {
 		csvText = ''; rows = []; parseError = ''; result = null; progress = 0;
+		reimbursementPreview = null; reimbursementOverrides = {};
 	}
+
+	const selectedReimbursementWarnings = $derived(
+		Object.entries(reimbursementOverrides)
+			.filter(([, selected]) => selected)
+			.map(([rowIndex]) => Number(rowIndex))
+	);
 
 	// ── Import in batches with progress ───────────────────────────────────────
 	async function runImport() {
@@ -248,6 +285,42 @@ Here are the records to convert:
 		progress  = 0;
 		result    = null;
 		parseError = '';
+
+		if (selectedType === 'reimbursements') {
+			try {
+				const isPreview = reimbursementPreview === null;
+				const res = await fetch('/api/import', {
+					method: 'POST',
+					headers: { 'Content-Type': 'application/json' },
+					body: JSON.stringify({
+						type: selectedType,
+						rows,
+						preview: isPreview,
+						overrideRowIndexes: selectedReimbursementWarnings
+					})
+				});
+				const response = await res.json().catch(() => ({}));
+				if (!res.ok) throw new Error(response.message ?? `Error ${res.status}`);
+				if (isPreview) {
+					reimbursementPreview = response as ReimbursementPreview;
+				} else {
+					result = {
+						created: response.created ?? 0,
+						skipped: response.skipped ?? 0,
+						failed: response.failed ?? 0,
+						errors: response.errors ?? []
+					};
+					reimbursementPreview = null;
+					reimbursementOverrides = {};
+				}
+				progress = 100;
+			} catch (importError: any) {
+				parseError = importError?.message ?? 'Reimbursement import failed';
+			} finally {
+				importing = false;
+			}
+			return;
+		}
 
 		if (selectedType === 'project_tasks') {
 			try {
@@ -322,6 +395,7 @@ Here are the records to convert:
 	function selectType(t: ImportType) {
 		selectedType = t;
 		rows = []; csvText = ''; parseError = ''; result = null; progress = 0;
+		reimbursementPreview = null; reimbursementOverrides = {};
 		if (t !== 'project_tasks') selectedProjectId = '';
 	}
 </script>
@@ -526,17 +600,61 @@ Here are the records to convert:
 	<Card class="p-5 bg-slate-800/50 border-slate-700">
 		<div class="flex items-center justify-between mb-3">
 			<h2 class="text-sm font-semibold text-slate-300 uppercase tracking-wide">
-				Preview — {rows.length} row{rows.length !== 1 ? 's' : ''} detected
+				{selectedType === 'reimbursements' && reimbursementPreview ? 'Import Review' : 'Preview'} — {rows.length} row{rows.length !== 1 ? 's' : ''} detected
 			</h2>
 			<Button
 				onclick={runImport}
-				disabled={importing}
+				disabled={importing || (selectedType === 'reimbursements' && (reimbursementPreview?.summary.invalidRows ?? 0) > 0)}
 				class="gap-2 bg-emerald-600 hover:bg-emerald-700 text-white h-9"
 			>
 				<Upload class="size-4" />
-				{importing ? `Importing… ${progress}%` : selectedType === 'project_tasks' ? `${projectImportDryRun ? 'Dry Run' : 'Merge'} ${rows.length} task row${rows.length !== 1 ? 's' : ''}` : `Import ${rows.length} ${selectedType}`}
+				{#if importing}
+					Working…
+				{:else if selectedType === 'reimbursements' && !reimbursementPreview}
+					Review reimbursement import
+				{:else if selectedType === 'reimbursements' && reimbursementPreview}
+					Import {reimbursementPreview.summary.newTransactions + selectedReimbursementWarnings.length} selected transactions
+				{:else if selectedType === 'project_tasks'}
+					{projectImportDryRun ? 'Dry Run' : 'Merge'} {rows.length} task row{rows.length !== 1 ? 's' : ''}
+				{:else}
+					Import {rows.length} {selectedType}
+				{/if}
 			</Button>
 		</div>
+
+		{#if selectedType === 'reimbursements' && reimbursementPreview}
+			<div class="mb-4 grid grid-cols-2 gap-2 md:grid-cols-4 lg:grid-cols-6">
+				<div class="border border-emerald-800 bg-emerald-950/30 p-3"><p class="text-[10px] uppercase text-emerald-400">New</p><p class="text-xl font-semibold text-emerald-200">{reimbursementPreview.summary.newTransactions}</p></div>
+				<div class="border border-amber-800 bg-amber-950/30 p-3"><p class="text-[10px] uppercase text-amber-400">Potential</p><p class="text-xl font-semibold text-amber-200">{reimbursementPreview.summary.potentialDuplicates}</p></div>
+				<div class="border border-red-800 bg-red-950/30 p-3"><p class="text-[10px] uppercase text-red-400">Exact</p><p class="text-xl font-semibold text-red-200">{reimbursementPreview.summary.exactMatches}</p></div>
+				<div class="border border-slate-700 bg-slate-900/40 p-3"><p class="text-[10px] uppercase text-slate-400">Invalid</p><p class="text-xl font-semibold text-slate-200">{reimbursementPreview.summary.invalidRows}</p></div>
+				<div class="border border-slate-700 bg-slate-900/40 p-3"><p class="text-[10px] uppercase text-slate-400">Proposed</p><p class="text-sm font-semibold text-slate-200">{new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(reimbursementPreview.summary.totalProposedAmount)}</p></div>
+				<div class="border border-amber-800 bg-amber-950/30 p-3"><p class="text-[10px] uppercase text-amber-400">At Risk</p><p class="text-sm font-semibold text-amber-200">{new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(reimbursementPreview.summary.totalPotentiallyDuplicatedAmount)}</p></div>
+			</div>
+
+			<div class="mb-4 overflow-x-auto border border-slate-700">
+				<table class="w-full text-xs">
+					<thead class="bg-slate-900/60 text-left text-slate-400"><tr><th class="p-2">Override</th><th class="p-2">Result</th><th class="p-2">Date</th><th class="p-2">Vendor / Description</th><th class="p-2">Claimant</th><th class="p-2 text-right">Amount</th><th class="p-2">Reason</th></tr></thead>
+					<tbody class="divide-y divide-slate-700/50">
+						{#each reimbursementPreview.rows as previewRow}
+							<tr class={previewRow.classification === 'invalid' ? 'bg-red-950/20' : previewRow.classification === 'new' ? '' : 'bg-amber-950/20'}>
+								<td class="p-2 text-center">
+									{#if previewRow.classification === 'potential_duplicate' || previewRow.classification === 'exact_match'}
+										<input type="checkbox" bind:checked={reimbursementOverrides[previewRow.rowIndex]} class="accent-amber-500" aria-label={`Override duplicate warning for row ${previewRow.rowIndex + 2}`} />
+									{:else}—{/if}
+								</td>
+								<td class="p-2 font-medium {previewRow.classification === 'new' ? 'text-emerald-300' : previewRow.classification === 'invalid' ? 'text-red-300' : 'text-amber-300'}">{previewRow.classification.replaceAll('_', ' ')}</td>
+								<td class="p-2 font-mono text-slate-300">{previewRow.transactionDate || '—'}</td>
+								<td class="p-2 text-slate-200"><p>{previewRow.vendor || previewRow.description}</p>{#if previewRow.vendor}<p class="text-slate-500">{previewRow.description}</p>{/if}{#if previewRow.businessPurposeStatus === 'unconfirmed'}<p class="mt-1 text-amber-400">Business purpose confirmation required</p>{/if}</td>
+								<td class="p-2 text-slate-400">{previewRow.claimantEmail}</td>
+								<td class="p-2 text-right font-mono text-slate-200">{new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(previewRow.amount)}</td>
+								<td class="p-2 text-slate-400">{previewRow.errors.join('; ') || previewRow.reason || 'New transaction'}</td>
+							</tr>
+						{/each}
+					</tbody>
+				</table>
+			</div>
+		{/if}
 
 		<!-- Progress bar -->
 		{#if importing || (result && progress === 100)}

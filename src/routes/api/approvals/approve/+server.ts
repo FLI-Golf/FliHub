@@ -2,6 +2,7 @@ import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { getAdminPocketBase } from '$lib/infra/pocketbase/pbClient';
 import { checkEventFundingCapacity } from '$lib/server/event-funding';
+import { requiresBusinessPurposeReview } from '$lib/domain/reimbursements/integrity';
 
 /** Derive a short project code from the project name — first letter of each word, max 6 chars, uppercase. */
 function deriveProjectCode(name: string): string {
@@ -158,6 +159,22 @@ export const POST: RequestHandler = async ({ locals, request }) => {
 						return json({ error: 'Linked expense or reimbursement claim not found' }, { status: 404 });
 					}
 
+					const claimItems = await pb.collection('reimbursement_items').getFullList({
+						filter: `claim="${claim.id}"`,
+						fields: 'id,vendor,description,businessPurposeStatus,isArchived'
+					});
+					const unresolvedPurposeItems = claimItems.filter((item: any) =>
+						item.isArchived !== true
+						&& (item.businessPurposeStatus === 'unconfirmed'
+							|| (item.businessPurposeStatus !== 'confirmed' && requiresBusinessPurposeReview(item)))
+					);
+					if (unresolvedPurposeItems.length > 0) {
+						return json({
+							error: `${unresolvedPurposeItems.length} reimbursement transaction(s) require business-purpose confirmation`,
+							itemIds: unresolvedPurposeItems.map((item: any) => item.id)
+						}, { status: 409 });
+					}
+
 					const existingWOs = await pb.collection('work_orders').getFullList({
 						filter: `claimId='${claim.id}'`,
 						fields: 'id,work_order_number',
@@ -207,7 +224,7 @@ export const POST: RequestHandler = async ({ locals, request }) => {
 							amount:            claim.totalAmount || 0,
 							approvedDate:      new Date().toISOString(),
 							notes:             'Reimbursement claim approved and submitted to QuickBooks for payment processing.',
-						}).catch((e: any) => console.error('❌ reimbursement work_order create failed:', e.message, JSON.stringify(e.data ?? {})));
+						}).catch((e: any) => console.error('Reimbursement work order creation failed:', e.message));
 					}
 
 					await pb.collection('reimbursement_claims').update(claim.id, {

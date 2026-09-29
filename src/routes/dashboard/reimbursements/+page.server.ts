@@ -36,13 +36,14 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 			: [];
 
 		const myClaimIds = (myClaims as any[]).map((c: any) => c.id);
-		const myItems = myClaimIds.length
+		const loadedMyItems = myClaimIds.length
 			? await adminPb.collection('reimbursement_items').getFullList({
 				filter: myClaimIds.map((id: string) => `claim="${id}"`).join('||'),
 				sort:   'date',
 				expand: 'vendorId'
 			}).catch(() => [])
 			: [];
+		const myItems = (loadedMyItems as any[]).filter((item: any) => item.isArchived !== true);
 
 		const myBankStatements = profile?.id
 			? await adminPb.collection('bank_statements').getFullList({
@@ -68,11 +69,12 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 
 			const allIds = allClaims.map((c: any) => c.id);
 			if (allIds.length) {
-				allItems = await adminPb.collection('reimbursement_items').getFullList({
+				const loadedAllItems = await adminPb.collection('reimbursement_items').getFullList({
 					filter: allIds.map((id: string) => `claim="${id}"`).join('||'),
 					sort:   'date',
 					expand: 'vendorId'
 				}).catch(() => []);
+				allItems = (loadedAllItems as any[]).filter((item: any) => item.isArchived !== true);
 			}
 		} else if (canAccessAdminView) {
 			// Claimant-scoped "admin" summaries for marketing_lead users.

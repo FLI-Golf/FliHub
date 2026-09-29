@@ -67,7 +67,16 @@ export const ReimbursementItemSchema = z.object({
 	category:    ItemCategoryEnum.optional(),
 	vendor:      z.string().max(255).optional(),
 	receiptUrl:  z.string().max(500).optional(),
-	notes:       z.string().max(1000).optional()
+	notes:       z.string().max(1000).optional(),
+	sourceTransactionId: z.string().max(255).optional(),
+	importBatchId: z.string().max(255).optional(),
+	bankStatement: z.string().optional(),
+	businessPurposeStatus: z.enum(['not_required', 'unconfirmed', 'confirmed']).optional(),
+	duplicateReviewStatus: z.enum(['pending', 'keep', 'archived']).optional(),
+	isArchived: z.boolean().optional(),
+	archivedAt: z.string().optional(),
+	archivedBy: z.string().optional(),
+	archiveReason: z.string().max(2000).optional()
 });
 
 export const ReimbursementClaimSchema = z.object({

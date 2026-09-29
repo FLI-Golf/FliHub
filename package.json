@@ -78,7 +78,10 @@
     "migrate:media:module8-10": "tsx scripts/migrate-media-module8-10.ts",
     "migrate:work-orders:wo-number-unique": "tsx src/lib/migrations/add-work-order-number-unique-index.ts",
     "migrate:bids:task-targeting": "tsx src/lib/migrations/add-bids-task-targeting-fields.ts",
-    "migrate:bids:task-targeting:apply": "tsx src/lib/migrations/add-bids-task-targeting-fields.ts --apply"
+    "migrate:bids:task-targeting:apply": "tsx src/lib/migrations/add-bids-task-targeting-fields.ts --apply",
+    "migrate:reimbursements:integrity": "tsx scripts/migrate-reimbursement-integrity.ts",
+    "migrate:reimbursements:integrity:apply": "tsx scripts/migrate-reimbursement-integrity.ts --apply",
+    "test:reimbursements": "tsx --test src/lib/domain/reimbursements/integrity.test.ts src/lib/server/reimbursements/import.test.ts"
   },
   "repository": {
     "type": "git",

@@ -1,6 +1,7 @@
 import { json } from '@sveltejs/kit';
 import { RequestContext } from '$lib/infra/RequestContext';
 import { getAdminPocketBase } from '$lib/infra/pocketbase/pbClient';
+import { toDateOnly } from '$lib/domain/reimbursements/integrity';
 import {
 	DEFAULT_REIMBURSEMENT_MAX_CLAIM_TOTAL,
 	REIMBURSEMENT_MAX_TOTAL_SETTING_KEY
@@ -22,13 +23,25 @@ export const PATCH: RequestHandler = async ({ locals, url, params, request }) =>
 	try {
 		const adminPb = await getAdminPocketBase();
 		const maxClaimTotal = await getMaxClaimTotal(adminPb);
+		const claim = await adminPb.collection('reimbursement_claims').getOne(params.id, { fields: 'id,claimant,status' });
+		const isAdministrator = ctx.role === 'admin' || ctx.role === 'leader';
+		if (!isAdministrator && claim.claimant !== ctx.profile?.id) return json({ message: 'Forbidden' }, { status: 403 });
+		if (claim.status === 'approved' || claim.status === 'paid' || claim.status === 'rejected') {
+			return json({ message: 'Financially finalized claim items cannot be edited' }, { status: 409 });
+		}
+		if (!isAdministrator && claim.status !== 'draft') {
+			return json({ message: 'Only draft claim items can be edited by claimants' }, { status: 403 });
+		}
 
-		const existingItem = await ctx.pb.collection('reimbursement_items').getOne(params.itemId, { fields: 'id,amount' });
+		const existingItem = await adminPb.collection('reimbursement_items').getOne(params.itemId, { fields: 'id,claim,amount,isArchived' });
+		if (existingItem.claim !== params.id) return json({ message: 'Line item does not belong to this claim' }, { status: 400 });
+		if (existingItem.isArchived === true) return json({ message: 'Archived line items must be restored before editing' }, { status: 409 });
 		const nextAmount = body.amount !== undefined ? Number(body.amount) : Number(existingItem.amount || 0);
 
 		const allItems = await ctx.pb.collection('reimbursement_items')
-			.getFullList({ filter: `claim = "${params.id}"`, fields: 'id,amount' });
+			.getFullList({ filter: `claim = "${params.id}"`, fields: 'id,amount,isArchived' });
 		const nextTotal = allItems.reduce((s, i) => {
+			if ((i as any).isArchived === true) return s;
 			if (i.id === params.itemId) return s + nextAmount;
 			return s + (i.amount || 0);
 		}, 0);
@@ -44,7 +57,11 @@ export const PATCH: RequestHandler = async ({ locals, url, params, request }) =>
 		const update: Record<string, any> = {};
 		if (body.description !== undefined) update.description = body.description;
 		if (body.amount      !== undefined) update.amount      = nextAmount;
-		if (body.date        !== undefined) update.date        = body.date || null;
+		if (body.date !== undefined) {
+			const date = body.date ? toDateOnly(body.date) : null;
+			if (body.date && !date) return json({ message: 'Transaction date must use YYYY-MM-DD' }, { status: 400 });
+			update.date = date;
+		}
 		if (body.category    !== undefined) update.category    = body.category;
 		if (body.vendor      !== undefined) update.vendor      = body.vendor;
 		if (body.vendorId    !== undefined) update.vendorId    = body.vendorId || null;
@@ -67,9 +84,15 @@ export const DELETE: RequestHandler = async ({ locals, url, params }) => {
 	if (!ctx) return json({ message: 'Unauthorized' }, { status: 401 });
 	try {
 		const claim = await ctx.pb.collection('reimbursement_claims')
-			.getOne(params.id, { fields: 'id,status,department,totalAmount' });
+			.getOne(params.id, { fields: 'id,claimant,status,department,totalAmount' });
+		const isAdministrator = ctx.role === 'admin' || ctx.role === 'leader';
+		if (!isAdministrator && claim.claimant !== ctx.profile?.id) return json({ message: 'Forbidden' }, { status: 403 });
+		if (claim.status !== 'draft') {
+			return json({ message: 'Submitted reimbursement items must use the audited administrative review workflow' }, { status: 409 });
+		}
 		const item = await ctx.pb.collection('reimbursement_items')
-			.getOne(params.itemId, { fields: 'id,amount' });
+			.getOne(params.itemId, { fields: 'id,claim,amount' });
+		if (item.claim !== params.id) return json({ message: 'Line item does not belong to this claim' }, { status: 400 });
 		const removedAmount = Number(item.amount || 0);
 
 		await ctx.pb.collection('reimbursement_items').delete(params.itemId);

@@ -1,7 +1,10 @@
 import type { PageServerLoad } from './$types';
 import { getAdminPocketBase } from '$lib/infra/pocketbase/pbClient';
+import { RequestContext } from '$lib/infra/RequestContext';
 
-export const load: PageServerLoad = async () => {
+export const load: PageServerLoad = async ({ locals, url }) => {
+	const ctx = await RequestContext.from(locals, url);
+	ctx.requireRole('admin', 'leader');
 	try {
 		const adminPb = await getAdminPocketBase();
 			const [departments, userProfiles, vendors, projects] = await Promise.all([

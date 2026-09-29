@@ -6,7 +6,6 @@ import type { RequestHandler } from './$types';
 // POST /api/reimbursements/:id/request-approval
 // Moves claim to under_review and creates a pending approval if one does not exist.
 export const POST: RequestHandler = async ({ locals, url, params }) => {
-	console.log(`[reimb] request-approval hit for claim ${params.id}`);
 	const ctx = await RequestContext.fromApi(locals, url);
 	if (!ctx) return json({ message: 'Unauthorized' }, { status: 401 });
 	if (!['admin', 'leader'].includes(ctx.role)) {
@@ -38,9 +37,6 @@ export const POST: RequestHandler = async ({ locals, url, params }) => {
 				amount: claim.totalAmount || 0,
 				comments: '<p>Reimbursement claim submitted for approval.</p>'
 			});
-			console.log(`[reimb] approval created: ${approval.id} for claim ${claim.id}`);
-		} else {
-			console.log(`[reimb] pending approval exists: ${approval.id} for claim ${claim.id}`);
 		}
 
 		if (claim.status !== 'under_review') {
@@ -52,12 +48,7 @@ export const POST: RequestHandler = async ({ locals, url, params }) => {
 		return json({ ok: true, approvalId: approval.id });
 	} catch (err: any) {
 		const message = err?.response?.message ?? err?.message ?? 'Failed to request approval';
-		console.error('[reimb] request-approval failed', {
-			claimId: params.id,
-			message,
-			data: err?.response?.data ?? null,
-			status: err?.status ?? err?.response?.status ?? 500
-		});
+		console.error('[reimb] request-approval failed:', message);
 		return json({ message }, { status: err?.status ?? err?.response?.status ?? 500 });
 	}
 };

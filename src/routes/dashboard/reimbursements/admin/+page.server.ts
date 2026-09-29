@@ -3,6 +3,11 @@ import { RequestContext } from '$lib/infra/RequestContext';
 import { getAdminPocketBase } from '$lib/infra/pocketbase/pbClient';
 import { redirect } from '@sveltejs/kit';
 import {
+	groupSuspectedDuplicates,
+	requiresBusinessPurposeReview,
+	toDateOnly
+} from '$lib/domain/reimbursements/integrity';
+import {
 	DEFAULT_REIMBURSEMENT_MAX_CLAIM_TOTAL,
 	REIMBURSEMENT_MAX_TOTAL_SETTING_KEY
 } from '$lib/domain/schemas/reimbursement.schema';
@@ -32,11 +37,35 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 	]);
 
 	const claimIds = (claims as any[]).map((c: any) => c.id);
-	const items = claimIds.length
+	const loadedItems = claimIds.length
 		? await adminPb.collection('reimbursement_items').getFullList({
 			filter: claimIds.map((id: string) => `claim="${id}"`).join('||'),
-			sort: 'date'
+			sort: 'date',
+			expand: 'vendorId,bankStatement'
 		}).catch(() => [])
+		: [];
+	const items = (loadedItems as any[]).filter((item: any) => item.isArchived !== true);
+	const canAudit = role === 'admin' || role === 'leader';
+	const claimById = new Map((claims as any[]).map((claim: any) => [claim.id, claim]));
+	const auditTransactions = items.map((item: any) => {
+		const claim = claimById.get(item.claim);
+		const claimant = claim?.expand?.claimant;
+		return {
+			...item,
+			claimantId: claim?.claimant ?? '',
+			claimantName: [claimant?.firstName, claimant?.lastName].filter(Boolean).join(' ') || claimant?.email || '—',
+			claimTitle: claim?.title ?? '—',
+			claimStatus: claim?.status ?? '',
+			transactionDate: toDateOnly(item.date) ?? '',
+			bankStatement: item.expand?.bankStatement ?? item.bankStatement ?? null
+		};
+	});
+	const duplicateGroups = canAudit ? groupSuspectedDuplicates(auditTransactions) : [];
+	const businessPurposeItems = canAudit
+		? auditTransactions.filter((item: any) =>
+			item.businessPurposeStatus === 'unconfirmed'
+			|| (item.businessPurposeStatus !== 'confirmed' && requiresBusinessPurposeReview(item))
+		)
 		: [];
 
 	const maxClaimTotalSetting = (settings as any[]).find((s: any) => s.key === REIMBURSEMENT_MAX_TOTAL_SETTING_KEY);
@@ -58,5 +87,5 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 		totalPending:  claims.filter((c: any) => c.status === 'submitted' || c.status === 'under_review').reduce((s: number, c: any) => s + (c.totalAmount || 0), 0),
 	};
 
-	return { claims, items, metrics, profile, isAdmin, maxClaimTotal };
+	return { claims, items, metrics, profile, isAdmin, canAudit, duplicateGroups, businessPurposeItems, maxClaimTotal };
 };

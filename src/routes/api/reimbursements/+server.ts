@@ -1,6 +1,7 @@
 import { json } from '@sveltejs/kit';
 import { RequestContext } from '$lib/infra/RequestContext';
 import { getAdminPocketBase } from '$lib/infra/pocketbase/pbClient';
+import { requiresBusinessPurposeReview, toDateOnly } from '$lib/domain/reimbursements/integrity';
 import {
 	DEFAULT_REIMBURSEMENT_MAX_CLAIM_TOTAL,
 	REIMBURSEMENT_MAX_TOTAL_SETTING_KEY
@@ -41,10 +42,15 @@ export const POST: RequestHandler = async ({ locals, url, request }) => {
 
 	try {
 		const adminPb = await getAdminPocketBase();
+		const isAdministrator = ctx.role === 'admin' || ctx.role === 'leader';
+		const claimantId = isAdministrator && body.claimant ? body.claimant : ctx.profile?.id;
+		if (!claimantId) return json({ message: 'A valid user profile is required' }, { status: 403 });
 		const maxClaimTotal = await getMaxClaimTotal(adminPb);
 		const workOrder = await nextWorkOrderNumber(adminPb);
 		const items = body.items ?? [];
 		const total = (items as any[]).reduce((s: number, i: any) => s + (Number(i.amount) || 0), 0);
+		const invalidDate = (items as any[]).find((item: any) => item.date && !toDateOnly(item.date));
+		if (invalidDate) return json({ message: 'Transaction dates must use YYYY-MM-DD' }, { status: 400 });
 
 		if (total > maxClaimTotal) {
 			return json({
@@ -65,7 +71,7 @@ export const POST: RequestHandler = async ({ locals, url, request }) => {
 
 		const claim = await adminPb.collection('reimbursement_claims').create({
 			title:           body.title.trim(),
-			claimant:        ctx.profile?.id ?? body.claimant ?? null,
+			claimant:        claimantId,
 			status:          'draft',
 			notes:           body.notes?.trim() || '',
 			referenceNumber: workOrder,
@@ -75,16 +81,22 @@ export const POST: RequestHandler = async ({ locals, url, request }) => {
 		// Create any initial items passed along with the claim
 		for (const item of items) {
 			if (!item.description?.trim() || !item.amount) continue;
+			const businessPurposeStatus = requiresBusinessPurposeReview({
+				vendor: item.vendor,
+				description: item.description
+			}) ? 'unconfirmed' : 'not_required';
 			await adminPb.collection('reimbursement_items').create({
 				claim:       claim.id,
 				description: item.description.trim(),
 				amount:      Number(item.amount),
-				date:        item.date        || null,
+				date:        toDateOnly(item.date),
 				category:    item.category    || 'other',
 				vendor:      item.vendor?.trim()     || '',
 				vendorId:    item.vendorId            || null,
 				receiptUrl:  item.receiptUrl?.trim() || '',
-				notes:       item.notes?.trim()      || ''
+				notes:       item.notes?.trim()      || '',
+				businessPurposeStatus,
+				isArchived: false
 			});
 		}
 

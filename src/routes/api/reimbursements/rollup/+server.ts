@@ -118,7 +118,7 @@ export const POST: RequestHandler = async ({ locals, url, request }) => {
 			return json({ message: 'All selected claims must belong to the same claimant' }, { status: 400 });
 		}
 
-		const nonRollupStatuses = new Set(['paid', 'rejected']);
+		const nonRollupStatuses = new Set(['approved', 'paid', 'rejected']);
 		const blocked = claims.find((c: any) => nonRollupStatuses.has(c.status));
 		if (blocked) {
 			return json({ message: `Claim ${blocked.id} cannot be rolled up from status "${blocked.status}"` }, { status: 400 });
@@ -128,15 +128,16 @@ export const POST: RequestHandler = async ({ locals, url, request }) => {
 			filter: claimIds.map((id) => `claim="${id}"`).join(' || '),
 			sort: 'date,id'
 		});
+		const activeItems = (allItems as ReimbursementItem[]).filter((item: any) => item.isArchived !== true);
 
-		if (!allItems.length) {
+		if (!activeItems.length) {
 			return json({ message: 'Selected claims have no line items to roll up' }, { status: 400 });
 		}
 
 		const claimCreatedMap = new Map<string, string>();
 		for (const claim of claims as any[]) claimCreatedMap.set(claim.id, claim.created || '');
 
-		const sortedItems = [...(allItems as ReimbursementItem[])].sort((a, b) => {
+		const sortedItems = [...activeItems].sort((a, b) => {
 			const claimA = claimCreatedMap.get((a as any).claim) || '';
 			const claimB = claimCreatedMap.get((b as any).claim) || '';
 			if (claimA !== claimB) return claimA.localeCompare(claimB);
@@ -217,7 +218,7 @@ export const POST: RequestHandler = async ({ locals, url, request }) => {
 			ok: true,
 			rolledClaimIds,
 			sourceClaimIds: claimIds,
-			itemCount: allItems.length,
+			itemCount: activeItems.length,
 			maxClaimTotal
 		});
 	} catch (err: any) {
