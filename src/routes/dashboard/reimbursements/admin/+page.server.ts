@@ -60,7 +60,12 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 			bankStatement: item.expand?.bankStatement ?? item.bankStatement ?? null
 		};
 	});
-	const duplicateGroups = canAudit ? groupSuspectedDuplicates(auditTransactions) : [];
+	const allDuplicateGroups = canAudit ? groupSuspectedDuplicates(auditTransactions) : [];
+	// A group is resolved once every surviving record has been explicitly kept.
+	const duplicateGroups = allDuplicateGroups.filter(
+		(group: any) => !group.items.every((item: any) => item.duplicateReviewStatus === 'keep')
+	);
+	const resolvedDuplicateGroupCount = allDuplicateGroups.length - duplicateGroups.length;
 	const businessPurposeItems = canAudit
 		? auditTransactions.filter((item: any) =>
 			item.businessPurposeStatus === 'unconfirmed'
@@ -87,5 +92,5 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 		totalPending:  claims.filter((c: any) => c.status === 'submitted' || c.status === 'under_review').reduce((s: number, c: any) => s + (c.totalAmount || 0), 0),
 	};
 
-	return { claims, items, metrics, profile, isAdmin, canAudit, duplicateGroups, businessPurposeItems, maxClaimTotal };
+	return { claims, items, metrics, profile, isAdmin, canAudit, duplicateGroups, resolvedDuplicateGroupCount, businessPurposeItems, maxClaimTotal };
 };

@@ -350,11 +350,11 @@
 					<h2 id="duplicate-audit-heading" class="flex items-center gap-2 text-lg font-semibold text-slate-100"><ShieldAlert class="size-5 text-amber-400" /> Duplicate Audit</h2>
 					<p class="text-xs text-slate-400">Suspected groups only. Review records individually; nothing is removed automatically.</p>
 				</div>
-				<p class="text-xs text-slate-400">{data.duplicateGroups.length} group{data.duplicateGroups.length === 1 ? '' : 's'} · {fmt(data.duplicateGroups.reduce((sum: number, group: any) => sum + group.potentialDuplicatedAmount, 0))} potential exposure</p>
+				<p class="text-xs text-slate-400">{data.duplicateGroups.length} unresolved group{data.duplicateGroups.length === 1 ? '' : 's'} · {fmt(data.duplicateGroups.reduce((sum: number, group: any) => sum + group.potentialDuplicatedAmount, 0))} potential exposure{#if data.resolvedDuplicateGroupCount} · {data.resolvedDuplicateGroupCount} resolved{/if}</p>
 			</div>
 
 			{#if data.duplicateGroups.length === 0}
-				<div class="border border-slate-700 bg-slate-900/30 px-4 py-3 text-sm text-slate-400">No suspected duplicate groups.</div>
+				<div class="border border-slate-700 bg-slate-900/30 px-4 py-3 text-sm text-slate-400">{data.resolvedDuplicateGroupCount ? `All ${data.resolvedDuplicateGroupCount} suspected duplicate group(s) have been reviewed.` : 'No suspected duplicate groups.'}</div>
 			{:else}
 				<div class="space-y-3">
 					{#each data.duplicateGroups as group, groupIndex}
@@ -373,7 +373,7 @@
 											<td class="p-2 text-slate-300"><p>{item.claimantName}</p><p class="max-w-64 truncate text-slate-500" title={item.claimTitle}>{item.claimTitle}</p></td>
 											<td class="p-2 font-mono text-slate-400">{item.id}</td>
 											<td class="p-2 text-slate-400"><p>{item.receipts?.length ?? 0} receipt{item.receipts?.length === 1 ? '' : 's'}</p><p>{item.bankStatement ? 'Bank statement linked' : 'No bank statement link'}</p></td>
-											<td class="p-2"><div class="flex justify-end gap-1.5"><button onclick={() => reviewItem(item.id, 'keep', 'Reviewed against supporting evidence; retain this transaction.')} disabled={reviewBusyItemId === item.id} class="inline-flex items-center gap-1 border border-emerald-800 bg-emerald-950/40 px-2 py-1 text-emerald-300 disabled:opacity-50"><BadgeCheck class="size-3" /> Keep</button><button onclick={() => reviewItem(item.id, 'archive', 'Confirmed duplicate transaction; retain the reviewed matching record.')} disabled={reviewBusyItemId === item.id || isFinalized(item.claimStatus)} title={isFinalized(item.claimStatus) ? 'Finalized claims cannot be archived' : 'Archive duplicate'} class="inline-flex items-center gap-1 border border-red-800 bg-red-950/40 px-2 py-1 text-red-300 disabled:cursor-not-allowed disabled:opacity-40"><Archive class="size-3" /> Archive</button></div></td>
+											<td class="p-2"><div class="flex items-center justify-end gap-1.5">{#if item.duplicateReviewStatus === 'keep'}<span class="inline-flex items-center gap-1 border border-emerald-800 bg-emerald-950/40 px-2 py-1 text-emerald-300"><BadgeCheck class="size-3" /> Kept</span>{:else}<button onclick={() => reviewItem(item.id, 'keep', 'Reviewed against supporting evidence; retain this transaction.')} disabled={reviewBusyItemId === item.id} class="inline-flex items-center gap-1 border border-emerald-800 bg-emerald-950/40 px-2 py-1 text-emerald-300 disabled:opacity-50"><BadgeCheck class="size-3" /> Keep</button>{/if}<button onclick={() => reviewItem(item.id, 'archive', 'Confirmed duplicate transaction; retain the reviewed matching record.')} disabled={reviewBusyItemId === item.id || isFinalized(item.claimStatus)} title={isFinalized(item.claimStatus) ? 'Finalized claims cannot be archived' : 'Archive duplicate'} class="inline-flex items-center gap-1 border border-red-800 bg-red-950/40 px-2 py-1 text-red-300 disabled:cursor-not-allowed disabled:opacity-40"><Archive class="size-3" /> Archive</button></div></td>
 										</tr>
 									{/each}
 								</tbody>
