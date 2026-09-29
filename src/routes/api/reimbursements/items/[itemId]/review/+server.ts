@@ -10,6 +10,31 @@ import type { RequestHandler } from './$types';
 const FINALIZED_STATUSES = new Set(['approved', 'paid', 'rejected']);
 const ACTIONS = new Set(['keep', 'archive', 'restore', 'confirm_business_purpose', 'mark_business_purpose_unconfirmed']);
 
+const REQUIRED_ITEM_FIELDS = [
+	'businessPurposeStatus', 'businessPurposeConfirmedAt', 'businessPurposeConfirmedBy',
+	'duplicateReviewStatus', 'isArchived', 'archivedAt', 'archivedBy', 'archiveReason'
+];
+
+// Cached after the integrity migration is detected once.
+let schemaVerified = false;
+
+async function findMissingSchema(pb: any): Promise<string[]> {
+	if (schemaVerified) return [];
+
+	const missing: string[] = [];
+	const itemsCollection = await pb.collections.getOne('reimbursement_items').catch(() => null);
+	const presentFields = new Set((itemsCollection?.fields ?? []).map((field: any) => field.name));
+	for (const field of REQUIRED_ITEM_FIELDS) {
+		if (!presentFields.has(field)) missing.push(`reimbursement_items.${field}`);
+	}
+
+	const auditCollection = await pb.collections.getOne('reimbursement_item_audit').catch(() => null);
+	if (!auditCollection) missing.push('reimbursement_item_audit');
+
+	if (!missing.length) schemaVerified = true;
+	return missing;
+}
+
 async function getMaxClaimTotal(pb: any): Promise<number> {
 	const setting = await pb.collection('settings')
 		.getFirstListItem(`key = "${REIMBURSEMENT_MAX_TOTAL_SETTING_KEY}"`, { fields: 'value' })
@@ -33,6 +58,15 @@ export const PATCH: RequestHandler = async ({ locals, url, params, request }) =>
 
 	try {
 		const pb = await getAdminPocketBase();
+
+		const missingSchema = await findMissingSchema(pb);
+		if (missingSchema.length) {
+			return json({
+				message: 'The reimbursement integrity migration has not been applied to this database, so review actions cannot be recorded. Run "pnpm migrate:reimbursements:integrity:apply".',
+				missingSchema
+			}, { status: 503 });
+		}
+
 		const item = await pb.collection('reimbursement_items').getOne(params.itemId);
 		const claim = await pb.collection('reimbursement_claims').getOne(item.claim, {
 			fields: 'id,title,status,totalAmount,claimant'
@@ -137,7 +171,8 @@ export const PATCH: RequestHandler = async ({ locals, url, params, request }) =>
 
 		return json({ ok: true, item: updated });
 	} catch (error: any) {
-		console.error('[reimb-review] action failed:', error?.message ?? 'Unknown error');
-		return json({ message: 'Unable to complete reimbursement review action' }, { status: 500 });
+		const detail = error?.response?.message ?? error?.message ?? 'Unknown error';
+		console.error('[reimb-review] action failed:', detail);
+		return json({ message: `Unable to complete reimbursement review action: ${detail}` }, { status: 500 });
 	}
 };
