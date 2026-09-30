@@ -5,35 +5,14 @@ import {
 	DEFAULT_REIMBURSEMENT_MAX_CLAIM_TOTAL,
 	REIMBURSEMENT_MAX_TOTAL_SETTING_KEY
 } from '$lib/domain/schemas/reimbursement.schema';
+import {
+	FINALIZED_STATUSES,
+	findMissingSchema,
+	recalculateClaimTotal
+} from '$lib/server/reimbursements/review';
 import type { RequestHandler } from './$types';
 
-const FINALIZED_STATUSES = new Set(['approved', 'paid', 'rejected']);
 const ACTIONS = new Set(['keep', 'archive', 'restore', 'confirm_business_purpose', 'mark_business_purpose_unconfirmed']);
-
-const REQUIRED_ITEM_FIELDS = [
-	'businessPurposeStatus', 'businessPurposeConfirmedAt', 'businessPurposeConfirmedBy',
-	'duplicateReviewStatus', 'isArchived', 'archivedAt', 'archivedBy', 'archiveReason'
-];
-
-// Cached after the integrity migration is detected once.
-let schemaVerified = false;
-
-async function findMissingSchema(pb: any): Promise<string[]> {
-	if (schemaVerified) return [];
-
-	const missing: string[] = [];
-	const itemsCollection = await pb.collections.getOne('reimbursement_items').catch(() => null);
-	const presentFields = new Set((itemsCollection?.fields ?? []).map((field: any) => field.name));
-	for (const field of REQUIRED_ITEM_FIELDS) {
-		if (!presentFields.has(field)) missing.push(`reimbursement_items.${field}`);
-	}
-
-	const auditCollection = await pb.collections.getOne('reimbursement_item_audit').catch(() => null);
-	if (!auditCollection) missing.push('reimbursement_item_audit');
-
-	if (!missing.length) schemaVerified = true;
-	return missing;
-}
 
 async function getMaxClaimTotal(pb: any): Promise<number> {
 	const setting = await pb.collection('settings')
@@ -152,14 +131,7 @@ export const PATCH: RequestHandler = async ({ locals, url, params, request }) =>
 			});
 
 			if (action === 'archive' || action === 'restore') {
-				const activeItems = await pb.collection('reimbursement_items').getFullList({
-					filter: `claim = "${claim.id}"`,
-					fields: 'amount,isArchived'
-				});
-				const totalAmount = activeItems
-					.filter((candidate: any) => candidate.isArchived !== true)
-					.reduce((sum: number, candidate: any) => sum + Number(candidate.amount || 0), 0);
-				await pb.collection('reimbursement_claims').update(claim.id, { totalAmount });
+				await recalculateClaimTotal(pb, claim.id);
 			}
 		} catch (reviewError) {
 			if (auditRecord?.id) {

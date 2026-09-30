@@ -80,6 +80,8 @@
 	let rollupToast = $state<{ type: 'success' | 'error'; message: string } | null>(null);
 	let itemToast = $state<{ type: 'success' | 'error'; message: string } | null>(null);
 	let reviewBusyItemId = $state<string | null>(null);
+	let selectedAuditIds = $state<Record<string, boolean>>({});
+	let bulkBusy = $state(false);
 
 	function showItemToast(type: 'success' | 'error', message: string, timeoutMs = 3200) {
 		itemToast = { type, message };
@@ -90,6 +92,72 @@
 
 	function isFinalized(status: string) {
 		return status === 'approved' || status === 'paid' || status === 'rejected';
+	}
+
+	function canArchive(item: any) {
+		return !isFinalized(item.claimStatus);
+	}
+
+	const selectedAuditItems = $derived.by(() => {
+		const byId = new Map<string, any>();
+		for (const group of (data.duplicateGroups as any[]) ?? []) {
+			for (const item of group.items) if (selectedAuditIds[item.id]) byId.set(item.id, item);
+		}
+		return [...byId.values()];
+	});
+
+	const selectedAuditAmount = $derived(
+		selectedAuditItems.reduce((sum: number, item: any) => sum + Number(item.amount || 0), 0)
+	);
+
+	function toggleAuditItem(itemId: string, checked: boolean) {
+		selectedAuditIds = { ...selectedAuditIds, [itemId]: checked };
+	}
+
+	// Selects every archivable record except the first survivor in each group.
+	function selectExtras(groups: any[]) {
+		const next = { ...selectedAuditIds };
+		for (const group of groups) {
+			const archivable = group.items.filter(canArchive);
+			const survivor = group.items.find((item: any) => item.duplicateReviewStatus === 'keep')
+				?? group.items.find((item: any) => (item.receipts?.length ?? 0) > 0)
+				?? group.items[0];
+			for (const item of archivable) {
+				if (item.id !== survivor?.id) next[item.id] = true;
+			}
+		}
+		selectedAuditIds = next;
+	}
+
+	function clearAuditSelection() {
+		selectedAuditIds = {};
+	}
+
+	async function bulkArchiveSelected() {
+		const items = selectedAuditItems;
+		if (!items.length) return;
+		if (!confirm(`Archive ${items.length} duplicate record${items.length === 1 ? '' : 's'} totalling ${fmt(selectedAuditAmount)}?\n\nRecords are recoverable and an audit entry is kept for each.`)) return;
+
+		const reason = prompt('Reason for archiving these duplicates:', 'Confirmed duplicate transactions; one record retained per group.')?.trim();
+		if (!reason) return;
+
+		bulkBusy = true;
+		try {
+			const res = await fetch('/api/reimbursements/items/bulk-review', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ itemIds: items.map((item: any) => item.id), action: 'archive', reason })
+			});
+			const response = await res.json().catch(() => ({}));
+			if (!res.ok) throw new Error(response.message ?? 'Bulk archive failed');
+			clearAuditSelection();
+			await invalidateAll();
+			showItemToast('success', `Archived ${response.processed} record(s) across ${response.claimsUpdated} claim(s).`);
+		} catch (error: any) {
+			showItemToast('error', error?.message ?? 'Bulk archive failed', 6000);
+		} finally {
+			bulkBusy = false;
+		}
 	}
 
 	async function reviewItem(itemId: string, action: string, suggestedReason: string) {
@@ -353,6 +421,25 @@
 				<p class="text-xs text-slate-400">{data.duplicateGroups.length} unresolved group{data.duplicateGroups.length === 1 ? '' : 's'} · {fmt(data.duplicateGroups.reduce((sum: number, group: any) => sum + group.potentialDuplicatedAmount, 0))} potential exposure{#if data.resolvedDuplicateGroupCount} · {data.resolvedDuplicateGroupCount} resolved{/if}</p>
 			</div>
 
+			{#if data.duplicateGroups.length > 0}
+				<div class="flex flex-wrap items-center gap-2 border border-slate-700 bg-slate-900/40 px-3 py-2 text-xs">
+					<button onclick={() => selectExtras((data.duplicateGroups as any[]).filter((g: any) => g.classification === 'exact_match'))} class="border border-slate-600 bg-slate-800 px-2 py-1 text-slate-200 hover:bg-slate-700">Select extras in exact matches</button>
+					<button onclick={() => selectExtras(data.duplicateGroups as any[])} class="border border-slate-600 bg-slate-800 px-2 py-1 text-slate-200 hover:bg-slate-700">Select extras in all groups</button>
+					{#if selectedAuditItems.length}
+						<button onclick={clearAuditSelection} class="border border-slate-600 bg-slate-800 px-2 py-1 text-slate-300 hover:bg-slate-700">Clear</button>
+					{/if}
+					<span class="ml-auto text-slate-400">{selectedAuditItems.length} selected · {fmt(selectedAuditAmount)}</span>
+					<button
+						onclick={bulkArchiveSelected}
+						disabled={bulkBusy || selectedAuditItems.length === 0}
+						class="inline-flex items-center gap-1 border border-red-700 bg-red-900/50 px-3 py-1 font-medium text-red-200 hover:bg-red-900/80 disabled:cursor-not-allowed disabled:opacity-40"
+					>
+						<Archive class="size-3" /> {bulkBusy ? 'Archiving…' : `Archive ${selectedAuditItems.length} selected`}
+					</button>
+				</div>
+				<p class="text-[11px] text-slate-500">One record per group is always kept. Archived records stay recoverable and are excluded from claim totals.</p>
+			{/if}
+
 			{#if data.duplicateGroups.length === 0}
 				<div class="border border-slate-700 bg-slate-900/30 px-4 py-3 text-sm text-slate-400">{data.resolvedDuplicateGroupCount ? `All ${data.resolvedDuplicateGroupCount} suspected duplicate group(s) have been reviewed.` : 'No suspected duplicate groups.'}</div>
 			{:else}
@@ -361,13 +448,27 @@
 						<div class="overflow-x-auto border border-amber-900/60 bg-slate-900/30">
 							<div class="flex flex-wrap justify-between gap-2 border-b border-slate-700 px-3 py-2 text-xs">
 								<span class="font-semibold text-amber-300">Group {groupIndex + 1} · {group.occurrences} occurrences · {group.classification.replaceAll('_', ' ')}</span>
-								<span class="text-amber-200">Potential duplicated amount: {fmt(group.potentialDuplicatedAmount)}</span>
+								<div class="flex items-center gap-3">
+									<button onclick={() => selectExtras([group])} class="border border-slate-600 bg-slate-800 px-2 py-0.5 text-slate-200 hover:bg-slate-700">Select extras</button>
+									<span class="text-amber-200">Potential duplicated amount: {fmt(group.potentialDuplicatedAmount)}</span>
+								</div>
 							</div>
 							<table class="w-full text-xs">
-								<thead class="bg-slate-950/40 text-left text-slate-500"><tr><th class="p-2">Vendor / Date</th><th class="p-2">Amount</th><th class="p-2">Claimant / Claim</th><th class="p-2">PocketBase ID</th><th class="p-2">Evidence</th><th class="p-2 text-right">Review</th></tr></thead>
+								<thead class="bg-slate-950/40 text-left text-slate-500"><tr><th class="w-8 p-2"></th><th class="p-2">Vendor / Date</th><th class="p-2">Amount</th><th class="p-2">Claimant / Claim</th><th class="p-2">PocketBase ID</th><th class="p-2">Evidence</th><th class="p-2 text-right">Review</th></tr></thead>
 								<tbody class="divide-y divide-slate-800">
 									{#each group.items as item}
-										<tr>
+										<tr class={selectedAuditIds[item.id] ? 'bg-red-950/20' : ''}>
+											<td class="p-2 text-center">
+												<input
+													type="checkbox"
+													checked={!!selectedAuditIds[item.id]}
+													onchange={(e) => toggleAuditItem(item.id, e.currentTarget.checked)}
+													disabled={!canArchive(item)}
+													title={canArchive(item) ? 'Select for bulk archive' : 'Finalized claims cannot be archived'}
+													class="accent-red-500 disabled:opacity-30"
+													aria-label={`Select ${item.description} for bulk archive`}
+												/>
+											</td>
 											<td class="p-2 text-slate-200"><p>{item.vendor || item.description}</p><p class="text-slate-500">{fmtDate(item.transactionDate)}</p></td>
 											<td class="p-2 font-semibold text-emerald-300">{fmt(item.amount)}</td>
 											<td class="p-2 text-slate-300"><p>{item.claimantName}</p><p class="max-w-64 truncate text-slate-500" title={item.claimTitle}>{item.claimTitle}</p></td>

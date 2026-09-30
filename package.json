@@ -81,7 +81,7 @@
     "migrate:bids:task-targeting:apply": "tsx src/lib/migrations/add-bids-task-targeting-fields.ts --apply",
     "migrate:reimbursements:integrity": "tsx scripts/migrate-reimbursement-integrity.ts",
     "migrate:reimbursements:integrity:apply": "tsx scripts/migrate-reimbursement-integrity.ts --apply",
-    "test:reimbursements": "tsx --test src/lib/domain/reimbursements/integrity.test.ts src/lib/server/reimbursements/import.test.ts"
+    "test:reimbursements": "tsx --test src/lib/domain/reimbursements/integrity.test.ts src/lib/server/reimbursements/import.test.ts src/lib/server/reimbursements/review.test.ts"
   },
   "repository": {
     "type": "git",
