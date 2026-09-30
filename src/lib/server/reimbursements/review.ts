@@ -27,6 +27,14 @@ export async function findMissingSchema(pb: any): Promise<string[]> {
 	return missing;
 }
 
+export function normalizeBulkItemIds(itemIds: unknown): string[] {
+	return [...new Set(
+		(Array.isArray(itemIds) ? itemIds : [])
+			.filter((id: unknown): id is string => typeof id === 'string' && id.trim().length > 0)
+			.map((id: string) => id.trim())
+	)];
+}
+
 export function duplicateSignature(claimantId: string, date: unknown, amount: unknown): string {
 	return `${claimantId}|${toDateOnly(date) ?? ''}|${Math.round(Number(amount) * 100)}`;
 }

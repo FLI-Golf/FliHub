@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { duplicateSignature, hasGroupSurvivorViolation, planGroupArchive } from './review.js';
+import { duplicateSignature, hasGroupSurvivorViolation, normalizeBulkItemIds, planGroupArchive } from './review.js';
 
 const signature = duplicateSignature('claimant-1', '2026-07-19', 160.21);
 
@@ -79,4 +79,8 @@ test('signatures separate different billing dates and amounts', () => {
 	assert.notEqual(signature, duplicateSignature('claimant-1', '2026-07-19', 160.22));
 	assert.notEqual(signature, duplicateSignature('claimant-2', '2026-07-19', 160.21));
 	assert.equal(signature, duplicateSignature('claimant-1', '2026-07-19 00:00:00.000Z', 160.21));
+});
+
+test('bulk item selection keeps only valid unique ids', () => {
+	assert.deepEqual(normalizeBulkItemIds(['id-1', 'id-1', '  ', '', null, undefined, 'id-2', 42]), ['id-1', 'id-2']);
 });

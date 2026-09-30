@@ -81,7 +81,9 @@
 	let itemToast = $state<{ type: 'success' | 'error'; message: string } | null>(null);
 	let reviewBusyItemId = $state<string | null>(null);
 	let selectedAuditIds = $state<Record<string, boolean>>({});
+	let selectedBusinessPurposeIds = $state<string[]>([]);
 	let bulkBusy = $state(false);
+	let businessPurposeBulkBusy = $state(false);
 
 	function showItemToast(type: 'success' | 'error', message: string, timeoutMs = 3200) {
 		itemToast = { type, message };
@@ -198,6 +200,49 @@
 			showItemToast('error', error?.message ?? 'Bulk archive failed', 6000);
 		} finally {
 			bulkBusy = false;
+		}
+	}
+
+	const businessPurposeItems = $derived.by(() => (data.businessPurposeItems as any[]) ?? []);
+	const allBusinessPurposeSelected = $derived.by(
+		() => businessPurposeItems.length > 0 && businessPurposeItems.every((item: any) => selectedBusinessPurposeIds.includes(item.id))
+	);
+
+	function toggleBusinessPurposeItem(itemId: string, checked: boolean) {
+		selectedBusinessPurposeIds = checked
+			? [...new Set([...selectedBusinessPurposeIds, itemId])]
+			: selectedBusinessPurposeIds.filter((id) => id !== itemId);
+	}
+
+	function toggleAllBusinessPurposeItems() {
+		if (allBusinessPurposeSelected) {
+			selectedBusinessPurposeIds = [];
+			return;
+		}
+		selectedBusinessPurposeIds = businessPurposeItems.map((item: any) => item.id);
+	}
+
+	async function bulkDeleteBusinessPurposeItems() {
+		if (!selectedBusinessPurposeIds.length) return;
+		const selectedCount = selectedBusinessPurposeIds.length;
+		if (!confirm(`Delete ${selectedCount} business purpose item${selectedCount === 1 ? '' : 's'} from the review queue?`)) return;
+
+		businessPurposeBulkBusy = true;
+		try {
+			const res = await fetch('/api/reimbursements/items/bulk-delete', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ itemIds: selectedBusinessPurposeIds })
+			});
+			const response = await res.json().catch(() => ({}));
+			if (!res.ok) throw new Error(response.message ?? 'Bulk delete failed');
+			selectedBusinessPurposeIds = [];
+			await invalidateAll();
+			showItemToast('success', `Deleted ${response.deleted} item${response.deleted === 1 ? '' : 's'} from ${response.claimsUpdated} claim${response.claimsUpdated === 1 ? '' : 's'}.`);
+		} catch (error: any) {
+			showItemToast('error', error?.message ?? 'Bulk delete failed', 5000);
+		} finally {
+			businessPurposeBulkBusy = false;
 		}
 	}
 
@@ -559,10 +604,47 @@
 			{#if data.businessPurposeItems.length === 0}
 				<div class="border border-slate-700 bg-slate-900/30 px-4 py-3 text-sm text-slate-400">No transactions require confirmation.</div>
 			{:else}
+				<div class="mb-2 flex flex-wrap items-center gap-2 border border-slate-700 bg-slate-900/40 px-3 py-2 text-xs">
+					<label class="flex items-center gap-1.5 text-slate-300">
+						<input
+							type="checkbox"
+							checked={allBusinessPurposeSelected}
+							onchange={toggleAllBusinessPurposeItems}
+							class="accent-red-500"
+						/>
+						Select all
+					</label>
+					{#if selectedBusinessPurposeIds.length}
+						<button
+							onclick={bulkDeleteBusinessPurposeItems}
+							disabled={businessPurposeBulkBusy}
+							class="inline-flex items-center gap-1 border border-red-800 bg-red-950/40 px-2 py-1 font-medium text-red-200 disabled:cursor-not-allowed disabled:opacity-40"
+						>
+							<Trash2 class="size-3" /> {businessPurposeBulkBusy ? 'Deleting…' : `Delete ${selectedBusinessPurposeIds.length}`}
+						</button>
+					{/if}
+					<span class="ml-auto text-slate-400">{selectedBusinessPurposeIds.length} selected</span>
+				</div>
 				<div class="overflow-x-auto border border-amber-900/60 bg-slate-900/30">
-					<table class="w-full text-xs"><thead class="bg-slate-950/40 text-left text-slate-500"><tr><th class="p-2">Transaction</th><th class="p-2">Date</th><th class="p-2">Amount</th><th class="p-2">Claimant / Claim</th><th class="p-2">PocketBase ID</th><th class="p-2 text-right">Decision</th></tr></thead><tbody class="divide-y divide-slate-800">
+					<table class="w-full text-xs"><thead class="bg-slate-950/40 text-left text-slate-500"><tr><th class="w-8 p-2 text-center"><span class="sr-only">Select</span></th><th class="p-2">Transaction</th><th class="p-2">Date</th><th class="p-2">Amount</th><th class="p-2">Claimant / Claim</th><th class="p-2">PocketBase ID</th><th class="p-2 text-right">Decision</th></tr></thead><tbody class="divide-y divide-slate-800">
 						{#each data.businessPurposeItems as item}
-							<tr><td class="p-2 text-amber-200">{item.vendor || item.description}</td><td class="p-2 text-slate-300">{fmtDate(item.transactionDate)}</td><td class="p-2 font-semibold text-emerald-300">{fmt(item.amount)}</td><td class="p-2 text-slate-300"><p>{item.claimantName}</p><p class="max-w-64 truncate text-slate-500">{item.claimTitle}</p></td><td class="p-2 font-mono text-slate-400">{item.id}</td><td class="p-2 text-right"><button onclick={() => reviewItem(item.id, 'confirm_business_purpose', 'Administrator verified the documented FLI Golf business purpose.')} disabled={reviewBusyItemId === item.id} class="inline-flex items-center gap-1 border border-emerald-800 bg-emerald-950/40 px-2 py-1 text-emerald-300 disabled:opacity-50"><BadgeCheck class="size-3" /> Confirm business purpose</button></td></tr>
+							<tr>
+								<td class="p-2 text-center">
+									<input
+										type="checkbox"
+										checked={selectedBusinessPurposeIds.includes(item.id)}
+										onchange={(e) => toggleBusinessPurposeItem(item.id, e.currentTarget.checked)}
+										class="accent-red-500"
+										aria-label={`Select ${item.vendor || item.description} for bulk delete`}
+									/>
+								</td>
+								<td class="p-2 text-amber-200">{item.vendor || item.description}</td>
+								<td class="p-2 text-slate-300">{fmtDate(item.transactionDate)}</td>
+								<td class="p-2 font-semibold text-emerald-300">{fmt(item.amount)}</td>
+								<td class="p-2 text-slate-300"><p>{item.claimantName}</p><p class="max-w-64 truncate text-slate-500">{item.claimTitle}</p></td>
+								<td class="p-2 font-mono text-slate-400">{item.id}</td>
+								<td class="p-2 text-right"><button onclick={() => reviewItem(item.id, 'confirm_business_purpose', 'Administrator verified the documented FLI Golf business purpose.')} disabled={reviewBusyItemId === item.id} class="inline-flex items-center gap-1 border border-emerald-800 bg-emerald-950/40 px-2 py-1 text-emerald-300 disabled:opacity-50"><BadgeCheck class="size-3" /> Confirm business purpose</button></td>
+							</tr>
 						{/each}
 					</tbody></table>
 				</div>
