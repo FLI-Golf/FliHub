@@ -46,6 +46,59 @@ export function hasGroupSurvivorViolation(
 	return false;
 }
 
+export interface ArchiveCandidate {
+	id: string;
+	signature: string;
+	duplicateReviewStatus?: string;
+	receiptCount?: number;
+	hasBankStatement?: boolean;
+	created?: string;
+}
+
+/** Best-evidenced record wins, falling back to the oldest for a stable choice. */
+function pickSurvivor(candidates: ArchiveCandidate[]): ArchiveCandidate {
+	return [...candidates].sort((a, b) => {
+		const kept = Number(b.duplicateReviewStatus === 'keep') - Number(a.duplicateReviewStatus === 'keep');
+		if (kept) return kept;
+		const receipts = (b.receiptCount ?? 0) - (a.receiptCount ?? 0);
+		if (receipts) return receipts;
+		const statement = Number(!!b.hasBankStatement) - Number(!!a.hasBankStatement);
+		if (statement) return statement;
+		const created = String(a.created ?? '').localeCompare(String(b.created ?? ''));
+		if (created) return created;
+		return a.id.localeCompare(b.id);
+	})[0];
+}
+
+/**
+ * Resolves a selection down to one surviving record per duplicate group.
+ * A group keeps its survivor only when the selection would otherwise empty it.
+ */
+export function planGroupArchive(
+	selected: ArchiveCandidate[],
+	activeBySignature: Map<string, number>
+): { archiveIds: string[]; retainedIds: string[] } {
+	const bySignature = new Map<string, ArchiveCandidate[]>();
+	for (const candidate of selected) {
+		bySignature.set(candidate.signature, [...(bySignature.get(candidate.signature) ?? []), candidate]);
+	}
+
+	const archiveIds: string[] = [];
+	const retainedIds: string[] = [];
+	for (const [signature, candidates] of bySignature) {
+		const activeTotal = activeBySignature.get(signature) ?? 0;
+		if (candidates.length < activeTotal) {
+			archiveIds.push(...candidates.map((candidate) => candidate.id));
+			continue;
+		}
+		const survivor = pickSurvivor(candidates);
+		retainedIds.push(survivor.id);
+		archiveIds.push(...candidates.filter((candidate) => candidate.id !== survivor.id).map((candidate) => candidate.id));
+	}
+
+	return { archiveIds, retainedIds };
+}
+
 export async function recalculateClaimTotal(pb: any, claimId: string): Promise<number> {
 	const items = await pb.collection('reimbursement_items').getFullList({
 		filter: `claim = "${claimId}"`,

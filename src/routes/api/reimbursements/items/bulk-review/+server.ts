@@ -5,7 +5,7 @@ import {
 	FINALIZED_STATUSES,
 	duplicateSignature,
 	findMissingSchema,
-	hasGroupSurvivorViolation,
+	planGroupArchive,
 	recalculateClaimTotal
 } from '$lib/server/reimbursements/review';
 import type { RequestHandler } from './$types';
@@ -61,6 +61,9 @@ export const POST: RequestHandler = async ({ locals, url, request }) => {
 			selected.push({ item, claim });
 		}
 
+		let toProcess = selected;
+		let retainedIds: string[] = [];
+
 		if (action === 'archive') {
 			const activeBySignature = new Map<string, number>();
 			const allItems = await pb.collection('reimbursement_items').getFullList({
@@ -81,13 +84,27 @@ export const POST: RequestHandler = async ({ locals, url, request }) => {
 				activeBySignature.set(signature, (activeBySignature.get(signature) ?? 0) + 1);
 			}
 
-			const selectedSignatures = selected
-				.filter(({ item }) => item.isArchived !== true)
-				.map(({ item, claim }) => duplicateSignature(claim.claimant, item.date, item.amount));
+			const plan = planGroupArchive(
+				selected
+					.filter(({ item }) => item.isArchived !== true)
+					.map(({ item, claim }) => ({
+						id: item.id,
+						signature: duplicateSignature(claim.claimant, item.date, item.amount),
+						duplicateReviewStatus: item.duplicateReviewStatus,
+						receiptCount: (item.receipts ?? []).length,
+						hasBankStatement: !!item.bankStatement,
+						created: item.created
+					})),
+				activeBySignature
+			);
 
-			if (hasGroupSurvivorViolation(selectedSignatures, activeBySignature)) {
+			const archiveIds = new Set(plan.archiveIds);
+			retainedIds = plan.retainedIds;
+			toProcess = selected.filter(({ item }) => archiveIds.has(item.id));
+
+			if (!toProcess.length) {
 				return json({
-					message: 'At least one record in each duplicate group must remain active. Deselect one record per group and try again.'
+					message: 'Nothing to archive — each selected group already has only one record remaining.'
 				}, { status: 409 });
 			}
 		}
@@ -97,7 +114,7 @@ export const POST: RequestHandler = async ({ locals, url, request }) => {
 		const affectedClaimIds = new Set<string>();
 
 		try {
-			for (const { item, claim } of selected) {
+			for (const { item, claim } of toProcess) {
 				const update: Record<string, unknown> = action === 'archive'
 					? {
 						isArchived: true,
@@ -158,6 +175,7 @@ export const POST: RequestHandler = async ({ locals, url, request }) => {
 			ok: true,
 			action,
 			processed: performed.length,
+			retained: retainedIds.length,
 			claimsUpdated: affectedClaimIds.size
 		});
 	} catch (error: any) {

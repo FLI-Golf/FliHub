@@ -106,10 +106,6 @@
 		return [...byId.values()];
 	});
 
-	const selectedAuditAmount = $derived(
-		selectedAuditItems.reduce((sum: number, item: any) => sum + Number(item.amount || 0), 0)
-	);
-
 	const duplicateExposure = $derived(
 		((data.duplicateGroups as any[]) ?? []).reduce((sum: number, group: any) => sum + group.potentialDuplicatedAmount, 0)
 	);
@@ -117,6 +113,42 @@
 	function toggleAuditItem(itemId: string, checked: boolean) {
 		selectedAuditIds = { ...selectedAuditIds, [itemId]: checked };
 	}
+
+	function setGroupSelection(group: any, checked: boolean) {
+		const next = { ...selectedAuditIds };
+		for (const item of group.items.filter(canArchive)) next[item.id] = checked;
+		selectedAuditIds = next;
+	}
+
+	function isGroupFullySelected(group: any) {
+		const archivable = group.items.filter(canArchive);
+		return archivable.length > 0 && archivable.every((item: any) => selectedAuditIds[item.id]);
+	}
+
+	function selectAllGroups(groups: any[]) {
+		const next = { ...selectedAuditIds };
+		for (const group of groups) {
+			for (const item of group.items.filter(canArchive)) next[item.id] = true;
+		}
+		selectedAuditIds = next;
+	}
+
+	// Mirrors the server: a group only keeps a survivor when the selection would empty it.
+	const archivePlan = $derived.by(() => {
+		let toArchive = 0;
+		let retained = 0;
+		for (const group of (data.duplicateGroups as any[]) ?? []) {
+			const selectedInGroup = group.items.filter((item: any) => selectedAuditIds[item.id]);
+			if (!selectedInGroup.length) continue;
+			if (selectedInGroup.length >= group.items.length) {
+				toArchive += selectedInGroup.length - 1;
+				retained += 1;
+			} else {
+				toArchive += selectedInGroup.length;
+			}
+		}
+		return { toArchive, retained };
+	});
 
 	// Selects every archivable record except the first survivor in each group.
 	function selectExtras(groups: any[]) {
@@ -140,7 +172,12 @@
 	async function bulkArchiveSelected() {
 		const items = selectedAuditItems;
 		if (!items.length) return;
-		if (!confirm(`Archive ${items.length} duplicate record${items.length === 1 ? '' : 's'} totalling ${fmt(selectedAuditAmount)}?\n\nRecords are recoverable and an audit entry is kept for each.`)) return;
+		const { toArchive, retained } = archivePlan;
+		if (!toArchive) {
+			showItemToast('error', 'Each selected group already has only one record remaining.', 4500);
+			return;
+		}
+		if (!confirm(`Archive ${toArchive} duplicate record${toArchive === 1 ? '' : 's'}?\n\n${retained} record${retained === 1 ? '' : 's'} will be kept so every group retains one original.\nArchived records stay recoverable and each keeps an audit entry.`)) return;
 
 		const reason = prompt('Reason for archiving these duplicates:', 'Confirmed duplicate transactions; one record retained per group.')?.trim();
 		if (!reason) return;
@@ -156,7 +193,7 @@
 			if (!res.ok) throw new Error(response.message ?? 'Bulk archive failed');
 			clearAuditSelection();
 			await invalidateAll();
-			showItemToast('success', `Archived ${response.processed} record(s) across ${response.claimsUpdated} claim(s).`);
+			showItemToast('success', `Archived ${response.processed} record(s), kept ${response.retained} original(s) across ${response.claimsUpdated} claim(s).`);
 		} catch (error: any) {
 			showItemToast('error', error?.message ?? 'Bulk archive failed', 6000);
 		} finally {
@@ -442,21 +479,22 @@
 
 			{#if data.duplicateGroups.length > 0}
 				<div class="flex flex-wrap items-center gap-2 border border-slate-700 bg-slate-900/40 px-3 py-2 text-xs">
+					<button onclick={() => selectAllGroups(data.duplicateGroups as any[])} class="border border-slate-600 bg-slate-800 px-2 py-1 text-slate-200 hover:bg-slate-700">Select all records</button>
 					<button onclick={() => selectExtras((data.duplicateGroups as any[]).filter((g: any) => g.classification === 'exact_match'))} class="border border-slate-600 bg-slate-800 px-2 py-1 text-slate-200 hover:bg-slate-700">Select extras in exact matches</button>
 					<button onclick={() => selectExtras(data.duplicateGroups as any[])} class="border border-slate-600 bg-slate-800 px-2 py-1 text-slate-200 hover:bg-slate-700">Select extras in all groups</button>
 					{#if selectedAuditItems.length}
 						<button onclick={clearAuditSelection} class="border border-slate-600 bg-slate-800 px-2 py-1 text-slate-300 hover:bg-slate-700">Clear</button>
 					{/if}
-					<span class="ml-auto text-slate-400">{selectedAuditItems.length} selected · {fmt(selectedAuditAmount)}</span>
+					<span class="ml-auto text-slate-400">{selectedAuditItems.length} selected · archive {archivePlan.toArchive} · keep {archivePlan.retained}</span>
 					<button
 						onclick={bulkArchiveSelected}
-						disabled={bulkBusy || selectedAuditItems.length === 0}
+						disabled={bulkBusy || archivePlan.toArchive === 0}
 						class="inline-flex items-center gap-1 border border-red-700 bg-red-900/50 px-3 py-1 font-medium text-red-200 hover:bg-red-900/80 disabled:cursor-not-allowed disabled:opacity-40"
 					>
-						<Archive class="size-3" /> {bulkBusy ? 'Archiving…' : `Archive ${selectedAuditItems.length} selected`}
+						<Archive class="size-3" /> {bulkBusy ? 'Archiving…' : `Archive ${archivePlan.toArchive} duplicate${archivePlan.toArchive === 1 ? '' : 's'}`}
 					</button>
 				</div>
-				<p class="text-[11px] text-slate-500">One record per group is always kept. Archived records stay recoverable and are excluded from claim totals.</p>
+				<p class="text-[11px] text-slate-500">Select every record in a group and one original is kept automatically. Archived records stay recoverable and are excluded from claim totals.</p>
 			{/if}
 
 			{#if data.duplicateGroups.length === 0}
@@ -468,6 +506,15 @@
 							<div class="flex flex-wrap justify-between gap-2 border-b border-slate-700 px-3 py-2 text-xs">
 								<span class="font-semibold text-amber-300">Group {groupIndex + 1} · {group.occurrences} occurrences · {group.classification.replaceAll('_', ' ')}</span>
 								<div class="flex items-center gap-3">
+									<label class="flex items-center gap-1.5 text-slate-300">
+										<input
+											type="checkbox"
+											checked={isGroupFullySelected(group)}
+											onchange={(e) => setGroupSelection(group, e.currentTarget.checked)}
+											class="accent-red-500"
+										/>
+										Select all
+									</label>
 									<button onclick={() => selectExtras([group])} class="border border-slate-600 bg-slate-800 px-2 py-0.5 text-slate-200 hover:bg-slate-700">Select extras</button>
 									<span class="text-amber-200">Potential duplicated amount: {fmt(group.potentialDuplicatedAmount)}</span>
 								</div>
