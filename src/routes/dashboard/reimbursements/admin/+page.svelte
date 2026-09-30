@@ -472,7 +472,7 @@
 			<div class="flex flex-wrap items-end justify-between gap-2">
 				<div>
 					<h2 id="duplicate-audit-heading" class="flex items-center gap-2 text-lg font-semibold text-slate-100"><ShieldAlert class="size-5 text-amber-400" /> Duplicate Audit</h2>
-					<p class="text-xs text-slate-400">Suspected groups only. Review records individually; nothing is removed automatically.</p>
+					<p class="text-xs text-slate-400">Suspected groups only. Nothing is archived until you confirm, one original is always kept per group, and archived records stay recoverable.</p>
 				</div>
 				<p class="text-xs text-slate-400">{data.duplicateGroups.length} unresolved group{data.duplicateGroups.length === 1 ? '' : 's'} · {fmt(duplicateExposure)} potential exposure{#if data.resolvedDuplicateGroupCount} · {data.resolvedDuplicateGroupCount} resolved{/if}</p>
 			</div>
