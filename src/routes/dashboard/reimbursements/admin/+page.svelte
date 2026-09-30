@@ -110,6 +110,10 @@
 		selectedAuditItems.reduce((sum: number, item: any) => sum + Number(item.amount || 0), 0)
 	);
 
+	const duplicateExposure = $derived(
+		((data.duplicateGroups as any[]) ?? []).reduce((sum: number, group: any) => sum + group.potentialDuplicatedAmount, 0)
+	);
+
 	function toggleAuditItem(itemId: string, checked: boolean) {
 		selectedAuditIds = { ...selectedAuditIds, [itemId]: checked };
 	}
@@ -392,7 +396,7 @@
 	</div>
 
 	<!-- Pipeline metrics -->
-	<div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+	<div class="grid grid-cols-2 gap-3 md:grid-cols-4 {data.canAudit ? 'lg:grid-cols-5' : ''}">
 		{#each PIPELINE as p}
 			<button
 				onclick={() => fStatus = fStatus === p.key ? 'all' : p.key}
@@ -409,6 +413,21 @@
 				{/if}
 			</button>
 		{/each}
+
+		{#if data.canAudit}
+			<a
+				href="#duplicate-audit-heading"
+				class="rounded-xl border p-4 text-left transition-all hover:brightness-110 {data.duplicateGroups.length ? 'bg-amber-950/40 border-amber-800/50' : 'bg-slate-800/40 border-slate-700'}"
+			>
+				<p class="text-xs uppercase tracking-wide font-medium {data.duplicateGroups.length ? 'text-amber-400' : 'text-slate-400'}">Duplicates</p>
+				<p class="text-2xl font-bold text-slate-100 mt-1">{data.duplicateGroups.length}</p>
+				{#if data.duplicateGroups.length}
+					<p class="text-xs text-amber-400 mt-0.5">{fmt(duplicateExposure)} at risk</p>
+				{:else}
+					<p class="text-xs text-slate-500 mt-0.5">{data.resolvedDuplicateGroupCount ? 'all reviewed' : 'none found'}</p>
+				{/if}
+			</a>
+		{/if}
 	</div>
 
 	{#if data.canAudit}
@@ -418,7 +437,7 @@
 					<h2 id="duplicate-audit-heading" class="flex items-center gap-2 text-lg font-semibold text-slate-100"><ShieldAlert class="size-5 text-amber-400" /> Duplicate Audit</h2>
 					<p class="text-xs text-slate-400">Suspected groups only. Review records individually; nothing is removed automatically.</p>
 				</div>
-				<p class="text-xs text-slate-400">{data.duplicateGroups.length} unresolved group{data.duplicateGroups.length === 1 ? '' : 's'} · {fmt(data.duplicateGroups.reduce((sum: number, group: any) => sum + group.potentialDuplicatedAmount, 0))} potential exposure{#if data.resolvedDuplicateGroupCount} · {data.resolvedDuplicateGroupCount} resolved{/if}</p>
+				<p class="text-xs text-slate-400">{data.duplicateGroups.length} unresolved group{data.duplicateGroups.length === 1 ? '' : 's'} · {fmt(duplicateExposure)} potential exposure{#if data.resolvedDuplicateGroupCount} · {data.resolvedDuplicateGroupCount} resolved{/if}</p>
 			</div>
 
 			{#if data.duplicateGroups.length > 0}
