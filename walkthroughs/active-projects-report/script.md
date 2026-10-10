@@ -43,4 +43,4 @@ Fields per beat:
 
 ### Beat 7
 - action: show-report
-- caption: The report loads with the project's full breakdown. This is where we end.
+- caption: The report loads with the project's full breakdown.
