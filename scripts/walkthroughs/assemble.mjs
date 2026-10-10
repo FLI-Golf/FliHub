@@ -9,9 +9,15 @@
 // Usage: node scripts/walkthroughs/assemble.mjs tournament-payouts
 
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
-import { spawn } from 'node:child_process';
+import { spawn, execFileSync } from 'node:child_process';
 import path from 'node:path';
 import { WALKTHROUGH } from './config.mjs';
+
+const FINAL_HOLD = 3.0;
+
+function probeDuration(file) {
+	return Number(execFileSync('ffprobe', ['-v', 'error', '-show_entries', 'format=duration', '-of', 'csv=p=0', file]).toString().trim());
+}
 
 const name = process.argv[2];
 if (!name) {
@@ -83,17 +89,30 @@ async function run() {
 		const mixInputs = narration.clips.map((_, i) => `[a${i}]`).join('');
 		const filter = `${filterParts};${mixInputs}amix=inputs=${inputs.length}:normalize=0[aout]`;
 
+		// Guarantee the final sentence is followed by a full closing hold: if the
+		// recorded video ends before the last clip's end + FINAL_HOLD, clone the
+		// last frame to cover the gap instead of cutting the audio short.
+		const lastClip = narration.clips[narration.clips.length - 1];
+		const lastStart = beatTimeForClip(lastClip);
+		const requiredDuration = lastStart + lastClip.duration + FINAL_HOLD;
+		const videoDurationNow = probeDuration(webm);
+		const padSeconds = Math.max(0, requiredDuration - videoDurationNow);
+		const videoFilters = padSeconds > 0.05
+			? `tpad=stop_mode=clone:stop_duration=${padSeconds.toFixed(2)},${subFilter}`
+			: subFilter;
+
 		await runFfmpeg([
 			'-i', webm,
 			...inputs.flatMap((f) => ['-i', f]),
 			'-filter_complex', filter,
 			'-map', '0:v', '-map', '[aout]',
-			'-vf', subFilter,
+			'-vf', videoFilters,
 			'-c:v', 'libx264', '-pix_fmt', 'yuv420p', '-c:a', 'aac',
 			// No -shortest: the paced recording is longer than the audio mix, and
 			// truncating to the shorter stream would cut the final sentence.
 			mp4
 		]);
+		if (padSeconds > 0.05) console.log(`Padded video tail by ${padSeconds.toFixed(2)}s to preserve the closing hold.`);
 	} else {
 		await runFfmpeg([
 			'-i', webm,
