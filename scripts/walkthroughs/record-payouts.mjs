@@ -5,41 +5,57 @@
 //   - how professional payouts are calculated per placement,
 //   - how a manager's percentage reduces a pro's net allocation,
 //   - the per-tournament math verification against the configured rules,
-//   - the final paid result.
+//   - the final payout summary, held until the last narration sentence finishes.
 //
-// The script drives a real browser, records a WebM of the application UI, and
-// writes a caption/narration timeline (beat + caption text + timestamps) that the
-// narration/assembly step uses to sync audio and captions to the video.
+// Pacing is driven by the measured narration clip durations in
+// <name>.narration.json (run narrate.mjs first): each beat holds the view until
+// its sentence finishes, and the final summary gets an extra 3s hold.
+// The demo-data reset runs AFTER recording stops, so it never appears on video.
 //
 // Usage:
 //   pnpm run dev            # start the app first (separate terminal)
+//   node scripts/walkthroughs/narrate.mjs tournament-payouts
 //   node scripts/walkthroughs/record-payouts.mjs
 //
 // Credentials come from WALKTHROUGH_LOGIN_EMAIL / WALKTHROUGH_LOGIN_PASSWORD (or a
 // git-ignored .env). Output lands in walkthroughs/output/ (git-ignored).
 
-import { mkdir, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, writeFile, rename, copyFile, unlink } from 'node:fs/promises';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { chromium } from 'playwright';
 import { WALKTHROUGH } from './config.mjs';
 
 const NAME = 'tournament-payouts';
+const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const outDir = path.join(WALKTHROUGH.dir.output, NAME);
 await mkdir(outDir, { recursive: true });
+
+const script = JSON.parse(await readFile(path.join(repoRoot, 'walkthroughs', NAME, 'script.json'), 'utf8'));
+
+let clipDurations = [];
+try {
+	const narration = JSON.parse(await readFile(path.join(outDir, `${NAME}.narration.json`), 'utf8'));
+	clipDurations = narration.clips.map((c) => c.duration);
+} catch {
+	console.warn('No narration manifest found; using default pacing. Run narrate.mjs first for synced pacing.');
+}
+
+const GAP_AFTER_CLIP = 0.9;   // silence between sentences
+const FINAL_HOLD = 3.0;       // extra hold on the final summary after the last sentence
 
 if (!WALKTHROUGH.loginEmail || !WALKTHROUGH.loginPassword) {
 	console.error('Missing demo login. Set WALKTHROUGH_LOGIN_EMAIL and WALKTHROUGH_LOGIN_PASSWORD (or in .env).');
 	process.exit(1);
 }
 
-// Caption beats with the elapsed time (seconds) at which each action completes.
-// The narration script is generated from these so audio stays in sync.
 const beats = [];
 const beat = (t, caption) => beats.push({ t: Number(t.toFixed(2)), caption });
+const holdFor = (beatIndex) =>
+	clipDurations[beatIndex] != null ? clipDurations[beatIndex] + GAP_AFTER_CLIP : 3.5;
 
 async function login(page) {
 	await page.goto(`${WALKTHROUGH.baseUrl}/auth/login`, { waitUntil: 'domcontentloaded' });
-	// The persistent context may already be authenticated and redirect away.
 	const emailInput = page.locator('input[name="email"]');
 	if (await emailInput.count() === 0) return;
 	try {
@@ -59,6 +75,7 @@ async function login(page) {
 async function run() {
 	const startedAt = Date.now();
 	const t0 = () => (Date.now() - startedAt) / 1000;
+	const line = (i) => script.lines[i].caption;
 
 	const context = await chromium.launchPersistentContext(WALKTHROUGH.dir.auth, {
 		executablePath: WALKTHROUGH.chromiumPath,
@@ -71,81 +88,90 @@ async function run() {
 
 	await login(page);
 
-	// Navigate to the payout testing page.
+	// Beat 1 — land on the payout testing dashboard.
 	await page.goto(`${WALKTHROUGH.baseUrl}/dashboard/talent/payout-testing`, { waitUntil: 'domcontentloaded' });
-	await page.waitForTimeout(3000);
-	beat(t0(), 'In FliHub, an admin opens the payout testing dashboard for the season.');
+	await page.waitForTimeout(2500);
+	beat(t0(), line(0));
+	await page.waitForTimeout(holdFor(0) * 1000);
 
-	// Show the season summary strip (prize pool, franchise, to pros, to managers).
+	// Beat 2 — season summary strip.
 	await page.evaluate(() => window.scrollTo({ top: 0, behavior: 'instant' }));
-	await page.waitForTimeout(4000);
-	beat(t0(), 'The season summary shows the prize pool split between pros, managers, and franchises.');
+	beat(t0(), line(1));
+	await page.waitForTimeout(holdFor(1) * 1000);
 
-	// Seed the first tournament through the UI to produce a finishing order and payouts.
+	// Beat 3 — seed the first tournament through the UI.
 	const firstCard = page.locator('div.rounded-xl.border.overflow-hidden').first();
 	const seedButton = firstCard.locator('button:has-text("Seed Results")');
 	if (await seedButton.count()) {
 		await seedButton.scrollIntoViewIfNeeded();
-		await page.waitForTimeout(800);
+		await page.waitForTimeout(600);
 		await seedButton.click();
 		await page.waitForTimeout(5000);
-		beat(t0(), 'Seeding the first tournament produces a finishing order and calculates each placement\'s payout.');
-		await page.waitForTimeout(1500);
-	} else {
-		beat(t0(), 'The first tournament already has a finishing order and calculated payouts.');
 	}
+	beat(t0(), line(2));
+	await page.waitForTimeout(holdFor(2) * 1000);
 
-	// Expand the first tournament to reveal standings and the math check.
+	// Beat 4 — expand to reveal standings and the math check.
 	const expandToggle = page.locator('div.rounded-xl.border.overflow-hidden').first().locator('button').last();
 	await expandToggle.scrollIntoViewIfNeeded();
 	await expandToggle.click();
-	await page.waitForTimeout(2000);
-	beat(t0(), 'Expanding the tournament shows the team standings and the prize-pool math check.');
-	await page.waitForTimeout(2500);
+	await page.waitForTimeout(1500);
+	beat(t0(), line(3));
+	await page.waitForTimeout(holdFor(3) * 1000);
 
-	// Scroll to the pro rows showing gross, manager cut percentage, and net.
+	// Beat 5 — pro rows: gross, manager cut percentage, net.
 	await page.mouse.wheel(0, 420);
-	await page.waitForTimeout(2500);
-	beat(t0(), 'Each pro row lists the gross payout, the manager\'s percentage cut, and the resulting net.');
-	await page.waitForTimeout(3500);
+	beat(t0(), line(4));
+	await page.waitForTimeout(holdFor(4) * 1000);
 
-	// Scroll back to the summary to close on the totals.
+	// Beat 6 — back to the summary; hold until the last sentence finishes + 3s.
 	await page.evaluate(() => window.scrollTo({ top: 0, behavior: 'instant' }));
-	await page.waitForTimeout(2500);
-	beat(t0(), 'The summary confirms the tournament total matches the configured payout rules.');
-	// Hold the final result long enough to read before resetting.
-	await page.waitForTimeout(5000);
+	await page.waitForTimeout(600);
+	beat(t0(), line(5));
+	const finalHold = (clipDurations[5] != null ? clipDurations[5] + FINAL_HOLD : 6);
+	await page.waitForTimeout(finalHold * 1000);
 
-	// Reset the tournament so the demo data returns to a clean state.
-	const resetToggle = page.locator('div.rounded-xl.border.overflow-hidden').first().locator('button[title*="Reset"]');
-	if (await resetToggle.count()) {
-		await resetToggle.click();
-		await page.waitForTimeout(3000);
-		beat(t0(), 'The demonstration resets the seeded tournament so the demo data stays clean.');
-		await page.waitForTimeout(2500);
-	}
-
+	// Stop recording before touching any demo data.
 	const video = page.video();
 	await context.close();
 	const videoPath = await video.path();
 	const finalVideo = path.join(outDir, `${NAME}.webm`);
-	// Playwright auto-names the file; rename it deterministically.
 	if (videoPath !== finalVideo) {
-		const { rename, copyFile, unlink } = await import('node:fs/promises');
 		await rename(videoPath, finalVideo).catch(async () => {
 			await copyFile(videoPath, finalVideo);
 			await unlink(videoPath).catch(() => {});
 		});
 	}
 
-	// Persist the caption timeline for narration + assembly.
+	// Reset the seeded tournament off-camera so demo data stays clean.
+	try {
+		const cleanup = await chromium.launchPersistentContext(WALKTHROUGH.dir.auth, {
+			executablePath: WALKTHROUGH.chromiumPath,
+			headless: true,
+			viewport: WALKTHROUGH.viewport,
+			args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--disable-gpu']
+		});
+		const cleanupPage = cleanup.pages()[0] ?? (await cleanup.newPage());
+		await cleanupPage.goto(`${WALKTHROUGH.baseUrl}/dashboard/talent/payout-testing`, { waitUntil: 'domcontentloaded' });
+		await cleanupPage.waitForTimeout(2500);
+		const resetToggle = cleanupPage.locator('div.rounded-xl.border.overflow-hidden').first().locator('button[title*="Reset"]');
+		if (await resetToggle.count()) {
+			await resetToggle.click();
+			await cleanupPage.waitForTimeout(3000);
+		}
+		await cleanup.close();
+		console.log('Demo data reset off-camera.');
+	} catch (e) {
+		console.warn('Off-camera reset skipped:', e.message);
+	}
+
 	await writeFile(
 		path.join(outDir, `${NAME}.beats.json`),
 		JSON.stringify({ name: NAME, viewport: WALKTHROUGH.viewport, beats }, null, 2)
 	);
 
 	console.log('Recorded:', finalVideo);
-	console.log('Beats:', beats.length);
+	console.log('Beats:', beats.length, '| final beat at', beats[beats.length - 1].t + 's');
 }
 
 run().catch((e) => {

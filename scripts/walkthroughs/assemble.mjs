@@ -40,9 +40,11 @@ const toSrtTime = (t) => {
 	return `${h}:${m}:${s},${mm}`;
 };
 
-// Build SRT: each caption shows from its beat time until the next beat (or +4s).
+// Build SRT: each caption shows from its beat time until the next beat.
+// The final caption stays visible until the end of the video.
+const videoDuration = beats[beats.length - 1].t + 10; // upper bound; real end read after encode
 const srt = beats.map((b, i) => {
-	const end = beats[i + 1] ? beats[i + 1].t : b.t + 4;
+	const end = beats[i + 1] ? beats[i + 1].t : videoDuration;
 	return `${i + 1}\n${toSrtTime(b.t)} --> ${toSrtTime(end)}\n${b.caption}\n`;
 }).join('\n');
 const srtPath = path.join(outDir, `${name}.srt`);
@@ -63,9 +65,9 @@ async function run() {
 	const subFilter = `subtitles=${srtPath.replace(/\\/g, '/').replace(/:/g, '\\:')}`;
 
 	if (hasAudio) {
-		// Build an audio track by placing each narration clip at its beat time.
+		// Place each narration clip at its beat time from the beats file.
 		const inputs = narration.clips.map((c) => c.file);
-		const delays = narration.clips.map((c) => Math.round(c.at * 1000));
+		const delays = narration.clips.map((c) => Math.round((beats[c.beat]?.t ?? 0) * 1000));
 		const filterParts = inputs.map((_, i) => `[${i + 1}:a]adelay=${delays[i]}|${delays[i]}[a${i}]`).join(';');
 		const mixInputs = narration.clips.map((_, i) => `[a${i}]`).join('');
 		const filter = `${filterParts};${mixInputs}amix=inputs=${inputs.length}:normalize=0[aout]`;
@@ -76,7 +78,9 @@ async function run() {
 			'-filter_complex', filter,
 			'-map', '0:v', '-map', '[aout]',
 			'-vf', subFilter,
-			'-c:v', 'libx264', '-pix_fmt', 'yuv420p', '-c:a', 'aac', '-shortest',
+			'-c:v', 'libx264', '-pix_fmt', 'yuv420p', '-c:a', 'aac',
+			// No -shortest: the paced recording is longer than the audio mix, and
+			// truncating to the shorter stream would cut the final sentence.
 			mp4
 		]);
 	} else {
