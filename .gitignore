@@ -33,3 +33,10 @@ pb_migrations/
 
 # Generated PDF artifacts
 trademark-pdfs/
+
+# Walkthrough recordings: narration audio, video, and browser auth state
+walkthroughs/output/
+scripts/walkthroughs/.auth/
+scripts/walkthroughs/.cache/
+test-results/
+playwright-report/
