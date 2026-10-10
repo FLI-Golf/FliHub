@@ -65,9 +65,19 @@ async function run() {
 	const subFilter = `subtitles=${srtPath.replace(/\\/g, '/').replace(/:/g, '\\:')}`;
 
 	if (hasAudio) {
-		// Place each narration clip at its beat time from the beats file.
+		// Map each narration clip to its beat by caption text so hand-edited or
+		// reordered beats (e.g. caption-only test beats) don't shift the audio.
+		// Tolerates captions trimmed/extended by hand, then falls back to index.
+		const beatTimeForClip = (clip) => {
+			const text = clip.text.trim();
+			const byText =
+				beats.find((b) => b.caption.trim() === text) ??
+				beats.find((b) => text.startsWith(b.caption.trim()) || b.caption.trim().startsWith(text));
+			if (byText) return byText.t;
+			return beats[clip.beat]?.t ?? 0;
+		};
 		const inputs = narration.clips.map((c) => c.file);
-		const delays = narration.clips.map((c) => Math.round((beats[c.beat]?.t ?? 0) * 1000));
+		const delays = narration.clips.map((c) => Math.round(beatTimeForClip(c) * 1000));
 		const filterParts = inputs.map((_, i) => `[${i + 1}:a]adelay=${delays[i]}|${delays[i]}[a${i}]`).join(';');
 		const mixInputs = narration.clips.map((_, i) => `[a${i}]`).join('');
 		const filter = `${filterParts};${mixInputs}amix=inputs=${inputs.length}:normalize=0[aout]`;
