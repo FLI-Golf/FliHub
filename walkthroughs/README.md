@@ -20,8 +20,8 @@ All secrets live in the git-ignored `.env` (never committed or printed):
 ```
 DEMO_USER=...            # app login used in recordings
 DEMO_PASSWORD=...
-ELEVENLABS_API_KEY=sk_...   # narration (optional; must be an sk_ key)
-ELEVENLABS_VOICE_ID=...     # optional; defaults to "Adam"
+ELEVENLABS_API_KEY=sk_...   # narration auth (optional; must be an sk_ key)
+ELEVENLABS_VOICE_ID=...     # voice selection only; blank uses the default voice
 ```
 
 `FLI_TOKEN` is reserved for GitHub operations and is never sent to ElevenLabs.

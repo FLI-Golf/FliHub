@@ -20,11 +20,11 @@ export const WALKTHROUGH = {
 		process.env.WALKTHROUGH_CHROMIUM ||
 		(await import('@sparticuz/chromium').then((m) => m.default.executablePath()).catch(() => '/tmp/chromium')),
 
-	// ElevenLabs narration. Key is read from env/ignored .env; never committed.
-	// Accepts ELEVENLABS_API_KEY, falling back to ELEVENLABS_VOICE_ID per project convention.
-	elevenLabsApiKey: process.env.ELEVENLABS_API_KEY || process.env.ELEVENLABS_VOICE_ID || '',
-	// Voice is configurable; override with ELEVENLABS_VOICE (a 20-char voice ID).
-	elevenLabsVoiceId: process.env.ELEVENLABS_VOICE || process.env.ELEVENLABS_DEFAULT_VOICE || 'pNInz6obpgDQGcFmaJgB', // "Adam"
+	// ElevenLabs narration. The authentication key comes only from
+	// ELEVENLABS_API_KEY (env or git-ignored .env); never committed or printed.
+	elevenLabsApiKey: process.env.ELEVENLABS_API_KEY || '',
+	// ELEVENLABS_VOICE_ID selects the voice; the default is used when blank.
+	elevenLabsVoiceId: process.env.ELEVENLABS_VOICE_ID || 'pNInz6obpgDQGcFmaJgB', // "Adam"
 	elevenLabsModel: process.env.ELEVENLABS_MODEL || 'eleven_multilingual_v2',
 
 	// Recording dimensions (720p). Override with WALKTHROUGH_VIEWPORT=1920x1080.
