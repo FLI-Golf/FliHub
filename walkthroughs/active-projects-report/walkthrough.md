@@ -36,22 +36,25 @@ generated report.
 6. "Opening one project's report generates a printable summary."
 7. "The report loads with the project's full breakdown. This is where we end."
 
-(Pronunciation: FLI → "Fly", FliHub → "Fly Hub". Narration text lives in
-`script.json` as `say`; on-screen captions use `caption`.)
+(Pronunciation: FLI → "Fly", FliHub → "Fly Hub". The single editable source is
+`script.md` — captions double as narration text and the spoken form is derived
+automatically. `beats.json`, captions, audio, and video are generated artifacts
+under `walkthroughs/output/`; do not edit them by hand.)
 
 ## Timing and final hold
 
-- Beat 1 is pinned to **10.0s** so narration starts at 0:10.
-- Each beat holds for its measured narration clip duration plus ~0.9s, so a
-  sentence finishes before the next begins.
-- Final report is held for the last sentence plus a **3s** hold. The closing
-  sentence ends at ~55.5s and the video runs to 59.2s — no audio is cut off.
-- Demo-data reset (seeding) does not apply here; this walkthrough is read-only.
+- The opening beat is pinned to **0.4s** (the earlier duplicate at 10s is removed).
+- Beat times are computed from measured clip durations: each beat starts after
+  the previous sentence ends plus its pause, so sentences never overlap.
+- The closing sentence ends at ~39.1s and the video holds to 42.2s (**3.1s**).
+- This walkthrough is read-only; no demo-data reset applies.
 
 ## Reproduce
 
+Edit `script.md`, then rebuild everything from it:
+
 ```bash
-pnpm run dev
+pnpm run dev   # app must be running
 node scripts/walkthroughs/narrate.mjs active-projects-report
 node scripts/walkthroughs/record-active-projects.mjs
 node scripts/walkthroughs/assemble.mjs active-projects-report

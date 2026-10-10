@@ -65,10 +65,11 @@ async function run() {
 	const subFilter = `subtitles=${srtPath.replace(/\\/g, '/').replace(/:/g, '\\:')}`;
 
 	if (hasAudio) {
-		// Map each narration clip to its beat by caption text so hand-edited or
-		// reordered beats (e.g. caption-only test beats) don't shift the audio.
-		// Tolerates captions trimmed/extended by hand, then falls back to index.
+		// Place each clip at its scheduled time (written by narrate.mjs). Text
+		// matching against the beats file remains as a fallback for older
+		// manifests that predate scheduled clip times.
 		const beatTimeForClip = (clip) => {
+			if (typeof clip.t === 'number') return clip.t;
 			const text = clip.text.trim();
 			const byText =
 				beats.find((b) => b.caption.trim() === text) ??
