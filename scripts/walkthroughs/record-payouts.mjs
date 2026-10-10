@@ -69,12 +69,10 @@ async function login(page) {
 		page.waitForNavigation({ timeout: 30000 }).catch(() => null),
 		page.click('button[type="submit"]')
 	]);
-	await page.waitForTimeout(2000);
+	await page.waitForTimeout(600);
 }
 
 async function run() {
-	const startedAt = Date.now();
-	const t0 = () => (Date.now() - startedAt) / 1000;
 	const line = (i) => script.lines[i].caption;
 
 	const context = await chromium.launchPersistentContext(WALKTHROUGH.dir.auth, {
@@ -86,11 +84,19 @@ async function run() {
 	});
 	const page = context.pages()[0] ?? (await context.newPage());
 
+	// Start the beat clock when the recording context is ready so beat times
+	// match the video timeline (browser launch overhead is excluded).
+	const startedAt = Date.now();
+	const t0 = () => (Date.now() - startedAt) / 1000;
+
 	await login(page);
 
 	// Beat 1 — land on the payout testing dashboard.
 	await page.goto(`${WALKTHROUGH.baseUrl}/dashboard/talent/payout-testing`, { waitUntil: 'domcontentloaded' });
-	await page.waitForTimeout(2500);
+	await page.locator('h1:has-text("Payout Testing")').waitFor({ state: 'visible', timeout: 15000 }).catch(() => {});
+	// Pin the first narration beat to exactly 10s on the video timeline.
+	const leadIn = 10.0 - t0();
+	if (leadIn > 0) await page.waitForTimeout(leadIn * 1000);
 	beat(t0(), line(0));
 	await page.waitForTimeout(holdFor(0) * 1000);
 
