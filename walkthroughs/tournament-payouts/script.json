@@ -1,0 +1,29 @@
+{
+	"name": "tournament-payouts",
+	"lines": [
+		{
+			"caption": "In FliHub, an admin opens the payout testing dashboard for the season.",
+			"say": "In Fly Hub, an admin opens the payout testing dashboard for the season."
+		},
+		{
+			"caption": "The season summary shows the prize pool split between pros, managers, and franchises.",
+			"say": "The season summary shows the prize pool split between pros, managers, and franchises."
+		},
+		{
+			"caption": "Seeding the first tournament produces a finishing order and calculates each placement's payout.",
+			"say": "Seeding the first tournament produces a finishing order and calculates each placement's payout."
+		},
+		{
+			"caption": "Expanding the tournament shows the team standings and the prize-pool math check.",
+			"say": "Expanding the tournament shows the team standings and the prize-pool math check."
+		},
+		{
+			"caption": "Each pro row lists the gross payout, the manager's percentage cut, and the resulting net.",
+			"say": "Each pro row lists the gross payout, the manager's percentage cut, and the resulting net."
+		},
+		{
+			"caption": "The summary confirms the tournament total matches the configured payout rules.",
+			"say": "The summary confirms the tournament total matches the configured payout rules."
+		}
+	]
+}
