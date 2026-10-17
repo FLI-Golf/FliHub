@@ -52,6 +52,34 @@ calls. Delete the cache to force regeneration.
 
 ## Adding a walkthrough
 
-Copy `record-payouts.mjs`, drive the app UI only (no code/terminal footage), and
-call `beat(t, caption)` at each completed action. The beats file drives caption
-timing, narration text, and audio placement.
+The editable source for each walkthrough is `walkthroughs/<name>/script.md`.
+Each beat is a `### Beat N` section with bullet fields:
+
+- `at` — optional fixed start time in seconds (used for the opening beat).
+- `pause` — optional silence after this beat's narration (default 0.9s; the
+  final beat's closing hold defaults to 3s).
+- `action` — a recorder action name (see the walkthrough's `record-*.mjs`).
+- `caption` — on-screen text AND the narration source. Spoken text is derived
+  automatically (FliHub → "Fly Hub"); add `- say:` only to override.
+
+Then narrate (generates `beats.json` + cached audio), record, and assemble:
+
+```bash
+node scripts/walkthroughs/narrate.mjs <name>
+node scripts/walkthroughs/record-<name>.mjs
+node scripts/walkthroughs/assemble.mjs <name>
+```
+
+`beats.json` is generated from the source — edit `script.md`, never the
+generated JSON. The recorder drives the app UI only (no code/terminal footage).
+
+## Existing walkthroughs
+
+| Name | Subject |
+|---|---|
+| tournament-payouts | Payout testing, manager cut |
+| active-projects-report | Review active projects, open a report |
+| add-test-project | Add a project via the form |
+| expense-approval-payment | Expense → approval → work order → simulated payment |
+| talent-tournaments | Tournament area overview (read-only) |
+| tournament-payout-review | Season Opener seed + payout review (production) |
